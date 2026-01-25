@@ -1,0 +1,154 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Multi-Tenancy Core ---
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users      User[]
+  leads      Lead[]
+  properties Property[]
+  templates  EmailTemplate[]
+  settings   TenantSettings?
+}
+
+model TenantSettings {
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  // Configuration
+  smtpConfig    Json? // { host, port, user, pass }
+  stripeConfig  Json? // { customerId, subscriptionId }
+  aiPersonality Json? // { tone: "professional", language: "de" }
+}
+
+model User {
+  id       String @id @default(uuid())
+  email    String @unique
+  name     String
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  role     Role   @default(AGENT)
+
+  // Relations
+  leads Lead[] // Leads assigned to this agent
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  AGENT
+}
+
+// --- CRM Core ---
+
+model Lead {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  // Contact Info
+  email     String
+  firstName String?
+  lastName  String?
+  phone     String?
+  
+  // Status
+  status    LeadStatus @default(NEW)
+  
+  // Assignment
+  assignedToId String?
+  assignedTo   User?   @relation(fields: [assignedToId], references: [id])
+
+  // Context
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id])
+
+  // Conversation History
+  messages  Message[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, email, propertyId]) // Prevent duplicates per property
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  CONVERSATION
+  BOOKED
+  LOST
+}
+
+model Property {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  title       String
+  address     String
+  price       Decimal?
+  rooms       Int?
+  area        Float?
+  description String?
+  
+  // AI Context
+  aiFacts     String? // "No pets allowed", "South facing balcony"
+  
+  leads       Lead[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id])
+  
+  role      MessageRole // SYSTEM, USER, ASSISTANT
+  content   String
+  createdAt DateTime @default(now())
+}
+
+enum MessageRole {
+  SYSTEM
+  USER
+  ASSISTANT
+}
+
+// --- Orchestrator & Templates ---
+
+model EmailTemplate {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  name      String   // "Exposé Default", "Follow-up 1"
+  subject   String   // "Ihr Exposé für {{property.title}}"
+  body      String   // HTML/Markdown with placeholders
+  
+  // AI Configuration
+  aiPrompt  String?  // "Rewrite this to be very polite"
+  variables Json?    // List of used variables: ["lead.firstName", "property.price"]
+  
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

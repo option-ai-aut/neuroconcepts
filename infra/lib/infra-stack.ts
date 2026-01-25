@@ -8,6 +8,8 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdaNode from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as amplify from '@aws-cdk/aws-amplify-alpha';
+import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import * as path from 'path';
 
 export interface NeuroConceptsStackProps extends cdk.StackProps {
@@ -157,13 +159,65 @@ export class NeuroConceptsStack extends cdk.Stack {
       proxy: true,
       deployOptions: {
         stageName: props.stageName,
+      },
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowMethods: apigateway.Cors.ALL_METHODS,
       }
     });
+
+    // --- 5. Frontend (Amplify) ---
+    // Note: We only create the Amplify App once (in Dev stack for simplicity, or we can have separate apps)
+    // Here we create one App per stage to keep them isolated.
+    
+    const amplifyApp = new amplify.App(this, 'NeuroConceptsFrontend', {
+      appName: `NeuroConcepts-${props.stageName}`,
+      sourceCodeProvider: new amplify.GitHubSourceCodeProvider({
+        owner: 'option-ai-aut',
+        repository: 'neuroconcepts',
+        oauthToken: cdk.SecretValue.secretsManager('github-token'), // Requires 'github-token' in Secrets Manager
+      }),
+      autoBranchCreation: {
+        patterns: ['main', 'dev/*'],
+      },
+      environmentVariables: {
+        NEXT_PUBLIC_API_URL: api.url,
+        AMPLIFY_MONOREPO_APP_ROOT: 'frontend',
+      },
+      buildSpec: codebuild.BuildSpec.fromObject({
+        version: '1.0',
+        applications: [
+          {
+            frontend: {
+              phases: {
+                preBuild: {
+                  commands: ['npm ci'],
+                },
+                build: {
+                  commands: ['npm run build'],
+                },
+              },
+              artifacts: {
+                baseDirectory: '.next',
+                files: ['**/*'],
+              },
+              cache: {
+                paths: ['node_modules/**/*'],
+              },
+            },
+            appRoot: 'frontend',
+          },
+        ],
+      }),
+    });
+
+    const mainBranch = amplifyApp.addBranch('main');
 
     // --- Outputs ---
     new cdk.CfnOutput(this, 'VpcId', { value: this.vpc.vpcId });
     new cdk.CfnOutput(this, 'DBEndpoint', { value: this.dbEndpoint });
     new cdk.CfnOutput(this, 'EmailBucketName', { value: emailBucket.bucketName });
     new cdk.CfnOutput(this, 'OrchestratorApiUrl', { value: api.url });
+    new cdk.CfnOutput(this, 'AmplifyAppId', { value: amplifyApp.appId });
   }
 }
