@@ -10,6 +10,7 @@ import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as amplify from '@aws-cdk/aws-amplify-alpha';
 import * as codebuild from 'aws-cdk-lib/aws-codebuild';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as path from 'path';
 
 export interface NeuroConceptsStackProps extends cdk.StackProps {
@@ -20,6 +21,8 @@ export class NeuroConceptsStack extends cdk.Stack {
   public readonly vpc: ec2.Vpc;
   public readonly dbSecret: secretsmanager.Secret;
   public readonly dbEndpoint: string;
+  public readonly userPool: cognito.UserPool;
+  public readonly userPoolClient: cognito.UserPoolClient;
 
   constructor(scope: Construct, id: string, props: NeuroConceptsStackProps) {
     super(scope, id, props);
@@ -74,18 +77,14 @@ export class NeuroConceptsStack extends cdk.Stack {
       const instance = new rds.DatabaseInstance(this, 'PostgresInstance', {
         engine: rds.DatabaseInstanceEngine.postgres({ version: rds.PostgresEngineVersion.VER_16 }),
         vpc: this.vpc,
-        // In Dev (0 NAT), DB must be public or isolated. Public allows easy access.
-        // In Stage (1 NAT), we could use Private, but to keep it cheap and consistent with Dev (t4g.micro), we use Public for now or Private if NAT exists.
-        // Actually, if we use t4g.micro in Stage, we should put it in Private subnet if NAT exists, or Public if not.
-        // But to avoid the "WithExpressConfiguration" error of Aurora Free Tier entirely, we use RDS Instance for Stage too.
         vpcSubnets: { subnetType: props.stageName === 'dev' ? ec2.SubnetType.PUBLIC : ec2.SubnetType.PRIVATE_WITH_EGRESS },
         instanceType: ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.MICRO),
         allocatedStorage: 20,
         maxAllocatedStorage: 50,
         credentials: rds.Credentials.fromSecret(this.dbSecret),
         securityGroups: [dbSg],
-        publiclyAccessible: props.stageName === 'dev', // Only Dev is public
-        removalPolicy: cdk.RemovalPolicy.DESTROY, 
+        publiclyAccessible: props.stageName === 'dev',
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
       });
       this.dbEndpoint = instance.dbInstanceEndpointAddress;
     } else {
@@ -95,7 +94,7 @@ export class NeuroConceptsStack extends cdk.Stack {
         vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
         writer: rds.ClusterInstance.serverlessV2('Writer'),
         serverlessV2MinCapacity: 0.5,
-        serverlessV2MaxCapacity: 4, // Limit for free tier / trial accounts
+        serverlessV2MaxCapacity: 4,
         credentials: rds.Credentials.fromSecret(this.dbSecret),
         securityGroups: [dbSg],
         defaultDatabaseName: 'neuroconcepts',
@@ -104,7 +103,31 @@ export class NeuroConceptsStack extends cdk.Stack {
       this.dbEndpoint = cluster.clusterEndpoint.hostname;
     }
 
-    // --- 3. E-Mail Intake (S3 + Lambda) ---
+    // --- 3. Authentication (Cognito) ---
+    this.userPool = new cognito.UserPool(this, 'NeuroConceptsUserPool', {
+      userPoolName: `NeuroConcepts-Users-${props.stageName}`,
+      selfSignUpEnabled: true, // Allow users to register themselves
+      signInAliases: { email: true },
+      autoVerify: { email: true },
+      passwordPolicy: {
+        minLength: 8,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireDigits: true,
+      },
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
+    });
+
+    this.userPoolClient = this.userPool.addClient('NeuroConceptsClient', {
+      userPoolClientName: `NeuroConcepts-Client-${props.stageName}`,
+      generateSecret: false, // Web apps cannot keep secrets
+      authFlows: {
+        userSrp: true,
+      },
+    });
+
+    // --- 4. E-Mail Intake (S3 + Lambda) ---
     const emailBucket = new s3.Bucket(this, 'EmailIngestBucket', {
       versioned: false,
       removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
@@ -130,12 +153,10 @@ export class NeuroConceptsStack extends cdk.Stack {
     this.dbSecret.grantRead(emailProcessor);
     emailBucket.addEventNotification(s3.EventType.OBJECT_CREATED, new s3n.LambdaDestination(emailProcessor));
 
-    // --- 4. Orchestrator Service (Lambda + API Gateway) ---
+    // --- 5. Orchestrator Service (Lambda + API Gateway) ---
     
-    // In Dev: Run Lambda OUTSIDE VPC (to get Internet access) and connect to Public DB
-    // In Prod: Run Lambda INSIDE VPC (Private Subnet) and connect to Private DB via NAT Gateway (for Internet)
     const lambdaVpc = props.stageName === 'dev' ? undefined : this.vpc;
-    const lambdaSg = props.stageName === 'dev' ? undefined : [dbSg]; // Only need SG if in VPC
+    const lambdaSg = props.stageName === 'dev' ? undefined : [dbSg]; 
 
     const orchestratorLambda = new lambdaNode.NodejsFunction(this, 'OrchestratorLambda', {
       runtime: lambda.Runtime.NODEJS_22_X,
@@ -154,10 +175,8 @@ export class NeuroConceptsStack extends cdk.Stack {
       bundling: { minify: true, sourceMap: true },
     });
 
-    // Grant DB Access
     this.dbSecret.grantRead(orchestratorLambda);
     
-    // API Gateway
     const api = new apigateway.LambdaRestApi(this, 'OrchestratorApi', {
       handler: orchestratorLambda,
       proxy: true,
@@ -170,22 +189,23 @@ export class NeuroConceptsStack extends cdk.Stack {
       }
     });
 
-    // --- 5. Frontend (Amplify) ---
-    // Note: We only create the Amplify App once (in Dev stack for simplicity, or we can have separate apps)
-    // Here we create one App per stage to keep them isolated.
+    // --- 6. Frontend (Amplify) ---
     
     const amplifyApp = new amplify.App(this, 'NeuroConceptsFrontend', {
       appName: `NeuroConcepts-${props.stageName}`,
       sourceCodeProvider: new amplify.GitHubSourceCodeProvider({
         owner: 'option-ai-aut',
         repository: 'neuroconcepts',
-        oauthToken: cdk.SecretValue.secretsManager('github-token-new'), // Requires 'github-token-new' in Secrets Manager
+        oauthToken: cdk.SecretValue.secretsManager('github-token-new'),
       }),
       autoBranchCreation: {
         patterns: ['main', 'dev/*'],
       },
       environmentVariables: {
         NEXT_PUBLIC_API_URL: api.url,
+        NEXT_PUBLIC_USER_POOL_ID: this.userPool.userPoolId,
+        NEXT_PUBLIC_USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
+        NEXT_PUBLIC_AWS_REGION: this.region,
         AMPLIFY_MONOREPO_APP_ROOT: 'frontend',
       },
       buildSpec: codebuild.BuildSpec.fromObject({
@@ -195,7 +215,13 @@ export class NeuroConceptsStack extends cdk.Stack {
             frontend: {
               phases: {
                 preBuild: {
-                  commands: ['npm ci'],
+                  commands: [
+                    'npm ci',
+                    'echo "NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" >> .env.production',
+                    'echo "NEXT_PUBLIC_USER_POOL_ID=$NEXT_PUBLIC_USER_POOL_ID" >> .env.production',
+                    'echo "NEXT_PUBLIC_USER_POOL_CLIENT_ID=$NEXT_PUBLIC_USER_POOL_CLIENT_ID" >> .env.production',
+                    'echo "NEXT_PUBLIC_AWS_REGION=$NEXT_PUBLIC_AWS_REGION" >> .env.production',
+                  ],
                 },
                 build: {
                   commands: ['npm run build'],
@@ -223,5 +249,7 @@ export class NeuroConceptsStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'EmailBucketName', { value: emailBucket.bucketName });
     new cdk.CfnOutput(this, 'OrchestratorApiUrl', { value: api.url });
     new cdk.CfnOutput(this, 'AmplifyAppId', { value: amplifyApp.appId });
+    new cdk.CfnOutput(this, 'UserPoolId', { value: this.userPool.userPoolId });
+    new cdk.CfnOutput(this, 'UserPoolClientId', { value: this.userPoolClient.userPoolClientId });
   }
 }

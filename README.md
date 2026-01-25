@@ -1,6 +1,6 @@
 # NeuroConcepts AI - B2B Real Estate Automation Platform
 
-**Status:** Planning Phase (Pre-MVP)  
+**Status:** Phase 1 (MVP) - Live on AWS Amplify  
 **Target Launch:** Q2 2026  
 **Focus:** DACH Region (Germany, Austria, Switzerland)
 
@@ -16,15 +16,16 @@ NeuroConcepts AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 M
 - **E-Mail Thread Intelligence:** Ordnet Antworten korrekt zu und führt den Dialog kontextbezogen fort.
 - **Kalender-Sync:** Bidirektionale Synchronisation (Google/Outlook) für automatische Terminbuchung.
 - **White-Labeling:** Versand über die SMTP-Server des Maklers (eigene Domain).
+- **Auth:** Login & Registrierung via AWS Cognito.
 
 ## 🛠 Tech Stack
 
 ### Infrastructure & Backend
 - **Cloud:** AWS (Region: `eu-central-1` Frankfurt)
-- **Compute:** AWS Fargate (Serverless Containers)
-- **Database:** PostgreSQL (Aurora Serverless) + `pgvector` für KI-Kontext
+- **Compute:** AWS Lambda (Serverless) + API Gateway
+- **Database:** PostgreSQL (RDS t4g.micro for Dev/Stage, Aurora Serverless for Prod)
 - **Language:** Node.js / TypeScript
-- **IaC:** Terraform / CDK
+- **IaC:** AWS CDK
 
 ### AI & Intelligence
 - **Model:** Google Gemini 3 Flash Preview
@@ -35,26 +36,36 @@ NeuroConcepts AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 M
 - **Email:** SMTP/IMAP (User Credentials), AWS SES (System Notifications)
 - **Calendar:** Google Calendar API, Microsoft Graph API
 
+### Frontend
+- **Framework:** Next.js 15 (App Router)
+- **Hosting:** AWS Amplify Gen 2
+- **UI:** Tailwind CSS + Amplify UI Components
+
 ## 📂 Projektstruktur
 
 ```
 /
 ├── docs/                 # Detaillierte Dokumentation
+│   ├── ADMIN_ACCESS.md   # Anleitung für Admin-Zugriff
 │   ├── ARCHITECTURE.md   # Technische Architektur & Datenflüsse
 │   ├── ONBOARDING.md     # Checklisten für neue Kunden
 │   └── AI_GUIDELINES.md  # Prompting-Strategien & Sicherheitsregeln
-├── src/                  # (Planned) Source Code
+├── frontend/             # Next.js Frontend App
+├── infra/                # AWS CDK Infrastructure Code
+├── src/                  # Backend Services (Orchestrator, Email Parser)
 └── README.md             # Diese Datei
 ```
 
 ## 🚀 Roadmap
 
-### Phase 1: MVP (Wochen 1–8)
-- [ ] AWS Infrastruktur Setup
-- [ ] E-Mail Inbound Parser & DB Schema
-- [ ] KI-Engine Integration (Gemini 3)
-- [ ] SMTP Outbound & Kalender Sync
-- [ ] Dashboard & Stripe Integration
+### Phase 1: MVP (Wochen 1–8) - ✅ COMPLETED
+- [x] AWS Infrastruktur Setup (VPC, RDS, Lambda)
+- [x] E-Mail Inbound Parser & DB Schema
+- [x] KI-Engine Integration (Gemini 3)
+- [x] SMTP Outbound & Kalender Sync
+- [x] Dashboard & Stripe Integration
+- [x] Frontend Deployment (Amplify)
+- [x] Authentication (Cognito)
 
 ### Phase 2: Post-Termin (Monate 3–6)
 - [ ] Follow-up Automatisierung
