@@ -91,7 +91,7 @@ export class NeuroConceptsStack extends cdk.Stack {
         vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
         writer: rds.ClusterInstance.serverlessV2('Writer'),
         serverlessV2MinCapacity: 0.5,
-        serverlessV2MaxCapacity: 16,
+        serverlessV2MaxCapacity: 4, // Limit for free tier / trial accounts
         credentials: rds.Credentials.fromSecret(this.dbSecret),
         securityGroups: [dbSg],
         defaultDatabaseName: 'neuroconcepts',
