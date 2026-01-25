@@ -70,18 +70,22 @@ export class NeuroConceptsStack extends cdk.Stack {
       dbSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(5432), 'Allow public access to DB in Dev');
     }
 
-    if (props.stageName === 'dev') {
+    if (props.stageName === 'dev' || props.stageName === 'stage') {
       const instance = new rds.DatabaseInstance(this, 'PostgresInstance', {
         engine: rds.DatabaseInstanceEngine.postgres({ version: rds.PostgresEngineVersion.VER_16 }),
         vpc: this.vpc,
-        vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+        // In Dev (0 NAT), DB must be public or isolated. Public allows easy access.
+        // In Stage (1 NAT), we could use Private, but to keep it cheap and consistent with Dev (t4g.micro), we use Public for now or Private if NAT exists.
+        // Actually, if we use t4g.micro in Stage, we should put it in Private subnet if NAT exists, or Public if not.
+        // But to avoid the "WithExpressConfiguration" error of Aurora Free Tier entirely, we use RDS Instance for Stage too.
+        vpcSubnets: { subnetType: props.stageName === 'dev' ? ec2.SubnetType.PUBLIC : ec2.SubnetType.PRIVATE_WITH_EGRESS },
         instanceType: ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.MICRO),
         allocatedStorage: 20,
         maxAllocatedStorage: 50,
         credentials: rds.Credentials.fromSecret(this.dbSecret),
         securityGroups: [dbSg],
-        publiclyAccessible: true,
-        removalPolicy: cdk.RemovalPolicy.DESTROY,
+        publiclyAccessible: props.stageName === 'dev', // Only Dev is public
+        removalPolicy: cdk.RemovalPolicy.DESTROY, 
       });
       this.dbEndpoint = instance.dbInstanceEndpointAddress;
     } else {
