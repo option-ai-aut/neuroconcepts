@@ -179,7 +179,7 @@ export class NeuroConceptsStack extends cdk.Stack {
       sourceCodeProvider: new amplify.GitHubSourceCodeProvider({
         owner: 'option-ai-aut',
         repository: 'neuroconcepts',
-        oauthToken: cdk.SecretValue.secretsManager('github-token'), // Requires 'github-token' in Secrets Manager
+        oauthToken: cdk.SecretValue.secretsManager('github-token-new'), // Requires 'github-token-new' in Secrets Manager
       }),
       autoBranchCreation: {
         patterns: ['main', 'dev/*'],
