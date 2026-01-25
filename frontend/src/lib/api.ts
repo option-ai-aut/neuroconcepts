@@ -7,25 +7,47 @@ export interface Lead {
   lastName?: string;
   status: string;
   createdAt: string;
+  propertyId?: string;
+}
+
+export interface TemplateRenderRequest {
+  templateBody: string;
+  context: any;
 }
 
 export async function getLeads(): Promise<Lead[]> {
-  // Mock data for now if API is empty
   try {
     const res = await fetch(`${API_URL}/leads`);
     if (!res.ok) throw new Error('Failed to fetch leads');
     return await res.json();
   } catch (error) {
-    console.error(error);
+    console.error('API Error:', error);
     return [];
   }
 }
 
-export async function createLead(data: any) {
-  const res = await fetch(`${API_URL}/leads`, {
+export async function getLead(id: string): Promise<Lead | null> {
+  try {
+    const res = await fetch(`${API_URL}/leads/${id}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (error) {
+    console.error('API Error:', error);
+    return null;
+  }
+}
+
+export async function renderTemplate(data: TemplateRenderRequest) {
+  const res = await fetch(`${API_URL}/templates/render`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
   return res.json();
+}
+
+export async function sendExpose(leadId: string, content: string) {
+  // TODO: Implement send endpoint in backend
+  console.log('Sending expose to', leadId, content);
+  return { success: true };
 }
