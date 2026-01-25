@@ -5,6 +5,7 @@ applications:
         preBuild:
           commands:
             - npm ci
+            - echo "NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" >> .env.production
         build:
           commands:
             - npm run build
