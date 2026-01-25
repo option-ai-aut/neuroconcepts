@@ -12,17 +12,17 @@ graph TD
         UserMail[User IMAP] -->|Poll| Poller[Mail Poller Service]
     end
 
-    subgraph "Core Application (AWS Fargate)"
+    subgraph "Core Application (AWS Lambda)"
         API --> Orchestrator
-        SES -->|Lambda| Orchestrator
-        Poller --> Orchestrator
+        SES -->|Lambda| EmailParser
+        EmailParser --> Orchestrator
         
-        Orchestrator[Orchestrator Service]
+        Orchestrator[Orchestrator Lambda]
         TenantMgr[Tenant Manager]
         Billing[Billing Service]
     end
 
-    subgraph "Data Layer (Aurora Serverless)"
+    subgraph "Data Layer (Aurora Serverless / RDS)"
         DB[(PostgreSQL)]
         Vector[(pgvector)]
     end
@@ -38,6 +38,11 @@ graph TD
         Billing -->|Events| Stripe[Stripe API]
     end
 
+    subgraph "Frontend (Amplify)"
+        NextJS[Next.js App] --> API
+        NextJS --> Cognito[AWS Cognito]
+    end
+
     Orchestrator --> DB
     Orchestrator --> Vector
     TenantMgr --> DB
@@ -51,11 +56,13 @@ graph TD
 *   **Mail Poller:** Ein Hintergrund-Service, der optional IMAP-Postfächer der Makler auf neue direkte Antworten überwacht (für White-Labeling ohne Weiterleitung).
 
 ### 2. Core Application
-*   **Orchestrator:** Die zentrale Schaltstelle. Verwaltet den Status eines Leads (`NEW` -> `CONTACTED` -> `CONVERSATION` -> `BOOKED`). Entscheidet, wann die KI aufgerufen wird und wann ein Mensch eingreifen muss.
+*   **Orchestrator (Lambda + API Gateway):** Die zentrale Schaltstelle. Verwaltet den Status eines Leads (`NEW` -> `CONTACTED` -> `CONVERSATION` -> `BOOKED`). Entscheidet, wann die KI aufgerufen wird und wann ein Mensch eingreifen muss.
 *   **Tenant Manager:** Verwaltet die Mandanten (Immobilienfirmen), deren Konfigurationen (SMTP-Zugangsdaten, Routing-Regeln) und Benutzerrechte.
 
 ### 3. Data Layer
 *   **PostgreSQL:** Speichert relationale Daten: Tenants, Users, Leads, Properties, CalendarEvents.
+    *   **Dev/Stage:** RDS Single Instance (`t4g.micro`) zur Kostenoptimierung.
+    *   **Prod:** Aurora Serverless v2 für Skalierbarkeit und HA.
 *   **pgvector:** Speichert Embeddings von Exposés und vergangenen Konversationen, um der KI ein "Langzeitgedächtnis" zu geben (RAG - Retrieval Augmented Generation).
 
 ### 4. AI Engine (Google Gemini 3 Flash)
@@ -70,6 +77,11 @@ graph TD
 *   **Kalender:** Direkte Integration via Google Calendar API und Microsoft Graph API. Wir nutzen Refresh Tokens für dauerhaften Zugriff.
 *   **Stripe:** Abwicklung von Subscriptions. Webhooks von Stripe aktualisieren den Lizenz-Status im `Tenant Manager`.
 
+### 6. Frontend (AWS Amplify)
+*   **Framework:** Next.js 15 (App Router).
+*   **Hosting:** AWS Amplify Gen 2 (Compute).
+*   **Auth:** AWS Cognito User Pool für sicheren Login/Registrierung.
+
 ## 🔒 Sicherheit & Compliance
 
 ### Datenhaltung
@@ -80,30 +92,23 @@ graph TD
 ### Multi-Tenancy
 *   **Logische Trennung:** Jede Datenbank-Abfrage erzwingt einen `WHERE tenant_id = X` Filter.
 *   **Rollen-Konzept:**
-    *   `Super Admin`: Systemweiter Zugriff.
-    *   `Tenant Admin`: Verwaltet Firma, Billing, User.
-    *   `Makler`: Zugriff auf zugewiesene Leads und eigenen Kalender.
+    *   `SUPER_ADMIN`: Systemweiter Zugriff.
+    *   `ADMIN`: Verwaltet Firma, Billing, User.
+    *   `AGENT`: Zugriff auf zugewiesene Leads und eigenen Kalender.
 
 ## ⚡️ Skalierbarkeit & Environments
 
 ### Infrastructure as Code (IaC)
-Wir nutzen **AWS CDK (Cloud Development Kit)**, um die gesamte Infrastruktur im Code zu definieren. Das ermöglicht uns, identische Kopien der Umgebung zu erstellen.
+Wir nutzen **AWS CDK (Cloud Development Kit)**, um die gesamte Infrastruktur im Code zu definieren.
 
 ### Environment-Strategie
-1.  **Dev (Development):**
-    *   Jeder Entwickler kann seinen eigenen Stack deployen (z.B. `neuroconcepts-dev-dennis`).
-    *   Dient zum Testen neuer Features während der Entwicklung.
-    *   Datenbanken sind klein und werden regelmäßig zurückgesetzt.
-2.  **Stage (Staging):**
-    *   Spiegelbild der Produktion (`neuroconcepts-stage`).
-    *   Hier testen wir den `main`-Branch, bevor er live geht.
-    *   Verwendet anonymisierte Produktionsdaten (optional).
-3.  **Prod (Production):**
-    *   Das Live-System (`neuroconcepts-prod`).
+1.  **Dev** (`NeuroConcepts-Dev`):
+    *   Für die tägliche Entwicklung.
+    *   Ressourcen sind minimal dimensioniert (0 NAT Gateways, RDS Micro).
+2.  **Stage** (`NeuroConcepts-Stage`):
+    *   Spiegelbild der Produktion.
+    *   Hierhin wird der `main`-Branch automatisch deployed (CI/CD).
+3.  **Prod** (`NeuroConcepts-Prod`):
+    *   Das Live-System.
     *   Zugriff stark eingeschränkt.
     *   Backups und High-Availability aktiviert.
-
-### AWS Account Struktur (Empfehlung)
-*   **Account A (Non-Prod):** Beinhaltet `Dev` und `Stage`.
-*   **Account B (Prod):** Beinhaltet nur `Prod`.
-*   *Vorteil:* Versehentliches Löschen von Prod-Daten im Dev-Modus ist technisch unmöglich.

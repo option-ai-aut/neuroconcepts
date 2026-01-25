@@ -7,11 +7,15 @@ Dieser Guide beschreibt den Prozess, um einen neuen Mandanten (Immobilienfirma) 
 ## ✅ Checkliste für den Kickoff-Call
 
 ### 1. Vorbereitung (Admin)
-- [ ] Tenant in der Super-Admin-Konsole anlegen.
-- [ ] Admin-User für den Kunden erstellen und Invite senden.
+- [ ] Tenant in der Super-Admin-Konsole anlegen (aktuell via DB-Zugriff).
 - [ ] Stripe Customer ID verknüpfen (oder Subscription manuell anlegen).
 
-### 2. Tech-Setup (Zusammen mit Kunden)
+### 2. User-Onboarding (Zusammen mit Kunden)
+- [ ] Kunde geht auf `/login`.
+- [ ] Kunde klickt "Create Account" und registriert sich mit seiner Firmen-E-Mail.
+- [ ] Admin weist dem neuen User die `tenantId` in der Datenbank zu.
+
+### 3. Tech-Setup (Im Dashboard)
 
 #### A. E-Mail Verbindung (White-Labeling)
 *Das System muss E-Mails im Namen des Maklers senden können.*
@@ -30,7 +34,7 @@ Dieser Guide beschreibt den Prozess, um einen neuen Mandanten (Immobilienfirma) 
 - Auswahl der Kalender, die auf "Verfügbarkeit" geprüft werden sollen (z.B. "Arbeit", aber nicht "Privat").
 - Konfiguration der Arbeitszeiten (z.B. Mo-Fr, 09:00 - 17:00).
 
-### 3. Content & Routing
+### 4. Content & Routing
 
 #### A. Erstes Objekt anlegen
 - PDF-Exposé hochladen (KI extrahiert Daten).
@@ -42,7 +46,7 @@ Dieser Guide beschreibt den Prozess, um einen neuen Mandanten (Immobilienfirma) 
 - [ ] Einzelner Makler
 - [ ] Team (Round Robin)
 
-### 4. Live-Simulation ("Aha-Moment")
+### 5. Live-Simulation ("Aha-Moment")
 
 1.  Kunde öffnet das Dashboard.
 2.  Wir senden eine E-Mail von einem neutralen Account an die Inbound-Adresse.
