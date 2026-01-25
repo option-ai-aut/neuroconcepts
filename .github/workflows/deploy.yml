@@ -1,0 +1,49 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: |
+          npm install
+          cd infra && npm install
+          cd ../src/services/email-parser && npm install
+          cd ../orchestrator && npm install
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
+      - name: Deploy to Stage (on main push)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cd infra
+          npx cdk deploy NeuroConcepts-Stage --require-approval never
+
+      - name: Deploy to Dev (Manual Dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          cd infra
+          npx cdk deploy NeuroConcepts-Dev --require-approval never

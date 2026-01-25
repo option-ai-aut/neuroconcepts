@@ -84,8 +84,26 @@ graph TD
     *   `Tenant Admin`: Verwaltet Firma, Billing, User.
     *   `Makler`: Zugriff auf zugewiesene Leads und eigenen Kalender.
 
-## ⚡️ Skalierbarkeit
+## ⚡️ Skalierbarkeit & Environments
 
-*   **Compute:** AWS Fargate skaliert automatisch basierend auf CPU/Memory-Last.
-*   **Database:** Aurora Serverless v2 passt die Kapazität (ACUs) millisekundengenau an die Last an.
-*   **Queueing:** AWS SQS puffert Lastspitzen bei eingehenden E-Mails ab, um den Orchestrator nicht zu überlasten.
+### Infrastructure as Code (IaC)
+Wir nutzen **AWS CDK (Cloud Development Kit)**, um die gesamte Infrastruktur im Code zu definieren. Das ermöglicht uns, identische Kopien der Umgebung zu erstellen.
+
+### Environment-Strategie
+1.  **Dev (Development):**
+    *   Jeder Entwickler kann seinen eigenen Stack deployen (z.B. `neuroconcepts-dev-dennis`).
+    *   Dient zum Testen neuer Features während der Entwicklung.
+    *   Datenbanken sind klein und werden regelmäßig zurückgesetzt.
+2.  **Stage (Staging):**
+    *   Spiegelbild der Produktion (`neuroconcepts-stage`).
+    *   Hier testen wir den `main`-Branch, bevor er live geht.
+    *   Verwendet anonymisierte Produktionsdaten (optional).
+3.  **Prod (Production):**
+    *   Das Live-System (`neuroconcepts-prod`).
+    *   Zugriff stark eingeschränkt.
+    *   Backups und High-Availability aktiviert.
+
+### AWS Account Struktur (Empfehlung)
+*   **Account A (Non-Prod):** Beinhaltet `Dev` und `Stage`.
+*   **Account B (Prod):** Beinhaltet nur `Prod`.
+*   *Vorteil:* Versehentliches Löschen von Prod-Daten im Dev-Modus ist technisch unmöglich.

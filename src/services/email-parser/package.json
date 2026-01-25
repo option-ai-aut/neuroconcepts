@@ -1,0 +1,15 @@
+{
+  "name": "email-parser",
+  "version": "1.0.0",
+  "description": "Parses incoming lead emails from S3",
+  "main": "index.js",
+  "dependencies": {
+    "mailparser": "^3.6.9",
+    "aws-sdk": "^2.1500.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.130",
+    "@types/mailparser": "^3.4.4",
+    "typescript": "^5.3.3"
+  }
+}
