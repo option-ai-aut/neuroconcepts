@@ -1,8 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
-  // eslint config is removed as it is no longer supported in next.config.ts
+  // output: 'standalone', // Disabled for Amplify native support
 };
 
 export default nextConfig;
