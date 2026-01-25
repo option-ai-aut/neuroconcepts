@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import serverless from 'serverless-http';
 import { PrismaClient } from '@prisma/client';
 import { TemplateService } from './services/TemplateService';
+import { GeminiService } from './services/GeminiService';
 
 dotenv.config();
 
@@ -22,6 +23,36 @@ app.get('/health', (req, res) => {
 });
 
 // --- Lead Intake ---
+
+// GET /leads - List all leads
+app.get('/leads', async (req, res) => {
+  try {
+    const leads = await prisma.lead.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        property: true, // Include property details if needed
+      }
+    });
+    res.json(leads);
+  } catch (error) {
+    console.error('Error fetching leads:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// GET /properties - List all properties
+app.get('/properties', async (req, res) => {
+  try {
+    const properties = await prisma.property.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(properties);
+  } catch (error) {
+    console.error('Error fetching properties:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 app.post('/leads', async (req, res) => {
   try {
     const { email, firstName, lastName, propertyId, tenantId, message } = req.body;
@@ -81,6 +112,19 @@ app.post('/templates/render', (req, res) => {
   const { templateBody, context } = req.body;
   const result = TemplateService.render(templateBody, context);
   res.json({ result });
+});
+
+// --- AI Assistant ---
+app.post('/chat', async (req, res) => {
+  try {
+    const { message, history, tenantId } = req.body;
+    const gemini = new GeminiService();
+    const response = await gemini.chat(message, tenantId, history);
+    res.json({ response });
+  } catch (error) {
+    console.error('Chat error:', error);
+    res.status(500).json({ error: 'AI Error' });
+  }
 });
 
 // Export for Lambda
