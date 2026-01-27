@@ -4,6 +4,7 @@ applications:
       phases:
         preBuild:
           commands:
+            - nvm use 20
             - npm ci
             - echo "NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" >> .env.production
             - echo "NEXT_PUBLIC_USER_POOL_ID=$NEXT_PUBLIC_USER_POOL_ID" >> .env.production
