@@ -4,23 +4,23 @@ applications:
       phases:
         preBuild:
           commands:
-            - cd frontend && npm ci
-            - cd frontend && echo "NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" >> .env.production
-            - cd frontend && echo "NEXT_PUBLIC_USER_POOL_ID=$NEXT_PUBLIC_USER_POOL_ID" >> .env.production
-            - cd frontend && echo "NEXT_PUBLIC_USER_POOL_CLIENT_ID=$NEXT_PUBLIC_USER_POOL_CLIENT_ID" >> .env.production
-            - cd frontend && echo "NEXT_PUBLIC_AWS_REGION=$NEXT_PUBLIC_AWS_REGION" >> .env.production
+            - npm ci
+            - echo "NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" >> .env.production
+            - echo "NEXT_PUBLIC_USER_POOL_ID=$NEXT_PUBLIC_USER_POOL_ID" >> .env.production
+            - echo "NEXT_PUBLIC_USER_POOL_CLIENT_ID=$NEXT_PUBLIC_USER_POOL_CLIENT_ID" >> .env.production
+            - echo "NEXT_PUBLIC_AWS_REGION=$NEXT_PUBLIC_AWS_REGION" >> .env.production
         build:
           commands:
-            - cd frontend && npm run build
+            - npm run build
         postBuild:
           commands:
-            - cd frontend && cp -r public .next/standalone/frontend/public
-            - cd frontend && cp -r .next/static .next/standalone/frontend/.next/static
+            - cp -r public .next/standalone/frontend/public
+            - cp -r .next/static .next/standalone/frontend/.next/static
       artifacts:
-        baseDirectory: frontend/.next/standalone/frontend
+        baseDirectory: .next/standalone/frontend
         files:
           - '**/*'
       cache:
         paths:
-          - frontend/node_modules/**/*
+          - node_modules/**/*
     appRoot: frontend
