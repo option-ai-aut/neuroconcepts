@@ -37,7 +37,7 @@ export default function Login() {
                 </div>
               );
             }
-            return null;
+            return <></>;
           }}
         </Authenticator>
       </div>
