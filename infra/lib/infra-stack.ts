@@ -145,6 +145,7 @@ export class NeuroConceptsStack extends cdk.Stack {
         STAGE: props.stageName,
         DB_SECRET_ARN: this.dbSecret.secretArn,
         DB_ENDPOINT: this.dbEndpoint,
+        ORCHESTRATOR_API_URL: api.url,
       },
       bundling: { minify: true, sourceMap: true },
     });

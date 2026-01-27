@@ -53,6 +53,31 @@ app.get('/properties', async (req, res) => {
   }
 });
 
+// POST /properties - Create new property
+app.post('/properties', async (req, res) => {
+  try {
+    const { title, address, price, rooms, area, description, aiFacts, tenantId } = req.body;
+    
+    const property = await prisma.property.create({
+      data: {
+        tenantId,
+        title,
+        address,
+        price,
+        rooms,
+        area,
+        description,
+        aiFacts
+      }
+    });
+
+    res.status(201).json(property);
+  } catch (error) {
+    console.error('Error creating property:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 app.post('/leads', async (req, res) => {
   try {
     const { email, firstName, lastName, propertyId, tenantId, message } = req.body;
@@ -115,12 +140,44 @@ app.post('/templates/render', (req, res) => {
 });
 
 // --- AI Assistant ---
+app.get('/chat/history', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: 'userId required' });
+
+    const history = await prisma.userChat.findMany({
+      where: { userId: String(userId) },
+      orderBy: { createdAt: 'asc' }
+    });
+    res.json(history);
+  } catch (error) {
+    console.error('Error fetching chat history:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 app.post('/chat', async (req, res) => {
   try {
-    const { message, history, tenantId } = req.body;
+    const { message, history, tenantId, userId } = req.body;
+    
+    // Save User Message
+    if (userId) {
+      await prisma.userChat.create({
+        data: { userId, role: 'USER', content: message }
+      });
+    }
+
     const gemini = new GeminiService();
-    const response = await gemini.chat(message, tenantId, history);
-    res.json({ response });
+    const responseText = await gemini.chat(message, tenantId, history);
+
+    // Save Assistant Message
+    if (userId) {
+      await prisma.userChat.create({
+        data: { userId, role: 'ASSISTANT', content: responseText }
+      });
+    }
+
+    res.json({ response: responseText });
   } catch (error) {
     console.error('Chat error:', error);
     res.status(500).json({ error: 'AI Error' });

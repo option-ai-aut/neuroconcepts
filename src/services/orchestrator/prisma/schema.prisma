@@ -47,7 +47,8 @@ model User {
   role     Role   @default(AGENT)
 
   // Relations
-  leads Lead[] // Leads assigned to this agent
+  leads    Lead[] // Leads assigned to this agent
+  chats    UserChat[]
 }
 
 enum Role {
@@ -131,6 +132,15 @@ enum MessageRole {
   SYSTEM
   USER
   ASSISTANT
+}
+
+model UserChat {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  role      MessageRole
+  content   String
+  createdAt DateTime @default(now())
 }
 
 // --- Orchestrator & Templates ---

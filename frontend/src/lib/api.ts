@@ -67,6 +67,16 @@ export async function renderTemplate(data: TemplateRenderRequest) {
   return res.json();
 }
 
+export async function createProperty(data: any) {
+  const res = await fetch(`${API_URL}/properties`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to create property');
+  return res.json();
+}
+
 export async function sendExpose(leadId: string, content: string) {
   // TODO: Implement send endpoint in backend
   console.log('Sending expose to', leadId, content);

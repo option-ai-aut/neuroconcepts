@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { getProperties, Property } from '@/lib/api';
 
+import Link from 'next/link';
+
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
 
@@ -14,9 +16,12 @@ export default function PropertiesPage() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Objekte</h1>
-        <button className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+        <Link 
+          href="/dashboard/crm/properties/new"
+          className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+        >
           Neues Objekt
-        </button>
+        </Link>
       </div>
 
       <div className="bg-white shadow overflow-hidden sm:rounded-lg">

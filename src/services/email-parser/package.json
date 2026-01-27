@@ -4,8 +4,10 @@
   "description": "Parses incoming lead emails from S3",
   "main": "index.js",
   "dependencies": {
-    "mailparser": "^3.6.9",
-    "aws-sdk": "^2.1500.0"
+    "aws-sdk": "^2.1500.0",
+    "axios": "^1.13.3",
+    "lucide-react": "^0.563.0",
+    "mailparser": "^3.6.9"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.130",
