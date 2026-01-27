@@ -14,6 +14,8 @@ applications:
             - npm run build
         postBuild:
           commands:
+            - mkdir -p .next/standalone/frontend/public
+            - mkdir -p .next/standalone/frontend/.next/static
             - cp -r public .next/standalone/frontend/public
             - cp -r .next/static .next/standalone/frontend/.next/static
       artifacts:
