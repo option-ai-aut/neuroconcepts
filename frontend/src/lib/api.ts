@@ -1,4 +1,9 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://1rnmc2z8eg.execute-api.eu-central-1.amazonaws.com/dev';
+import { getRuntimeConfig } from '@/components/EnvProvider';
+
+const getApiUrl = () => {
+  const config = getRuntimeConfig();
+  return config.apiUrl || 'https://1rnmc2z8eg.execute-api.eu-central-1.amazonaws.com/dev';
+};
 
 export interface Lead {
   id: string;
@@ -27,7 +32,7 @@ export interface TemplateRenderRequest {
 
 export async function getLeads(): Promise<Lead[]> {
   try {
-    const res = await fetch(`${API_URL}/leads`);
+    const res = await fetch(`${getApiUrl()}/leads`);
     if (!res.ok) throw new Error('Failed to fetch leads');
     return await res.json();
   } catch (error) {
@@ -38,7 +43,7 @@ export async function getLeads(): Promise<Lead[]> {
 
 export async function getProperties(): Promise<Property[]> {
   try {
-    const res = await fetch(`${API_URL}/properties`);
+    const res = await fetch(`${getApiUrl()}/properties`);
     if (!res.ok) throw new Error('Failed to fetch properties');
     return await res.json();
   } catch (error) {
@@ -49,7 +54,7 @@ export async function getProperties(): Promise<Property[]> {
 
 export async function getLead(id: string): Promise<Lead | null> {
   try {
-    const res = await fetch(`${API_URL}/leads/${id}`);
+    const res = await fetch(`${getApiUrl()}/leads/${id}`);
     if (!res.ok) return null;
     return await res.json();
   } catch (error) {
@@ -59,7 +64,7 @@ export async function getLead(id: string): Promise<Lead | null> {
 }
 
 export async function renderTemplate(data: TemplateRenderRequest) {
-  const res = await fetch(`${API_URL}/templates/render`, {
+  const res = await fetch(`${getApiUrl()}/templates/render`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -68,7 +73,7 @@ export async function renderTemplate(data: TemplateRenderRequest) {
 }
 
 export async function createProperty(data: any) {
-  const res = await fetch(`${API_URL}/properties`, {
+  const res = await fetch(`${getApiUrl()}/properties`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),

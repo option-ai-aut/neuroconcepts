@@ -197,9 +197,9 @@ export class NeuroConceptsStack extends cdk.Stack {
     const frontendImageAsset = new assets.DockerImageAsset(this, 'FrontendImage', {
       directory: path.join(__dirname, '../../frontend'),
       buildArgs: {
-        NEXT_PUBLIC_API_URL: api.url,
-        NEXT_PUBLIC_USER_POOL_ID: this.userPool.userPoolId,
-        NEXT_PUBLIC_USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
+        // NEXT_PUBLIC_API_URL is injected at runtime via App Runner env vars
+        // NEXT_PUBLIC_USER_POOL_ID: this.userPool.userPoolId, // These are also Tokens!
+        // NEXT_PUBLIC_USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
         NEXT_PUBLIC_AWS_REGION: this.region,
       },
     });
