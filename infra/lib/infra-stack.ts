@@ -8,7 +8,8 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdaNode from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
-import * as amplify from '@aws-cdk/aws-amplify-alpha';
+import * as apprunner from 'aws-cdk-lib/aws-apprunner';
+import * as assets from 'aws-cdk-lib/aws-ecr-assets';
 import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as path from 'path';
@@ -127,34 +128,7 @@ export class NeuroConceptsStack extends cdk.Stack {
       },
     });
 
-    // --- 4. E-Mail Intake (S3 + Lambda) ---
-    const emailBucket = new s3.Bucket(this, 'EmailIngestBucket', {
-      versioned: false,
-      removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
-      autoDeleteObjects: props.stageName === 'dev',
-      lifecycleRules: [{ expiration: cdk.Duration.days(7) }]
-    });
-
-    const emailProcessor = new lambdaNode.NodejsFunction(this, 'EmailProcessor', {
-      runtime: lambda.Runtime.NODEJS_22_X,
-      entry: path.join(__dirname, '../src/services/email-parser/index.ts'),
-      handler: 'handler',
-      timeout: cdk.Duration.seconds(30),
-      memorySize: 256,
-      environment: {
-        STAGE: props.stageName,
-        DB_SECRET_ARN: this.dbSecret.secretArn,
-        DB_ENDPOINT: this.dbEndpoint,
-        ORCHESTRATOR_API_URL: api.url,
-      },
-      bundling: { minify: true, sourceMap: true },
-    });
-
-    emailBucket.grantRead(emailProcessor);
-    this.dbSecret.grantRead(emailProcessor);
-    emailBucket.addEventNotification(s3.EventType.OBJECT_CREATED, new s3n.LambdaDestination(emailProcessor));
-
-    // --- 5. Orchestrator Service (Lambda + API Gateway) ---
+    // --- 4. Orchestrator Service (Lambda + API Gateway) ---
     
     const lambdaVpc = props.stageName === 'dev' ? undefined : this.vpc;
     const lambdaSg = props.stageName === 'dev' ? undefined : [dbSg]; 
@@ -189,6 +163,33 @@ export class NeuroConceptsStack extends cdk.Stack {
         allowMethods: apigateway.Cors.ALL_METHODS,
       }
     });
+
+    // --- 5. E-Mail Intake (S3 + Lambda) ---
+    const emailBucket = new s3.Bucket(this, 'EmailIngestBucket', {
+      versioned: false,
+      removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
+      autoDeleteObjects: props.stageName === 'dev',
+      lifecycleRules: [{ expiration: cdk.Duration.days(7) }]
+    });
+
+    const emailProcessor = new lambdaNode.NodejsFunction(this, 'EmailProcessor', {
+      runtime: lambda.Runtime.NODEJS_22_X,
+      entry: path.join(__dirname, '../src/services/email-parser/index.ts'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: {
+        STAGE: props.stageName,
+        DB_SECRET_ARN: this.dbSecret.secretArn,
+        DB_ENDPOINT: this.dbEndpoint,
+        ORCHESTRATOR_API_URL: api.url,
+      },
+      bundling: { minify: true, sourceMap: true },
+    });
+
+    emailBucket.grantRead(emailProcessor);
+    this.dbSecret.grantRead(emailProcessor);
+    emailBucket.addEventNotification(s3.EventType.OBJECT_CREATED, new s3n.LambdaDestination(emailProcessor));
 
     // --- 6. Frontend (App Runner) ---
     // Instead of Amplify, we use App Runner for stable, containerized Next.js hosting.
