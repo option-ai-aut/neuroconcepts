@@ -1,17 +1,13 @@
 version: 1
 applications:
-  - appRoot: frontend
-    frontend:
+  - frontend:
       phases:
         preBuild:
           commands:
             - npm ci
-            - echo "NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" >> .env.production
-            - echo "NEXT_PUBLIC_USER_POOL_ID=$NEXT_PUBLIC_USER_POOL_ID" >> .env.production
-            - echo "NEXT_PUBLIC_USER_POOL_CLIENT_ID=$NEXT_PUBLIC_USER_POOL_CLIENT_ID" >> .env.production
-            - echo "NEXT_PUBLIC_AWS_REGION=$NEXT_PUBLIC_AWS_REGION" >> .env.production
         build:
           commands:
+            - env | grep NEXT_PUBLIC_ >> .env.production
             - npm run build
       artifacts:
         baseDirectory: .next
@@ -20,3 +16,4 @@ applications:
       cache:
         paths:
           - node_modules/**/*
+    appRoot: frontend
