@@ -49,7 +49,8 @@ NeuroConcepts AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 M
 │   ├── ADMIN_ACCESS.md   # Anleitung für Admin-Zugriff
 │   ├── ARCHITECTURE.md   # Technische Architektur & Datenflüsse
 │   ├── ONBOARDING.md     # Checklisten für neue Kunden
-│   └── AI_GUIDELINES.md  # Prompting-Strategien & Sicherheitsregeln
+│   ├── AI_GUIDELINES.md  # Prompting-Strategien & Sicherheitsregeln
+│   └── DEV_ENVIRONMENT_SETUP.md # Anleitung für Dev-Environment & Stack Updates
 ├── frontend/             # Next.js Frontend App (Dockerized)
 ├── infra/                # AWS CDK Infrastructure Code
 ├── src/                  # Backend Services (Orchestrator, Email Parser)

@@ -17,9 +17,17 @@ import {
   MessageSquare
 } from 'lucide-react';
 
+import { useRouter } from 'next/navigation';
+
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [crmOpen, setCrmOpen] = useState(true);
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push('/login');
+  };
 
   const mainNavigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -78,7 +86,7 @@ export default function Sidebar() {
           Einstellungen
         </Link>
         <button
-          onClick={() => signOut()}
+          onClick={handleSignOut}
           className="w-full flex items-center px-3 py-2.5 text-sm font-medium text-red-400 rounded-xl hover:bg-red-900/20 transition-colors"
         >
           <LogOut className="w-5 h-5 mr-3" />

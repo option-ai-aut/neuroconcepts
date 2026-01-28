@@ -117,6 +117,15 @@ export class NeuroConceptsStack extends cdk.Stack {
         requireDigits: true,
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      standardAttributes: {
+        givenName: { required: true, mutable: true },
+        familyName: { required: true, mutable: true },
+        address: { required: false, mutable: true },
+      },
+      customAttributes: {
+        'company_name': new cognito.StringAttribute({ mutable: true }),
+        'employee_count': new cognito.NumberAttribute({ mutable: true }),
+      },
       removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
     });
 
@@ -146,6 +155,8 @@ export class NeuroConceptsStack extends cdk.Stack {
         STAGE: props.stageName,
         DB_SECRET_ARN: this.dbSecret.secretArn,
         DB_ENDPOINT: this.dbEndpoint,
+        USER_POOL_ID: this.userPool.userPoolId,
+        CLIENT_ID: this.userPoolClient.userPoolClientId,
       },
       bundling: { minify: true, sourceMap: true },
     });

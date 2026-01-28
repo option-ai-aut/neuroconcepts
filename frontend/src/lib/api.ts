@@ -1,8 +1,20 @@
 import { getRuntimeConfig } from '@/components/EnvProvider';
+import { fetchAuthSession } from 'aws-amplify/auth';
 
 const getApiUrl = () => {
   const config = getRuntimeConfig();
   return config.apiUrl || 'https://1rnmc2z8eg.execute-api.eu-central-1.amazonaws.com/dev';
+};
+
+const getAuthHeaders = async () => {
+  try {
+    const session = await fetchAuthSession();
+    const token = session.tokens?.idToken?.toString();
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
+  } catch (error) {
+    console.error('Error fetching auth session:', error);
+    return {};
+  }
 };
 
 export interface Message {
@@ -47,14 +59,16 @@ export const API_ENDPOINTS = {
 };
 
 export async function fetcher(url: string) {
-  const res = await fetch(`${getApiUrl()}${url}`);
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}${url}`, { headers });
   if (!res.ok) throw new Error('Failed to fetch data');
   return res.json();
 }
 
 export async function getLeads(): Promise<Lead[]> {
   try {
-    const res = await fetch(`${getApiUrl()}/leads`);
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${getApiUrl()}/leads`, { headers });
     if (!res.ok) throw new Error('Failed to fetch leads');
     return await res.json();
   } catch (error) {
@@ -65,7 +79,8 @@ export async function getLeads(): Promise<Lead[]> {
 
 export async function getProperties(): Promise<Property[]> {
   try {
-    const res = await fetch(`${getApiUrl()}/properties`);
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${getApiUrl()}/properties`, { headers });
     if (!res.ok) throw new Error('Failed to fetch properties');
     return await res.json();
   } catch (error) {
@@ -76,7 +91,8 @@ export async function getProperties(): Promise<Property[]> {
 
 export async function getLead(id: string): Promise<Lead | null> {
   try {
-    const res = await fetch(`${getApiUrl()}/leads/${id}`);
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${getApiUrl()}/leads/${id}`, { headers });
     if (!res.ok) return null;
     return await res.json();
   } catch (error) {
@@ -86,18 +102,20 @@ export async function getLead(id: string): Promise<Lead | null> {
 }
 
 export async function renderTemplate(data: TemplateRenderRequest) {
+  const headers = await getAuthHeaders();
   const res = await fetch(`${getApiUrl()}/templates/render`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
   return res.json();
 }
 
 export async function updateLead(id: string, data: Partial<Lead>) {
+  const headers = await getAuthHeaders();
   const res = await fetch(`${getApiUrl()}/leads/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error('Failed to update lead');
@@ -105,9 +123,10 @@ export async function updateLead(id: string, data: Partial<Lead>) {
 }
 
 export async function sendManualEmail(id: string, subject: string, body: string) {
+  const headers = await getAuthHeaders();
   const res = await fetch(`${getApiUrl()}/leads/${id}/email`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify({ subject, body }),
   });
   if (!res.ok) throw new Error('Failed to send email');
@@ -115,16 +134,20 @@ export async function sendManualEmail(id: string, subject: string, body: string)
 }
 
 export async function deleteLead(id: string) {
+  const headers = await getAuthHeaders();
   const res = await fetch(`${getApiUrl()}/leads/${id}`, {
     method: 'DELETE',
+    headers,
   });
   if (!res.ok) throw new Error('Failed to delete lead');
   return res.json();
 }
 
 export async function deleteProperty(id: string) {
+  const headers = await getAuthHeaders();
   const res = await fetch(`${getApiUrl()}/properties/${id}`, {
     method: 'DELETE',
+    headers,
   });
   if (!res.ok) throw new Error('Failed to delete property');
   return res.json();
@@ -132,10 +155,11 @@ export async function deleteProperty(id: string) {
 
 export async function createLead(data: any) {
   const url = `${getApiUrl()}/leads`;
+  const headers = await getAuthHeaders();
   console.log('POSTing to:', url);
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
   if (!res.ok) {
@@ -148,7 +172,8 @@ export async function createLead(data: any) {
 
 export async function getProperty(id: string): Promise<Property | null> {
   try {
-    const res = await fetch(`${getApiUrl()}/properties/${id}`);
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${getApiUrl()}/properties/${id}`, { headers });
     if (!res.ok) return null;
     return await res.json();
   } catch (error) {
@@ -158,9 +183,10 @@ export async function getProperty(id: string): Promise<Property | null> {
 }
 
 export async function updateProperty(id: string, data: Partial<Property>) {
+  const headers = await getAuthHeaders();
   const res = await fetch(`${getApiUrl()}/properties/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error('Failed to update property');
@@ -168,9 +194,10 @@ export async function updateProperty(id: string, data: Partial<Property>) {
 }
 
 export async function createProperty(data: any) {
+  const headers = await getAuthHeaders();
   const res = await fetch(`${getApiUrl()}/properties`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error('Failed to create property');
@@ -184,9 +211,52 @@ export async function sendExpose(leadId: string, content: string) {
 }
 
 export async function sendDraftMessage(messageId: string) {
+  const headers = await getAuthHeaders();
   const res = await fetch(`${getApiUrl()}/messages/${messageId}/send`, {
     method: 'POST',
+    headers,
   });
   if (!res.ok) throw new Error('Failed to send message');
+  return res.json();
+}
+
+// --- Auth & Team ---
+
+export async function syncUser() {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/auth/sync`, {
+    method: 'POST',
+    headers,
+  });
+  if (!res.ok) throw new Error('Failed to sync user');
+  return res.json();
+}
+
+export async function getMe() {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/me`, {
+    headers,
+  });
+  if (!res.ok) throw new Error('Failed to fetch profile');
+  return res.json();
+}
+
+export async function getSeats() {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/seats`, {
+    headers,
+  });
+  if (!res.ok) throw new Error('Failed to fetch seats');
+  return res.json();
+}
+
+export async function inviteSeat(email: string, role: string) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/seats/invite`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, role }),
+  });
+  if (!res.ok) throw new Error('Failed to invite user');
   return res.json();
 }

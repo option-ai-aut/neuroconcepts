@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { syncUser } from '@/lib/api';
 
 export default function LoginPage() {
   const { user, authStatus } = useAuthenticator((context) => [context.user, context.authStatus]);
@@ -13,7 +14,14 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (authStatus === 'authenticated') {
-      router.push('/dashboard');
+      // Sync user with backend
+      syncUser().then(() => {
+        router.push('/dashboard');
+      }).catch(err => {
+        console.error('Sync failed', err);
+        // Still redirect to dashboard, maybe show error there?
+        router.push('/dashboard');
+      });
     }
   }, [authStatus, router]);
 
@@ -35,7 +43,7 @@ export default function LoginPage() {
           <div className="max-w-md">
             <h2 className="text-4xl font-bold mb-6">Willkommen zurück.</h2>
             <p className="text-lg text-gray-300 leading-relaxed">
-              Jarvis hat heute bereits 12 Anfragen beantwortet und 3 Termine für dich gebucht. Logge dich ein, um den Status zu prüfen.
+              Dein intelligenter Assistent für Immobilienvertrieb. Automatisiere Kommunikation, Termine und Exposés, damit du dich auf das Wesentliche konzentrieren kannst.
             </p>
           </div>
           
@@ -46,9 +54,19 @@ export default function LoginPage() {
       </div>
 
       {/* Right Side - Login Form */}
-      <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-20 xl:px-24">
+      <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-20 xl:px-24 relative bg-white">
+        <div className="absolute top-8 right-8">
+          <Link 
+            href="/" 
+            className="group flex items-center px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-full transition-all"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+            Zurück zur Startseite
+          </Link>
+        </div>
+
         <div className="mx-auto w-full max-w-sm lg:w-96">
-          <div className="mb-8 lg:hidden">
+          <div className="mb-10 lg:hidden">
             <div className="flex items-center justify-center">
               <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg">
                 <span className="text-white font-bold text-xl">N</span>
@@ -59,21 +77,32 @@ export default function LoginPage() {
             </h2>
           </div>
 
-          <div className="mb-6">
-            <Link href="/" className="flex items-center text-sm text-gray-500 hover:text-gray-900 transition-colors">
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              Zurück zur Startseite
-            </Link>
-          </div>
-
           <div className="bg-white">
+            <style jsx global>{`
+              [data-amplify-authenticator] {
+                --amplify-colors-background-primary: white;
+                --amplify-components-authenticator-router-box-shadow: none;
+                --amplify-components-authenticator-router-border-width: 0;
+                --amplify-components-button-primary-background-color: #4f46e5;
+                --amplify-components-button-primary-hover-background-color: #4338ca;
+                --amplify-components-tabs-item-active-border-color: #4f46e5;
+                --amplify-components-tabs-item-color: #6b7280;
+                --amplify-components-tabs-item-active-color: #4f46e5;
+              }
+              /* Hide the password show/hide button from tab order but keep it clickable */
+              .amplify-passwordfield__show-password {
+                tab-index: -1 !important;
+              }
+              /* Optional: If you want to hide it completely visually */
+              /* .amplify-passwordfield__show-password { display: none; } */
+            `}</style>
             <Authenticator 
               initialState="signIn"
               components={{
                 Header: () => (
-                  <div className="text-center mb-6">
-                    <h3 className="text-xl font-bold text-gray-900">Anmelden</h3>
-                    <p className="text-sm text-gray-500 mt-1">Zugang zu deinem Dashboard</p>
+                  <div className="text-center mb-8">
+                    <h3 className="text-2xl font-bold text-gray-900">Anmelden</h3>
+                    <p className="text-sm text-gray-500 mt-2">Zugang zu deinem Dashboard</p>
                   </div>
                 )
               }}
@@ -89,20 +118,51 @@ export default function LoginPage() {
                   }
                 },
                 signUp: {
-                  email: {
+                  username: {
+                    order: 1,
                     label: 'E-Mail',
-                    placeholder: 'E-Mail Adresse',
-                    order: 1
+                    placeholder: 'E-Mail Adresse'
                   },
                   password: {
                     label: 'Passwort',
                     placeholder: 'Passwort erstellen',
                     order: 2
                   },
-                  confirmPassword: {
+                  confirm_password: {
                     label: 'Passwort bestätigen',
                     placeholder: 'Passwort wiederholen',
                     order: 3
+                  },
+                  given_name: {
+                    label: 'Vorname',
+                    placeholder: 'Max',
+                    order: 4,
+                    isRequired: true
+                  },
+                  family_name: {
+                    label: 'Nachname',
+                    placeholder: 'Mustermann',
+                    order: 5,
+                    isRequired: true
+                  },
+                  'custom:company_name': {
+                    label: 'Firmenname',
+                    placeholder: 'Muster Immobilien GmbH',
+                    order: 6,
+                    isRequired: true
+                  },
+                  address: {
+                    label: 'Firmenadresse',
+                    placeholder: 'Musterstraße 1, 1010 Wien',
+                    order: 7,
+                    isRequired: false
+                  },
+                  'custom:employee_count': {
+                    label: 'Anzahl Mitarbeiter',
+                    placeholder: 'z.B. 5',
+                    order: 8,
+                    type: 'number',
+                    isRequired: false
                   }
                 }
               }}

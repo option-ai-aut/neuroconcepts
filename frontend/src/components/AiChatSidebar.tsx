@@ -22,6 +22,8 @@ export default function AiChatSidebar() {
 
   useEffect(() => {
     const config = getRuntimeConfig();
+    if (!config.apiUrl || config.apiUrl === '' || !userId) return;
+
     // Load history
     fetch(`${config.apiUrl}/chat/history?userId=${userId}`)
       .then(res => res.json())
