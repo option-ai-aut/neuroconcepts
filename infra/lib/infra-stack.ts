@@ -230,6 +230,16 @@ export class NeuroConceptsStack extends cdk.Stack {
       instanceConfiguration: {
         cpu: '1024',
         memory: '2048',
+        instanceRoleArn: new cdk.aws_iam.Role(this, 'AppRunnerInstanceRole', {
+          assumedBy: new cdk.aws_iam.ServicePrincipal('tasks.apprunner.amazonaws.com'),
+        }).roleArn,
+      },
+      healthCheckConfiguration: {
+        protocol: 'TCP',
+        timeout: 5,
+        interval: 10,
+        unhealthyThreshold: 5,
+        healthyThreshold: 1,
       },
     });
 
