@@ -24,7 +24,7 @@ function AdminSidebar() {
   const navigation = [
     { name: 'Übersicht', href: '/admin' },
     { name: 'Team Chat', href: '/admin/chat' },
-    { name: 'KI Konfiguration', href: '/admin/ai-config' },
+    { name: 'Jarvis Konfiguration', href: '/admin/ai-config' },
     { name: 'User Management', href: '/admin/users' },
   ];
 

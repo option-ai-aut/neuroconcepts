@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, Paperclip } from 'lucide-react';
+import { useGlobalState } from '@/context/GlobalStateContext';
+import { getRuntimeConfig } from '@/components/EnvProvider';
 
 interface Message {
   role: 'USER' | 'ASSISTANT';
@@ -10,7 +12,7 @@ interface Message {
 
 export default function AiChatSidebar() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
+  const { aiChatDraft, setAiChatDraft } = useGlobalState();
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -19,8 +21,9 @@ export default function AiChatSidebar() {
   const tenantId = 'default-tenant';
 
   useEffect(() => {
+    const config = getRuntimeConfig();
     // Load history
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat/history?userId=${userId}`)
+    fetch(`${config.apiUrl}/chat/history?userId=${userId}`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) setMessages(data);
@@ -34,15 +37,16 @@ export default function AiChatSidebar() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!aiChatDraft.trim()) return;
 
-    const userMsg = { role: 'USER' as const, content: input };
+    const userMsg = { role: 'USER' as const, content: aiChatDraft };
     setMessages(prev => [...prev, userMsg]);
-    setInput('');
+    setAiChatDraft('');
     setIsLoading(true);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/chat`, {
+      const config = getRuntimeConfig();
+      const res = await fetch(`${config.apiUrl}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -57,27 +61,33 @@ export default function AiChatSidebar() {
       setMessages(prev => [...prev, { role: 'ASSISTANT', content: data.response }]);
     } catch (error) {
       console.error('Chat error:', error);
-      setMessages(prev => [...prev, { role: 'ASSISTANT', content: 'Fehler bei der Verbindung zur KI.' }]);
+      setMessages(prev => [...prev, { role: 'ASSISTANT', content: 'Fehler bei der Verbindung zu Jarvis.' }]);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col h-full bg-white border-l border-gray-200 w-80 shadow-lg">
-      <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+    <div className="flex flex-col h-full bg-white border-l border-gray-200 w-80 shadow-[-10px_0_20px_-5px_rgba(0,0,0,0.1)] z-20 relative">
+      <div className="h-16 px-4 border-b border-gray-200 flex items-center justify-between bg-white shrink-0">
         <div className="flex items-center space-x-2">
-          <Bot className="w-5 h-5 text-indigo-600" />
-          <span className="font-semibold text-gray-800">KI Assistent</span>
+          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-md shadow-indigo-900/50">
+            <Bot className="w-5 h-5 text-white" />
+          </div>
+          <span className="font-bold text-gray-900">Jarvis</span>
         </div>
-        <div className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full">Online</div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
         {messages.length === 0 && (
-          <div className="text-center text-gray-400 text-sm mt-10">
-            <Bot className="w-10 h-10 mx-auto mb-2 opacity-20" />
-            <p>Wie kann ich helfen?</p>
+          <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 space-y-3">
+            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center animate-alive">
+              <Bot className="w-6 h-6 text-gray-300" />
+            </div>
+            <div>
+              <p className="font-medium text-gray-600">Wie kann ich helfen?</p>
+              <p className="text-xs mt-1">Frag mich nach Leads, Objekten oder E-Mails.</p>
+            </div>
           </div>
         )}
         
@@ -86,7 +96,7 @@ export default function AiChatSidebar() {
             <div className={`max-w-[85%] rounded-2xl p-3 text-sm shadow-sm ${
               msg.role === 'USER' 
                 ? 'bg-indigo-600 text-white rounded-br-none' 
-                : 'bg-white border border-gray-100 text-gray-800 rounded-bl-none'
+                : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
             }`}>
               <p className="whitespace-pre-wrap">{msg.content}</p>
             </div>
@@ -94,7 +104,7 @@ export default function AiChatSidebar() {
         ))}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-white border border-gray-100 rounded-2xl rounded-bl-none p-3 shadow-sm">
+            <div className="bg-white border border-gray-200 rounded-2xl rounded-bl-none p-3 shadow-sm">
               <div className="flex space-x-1">
                 <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
                 <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-75"></div>
@@ -106,28 +116,33 @@ export default function AiChatSidebar() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-3 bg-white border-t border-gray-100">
+      <div className="p-4 bg-white border-t border-gray-200">
         <form onSubmit={handleSubmit} className="relative">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Nachricht..."
-            className="w-full pl-4 pr-10 py-3 bg-gray-100 border-none rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
-          />
-          <button
-            type="button"
-            className="absolute right-10 top-3 text-gray-400 hover:text-gray-600"
-          >
-            <Paperclip className="w-4 h-4" />
-          </button>
-          <button
-            type="submit"
-            disabled={isLoading || !input.trim()}
-            className="absolute right-2 top-2 p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 transition-colors"
-          >
-            <Send className="w-4 h-4" />
-          </button>
+          <div className="relative flex items-center">
+            <input
+              type="text"
+              value={aiChatDraft}
+              onChange={(e) => setAiChatDraft(e.target.value)}
+              placeholder="Nachricht an Jarvis..."
+              className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:bg-white transition-all placeholder-gray-400"
+            />
+            <div className="absolute right-2 flex items-center space-x-1">
+              <button
+                type="button"
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Anhang hinzufügen"
+              >
+                <Paperclip className="w-4 h-4" />
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading || !aiChatDraft.trim()}
+                className="p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 transition-colors shadow-sm"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </form>
       </div>
     </div>

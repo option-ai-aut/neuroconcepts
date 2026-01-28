@@ -40,6 +40,28 @@ app.get('/leads', async (req, res) => {
   }
 });
 
+// GET /leads/:id - Get lead details with messages
+app.get('/leads/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const lead = await prisma.lead.findUnique({
+      where: { id },
+      include: {
+        property: true,
+        messages: {
+          orderBy: { createdAt: 'asc' }
+        }
+      }
+    });
+    
+    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+    res.json(lead);
+  } catch (error) {
+    console.error('Error fetching lead:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 // GET /properties - List all properties
 app.get('/properties', async (req, res) => {
   try {
@@ -49,6 +71,138 @@ app.get('/properties', async (req, res) => {
     res.json(properties);
   } catch (error) {
     console.error('Error fetching properties:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// GET /properties/:id - Get property details
+app.get('/properties/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const property = await prisma.property.findUnique({
+      where: { id }
+    });
+    
+    if (!property) return res.status(404).json({ error: 'Property not found' });
+    res.json(property);
+  } catch (error) {
+    console.error('Error fetching property:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// PUT /leads/:id - Update lead details
+app.put('/leads/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { firstName, lastName, email, phone, status, notes } = req.body;
+    
+    const lead = await prisma.lead.update({
+      where: { id },
+      data: {
+        firstName,
+        lastName,
+        email,
+        phone,
+        status,
+        notes
+      }
+    });
+    
+    res.json(lead);
+  } catch (error) {
+    console.error('Error updating lead:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// PUT /properties/:id - Update property details
+app.put('/properties/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, address, price, rooms, area, description, aiFacts } = req.body;
+    
+    const property = await prisma.property.update({
+      where: { id },
+      data: {
+        title,
+        address,
+        price,
+        rooms,
+        area,
+        description,
+        aiFacts
+      }
+    });
+    
+    res.json(property);
+  } catch (error) {
+    console.error('Error updating property:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// POST /leads/:id/email - Send manual email
+app.post('/leads/:id/email', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { subject, body } = req.body;
+    
+    const lead = await prisma.lead.findUnique({ where: { id } });
+    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
+    // --- REAL SENDING LOGIC WOULD GO HERE (SMTP) ---
+    console.log('--- SENDING MANUAL EMAIL ---');
+    console.log('To:', lead.email);
+    console.log('Subject:', subject);
+    console.log('Body:', body);
+    // -----------------------------------------------
+
+    // Log message
+    const message = await prisma.message.create({
+      data: {
+        leadId: lead.id,
+        role: 'ASSISTANT',
+        content: `Subject: ${subject}\n\n${body}`,
+        status: 'SENT'
+      }
+    });
+
+    res.json(message);
+  } catch (error) {
+    console.error('Error sending email:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// DELETE /leads/:id - Delete a lead
+app.delete('/leads/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Delete related messages first (cascade delete would be better in schema)
+    await prisma.message.deleteMany({ where: { leadId: id } });
+    await prisma.lead.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting lead:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// DELETE /properties/:id - Delete a property
+app.delete('/properties/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Check if property has leads
+    const leadCount = await prisma.lead.count({ where: { propertyId: id } });
+    if (leadCount > 0) {
+      return res.status(400).json({ error: 'Cannot delete property with assigned leads' });
+    }
+    
+    await prisma.property.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting property:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -100,8 +254,17 @@ app.post('/leads', async (req, res) => {
     });
 
     // 2. Fetch Context
-    const property = await prisma.property.findUnique({ where: { id: propertyId } });
-    const template = await TemplateService.getTemplateForProperty(tenantId, propertyId);
+    let property = null;
+    let template = null;
+
+    if (propertyId) {
+      property = await prisma.property.findUnique({ where: { id: propertyId } });
+      template = await TemplateService.getTemplateForProperty(tenantId, propertyId);
+    } else {
+      // Fallback: Try to find a default template for the tenant
+      // For now, just skip AI draft if no property is selected
+      console.log('No propertyId provided, skipping AI draft generation');
+    }
 
     if (template && property) {
       // 3. Render Email
@@ -109,25 +272,60 @@ app.post('/leads', async (req, res) => {
       const emailBody = TemplateService.render(template.body, context);
       const emailSubject = TemplateService.render(template.subject, context);
 
-      // 4. Send Email (Mock for now, will connect to SMTP later)
-      console.log('--- SENDING EMAIL ---');
-      console.log('To:', email);
-      console.log('Subject:', emailSubject);
-      console.log('Body:', emailBody);
-      
-      // 5. Log AI Response
+      // 4. Create Draft Message (AI Response)
       await prisma.message.create({
         data: {
           leadId: lead.id,
           role: 'ASSISTANT',
-          content: emailBody
+          content: emailBody,
+          status: 'DRAFT'
         }
       });
+      
+      console.log('Draft message created for lead:', lead.id);
     }
 
     res.status(201).json({ message: 'Lead processed', leadId: lead.id });
   } catch (error) {
     console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// POST /messages/:id/send - Approve and send a draft message
+app.post('/messages/:id/send', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const message = await prisma.message.findUnique({ where: { id } });
+    if (!message) return res.status(404).json({ error: 'Message not found' });
+    if (message.status !== 'DRAFT') return res.status(400).json({ error: 'Message is not a draft' });
+    
+    // Fetch Lead to get email
+    const lead = await prisma.lead.findUnique({ where: { id: message.leadId } });
+    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
+    // --- REAL SENDING LOGIC WOULD GO HERE (SMTP) ---
+    console.log('--- SENDING EMAIL ---');
+    console.log('To:', lead.email);
+    console.log('Body:', message.content);
+    // -----------------------------------------------
+
+    // Update status
+    const updatedMessage = await prisma.message.update({
+      where: { id },
+      data: { status: 'SENT' }
+    });
+
+    // Update Lead Status
+    await prisma.lead.update({
+      where: { id: lead.id },
+      data: { status: 'CONTACTED' }
+    });
+
+    res.json(updatedMessage);
+  } catch (error) {
+    console.error('Error sending message:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });

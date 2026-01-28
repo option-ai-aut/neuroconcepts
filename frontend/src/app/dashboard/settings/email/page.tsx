@@ -19,14 +19,14 @@ export default function EmailSettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-lg font-medium mb-4">E-Mail Empfang (Inbound)</h2>
+    <div className="space-y-10">
+      <div>
+        <h2 className="text-base font-semibold text-gray-900 mb-1">E-Mail Empfang (Inbound)</h2>
         <p className="text-sm text-gray-500 mb-4">
           Leiten Sie alle Anfragen von Immobilienportalen (ImmoScout, Willhaben) an diese Adresse weiter.
         </p>
         <div className="flex items-center space-x-4">
-          <code className="bg-gray-100 px-4 py-2 rounded border border-gray-300 text-gray-800 font-mono select-all">
+          <code className="bg-white px-4 py-2 rounded border border-gray-200 text-gray-800 font-mono text-sm select-all">
             {inboundEmail}
           </code>
           <button 
@@ -38,53 +38,53 @@ export default function EmailSettingsPage() {
         </div>
       </div>
 
-      <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-lg font-medium mb-4">E-Mail Versand (SMTP)</h2>
-        <p className="text-sm text-gray-500 mb-4">
-          Damit wir in Ihrem Namen antworten können, hinterlegen Sie bitte Ihre SMTP-Zugangsdaten.
+      <div className="border-t border-gray-200 pt-8">
+        <h2 className="text-base font-semibold text-gray-900 mb-1">E-Mail Versand (SMTP)</h2>
+        <p className="text-sm text-gray-500 mb-6">
+          Hinterlegen Sie Ihre SMTP-Zugangsdaten, damit sowohl Sie als auch Jarvis E-Mails direkt über Ihre eigene Adresse versenden können.
         </p>
         <div className="grid grid-cols-1 gap-6 max-w-lg">
           <div>
-            <label className="block text-sm font-medium text-gray-700">SMTP Host</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">SMTP Host</label>
             <input 
               name="host"
               type="text" 
               placeholder="z.B. smtp.ionos.de"
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+              className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm focus:ring-indigo-500 focus:border-indigo-500"
               onChange={handleSmtpChange}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Port</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Port</label>
             <input 
               name="port"
               type="number" 
               defaultValue={587}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+              className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm focus:ring-indigo-500 focus:border-indigo-500"
               onChange={handleSmtpChange}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Benutzername</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Benutzername</label>
             <input 
               name="user"
               type="text" 
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+              className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm focus:ring-indigo-500 focus:border-indigo-500"
               onChange={handleSmtpChange}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Passwort</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Passwort</label>
             <input 
               name="password"
               type="password" 
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+              className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm focus:ring-indigo-500 focus:border-indigo-500"
               onChange={handleSmtpChange}
             />
           </div>
         </div>
-        <div className="mt-6">
-          <button className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+        <div className="mt-8">
+          <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-sm transition-colors">
             Verbindung testen & Speichern
           </button>
         </div>

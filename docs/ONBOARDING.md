@@ -29,7 +29,7 @@ Dieser Guide beschreibt den Prozess, um einen neuen Mandanten (Immobilienfirma) 
     - *Test-E-Mail senden lassen zur Bestätigung.*
 
 #### B. Kalender Integration
-*Damit die KI Termine buchen kann.*
+*Damit Jarvis Termine buchen kann.*
 - Klick auf "Connect Calendar".
 - Auswahl der Kalender, die auf "Verfügbarkeit" geprüft werden sollen (z.B. "Arbeit", aber nicht "Privat").
 - Konfiguration der Arbeitszeiten (z.B. Mo-Fr, 09:00 - 17:00).
@@ -37,9 +37,9 @@ Dieser Guide beschreibt den Prozess, um einen neuen Mandanten (Immobilienfirma) 
 ### 4. Content & Routing
 
 #### A. Erstes Objekt anlegen
-- PDF-Exposé hochladen (KI extrahiert Daten).
+- PDF-Exposé hochladen (Jarvis extrahiert Daten).
 - Stammdaten prüfen: Adresse, Kaltmiete, Zimmer, Fläche.
-- **KI-Fakten:** Wichtige Infos ergänzen, die nicht im Exposé stehen (z.B. "Keine WG", "Hund erlaubt").
+- **Jarvis-Fakten:** Wichtige Infos ergänzen, die nicht im Exposé stehen (z.B. "Keine WG", "Hund erlaubt").
 
 #### B. Routing-Regeln
 - Wer bekommt die Leads für dieses Objekt?
@@ -52,13 +52,13 @@ Dieser Guide beschreibt den Prozess, um einen neuen Mandanten (Immobilienfirma) 
 2.  Wir senden eine E-Mail von einem neutralen Account an die Inbound-Adresse.
 3.  **Beobachten:**
     - Lead erscheint im Dashboard ("New").
-    - KI analysiert und sendet Exposé (Status -> "Contacted").
+    - Jarvis analysiert und sendet Exposé (Status -> "Contacted").
     - E-Mail kommt im Test-Postfach an.
 4.  Wir antworten: "Sieht gut aus, wann kann ich besichtigen?"
 5.  **Beobachten:**
-    - KI erkennt Intent "Besichtigung".
-    - KI prüft Kalender des Maklers.
-    - KI antwortet mit konkreten Terminvorschlägen.
+    - Jarvis erkennt Intent "Besichtigung".
+    - Jarvis prüft Kalender des Maklers.
+    - Jarvis antwortet mit konkreten Terminvorschlägen.
 6.  Wir klicken den Link und buchen.
 7.  Termin erscheint im Kalender des Maklers.
 
@@ -72,6 +72,6 @@ Dieser Guide beschreibt den Prozess, um einen neuen Mandanten (Immobilienfirma) 
 - Prüfen: Hat der Token die richtigen Scopes?
 - Re-Connect durchführen.
 
-**KI antwortet nicht:**
+**Jarvis antwortet nicht:**
 - Prüfen: Ist das Objekt "aktiv"?
 - Prüfen: Gibt es offene To-Dos/Eskalationen für diesen Lead?

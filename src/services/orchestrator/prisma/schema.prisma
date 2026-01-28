@@ -36,6 +36,11 @@ model TenantSettings {
   smtpConfig    Json? // { host, port, user, pass }
   stripeConfig  Json? // { customerId, subscriptionId }
   aiPersonality Json? // { tone: "professional", language: "de" }
+  
+  // Calendar Integration (Tokens must be encrypted!)
+  googleCalendarConfig Json? // { accessToken, refreshToken, expiryDate, email }
+  outlookCalendarConfig Json? // { accessToken, refreshToken, expiryDate, email }
+  calendarShareTeam Boolean @default(true)
 }
 
 model User {
@@ -70,6 +75,9 @@ model Lead {
   lastName  String?
   phone     String?
   
+  // Internal
+  notes     String?   @db.Text
+
   // Status
   status    LeadStatus @default(NEW)
   
@@ -125,6 +133,8 @@ model Message {
   
   role      MessageRole // SYSTEM, USER, ASSISTANT
   content   String
+  status    MessageStatus @default(SENT) // Default to SENT for backward compatibility, but AI drafts will be DRAFT
+  
   createdAt DateTime @default(now())
 }
 
@@ -132,6 +142,12 @@ enum MessageRole {
   SYSTEM
   USER
   ASSISTANT
+}
+
+enum MessageStatus {
+  DRAFT
+  SENT
+  FAILED
 }
 
 model UserChat {

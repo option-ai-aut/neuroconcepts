@@ -109,8 +109,8 @@ export default function NewPropertyPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">KI-Fakten (Intern)</label>
-          <p className="text-xs text-gray-500 mb-1">Infos, die die KI wissen muss (z.B. "Keine Haustiere", "Südbalkon").</p>
+          <label className="block text-sm font-medium text-gray-700">Jarvis-Fakten (Intern)</label>
+          <p className="text-xs text-gray-500 mb-1">Infos, die Jarvis wissen muss (z.B. "Keine Haustiere", "Südbalkon").</p>
           <textarea 
             name="aiFacts" 
             rows={2} 

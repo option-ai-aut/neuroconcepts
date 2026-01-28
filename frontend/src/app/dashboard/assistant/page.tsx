@@ -10,7 +10,7 @@ interface Message {
 
 export default function AssistantPage() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Hallo! Ich bin dein KI-Assistent. Wie kann ich dir heute helfen? Ich kann Leads anlegen, Objekte verwalten oder Fragen zu deinem Portfolio beantworten.' }
+    { role: 'assistant', content: 'Hallo! Ich bin Jarvis. Wie kann ich dir heute helfen? Ich kann Leads anlegen, Objekte verwalten oder Fragen zu deinem Portfolio beantworten.' }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -92,7 +92,7 @@ export default function AssistantPage() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Schreibe eine Nachricht an die KI..."
+            placeholder="Schreibe eine Nachricht an Jarvis..."
             className="flex-1 border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           <button

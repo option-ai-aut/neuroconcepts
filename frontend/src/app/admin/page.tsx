@@ -17,9 +17,9 @@ export default function AdminPage() {
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Admin Konsole</h1>
       
       <div className="bg-white shadow rounded-lg p-6 mb-8">
-        <h2 className="text-lg font-medium mb-4">KI Modell Konfiguration</h2>
+        <h2 className="text-lg font-medium mb-4">Jarvis Modell Konfiguration</h2>
         <p className="text-sm text-gray-500 mb-4">
-          Hier kannst du das KI-Modell global für alle Mandanten ändern.
+          Hier kannst du das Jarvis-Modell global für alle Mandanten ändern.
         </p>
         
         <div className="grid grid-cols-1 gap-6">

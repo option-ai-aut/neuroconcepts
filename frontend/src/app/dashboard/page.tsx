@@ -61,7 +61,7 @@ export default function DashboardPage() {
     {
       title: 'Updates',
       value: 'System v1.2',
-      description: 'Neue KI-Features verfügbar',
+      description: 'Neue Jarvis-Features verfügbar',
       icon: Bell,
       href: '#',
       color: 'text-pink-600',
@@ -70,10 +70,13 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-8">Dashboard</h1>
+    <div className="h-full flex flex-col">
+      <div className="border-b border-gray-200 bg-white px-6 pt-6 pb-6 shadow-sm z-10">
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+      </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="flex-1 overflow-auto bg-gray-50/30 p-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {cards.map((card, index) => (
           <Link 
             key={index} 
@@ -114,7 +117,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">KI Insights</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Jarvis Insights</h3>
           <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-100">
             <p className="text-sm text-indigo-800">
               💡 <strong>Tipp:</strong> Die Reaktionszeit auf neue Leads ist heute um 15% schneller als letzte Woche. Weiter so!
@@ -122,6 +125,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

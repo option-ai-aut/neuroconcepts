@@ -51,27 +51,35 @@ export class AiToolExecutor {
 
     switch (toolName) {
       case 'create_lead':
+        // SECURITY: Explicitly destructure args to prevent prototype pollution or overwriting protected fields
+        const { firstName, lastName, email, phone, message } = args;
+        
         return await prisma.lead.create({
           data: {
-            ...args,
-            tenantId,
-            messages: args.message ? {
-              create: { role: 'USER', content: args.message }
+            firstName,
+            lastName,
+            email,
+            phone,
+            tenantId, // Hard-coded from authenticated session
+            messages: message ? {
+              create: { role: 'USER', content: message }
             } : undefined
           }
         });
 
       case 'search_properties':
+        const { query, minPrice, maxPrice } = args;
+        
         return await prisma.property.findMany({
           where: {
-            tenantId,
+            tenantId, // Hard constraint
             OR: [
-              { title: { contains: args.query, mode: 'insensitive' } },
-              { address: { contains: args.query, mode: 'insensitive' } }
+              { title: { contains: query || '', mode: 'insensitive' } },
+              { address: { contains: query || '', mode: 'insensitive' } }
             ],
             price: {
-              gte: args.minPrice,
-              lte: args.maxPrice
+              gte: minPrice,
+              lte: maxPrice
             }
           }
         });

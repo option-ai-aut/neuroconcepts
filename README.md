@@ -12,7 +12,7 @@ NeuroConcepts AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 M
 
 ### Hauptfunktionen (Ticket 1 - MVP)
 - **Lead Intake:** Automatische Erfassung aus E-Mail-Weiterleitungen (ImmoScout, Willhaben) und Web-Formularen.
-- **KI-Kommunikation:** Google Gemini 3 Flash erstellt personalisierte Exposés und beantwortet Rückfragen in Echtzeit (DE/EN/FR/ES).
+- **Jarvis-Kommunikation:** Google Gemini 3 Flash erstellt personalisierte Exposés und beantwortet Rückfragen in Echtzeit (DE/EN/FR/ES).
 - **E-Mail Thread Intelligence:** Ordnet Antworten korrekt zu und führt den Dialog kontextbezogen fort.
 - **Kalender-Sync:** Bidirektionale Synchronisation (Google/Outlook) für automatische Terminbuchung.
 - **White-Labeling:** Versand über die SMTP-Server des Maklers (eigene Domain).
@@ -61,7 +61,7 @@ NeuroConcepts AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 M
 ### Phase 1: MVP (Wochen 1–8) - ✅ COMPLETED
 - [x] AWS Infrastruktur Setup (VPC, RDS, Lambda)
 - [x] E-Mail Inbound Parser & DB Schema
-- [x] KI-Engine Integration (Gemini 3)
+- [x] Jarvis-Engine Integration (Gemini 3)
 - [x] SMTP Outbound & Kalender Sync
 - [x] Dashboard & Stripe Integration
 - [x] Frontend Deployment (AWS Lambda + Docker)
@@ -77,7 +77,7 @@ NeuroConcepts AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 M
 
 - **Datenhaltung:** Konform mit österreichischen und EU-Rechtsvorgaben (DSGVO).
 - **Isolation:** Logische Mandantentrennung (Multi-Tenancy).
-- **Transparenz:** KI-Nachrichten sind im Dashboard klar gekennzeichnet.
+- **Transparenz:** Jarvis-Nachrichten sind im Dashboard klar gekennzeichnet.
 
 ## 📞 Support
 
