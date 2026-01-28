@@ -236,9 +236,9 @@ export class NeuroConceptsStack extends cdk.Stack {
       },
       healthCheckConfiguration: {
         protocol: 'TCP',
-        timeout: 5,
-        interval: 10,
-        unhealthyThreshold: 5,
+        timeout: 10,
+        interval: 20,
+        unhealthyThreshold: 10,
         healthyThreshold: 1,
       },
     });
