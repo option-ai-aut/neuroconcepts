@@ -16,6 +16,7 @@ datasource db {
 model Tenant {
   id        String   @id @default(uuid())
   name      String
+  address   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -44,12 +45,14 @@ model TenantSettings {
 }
 
 model User {
-  id       String @id @default(uuid())
-  email    String @unique
-  name     String
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-  role     Role   @default(AGENT)
+  id        String @id @default(uuid())
+  email     String @unique
+  firstName String?
+  lastName  String?
+  name      String? // Deprecated, keep for backward compatibility
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  role      Role   @default(AGENT)
 
   // Relations
   leads    Lead[] // Leads assigned to this agent

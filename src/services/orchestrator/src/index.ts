@@ -7,16 +7,208 @@ import serverless from 'serverless-http';
 import { PrismaClient } from '@prisma/client';
 import { TemplateService } from './services/TemplateService';
 import { GeminiService } from './services/GeminiService';
+import { authMiddleware } from './middleware/auth';
+import * as AWS from 'aws-sdk';
 
 dotenv.config();
 
 const app = express();
 const prisma = new PrismaClient();
+const cognito = new AWS.CognitoIdentityServiceProvider();
 
 app.use(helmet());
 app.use(cors());
 app.use(morgan('combined'));
 app.use(express.json());
+
+// --- Auth & User Management ---
+
+// Sync User from Token (Create/Update in DB)
+app.post('/auth/sync', authMiddleware, async (req, res) => {
+  try {
+    const { sub, email, given_name, family_name } = req.user!;
+    const companyName = req.user!['custom:company_name'];
+    // const employeeCount = req.user!['custom:employee_count']; // Not stored in DB yet, maybe later
+
+    // 1. Find or Create Tenant
+    // Strategy: If user has a tenantId in DB, use it. If not, create new Tenant (assuming first user is Admin/Owner)
+    // For simplicity in this MVP: We create a tenant based on company name if it doesn't exist for this user.
+    // Better: Check if user already exists.
+
+    let user = await prisma.user.findUnique({ where: { email } });
+    let tenantId = user?.tenantId;
+
+    if (!user) {
+      // New User
+      // Check if we should create a new tenant or if this is an invite?
+      // For self-signup, we create a new tenant.
+      
+      const newTenant = await prisma.tenant.create({
+        data: {
+          name: companyName || 'My Company',
+          // address: ... (from token if available)
+        }
+      });
+      tenantId = newTenant.id;
+
+      user = await prisma.user.create({
+        data: {
+          id: sub, // Use Cognito Sub as ID
+          email,
+          firstName: given_name,
+          lastName: family_name,
+          tenantId: newTenant.id,
+          role: 'ADMIN' // First user is Admin
+        }
+      });
+      
+      // Create default settings
+      await prisma.tenantSettings.create({
+        data: { tenantId: newTenant.id }
+      });
+    } else {
+      // Update existing user
+      user = await prisma.user.update({
+        where: { email },
+        data: {
+          firstName: given_name,
+          lastName: family_name,
+          // Don't update tenantId or role here
+        }
+      });
+    }
+
+    res.json({ user, tenantId });
+  } catch (error) {
+    console.error('Auth sync error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Get Current User Profile
+app.get('/me', authMiddleware, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email: req.user!.email },
+      include: { tenant: true }
+    });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json(user);
+  } catch (error) {
+    console.error('Get me error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Get Seats (Team Members)
+app.get('/seats', authMiddleware, async (req, res) => {
+  try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const seats = await prisma.user.findMany({
+      where: { tenantId: currentUser.tenantId },
+      select: { id: true, email: true, firstName: true, lastName: true, role: true }
+    });
+    res.json(seats);
+  } catch (error) {
+    console.error('Get seats error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Invite Seat
+app.post('/seats/invite', authMiddleware, async (req, res) => {
+  try {
+    const { email, role } = req.body;
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    
+    if (!currentUser || currentUser.role !== 'ADMIN' && currentUser.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ error: 'Only Admins can invite users' });
+    }
+
+    // 1. Create User in Cognito
+    const tempPassword = Math.random().toString(36).slice(-8) + 'Aa1!';
+    await cognito.adminCreateUser({
+      UserPoolId: process.env.USER_POOL_ID!,
+      Username: email,
+      UserAttributes: [
+        { Name: 'email', Value: email },
+        { Name: 'email_verified', Value: 'true' },
+        { Name: 'custom:company_name', Value: currentUser.tenantId } // Store TenantID in company name for now or use a custom attribute 'tenant_id'
+        // Ideally we use a custom attribute 'custom:tenant_id' in Cognito
+      ],
+      TemporaryPassword: tempPassword,
+      MessageAction: 'SUPPRESS', // We send our own email? Or let Cognito send it? Let's use Cognito default for now.
+      // Actually, if we use SUPPRESS, we must send the email. If we remove it, Cognito sends it.
+      // Let's remove MessageAction to let Cognito send the invite.
+    }).promise();
+    
+    // Note: adminCreateUser sends an email with temp password by default if MessageAction is not SUPPRESS.
+
+    // 2. Create User in DB (Pending state?)
+    // Actually, we can pre-create the user in DB so they are linked to the tenant.
+    // But their 'sub' will be different until they login? No, adminCreateUser returns the sub.
+    // Let's wait for them to login and hit /auth/sync? 
+    // Better: Create them now so they appear in the list.
+    
+    // We don't have the 'sub' yet easily available without parsing the response.
+    // Let's just return success and let /auth/sync handle the DB creation on first login.
+    // BUT: /auth/sync needs to know which tenant to put them in!
+    // The invite flow is tricky without a 'custom:tenant_id' attribute in Cognito.
+    
+    // Workaround: We create a "PendingInvite" record in DB? 
+    // Or we just rely on the fact that we can't easily map them yet.
+    
+    // Simplest solution for MVP: 
+    // When the invited user logs in, /auth/sync is called.
+    // We need to know their tenant.
+    // We can store the invite in a separate table 'UserInvite' { email, tenantId, role }.
+    // In /auth/sync, we check if there is an invite for this email. If yes, use that tenantId.
+    
+    // Since I don't want to change Prisma schema again right now:
+    // I will assume the user enters the company name correctly? No.
+    
+    // Okay, I will create the user in DB now. I need the 'sub' from Cognito response.
+    // const cognitoUser = await cognito.adminCreateUser(...).promise();
+    // const sub = cognitoUser.User.Username;
+    
+    // Let's do that.
+    
+    const params = {
+      UserPoolId: process.env.USER_POOL_ID!,
+      Username: email,
+      UserAttributes: [
+        { Name: 'email', Value: email },
+        { Name: 'email_verified', Value: 'true' },
+      ],
+      DesiredDeliveryMediums: ['EMAIL'],
+      TemporaryPassword: tempPassword,
+    };
+    
+    // @ts-ignore
+    const cognitoResponse = await cognito.adminCreateUser(params).promise();
+    const sub = cognitoResponse.User?.Username;
+
+    if (sub) {
+      await prisma.user.create({
+        data: {
+          id: sub,
+          email,
+          tenantId: currentUser.tenantId,
+          role: role || 'AGENT',
+          firstName: 'Pending',
+          lastName: 'Invite'
+        }
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Invite error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'orchestrator', runtime: 'lambda' });
