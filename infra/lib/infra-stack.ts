@@ -191,67 +191,42 @@ export class NeuroConceptsStack extends cdk.Stack {
     this.dbSecret.grantRead(emailProcessor);
     emailBucket.addEventNotification(s3.EventType.OBJECT_CREATED, new s3n.LambdaDestination(emailProcessor));
 
-    // --- 6. Frontend (App Runner) ---
-    // Instead of Amplify, we use App Runner for stable, containerized Next.js hosting.
+    // --- 6. Frontend (Lambda + Web Adapter) ---
+    // We use Lambda with Docker and the AWS Lambda Web Adapter for a serverless Next.js app.
     
-    const frontendImageAsset = new assets.DockerImageAsset(this, 'FrontendImage', {
-      directory: path.join(__dirname, '../../frontend'),
-      buildArgs: {
-        // NEXT_PUBLIC_API_URL is injected at runtime via App Runner env vars
-        // NEXT_PUBLIC_USER_POOL_ID: this.userPool.userPoolId, // These are also Tokens!
-        // NEXT_PUBLIC_USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
+    const frontendLambda = new lambda.DockerImageFunction(this, 'FrontendLambda', {
+      code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, '../../frontend'), {
+        buildArgs: {
+          NEXT_PUBLIC_AWS_REGION: this.region,
+        },
+      }),
+      memorySize: 2048, // Next.js needs some memory
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+        NEXT_PUBLIC_API_URL: api.url,
+        NEXT_PUBLIC_USER_POOL_ID: this.userPool.userPoolId,
+        NEXT_PUBLIC_USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
         NEXT_PUBLIC_AWS_REGION: this.region,
+        PORT: '3000',
+        AWS_LAMBDA_EXEC_WRAPPER: '/opt/extensions/lambda-adapter', // Enable Web Adapter
       },
     });
 
-    const appRunnerService = new apprunner.CfnService(this, 'FrontendService', {
-      serviceName: `NeuroConcepts-Frontend-${props.stageName}`,
-      sourceConfiguration: {
-        autoDeploymentsEnabled: true,
-        authenticationConfiguration: {
-          accessRoleArn: new cdk.aws_iam.Role(this, 'AppRunnerAccessRole', {
-            assumedBy: new cdk.aws_iam.ServicePrincipal('build.apprunner.amazonaws.com'),
-          }).roleArn,
-        },
-        imageRepository: {
-          imageIdentifier: frontendImageAsset.imageUri,
-          imageRepositoryType: 'ECR',
-          imageConfiguration: {
-            port: '3000',
-            runtimeEnvironmentVariables: [
-              { name: 'NEXT_PUBLIC_API_URL', value: api.url },
-              { name: 'NEXT_PUBLIC_USER_POOL_ID', value: this.userPool.userPoolId },
-              { name: 'NEXT_PUBLIC_USER_POOL_CLIENT_ID', value: this.userPoolClient.userPoolClientId },
-              { name: 'NEXT_PUBLIC_AWS_REGION', value: this.region },
-            ],
-          },
-        },
-      },
-      instanceConfiguration: {
-        cpu: '1024',
-        memory: '2048',
-        instanceRoleArn: new cdk.aws_iam.Role(this, 'AppRunnerInstanceRole', {
-          assumedBy: new cdk.aws_iam.ServicePrincipal('tasks.apprunner.amazonaws.com'),
-        }).roleArn,
-      },
-      healthCheckConfiguration: {
-        protocol: 'TCP',
-        timeout: 10,
-        interval: 20,
-        unhealthyThreshold: 10,
-        healthyThreshold: 1,
+    const frontendUrl = frontendLambda.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      cors: {
+        allowedOrigins: ['*'],
+        allowedMethods: [lambda.HttpMethod.ALL],
+        allowedHeaders: ['*'],
       },
     });
-
-    // Grant App Runner permission to pull from ECR
-    frontendImageAsset.repository.grantPull(new cdk.aws_iam.ServicePrincipal('build.apprunner.amazonaws.com'));
 
     // --- Outputs ---
     new cdk.CfnOutput(this, 'VpcId', { value: this.vpc.vpcId });
     new cdk.CfnOutput(this, 'DBEndpoint', { value: this.dbEndpoint });
     new cdk.CfnOutput(this, 'EmailBucketName', { value: emailBucket.bucketName });
     new cdk.CfnOutput(this, 'OrchestratorApiUrl', { value: api.url });
-    new cdk.CfnOutput(this, 'FrontendUrl', { value: appRunnerService.attrServiceUrl });
+    new cdk.CfnOutput(this, 'FrontendUrl', { value: frontendUrl.url });
     new cdk.CfnOutput(this, 'UserPoolId', { value: this.userPool.userPoolId });
     new cdk.CfnOutput(this, 'UserPoolClientId', { value: this.userPoolClient.userPoolClientId });
   }
