@@ -5,6 +5,16 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'stage'
+        type: choice
+        options:
+          - dev
+          - stage
+          - prod
 
 jobs:
   deploy:
@@ -36,14 +46,25 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-central-1
 
-      - name: Deploy to Stage (on main push)
-        if: github.ref == 'refs/heads/main'
+      # 1. AUTOMATIC: Deploy to Dev on Push
+      - name: Deploy to Dev (Automatic)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           cd infra
-          npx cdk deploy NeuroConcepts-Stage --require-approval never
+          echo "🚀 Auto-deploying to NeuroConcepts-Dev..."
+          npx cdk deploy NeuroConcepts-Dev --require-approval never
 
-      - name: Deploy to Dev (Manual Dispatch)
+      # 2. MANUAL: Deploy to Selected Environment
+      - name: Deploy to Selected Environment (Manual)
         if: github.event_name == 'workflow_dispatch'
         run: |
           cd infra
-          npx cdk deploy NeuroConcepts-Dev --require-approval never
+          ENV_NAME="${{ inputs.environment }}"
+          
+          # Convert input (dev/stage/prod) to Stack Name (NeuroConcepts-Dev/Stage/Prod)
+          # Capitalize first letter: dev -> Dev
+          STACK_SUFFIX="$(tr '[:lower:]' '[:upper:]' <<< ${ENV_NAME:0:1})${ENV_NAME:1}"
+          STACK_NAME="NeuroConcepts-$STACK_SUFFIX"
+          
+          echo "🚀 Manually deploying to $STACK_NAME..."
+          npx cdk deploy $STACK_NAME --require-approval never
