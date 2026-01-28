@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // output: 'standalone', // Disabled to let Amplify handle the build natively
+  output: 'standalone', // Required for Docker
   eslint: {
     ignoreDuringBuilds: true,
   },

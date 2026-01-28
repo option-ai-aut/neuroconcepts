@@ -190,66 +190,57 @@ export class NeuroConceptsStack extends cdk.Stack {
       }
     });
 
-    // --- 6. Frontend (Amplify) ---
+    // --- 6. Frontend (App Runner) ---
+    // Instead of Amplify, we use App Runner for stable, containerized Next.js hosting.
     
-    const amplifyApp = new amplify.App(this, 'NeuroConceptsFrontend', {
-      appName: `NeuroConcepts-${props.stageName}`,
-      sourceCodeProvider: new amplify.GitHubSourceCodeProvider({
-        owner: 'option-ai-aut',
-        repository: 'neuroconcepts',
-        oauthToken: cdk.SecretValue.secretsManager('github-token-new'),
-      }),
-      autoBranchCreation: {
-        patterns: ['main', 'dev/*'],
-      },
-      environmentVariables: {
+    const frontendImageAsset = new assets.DockerImageAsset(this, 'FrontendImage', {
+      directory: path.join(__dirname, '../../frontend'),
+      buildArgs: {
         NEXT_PUBLIC_API_URL: api.url,
         NEXT_PUBLIC_USER_POOL_ID: this.userPool.userPoolId,
         NEXT_PUBLIC_USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
         NEXT_PUBLIC_AWS_REGION: this.region,
-        AMPLIFY_MONOREPO_APP_ROOT: 'frontend',
       },
-      buildSpec: codebuild.BuildSpec.fromObject({
-        version: '1.0',
-        applications: [
-          {
-            frontend: {
-              phases: {
-                preBuild: {
-                  commands: [
-                    'npm ci',
-                    'echo "NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" >> .env.production',
-                    'echo "NEXT_PUBLIC_USER_POOL_ID=$NEXT_PUBLIC_USER_POOL_ID" >> .env.production',
-                    'echo "NEXT_PUBLIC_USER_POOL_CLIENT_ID=$NEXT_PUBLIC_USER_POOL_CLIENT_ID" >> .env.production',
-                    'echo "NEXT_PUBLIC_AWS_REGION=$NEXT_PUBLIC_AWS_REGION" >> .env.production',
-                  ],
-                },
-                build: {
-                  commands: ['npm run build'],
-                },
-              },
-              artifacts: {
-                baseDirectory: '.next',
-                files: ['**/*'],
-              },
-              cache: {
-                paths: ['node_modules/**/*'],
-              },
-            },
-            appRoot: 'frontend',
-          },
-        ],
-      }),
     });
 
-    const mainBranch = amplifyApp.addBranch('main');
+    const appRunnerService = new apprunner.CfnService(this, 'FrontendService', {
+      serviceName: `NeuroConcepts-Frontend-${props.stageName}`,
+      sourceConfiguration: {
+        autoDeploymentsEnabled: true,
+        authenticationConfiguration: {
+          accessRoleArn: new cdk.aws_iam.Role(this, 'AppRunnerAccessRole', {
+            assumedBy: new cdk.aws_iam.ServicePrincipal('build.apprunner.amazonaws.com'),
+          }).roleArn,
+        },
+        imageRepository: {
+          imageIdentifier: frontendImageAsset.imageUri,
+          imageRepositoryType: 'ECR',
+          imageConfiguration: {
+            port: '3000',
+            runtimeEnvironmentVariables: [
+              { name: 'NEXT_PUBLIC_API_URL', value: api.url },
+              { name: 'NEXT_PUBLIC_USER_POOL_ID', value: this.userPool.userPoolId },
+              { name: 'NEXT_PUBLIC_USER_POOL_CLIENT_ID', value: this.userPoolClient.userPoolClientId },
+              { name: 'NEXT_PUBLIC_AWS_REGION', value: this.region },
+            ],
+          },
+        },
+      },
+      instanceConfiguration: {
+        cpu: '1024',
+        memory: '2048',
+      },
+    });
+
+    // Grant App Runner permission to pull from ECR
+    frontendImageAsset.repository.grantPull(new cdk.aws_iam.ServicePrincipal('build.apprunner.amazonaws.com'));
 
     // --- Outputs ---
     new cdk.CfnOutput(this, 'VpcId', { value: this.vpc.vpcId });
     new cdk.CfnOutput(this, 'DBEndpoint', { value: this.dbEndpoint });
     new cdk.CfnOutput(this, 'EmailBucketName', { value: emailBucket.bucketName });
     new cdk.CfnOutput(this, 'OrchestratorApiUrl', { value: api.url });
-    new cdk.CfnOutput(this, 'AmplifyAppId', { value: amplifyApp.appId });
+    new cdk.CfnOutput(this, 'FrontendUrl', { value: appRunnerService.attrServiceUrl });
     new cdk.CfnOutput(this, 'UserPoolId', { value: this.userPool.userPoolId });
     new cdk.CfnOutput(this, 'UserPoolClientId', { value: this.userPoolClient.userPoolClientId });
   }
