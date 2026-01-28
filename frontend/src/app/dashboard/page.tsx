@@ -11,6 +11,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 
+// Dashboard Page
 export default function DashboardPage() {
   const cards = [
     {
