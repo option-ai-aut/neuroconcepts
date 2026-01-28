@@ -13,14 +13,10 @@ applications:
           commands:
             - npm run build
       artifacts:
-        baseDirectory: .next
+        baseDirectory: .
         files:
           - '**/*'
       cache:
         paths:
           - node_modules/**/*
-      customRules:
-        - source: /<*>
-          target: /index.html
-          status: 404-200
     appRoot: frontend
