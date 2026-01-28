@@ -6,7 +6,7 @@ const getApiUrl = () => {
   return config.apiUrl || 'https://1rnmc2z8eg.execute-api.eu-central-1.amazonaws.com/dev';
 };
 
-const getAuthHeaders = async () => {
+const getAuthHeaders = async (): Promise<HeadersInit> => {
   try {
     const session = await fetchAuthSession();
     const token = session.tokens?.idToken?.toString();
