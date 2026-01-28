@@ -38,8 +38,8 @@ graph TD
         Billing -->|Events| Stripe[Stripe API]
     end
 
-    subgraph "Frontend (Amplify)"
-        NextJS[Next.js App] --> API
+    subgraph "Frontend (Lambda + Web Adapter)"
+        NextJS[Next.js Docker Container] --> API
         NextJS --> Cognito[AWS Cognito]
     end
 
@@ -77,9 +77,11 @@ graph TD
 *   **Kalender:** Direkte Integration via Google Calendar API und Microsoft Graph API. Wir nutzen Refresh Tokens für dauerhaften Zugriff.
 *   **Stripe:** Abwicklung von Subscriptions. Webhooks von Stripe aktualisieren den Lizenz-Status im `Tenant Manager`.
 
-### 6. Frontend (AWS Amplify)
+### 6. Frontend (AWS Lambda)
 *   **Framework:** Next.js 15 (App Router).
-*   **Hosting:** AWS Amplify Gen 2 (Compute).
+*   **Hosting:** **AWS Lambda (Docker Image)**.
+    *   Wir nutzen den **AWS Lambda Web Adapter**, um die Next.js App als normalen Webserver im Container laufen zu lassen.
+    *   Dies ermöglicht "Scale to Zero" (0€ Kosten bei Inaktivität) und unendliche Skalierung bei Last.
 *   **Auth:** AWS Cognito User Pool für sicheren Login/Registrierung.
 
 ## 🔒 Sicherheit & Compliance
@@ -104,11 +106,12 @@ Wir nutzen **AWS CDK (Cloud Development Kit)**, um die gesamte Infrastruktur im 
 ### Environment-Strategie
 1.  **Dev** (`NeuroConcepts-Dev`):
     *   Für die tägliche Entwicklung.
-    *   Ressourcen sind minimal dimensioniert (0 NAT Gateways, RDS Micro).
+    *   **Deployment:** Automatisch bei Push auf `main`.
+    *   Ressourcen: RDS Micro, Lambda Frontend (Scale to Zero).
 2.  **Stage** (`NeuroConcepts-Stage`):
     *   Spiegelbild der Produktion.
-    *   Hierhin wird der `main`-Branch automatisch deployed (CI/CD).
+    *   **Deployment:** Manuell via GitHub Actions (Workflow Dispatch).
 3.  **Prod** (`NeuroConcepts-Prod`):
     *   Das Live-System.
-    *   Zugriff stark eingeschränkt.
+    *   **Deployment:** Manuell via GitHub Actions (Workflow Dispatch).
     *   Backups und High-Availability aktiviert.

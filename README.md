@@ -1,6 +1,6 @@
 # NeuroConcepts AI - B2B Real Estate Automation Platform
 
-**Status:** Phase 1 (MVP) - Live on AWS Amplify  
+**Status:** Phase 1 (MVP) - Live on AWS Lambda (Dev)  
 **Target Launch:** Q2 2026  
 **Focus:** DACH Region (Germany, Austria, Switzerland)
 
@@ -38,7 +38,7 @@ NeuroConcepts AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 M
 
 ### Frontend
 - **Framework:** Next.js 15 (App Router)
-- **Hosting:** AWS Amplify Gen 2
+- **Hosting:** AWS Lambda (via Docker + AWS Lambda Web Adapter)
 - **UI:** Tailwind CSS + Amplify UI Components
 
 ## 📂 Projektstruktur
@@ -50,7 +50,7 @@ NeuroConcepts AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 M
 │   ├── ARCHITECTURE.md   # Technische Architektur & Datenflüsse
 │   ├── ONBOARDING.md     # Checklisten für neue Kunden
 │   └── AI_GUIDELINES.md  # Prompting-Strategien & Sicherheitsregeln
-├── frontend/             # Next.js Frontend App
+├── frontend/             # Next.js Frontend App (Dockerized)
 ├── infra/                # AWS CDK Infrastructure Code
 ├── src/                  # Backend Services (Orchestrator, Email Parser)
 └── README.md             # Diese Datei
@@ -64,7 +64,7 @@ NeuroConcepts AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 M
 - [x] KI-Engine Integration (Gemini 3)
 - [x] SMTP Outbound & Kalender Sync
 - [x] Dashboard & Stripe Integration
-- [x] Frontend Deployment (Amplify)
+- [x] Frontend Deployment (AWS Lambda + Docker)
 - [x] Authentication (Cognito)
 
 ### Phase 2: Post-Termin (Monate 3–6)
