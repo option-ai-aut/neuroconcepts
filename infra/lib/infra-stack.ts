@@ -123,7 +123,7 @@ export class NeuroConceptsStack extends cdk.Stack {
         address: { required: false, mutable: true },
       },
       customAttributes: {
-        'company_name': new cognito.StringAttribute({ mutable: true }),
+        // 'company_name': new cognito.StringAttribute({ mutable: true }),
         // 'employee_count': new cognito.NumberAttribute({ mutable: true }), // Temporarily removed to fix update error
       },
       removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
