@@ -207,10 +207,12 @@ export class NeuroConceptsStack extends cdk.Stack {
       memorySize: 2048, // Next.js needs some memory
       timeout: cdk.Duration.seconds(30),
       environment: {
-        NEXT_PUBLIC_API_URL: api.url,
-        NEXT_PUBLIC_USER_POOL_ID: this.userPool.userPoolId,
-        NEXT_PUBLIC_USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
-        NEXT_PUBLIC_AWS_REGION: this.region,
+        // RUNTIME_ vars are read at runtime by the /api/config endpoint
+        // NEXT_PUBLIC_ vars are baked in at build time and won't work for dynamic values
+        RUNTIME_API_URL: api.url,
+        RUNTIME_USER_POOL_ID: this.userPool.userPoolId,
+        RUNTIME_USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
+        RUNTIME_AWS_REGION: this.region,
         PORT: '3000',
         AWS_LAMBDA_EXEC_WRAPPER: '/opt/extensions/lambda-adapter', // Enable Web Adapter
       },
