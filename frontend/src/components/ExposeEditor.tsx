@@ -218,7 +218,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
             name: 'Neue Vorlage',
             blocks: [],
             theme: 'default',
-            tenantId: '',
+            isDefault: false,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           });
@@ -280,10 +280,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     if (!propertyId || !selectedId) return;
     setLoading(true);
     try {
-      const newExpose = await createExpose({
-        propertyId,
-        templateId: selectedId,
-      });
+      const newExpose = await createExpose(propertyId, selectedId);
       setExpose(newExpose);
       setTemplates([]);
     } catch (error) {
