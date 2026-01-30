@@ -25,6 +25,31 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
+/* Global Border Radius */
+* {
+  --radius-sm: 0.25rem;  /* 4px */
+  --radius-md: 0.5rem;   /* 8px */
+  --radius-lg: 0.75rem;  /* 12px */
+  --radius-xl: 1rem;     /* 16px */
+}
+
+/* Apply to common elements */
+.rounded-sm { border-radius: var(--radius-sm); }
+.rounded, .rounded-md { border-radius: var(--radius-md); }
+.rounded-lg { border-radius: var(--radius-lg); }
+.rounded-xl { border-radius: var(--radius-xl); }
+.rounded-2xl { border-radius: 1.75rem; }
+
+/* Specific overrides for consistent look */
+input, textarea, select, button {
+  border-radius: var(--radius-md) !important;
+}
+
+/* Dashboard Cards */
+.shadow-sm {
+  border-radius: var(--radius-xl) !important;
+}
+
 @keyframes float-rotate {
   0% {
     transform: translateY(0px) rotate(0deg);

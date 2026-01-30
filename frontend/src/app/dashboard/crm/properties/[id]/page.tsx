@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useState, use, useRef } from 'react';
-import { getProperty, Property, updateProperty, deleteProperty } from '@/lib/api';
+import { getProperty, Property, updateProperty, deleteProperty, getExposes, Expose } from '@/lib/api';
 import { useRouter } from 'next/navigation';
-import { Building, MapPin, Euro, Maximize, Home, FileText, ArrowLeft, MoreVertical, Trash2, Save } from 'lucide-react';
+import { Building, MapPin, Euro, Maximize, Home, FileText, ArrowLeft, MoreVertical, Trash2, Save, FileImage, Plus } from 'lucide-react';
 import Link from 'next/link';
+import { useGlobalState } from '@/context/GlobalStateContext';
 
 export default function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [property, setProperty] = useState<Property | null>(null);
+  const [exposes, setExposes] = useState<Expose[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Edit State
@@ -20,6 +22,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
 
   const router = useRouter();
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { openDrawer, updateExposeEditor } = useGlobalState();
 
   useEffect(() => {
     loadProperty();
@@ -46,12 +49,24 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
     }
   };
 
-  const loadProperty = () => {
-    getProperty(id).then((data) => {
-      setProperty(data);
-      setFormData(data || {});
-      setLoading(false);
+  const loadProperty = async () => {
+    const [propertyData, exposesData] = await Promise.all([
+      getProperty(id),
+      getExposes(id).catch(() => [])
+    ]);
+    setProperty(propertyData);
+    setFormData(propertyData || {});
+    setExposes(exposesData);
+    setLoading(false);
+  };
+
+  const handleOpenExposeEditor = (exposeId?: string) => {
+    updateExposeEditor({ 
+      propertyId: id, 
+      exposeId: exposeId,
+      isTemplate: false 
     });
+    openDrawer('EXPOSE_EDITOR');
   };
 
   const handleInputChange = (field: keyof Property, value: string | number) => {
@@ -80,9 +95,9 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   if (!property) return <div className="p-8 text-center text-red-500">Objekt nicht gefunden.</div>;
 
   return (
-    <div className="h-full flex flex-col bg-gray-50/30">
+    <div className="h-full flex flex-col bg-white">
       {/* Top Bar */}
-      <div className="h-16 border-b border-gray-200 bg-white px-6 flex items-center justify-between shrink-0">
+      <div className="h-16 bg-white px-6 flex items-center justify-between shrink-0">
         <div className="flex items-center">
           <Link href="/dashboard/crm/properties" className="mr-4 p-2 hover:bg-gray-100 rounded-full text-gray-500 hover:text-gray-900 transition-colors">
             <ArrowLeft className="w-5 h-5" />
@@ -250,6 +265,62 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 />
               </div>
             </div>
+          </div>
+
+          {/* Exposé Card */}
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                <FileImage className="w-5 h-5 mr-2 text-indigo-600" />
+                Exposé
+              </h2>
+              <button
+                onClick={() => handleOpenExposeEditor()}
+                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                {exposes.length > 0 ? 'Bearbeiten' : 'Erstellen'}
+              </button>
+            </div>
+
+            {exposes.length > 0 ? (
+              <div className="space-y-2">
+                {exposes.map((expose) => (
+                  <div
+                    key={expose.id}
+                    onClick={() => handleOpenExposeEditor(expose.id)}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                        <FileImage className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {expose.template?.name || 'Individuelles Exposé'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {expose.blocks?.length || 0} Blöcke • {expose.status === 'PUBLISHED' ? 'Veröffentlicht' : 'Entwurf'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      expose.status === 'PUBLISHED' 
+                        ? 'bg-green-100 text-green-700' 
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {expose.status === 'PUBLISHED' ? 'Live' : 'Entwurf'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-400">
+                <FileImage className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <p className="text-sm">Noch kein Exposé erstellt</p>
+                <p className="text-xs mt-1">Klicke auf "Erstellen" um loszulegen</p>
+              </div>
+            )}
           </div>
 
           {/* Bilder & Dokumente Placeholder */}

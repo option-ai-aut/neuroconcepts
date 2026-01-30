@@ -20,9 +20,9 @@ export default function SettingsLayout({
   ];
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="border-b border-gray-200 bg-white px-6 pt-6 pb-0 shadow-sm z-10">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Einstellungen</h1>
+    <div className="h-full flex flex-col relative bg-white">
+      <div className="pt-8 px-8 pb-0">
+        <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight mb-6">Einstellungen</h1>
         <nav className="-mb-px flex space-x-8" aria-label="Tabs">
           {tabs.map((tab) => (
             <Link
@@ -39,7 +39,7 @@ export default function SettingsLayout({
           ))}
         </nav>
       </div>
-      <div className="flex-1 overflow-auto bg-gray-50/30 p-8">
+      <div className="flex-1 overflow-auto bg-white p-8 pt-8">
         <div className="max-w-3xl">
           {children}
         </div>

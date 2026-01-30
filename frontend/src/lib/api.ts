@@ -46,6 +46,41 @@ export interface Property {
   rooms?: number;
   area?: number;
   description?: string;
+  aiFacts?: string;
+  images?: string[];      // Property photos
+  floorplans?: string[];  // Floor plan images
+}
+
+// Exposé Types
+export interface ExposeBlock {
+  id: string;
+  type: string;
+  [key: string]: any;
+}
+
+export interface ExposeTemplate {
+  id: string;
+  name: string;
+  blocks: ExposeBlock[];
+  theme: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Expose {
+  id: string;
+  propertyId: string;
+  property?: Property;
+  templateId?: string;
+  template?: { id: string; name: string; updatedAt: string };
+  createdFromTemplateAt?: string;
+  blocks: ExposeBlock[];
+  theme: string;
+  status: 'DRAFT' | 'PUBLISHED';
+  pdfUrl?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface TemplateRenderRequest {
@@ -56,6 +91,8 @@ export interface TemplateRenderRequest {
 export const API_ENDPOINTS = {
   LEADS: '/leads',
   PROPERTIES: '/properties',
+  EXPOSE_TEMPLATES: '/expose-templates',
+  EXPOSES: '/exposes',
 };
 
 export async function fetcher(url: string) {
@@ -176,8 +213,8 @@ export async function getProperty(id: string): Promise<Property | null> {
     const res = await fetch(`${getApiUrl()}/properties/${id}`, { headers });
     if (!res.ok) return null;
     return await res.json();
-  } catch (error) {
-    console.error('API Error:', error);
+  } catch {
+    // Backend not available - silent fail
     return null;
   }
 }
@@ -259,4 +296,203 @@ export async function inviteSeat(email: string, role: string) {
   });
   if (!res.ok) throw new Error('Failed to invite user');
   return res.json();
+}
+
+// --- Chat ---
+
+export async function getChannels() {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/channels`, { headers });
+  if (!res.ok) throw new Error('Failed to fetch channels');
+  return res.json();
+}
+
+export async function getChannelMessages(channelId: string) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/channels/${channelId}/messages`, { headers });
+  if (!res.ok) throw new Error('Failed to fetch messages');
+  return res.json();
+}
+
+export async function sendChannelMessage(channelId: string, content: string) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/channels/${channelId}/messages`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) throw new Error('Failed to send message');
+  return res.json();
+}
+
+// --- Exposé Templates ---
+
+export async function getExposeTemplates(): Promise<ExposeTemplate[]> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/expose-templates`, { headers });
+  if (!res.ok) throw new Error('Failed to fetch expose templates');
+  return res.json();
+}
+
+export async function getExposeTemplate(id: string): Promise<ExposeTemplate | null> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/expose-templates/${id}`, { headers });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function createExposeTemplate(data: Partial<ExposeTemplate>) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/expose-templates`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to create expose template');
+  return res.json();
+}
+
+export async function updateExposeTemplate(id: string, data: Partial<ExposeTemplate>) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/expose-templates/${id}`, {
+    method: 'PUT',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to update expose template');
+  return res.json();
+}
+
+export async function deleteExposeTemplate(id: string) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/expose-templates/${id}`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!res.ok) throw new Error('Failed to delete expose template');
+  return res.json();
+}
+
+// --- Exposés (Instances) ---
+
+export async function getExposes(propertyId?: string): Promise<Expose[]> {
+  const headers = await getAuthHeaders();
+  const url = propertyId 
+    ? `${getApiUrl()}/exposes?propertyId=${propertyId}`
+    : `${getApiUrl()}/exposes`;
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error('Failed to fetch exposes');
+  return res.json();
+}
+
+export async function getExpose(id: string): Promise<Expose | null> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/exposes/${id}`, { headers });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function createExpose(propertyId: string, templateId?: string) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/exposes`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ propertyId, templateId }),
+  });
+  if (!res.ok) throw new Error('Failed to create expose');
+  return res.json();
+}
+
+export async function updateExpose(id: string, data: Partial<Expose>) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/exposes/${id}`, {
+    method: 'PUT',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to update expose');
+  return res.json();
+}
+
+export async function regenerateExpose(id: string) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/exposes/${id}/regenerate`, {
+    method: 'POST',
+    headers,
+  });
+  if (!res.ok) throw new Error('Failed to regenerate expose');
+  return res.json();
+}
+
+export async function deleteExpose(id: string) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/exposes/${id}`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!res.ok) throw new Error('Failed to delete expose');
+  return res.json();
+}
+
+// --- Jarvis AI ---
+
+export async function chatWithJarvisForExpose(exposeId: string, message: string, history: { role: string; content: string }[] = []) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/exposes/${exposeId}/chat`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, history }),
+  });
+  if (!res.ok) throw new Error('Failed to chat with Jarvis');
+  return res.json();
+}
+
+export async function generatePropertyText(propertyId: string, textType: 'description' | 'headline' | 'highlights' | 'location', options?: {
+  tone?: 'professional' | 'luxurious' | 'friendly' | 'modern';
+  maxLength?: number;
+}) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/properties/${propertyId}/generate-text`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ textType, ...options }),
+  });
+  if (!res.ok) throw new Error('Failed to generate text');
+  return res.json();
+}
+
+// --- PDF Export ---
+
+export async function downloadExposePdf(exposeId: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/exposes/${exposeId}/pdf`, { headers });
+  
+  if (!res.ok) throw new Error('Failed to generate PDF');
+  
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `expose-${exposeId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+}
+
+export async function downloadTemplatePdf(templateId: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/expose-templates/${templateId}/pdf`, { headers });
+  
+  if (!res.ok) throw new Error('Failed to generate PDF');
+  
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `vorlage-${templateId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
 }

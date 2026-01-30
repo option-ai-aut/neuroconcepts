@@ -21,11 +21,13 @@ model Tenant {
   updatedAt DateTime @updatedAt
 
   // Relations
-  users      User[]
-  leads      Lead[]
-  properties Property[]
-  templates  EmailTemplate[]
-  settings   TenantSettings?
+  users           User[]
+  leads           Lead[]
+  properties      Property[]
+  emailTemplates  EmailTemplate[] @relation("TenantEmailTemplates")
+  exposeTemplates ExposeTemplate[] @relation("TenantExposeTemplates")
+  settings        TenantSettings?
+  channels        Channel[]
 }
 
 model TenantSettings {
@@ -42,6 +44,9 @@ model TenantSettings {
   googleCalendarConfig Json? // { accessToken, refreshToken, expiryDate, email }
   outlookCalendarConfig Json? // { accessToken, refreshToken, expiryDate, email }
   calendarShareTeam Boolean @default(true)
+  
+  // Auto-Reply Settings
+  autoReplyEnabled Boolean @default(false) // If true, Jarvis sends emails automatically
 }
 
 model User {
@@ -57,6 +62,8 @@ model User {
   // Relations
   leads    Lead[] // Leads assigned to this agent
   chats    UserChat[]
+  channelMemberships ChannelMember[]
+  channelMessages    ChannelMessage[]
 }
 
 enum Role {
@@ -124,7 +131,14 @@ model Property {
   // AI Context
   aiFacts     String? // "No pets allowed", "South facing balcony"
   
+  // Media - separated for AI to distinguish
+  images      String[] // Array of S3 URLs for property photos
+  floorplans  String[] // Array of S3 URLs for floor plans
+  
+  // Relations
   leads       Lead[]
+  exposes     Expose[]
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -162,12 +176,61 @@ model UserChat {
   createdAt DateTime @default(now())
 }
 
+// --- Team Chat ---
+
+model Channel {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  name      String   // "General", "Sales", or "DM-User1-User2"
+  type      ChannelType
+  
+  messages  ChannelMessage[]
+  members   ChannelMember[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum ChannelType {
+  PUBLIC
+  PRIVATE
+  DM
+}
+
+model ChannelMember {
+  id        String   @id @default(uuid())
+  channelId String
+  channel   Channel  @relation(fields: [channelId], references: [id])
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  joinedAt  DateTime @default(now())
+  
+  @@unique([channelId, userId])
+}
+
+model ChannelMessage {
+  id        String   @id @default(uuid())
+  channelId String
+  channel   Channel  @relation(fields: [channelId], references: [id])
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  content   String   @db.Text
+  
+  createdAt DateTime @default(now())
+}
+
 // --- Orchestrator & Templates ---
 
 model EmailTemplate {
   id        String   @id @default(uuid())
   tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  tenant    Tenant   @relation("TenantEmailTemplates", fields: [tenantId], references: [id])
   
   name      String   // "Exposé Default", "Follow-up 1"
   subject   String   // "Ihr Exposé für {{property.title}}"
@@ -180,4 +243,58 @@ model EmailTemplate {
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// --- Exposé System ---
+
+model ExposeTemplate {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation("TenantExposeTemplates", fields: [tenantId], references: [id])
+  
+  name      String   // "Modern Minimalist", "Klassisch Elegant"
+  blocks    Json     // Array of ExposeBlock with placeholders
+  
+  // Styling
+  theme     String   @default("default") // "default", "modern", "classic", "luxury"
+  
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Instances created from this template
+  exposes   Expose[]
+}
+
+model Expose {
+  id          String   @id @default(uuid())
+  tenantId    String
+  
+  // Relations
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+  
+  // Template reference (optional - to detect updates)
+  templateId  String?
+  template    ExposeTemplate? @relation(fields: [templateId], references: [id])
+  createdFromTemplateAt DateTime? // When was this generated from template
+  
+  // Content (concrete data, no placeholders)
+  blocks      Json     // Array of ExposeBlock with real data
+  theme       String   @default("default")
+  
+  // Status
+  status      ExposeStatus @default(DRAFT)
+  
+  // Generated PDF
+  pdfUrl      String?  // S3 URL to generated PDF
+  pdfGeneratedAt DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum ExposeStatus {
+  DRAFT
+  PUBLISHED
 }

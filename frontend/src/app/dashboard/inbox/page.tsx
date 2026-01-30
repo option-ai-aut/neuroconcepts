@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Lead, fetcher, API_ENDPOINTS, sendDraftMessage } from '@/lib/api';
-import { RefreshCw, Search, User, Clock, MessageSquare, Send, Mail } from 'lucide-react';
+import { RefreshCw, Search, User, Clock, MessageSquare, Send, Mail, Plus } from 'lucide-react';
 import useSWR from 'swr';
 import { useGlobalState } from '@/context/GlobalStateContext';
 
@@ -40,35 +40,33 @@ export default function InboxPage() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-white">
-      {/* Header */}
-      <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center shrink-0">
-        <h1 className="text-2xl font-bold text-gray-900">Posteingang</h1>
-        <button 
-          onClick={() => mutate()}
-          disabled={isValidating}
-          className={`p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all ${isValidating ? 'animate-spin' : ''}`}
-          title="Aktualisieren"
-        >
-          <RefreshCw className="w-5 h-5" />
-        </button>
+    <div className="h-full flex flex-col relative">
+      <div className="pt-8 px-8 pb-4">
+        <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Posteingang</h1>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar: Message List */}
-        <div className="w-96 border-r border-gray-200 flex flex-col bg-gray-50/30">
+        <div className="w-96 flex flex-col bg-gray-50/30">
           {/* Search */}
-          <div className="p-4 border-b border-gray-200 bg-white">
-            <div className="relative">
+          <div className="p-4 bg-white flex gap-2">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input 
                 type="text"
                 placeholder="Suchen..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent focus:bg-white focus:border-indigo-500 focus:ring-0 rounded-lg text-sm transition-all"
+                className="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent focus:bg-white focus:border-indigo-500 focus:ring-0 rounded-md text-sm transition-all"
               />
             </div>
+            <button 
+              onClick={() => openDrawer('EMAIL')}
+              className="bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 transition-colors"
+              title="Neue E-Mail"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
           </div>
 
           {/* List */}
@@ -83,11 +81,13 @@ export default function InboxPage() {
                   <button
                     key={lead.id}
                     onClick={() => setSelectedLeadId(lead.id)}
-                    className={`w-full text-left p-4 hover:bg-white transition-colors flex flex-col gap-1 ${
-                      selectedLeadId === lead.id ? 'bg-white border-l-4 border-indigo-600 shadow-sm' : 'border-l-4 border-transparent'
+                    className={`w-full text-left p-4 hover:bg-white transition-colors flex flex-col gap-1 border-r-4 ${
+                      selectedLeadId === lead.id 
+                        ? 'bg-white border-indigo-600' 
+                        : 'border-transparent hover:border-indigo-200'
                     }`}
                   >
-                    <div className="flex justify-between items-start w-full">
+                    <div className={`flex justify-between items-start w-full ${selectedLeadId === lead.id ? '' : ''}`}>
                       <span className={`text-sm font-semibold truncate ${selectedLeadId === lead.id ? 'text-indigo-900' : 'text-gray-900'}`}>
                         {lead.firstName} {lead.lastName}
                       </span>
@@ -120,7 +120,7 @@ export default function InboxPage() {
           {selectedLeadId && selectedLead ? (
             <>
               {/* Message Header */}
-              <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-start shrink-0">
+              <div className="px-8 py-6 flex justify-between items-start shrink-0">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg">
                     {selectedLead.firstName?.charAt(0)}{selectedLead.lastName?.charAt(0)}
@@ -167,15 +167,15 @@ export default function InboxPage() {
                         
                         <div className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
                           msg.role === 'USER' 
-                            ? 'bg-white border border-gray-200 text-gray-800 rounded-tl-none' 
+                            ? 'bg-white text-gray-800 rounded-tl-none' 
                             : msg.status === 'DRAFT'
-                              ? 'bg-amber-50 border border-amber-200 text-gray-800 rounded-tl-none'
-                              : 'bg-indigo-50 border border-indigo-100 text-gray-800 rounded-tl-none'
+                              ? 'bg-amber-50 text-gray-800 rounded-tl-none'
+                              : 'bg-indigo-50 text-gray-800 rounded-tl-none'
                         }`}>
                           <p className="whitespace-pre-wrap">{msg.content}</p>
                           
                           {msg.status === 'DRAFT' && (
-                            <div className="mt-3 pt-3 border-t border-amber-200/50 flex justify-end">
+                            <div className="mt-3 pt-3 flex justify-end">
                               <button
                                 onClick={() => handleSendDraft(msg.id)}
                                 className="text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center"

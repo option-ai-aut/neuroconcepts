@@ -11,9 +11,9 @@ export default function CalendarPage() {
 
   if (!isConnected) {
     return (
-      <div className="h-full flex flex-col">
-        <div className="border-b border-gray-200 bg-white px-6 py-6 shadow-sm z-10">
-          <h1 className="text-2xl font-bold text-gray-900">Kalender</h1>
+      <div className="h-full flex flex-col relative">
+        <div className="pt-8 px-8 pb-4">
+          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Kalender</h1>
         </div>
         
         <div className="flex-1 flex flex-col items-center justify-center bg-gray-50/30 p-8">
@@ -45,23 +45,11 @@ export default function CalendarPage() {
 
   // Connected View
   return (
-    <div className="h-full flex flex-col">
-      {/* Header Toolbar */}
-      <div className="border-b border-gray-200 bg-white px-6 py-4 shadow-sm z-10 flex justify-between items-center shrink-0">
-        <div className="flex items-center space-x-6">
-          <h1 className="text-2xl font-bold text-gray-900">Kalender</h1>
-          <div className="flex items-center bg-gray-100 rounded-lg p-1">
-            <button className="p-1 hover:bg-white rounded-md transition-colors shadow-sm text-gray-600">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="px-4 text-sm font-medium text-gray-700">Januar 2026</span>
-            <button className="p-1 hover:bg-white rounded-md transition-colors shadow-sm text-gray-600">
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+    <div className="h-full flex flex-col relative bg-white">
+      <div className="pt-8 px-8 pb-4 flex justify-between items-end">
+        <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Kalender</h1>
         
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 pb-1">
           <div className="flex -space-x-2 mr-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600" title={`Mitarbeiter ${i}`}>
@@ -82,6 +70,18 @@ export default function CalendarPage() {
       
       {/* Calendar Grid (Simplified Mock) */}
       <div className="flex-1 overflow-auto bg-white p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+            <button className="p-1 hover:bg-white rounded-md transition-colors shadow-sm text-gray-600">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="px-4 text-sm font-medium text-gray-700">Januar 2026</span>
+            <button className="p-1 hover:bg-white rounded-md transition-colors shadow-sm text-gray-600">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-8 gap-4 h-full">
           {/* Time Column */}
           <div className="col-span-1 border-r border-gray-100 pr-4 space-y-12 pt-12 text-xs text-gray-400 text-right font-mono">

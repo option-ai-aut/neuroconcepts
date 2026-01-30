@@ -47,9 +47,9 @@ export default function Sidebar() {
   };
 
   return (
-    <div className="flex flex-col w-64 bg-slate-900 h-screen border-r border-gray-800 shadow-sm">
+    <div className="flex flex-col w-64 bg-slate-900 h-screen relative z-20">
       <div className="flex items-center h-16 px-6 shrink-0">
-        <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center mr-3 shadow-md shadow-indigo-900/50">
+        <div className="w-8 h-8 bg-indigo-600 rounded-md flex items-center justify-center mr-3 shadow-md shadow-indigo-900/50">
           <span className="text-white font-bold text-lg">N</span>
         </div>
         <span className="text-white font-bold text-lg tracking-tight">NeuroConcepts</span>
@@ -60,7 +60,7 @@ export default function Sidebar() {
           <div key={item.name}>
             <Link
               href={item.href}
-              className={`flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 ${
+              className={`flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-all duration-200 ${
                 isActive(item.href)
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/50'
                   : 'text-gray-400 hover:bg-gray-800 hover:text-white'
@@ -76,7 +76,7 @@ export default function Sidebar() {
       <div className="p-4 space-y-1">
         <Link
           href="/dashboard/settings"
-          className={`flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-colors ${
+          className={`flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors ${
             pathname.includes('/settings')
               ? 'bg-gray-800 text-white'
               : 'text-gray-400 hover:bg-gray-800 hover:text-white'
@@ -87,7 +87,7 @@ export default function Sidebar() {
         </Link>
         <button
           onClick={handleSignOut}
-          className="w-full flex items-center px-3 py-2.5 text-sm font-medium text-red-400 rounded-xl hover:bg-red-900/20 transition-colors"
+          className="w-full flex items-center px-3 py-2.5 text-sm font-medium text-red-400 rounded-md hover:bg-red-900/20 transition-colors"
         >
           <LogOut className="w-5 h-5 mr-3" />
           Abmelden

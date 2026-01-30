@@ -1,108 +1,193 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { Hash, MessageSquare, Plus, Search, User, Send } from 'lucide-react';
+import { getChannels, getChannelMessages, sendChannelMessage, getMe, getSeats } from '@/lib/api';
+import useSWR from 'swr';
 
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-  attachments?: string[];
-}
+export default function TeamChatPage() {
+  const { data: user } = useSWR('/me', getMe);
+  const { data: channels = [], mutate: mutateChannels } = useSWR('/channels', getChannels);
+  const { data: seats = [] } = useSWR('/seats', getSeats);
+  
+  const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
 
-export default function AssistantPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Hallo! Ich bin Jarvis. Wie kann ich dir heute helfen? Ich kann Leads anlegen, Objekte verwalten oder Fragen zu deinem Portfolio beantworten.' }
-  ]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Set default channel
+  useEffect(() => {
+    if (channels.length > 0 && !activeChannelId) {
+      setActiveChannelId(channels[0].id);
+    }
+  }, [channels, activeChannelId]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  const { data: messages = [], mutate: mutateMessages } = useSWR(
+    activeChannelId ? `/channels/${activeChannelId}/messages` : null,
+    () => getChannelMessages(activeChannelId!),
+    { refreshInterval: 2000 } // Poll for new messages
+  );
 
-  useEffect(scrollToBottom, [messages]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim()) return;
-
-    const userMessage = { role: 'user' as const, content: input };
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
-
+  const handleSendMessage = async () => {
+    if (!message.trim() || !activeChannelId) return;
     try {
-      // TODO: Connect to real backend API
-      // const response = await fetch('/api/chat', { ... });
-      
-      // Mock response for now
-      setTimeout(() => {
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
-          content: 'Das ist eine simulierte Antwort. Ich werde bald mit Gemini 3 Flash verbunden sein und echte Aktionen in deinem CRM durchführen können.' 
-        }]);
-        setIsLoading(false);
-      }, 1000);
+      await sendChannelMessage(activeChannelId, message);
+      setMessage('');
+      mutateMessages();
     } catch (error) {
-      console.error('Chat error:', error);
-      setIsLoading(false);
+      alert('Fehler beim Senden: ' + error);
     }
   };
 
+  const activeChannel = channels.find((c: any) => c.id === activeChannelId);
+
   return (
-    <div className="flex flex-col h-[calc(100vh-6rem)]">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg, index) => (
-          <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] rounded-lg p-4 ${
-              msg.role === 'user' 
-                ? 'bg-indigo-600 text-white' 
-                : 'bg-white border border-gray-200 text-gray-900 shadow-sm'
-            }`}>
-              <p className="whitespace-pre-wrap">{msg.content}</p>
+    <div className="h-full flex flex-col relative bg-white">
+      {/* Header */}
+      <div className="pt-8 px-8 pb-4 shrink-0">
+        <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Team Chat</h1>
+      </div>
+
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar: Channels & DMs */}
+        <div className="w-64 flex flex-col bg-gray-50/30">
+          <div className="p-4 bg-transparent">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input 
+                type="text" 
+                placeholder="Suchen..." 
+                className="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent focus:bg-white focus:border-indigo-500 focus:ring-0 rounded-lg text-sm transition-all"
+              />
             </div>
           </div>
-        ))}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-              <div className="flex space-x-2">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-75"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150"></div>
+
+          <div className="flex-1 overflow-y-auto px-3 space-y-6">
+            {/* Channels */}
+            <div>
+              <div className="flex items-center justify-between px-2 mb-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Channels</h3>
+                <button 
+                  className="text-gray-400 hover:text-gray-600"
+                  onClick={() => alert('Channel erstellen noch nicht implementiert')}
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="space-y-0.5">
+                {channels.map((channel: any) => (
+                  <button
+                    key={channel.id}
+                    onClick={() => setActiveChannelId(channel.id)}
+                    className={`w-full flex items-center px-2 py-1.5 text-sm font-medium rounded-md group ${
+                      activeChannelId === channel.id 
+                        ? 'bg-gray-200 text-gray-900' 
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }`}
+                  >
+                    <Hash className="w-4 h-4 mr-2 text-gray-400 group-hover:text-gray-500" />
+                    <span className="truncate"> {channel.name} </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Direct Messages (Mock for now based on seats) */}
+            <div>
+              <div className="flex items-center justify-between px-2 mb-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Direktnachrichten</h3>
+                <button className="text-gray-400 hover:text-gray-600">
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="space-y-0.5">
+                {seats.filter((s: any) => s.id !== user?.id).map((seat: any) => (
+                  <button
+                    key={seat.id}
+                    className="w-full flex items-center px-2 py-1.5 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 group"
+                  >
+                    <div className="relative mr-2">
+                      <div className="w-2 h-2 rounded-full bg-gray-300"></div>
+                    </div>
+                    <span className="truncate">{seat.firstName} {seat.lastName}</span>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
+        </div>
 
-      <div className="p-4 bg-white border-t border-gray-200">
-        <form onSubmit={handleSubmit} className="flex space-x-4">
-          <button
-            type="button"
-            className="p-2 text-gray-500 hover:text-gray-700"
-            title="Datei hochladen"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-            </svg>
-          </button>
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Schreibe eine Nachricht an Jarvis..."
-            className="flex-1 border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50"
-          >
-            Senden
-          </button>
-        </form>
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col bg-white">
+          {activeChannel ? (
+            <>
+              {/* Channel Header */}
+              <div className="px-6 py-3 flex items-center justify-between">
+                <div className="flex items-center">
+                  <Hash className="w-5 h-5 text-gray-400 mr-2" />
+                  <h2 className="text-lg font-bold text-gray-900">{activeChannel.name}</h2>
+                </div>
+                <div className="flex items-center text-sm text-gray-500">
+                  <User className="w-4 h-4 mr-1" />
+                  {activeChannel._count?.members || 0} Mitglieder
+                </div>
+              </div>
+
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {messages.map((msg: any) => (
+                  <div key={msg.id} className="flex items-start space-x-3 group">
+                    <div className="w-10 h-10 rounded bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm shrink-0">
+                      {msg.user.firstName?.charAt(0)}{msg.user.lastName?.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="flex items-baseline space-x-2">
+                        <span className="font-bold text-gray-900">{msg.user.firstName} {msg.user.lastName}</span>
+                        <span className="text-xs text-gray-500">{new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                      </div>
+                      <p className="text-gray-800 text-sm mt-0.5">{msg.content}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Input Area */}
+              <div className="p-4">
+                <div className="bg-gray-50 rounded-xl p-2 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent transition-all">
+                  <textarea
+                    rows={1}
+                    className="w-full bg-transparent border-none focus:ring-0 resize-none text-sm p-2"
+                    placeholder={`Nachricht an #${activeChannel.name}...`}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                  />
+                  <div className="flex justify-between items-center px-2 pb-1">
+                    <div className="flex space-x-2">
+                      {/* Formatting tools could go here */}
+                    </div>
+                    <button 
+                      onClick={handleSendMessage}
+                      className={`p-2 rounded-lg transition-colors ${
+                        message.trim() ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      }`}
+                      disabled={!message.trim()}
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-gray-500">
+              Wähle einen Channel aus
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

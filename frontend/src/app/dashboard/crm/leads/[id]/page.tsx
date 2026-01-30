@@ -102,9 +102,9 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   if (!lead) return <div className="p-8 text-center text-red-500">Lead nicht gefunden.</div>;
 
   return (
-    <div className="h-full flex flex-col bg-gray-50/30">
+    <div className="h-full flex flex-col bg-white">
       {/* Top Bar */}
-      <div className="h-16 border-b border-gray-200 bg-white px-6 flex items-center justify-between shrink-0">
+      <div className="h-16 bg-white px-6 flex items-center justify-between shrink-0">
         <div className="flex items-center">
           <Link href="/dashboard/crm/leads" className="mr-4 p-2 hover:bg-gray-100 rounded-full text-gray-500 hover:text-gray-900 transition-colors">
             <ArrowLeft className="w-5 h-5" />

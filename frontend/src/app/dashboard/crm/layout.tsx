@@ -16,9 +16,9 @@ export default function CrmLayout({
   ];
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="border-b border-gray-200 bg-white px-6 pt-6 pb-0 shadow-sm z-10 shrink-0">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">CRM</h1>
+    <div className="flex flex-col h-full relative bg-white">
+      <div className="pt-8 px-8 pb-0 shrink-0">
+        <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight mb-6">CRM</h1>
         <nav className="-mb-px flex space-x-8" aria-label="Tabs">
           {tabs.map((tab) => {
             const isActive = pathname.startsWith(tab.href);
@@ -41,7 +41,7 @@ export default function CrmLayout({
           })}
         </nav>
       </div>
-      <div className="flex-1 overflow-auto bg-gray-50/30">
+      <div className="flex-1 overflow-auto bg-white">
         {children}
       </div>
     </div>

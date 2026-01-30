@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { X, Minus, Maximize2, Send, Paperclip } from 'lucide-react';
 import { createLead, createProperty, sendManualEmail, API_ENDPOINTS } from '@/lib/api';
@@ -22,6 +23,27 @@ export default function GlobalDrawer() {
     emailFormData,
     updateEmailForm
   } = useGlobalState();
+
+  // Animation state
+  const [isVisible, setIsVisible] = useState(false);
+
+  // Animate in when drawer opens
+  useEffect(() => {
+    if (drawerOpen) {
+      const timer = setTimeout(() => setIsVisible(true), 10);
+      return () => clearTimeout(timer);
+    } else {
+      setIsVisible(false);
+    }
+  }, [drawerOpen]);
+
+  // Animated close function
+  const handleAnimatedClose = () => {
+    setIsVisible(false);
+    setTimeout(() => {
+      closeDrawer();
+    }, 300);
+  };
 
   const handleCreateLead = async () => {
     console.log('Creating lead with data:', leadFormData);
@@ -93,9 +115,10 @@ export default function GlobalDrawer() {
 
   return (
     <div
-      className={`fixed bottom-0 left-64 right-80 bg-white shadow-[0_-5px_30px_rgba(0,0,0,0.1)] border-t border-x border-gray-200 rounded-t-xl transition-all duration-300 ease-in-out z-40 ${
+      className={`fixed bottom-0 left-64 right-80 bg-white shadow-[0_-5px_30px_rgba(0,0,0,0.1)] border-t border-x border-gray-200 rounded-t-xl transition-all duration-300 ease-out z-40 ${
         drawerMinimized ? 'h-12' : 'h-[450px]'
       }`}
+      style={{ transform: isVisible ? 'translateY(0)' : 'translateY(100%)' }}
     >
       {/* Header */}
       <div 
@@ -118,7 +141,7 @@ export default function GlobalDrawer() {
               <Minus className="w-4 h-4" />
             </button>
           )}
-          <button onClick={closeDrawer} className="p-1 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50">
+          <button onClick={handleAnimatedClose} className="p-1 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -156,7 +179,7 @@ export default function GlobalDrawer() {
                   </button>
                   <div className="flex space-x-3">
                     <button 
-                      onClick={closeDrawer}
+                      onClick={handleAnimatedClose}
                       className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none"
                     >
                       Verwerfen
@@ -255,7 +278,7 @@ export default function GlobalDrawer() {
                   </div>
                   <div className="mt-6 pt-6 border-t border-gray-50 flex justify-end space-x-3">
                     <button 
-                      onClick={closeDrawer}
+                      onClick={handleAnimatedClose}
                       className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                     >
                       Abbrechen
@@ -357,7 +380,7 @@ export default function GlobalDrawer() {
                   </div>
                   <div className="mt-auto pt-6 border-t border-gray-50 flex justify-end space-x-3">
                     <button 
-                      onClick={closeDrawer}
+                      onClick={handleAnimatedClose}
                       className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                     >
                       Abbrechen
