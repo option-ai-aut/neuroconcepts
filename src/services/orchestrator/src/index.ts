@@ -943,21 +943,27 @@ app.post('/chat', async (req, res) => {
   try {
     const { message, history, tenantId, userId } = req.body;
     
-    // Save User Message
+    // Save User Message (only if user exists in DB)
     if (userId) {
-      await prisma.userChat.create({
-        data: { userId, role: 'USER', content: message }
-      });
+      const userExists = await prisma.user.findUnique({ where: { id: userId } });
+      if (userExists) {
+        await prisma.userChat.create({
+          data: { userId, role: 'USER', content: message }
+        });
+      }
     }
 
     const gemini = new GeminiService();
     const responseText = await gemini.chat(message, tenantId, history);
 
-    // Save Assistant Message
+    // Save Assistant Message (only if user exists in DB)
     if (userId) {
-      await prisma.userChat.create({
-        data: { userId, role: 'ASSISTANT', content: responseText }
-      });
+      const userExists = await prisma.user.findUnique({ where: { id: userId } });
+      if (userExists) {
+        await prisma.userChat.create({
+          data: { userId, role: 'ASSISTANT', content: responseText }
+        });
+      }
     }
 
     res.json({ response: responseText });

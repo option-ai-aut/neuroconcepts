@@ -183,7 +183,7 @@ export default function AiChatSidebar() {
               value={aiChatDraft}
               onChange={(e) => setAiChatDraft(e.target.value)}
               placeholder="Nachricht an Jarvis..."
-              className="w-full pl-4 pr-12 py-3 bg-gray-50 border-transparent rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all placeholder-gray-400"
+              className="w-full pl-4 pr-12 py-3 bg-gray-50 border-transparent rounded-md text-sm text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white transition-all placeholder-gray-400"
             />
             <div className="absolute right-2 flex items-center space-x-1">
               <button
