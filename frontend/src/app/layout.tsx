@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { EnvProvider } from "@/components/EnvProvider";
 import { AuthProvider } from "@/components/AuthProvider";
 import { GlobalStateProvider } from "@/context/GlobalStateContext";
+import { RuntimeConfigProvider } from "@/components/RuntimeConfigProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,26 +27,18 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Read env vars at runtime (Server Component)
-  const config = {
-    apiUrl: process.env.NEXT_PUBLIC_API_URL || '',
-    userPoolId: process.env.NEXT_PUBLIC_USER_POOL_ID || '',
-    userPoolClientId: process.env.NEXT_PUBLIC_USER_POOL_CLIENT_ID || '',
-    awsRegion: process.env.NEXT_PUBLIC_AWS_REGION || '',
-  };
-
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <EnvProvider config={config}>
+        <RuntimeConfigProvider>
           <AuthProvider>
             <GlobalStateProvider>
               {children}
             </GlobalStateProvider>
           </AuthProvider>
-        </EnvProvider>
+        </RuntimeConfigProvider>
       </body>
     </html>
   );
