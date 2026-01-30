@@ -117,15 +117,8 @@ export class NeuroConceptsStack extends cdk.Stack {
         requireDigits: true,
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
-      standardAttributes: {
-        givenName: { required: true, mutable: true },
-        familyName: { required: true, mutable: true },
-        address: { required: false, mutable: true },
-      },
-      customAttributes: {
-        // 'company_name': new cognito.StringAttribute({ mutable: true }),
-        // 'employee_count': new cognito.NumberAttribute({ mutable: true }), // Temporarily removed to fix update error
-      },
+      // Note: standardAttributes cannot be modified after UserPool creation
+      // If you need to change attributes, you must recreate the UserPool
       removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
     });
 
