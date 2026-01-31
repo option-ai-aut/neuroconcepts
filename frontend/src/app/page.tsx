@@ -161,18 +161,52 @@ export default function LandingPage() {
       <nav className="fixed w-full z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
+            <Link href="/" className="flex items-center">
               <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center mr-3 shadow-lg shadow-indigo-500/30">
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
               <span className="font-bold text-xl tracking-tight">NeuroConcepts</span>
-            </div>
-            <div className="hidden md:flex items-center space-x-8">
-              <a href="#warum" onClick={(e) => handleAnchorClick(e, 'warum')} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Warum wir</a>
-              <a href="#jarvis" onClick={(e) => handleAnchorClick(e, 'jarvis')} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Jarvis KI</a>
-              <a href="#features" onClick={(e) => handleAnchorClick(e, 'features')} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Features</a>
-              <a href="#ergebnisse" onClick={(e) => handleAnchorClick(e, 'ergebnisse')} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Ergebnisse</a>
+            </Link>
+            <div className="hidden md:flex items-center space-x-6">
+              {/* Produkt Dropdown */}
+              <div className="relative group">
+                <button className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1">
+                  Produkt
+                  <svg className="w-4 h-4 transition-transform group-hover:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                  <div className="bg-white rounded-xl shadow-xl border border-gray-100 py-2 min-w-[200px]">
+                    <a href="#jarvis" onClick={(e) => handleAnchorClick(e, 'jarvis')} className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Jarvis KI</a>
+                    <a href="#features" onClick={(e) => handleAnchorClick(e, 'features')} className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Features</a>
+                    <a href="#bildbearbeitung" onClick={(e) => handleAnchorClick(e, 'bildbearbeitung')} className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">KI-Bildbearbeitung</a>
+                    <Link href="/integrationen" className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Integrationen</Link>
+                  </div>
+                </div>
+              </div>
+
               <Link href="/preise" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Preise</Link>
+              
+              {/* Unternehmen Dropdown */}
+              <div className="relative group">
+                <button className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1">
+                  Unternehmen
+                  <svg className="w-4 h-4 transition-transform group-hover:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                  <div className="bg-white rounded-xl shadow-xl border border-gray-100 py-2 min-w-[200px]">
+                    <Link href="/ueber-uns" className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Über uns</Link>
+                    <Link href="/blog" className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Blog</Link>
+                    <Link href="/karriere" className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Karriere</Link>
+                    <Link href="/kontakt" className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Kontakt</Link>
+                  </div>
+                </div>
+              </div>
+
+              <a href="#demo" onClick={(e) => handleAnchorClick(e, 'demo')} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Demo</a>
             </div>
             <div className="flex items-center space-x-4">
               <Link href="/login" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
