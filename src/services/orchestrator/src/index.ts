@@ -4,12 +4,13 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import serverless from 'serverless-http';
-import { PrismaClient, ActivityType } from '@prisma/client';
+import { PrismaClient, Prisma, ActivityType } from '@prisma/client';
 import { TemplateService } from './services/TemplateService';
 import { GeminiService } from './services/GeminiService';
 import { PdfService } from './services/PdfService';
 import { encryptionService } from './services/EncryptionService';
 import { ConversationMemory } from './services/ConversationMemory';
+import { CalendarService } from './services/CalendarService';
 import { authMiddleware } from './middleware/auth';
 import { AiSafetyMiddleware, wrapAiResponse } from './middleware/aiSafety';
 import * as AWS from 'aws-sdk';
@@ -64,9 +65,12 @@ app.use('/uploads', express.static(uploadDir));
 // Sync User from Token (Create/Update in DB)
 app.post('/auth/sync', authMiddleware, async (req, res) => {
   try {
-    const { sub, email, given_name, family_name } = req.user!;
+    const { sub, email, given_name, family_name, address, phone_number } = req.user!;
     const companyName = req.user!['custom:company_name'];
     // const employeeCount = req.user!['custom:employee_count']; // Not stored in DB yet, maybe later
+    
+    // Note: PLZ, City, Country are not in Cognito custom attributes
+    // They can be added later via the profile page
 
     // 1. Find or Create Tenant
     // Strategy: If user has a tenantId in DB, use it. If not, create new Tenant (assuming first user is Admin/Owner)
@@ -95,6 +99,8 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
           email,
           firstName: given_name,
           lastName: family_name,
+          phone: phone_number,
+          street: address,
           tenantId: newTenant.id,
           role: 'ADMIN' // First user is Admin
         }
@@ -111,6 +117,8 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
         data: {
           firstName: given_name,
           lastName: family_name,
+          phone: phone_number,
+          street: address,
           // Don't update tenantId or role here
         }
       });
@@ -134,6 +142,32 @@ app.get('/me', authMiddleware, async (req, res) => {
     res.json(user);
   } catch (error) {
     console.error('Get me error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Update Current User Profile
+app.patch('/me', authMiddleware, async (req, res) => {
+  try {
+    const { firstName, lastName, phone, street, postalCode, city, country } = req.body;
+    
+    const user = await prisma.user.update({
+      where: { email: req.user!.email },
+      data: {
+        firstName,
+        lastName,
+        phone,
+        street,
+        postalCode,
+        city,
+        country
+      },
+      include: { tenant: true }
+    });
+    
+    res.json(user);
+  } catch (error) {
+    console.error('Error updating user:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -1636,7 +1670,7 @@ app.get('/portals', async (req, res) => {
 });
 
 // GET /portal-connections - Get portal connections (tenant or user level)
-app.get('/portal-connections', async (req, res) => {
+app.get('/portal-connections', authMiddleware, async (req, res) => {
   try {
     const { tenantId, userId } = req.query;
     
@@ -1670,18 +1704,49 @@ app.get('/portal-connections', async (req, res) => {
 });
 
 // POST /portal-connections - Create or update portal connection (tenant or user level)
-app.post('/portal-connections', async (req, res) => {
+app.post('/portal-connections', authMiddleware, async (req, res) => {
   try {
-    const { tenantId, userId, portalId, ftpHost, ftpPort, ftpUsername, ftpPassword, ftpPath, useSftp, providerId, isEnabled, autoSyncEnabled, autoSyncInterval } = req.body;
+    const { 
+      tenantId, userId, portalId, 
+      // FTP fields
+      ftpHost, ftpPort, ftpUsername, ftpPassword, ftpPath, useSftp, 
+      // API fields
+      apiKey, apiSecret, apiEndpoint,
+      // Common fields
+      providerId, isEnabled, autoSyncEnabled, autoSyncInterval 
+    } = req.body;
     
     if ((!tenantId && !userId) || !portalId) {
       return res.status(400).json({ error: '(tenantId or userId) and portalId required' });
     }
     
-    // Encrypt password if provided
+    // Get current user to check permissions
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    // SECURITY: Only admins can create/modify tenant-level connections
+    if (tenantId && !userId) {
+      if (currentUser.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Nur Admins können Firmen-Verbindungen erstellen oder ändern' });
+      }
+    }
+    
+    // SECURITY: Users can only create/modify their own user-level connections
+    if (userId && String(userId) !== currentUser.id) {
+      return res.status(403).json({ error: 'Sie können nur Ihre eigenen Verbindungen verwalten' });
+    }
+    
+    // Encrypt sensitive fields if provided
     let encryptedPassword = ftpPassword;
     if (ftpPassword && !encryptionService.isEncrypted(ftpPassword)) {
       encryptedPassword = encryptionService.encrypt(ftpPassword);
+    }
+    
+    let encryptedApiSecret = apiSecret;
+    if (apiSecret && !encryptionService.isEncrypted(apiSecret)) {
+      encryptedApiSecret = encryptionService.encrypt(apiSecret);
     }
     
     // Determine unique constraint
@@ -1690,12 +1755,18 @@ app.post('/portal-connections', async (req, res) => {
       : { tenantId_portalId: { tenantId: String(tenantId), portalId: String(portalId) } };
     
     const dataFields = {
+      // FTP fields
       ftpHost,
       ftpPort: ftpPort || 21,
       ftpUsername,
       ftpPassword: encryptedPassword,
       ftpPath,
       useSftp: useSftp || false,
+      // API fields
+      apiKey,
+      apiSecret: encryptedApiSecret,
+      apiEndpoint,
+      // Common fields
       providerId,
       isEnabled: isEnabled !== undefined ? isEnabled : true,
       autoSyncEnabled: autoSyncEnabled || false,
@@ -1713,10 +1784,10 @@ app.post('/portal-connections', async (req, res) => {
       include: { portal: true }
     });
     
-    // Don't send password back to client
-    const { ftpPassword: _, ...connectionWithoutPassword } = connection;
+    // Don't send sensitive data back to client
+    const { ftpPassword: _, apiSecret: __, ...connectionWithoutSecrets } = connection;
     
-    res.json(connectionWithoutPassword);
+    res.json(connectionWithoutSecrets);
   } catch (error) {
     console.error('Error saving portal connection:', error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -1724,9 +1795,36 @@ app.post('/portal-connections', async (req, res) => {
 });
 
 // DELETE /portal-connections/:id - Delete portal connection
-app.delete('/portal-connections/:id', async (req, res) => {
+app.delete('/portal-connections/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Get current user to check permissions
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    // Get the connection to check ownership
+    const connection = await prisma.portalConnection.findUnique({
+      where: { id }
+    });
+    
+    if (!connection) {
+      return res.status(404).json({ error: 'Connection not found' });
+    }
+    
+    // SECURITY: Only admins can delete tenant-level connections
+    if (connection.tenantId && !connection.userId) {
+      if (currentUser.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Nur Admins können Firmen-FTP-Verbindungen löschen' });
+      }
+    }
+    
+    // SECURITY: Users can only delete their own user-level connections
+    if (connection.userId && connection.userId !== currentUser.id) {
+      return res.status(403).json({ error: 'Sie können nur Ihre eigenen FTP-Verbindungen löschen' });
+    }
     
     await prisma.portalConnection.delete({
       where: { id }
@@ -1740,7 +1838,7 @@ app.delete('/portal-connections/:id', async (req, res) => {
 });
 
 // GET /portal-connections/effective - Get effective connection for user (with hierarchy)
-app.get('/portal-connections/effective', async (req, res) => {
+app.get('/portal-connections/effective', authMiddleware, async (req, res) => {
   try {
     const { userId, tenantId } = req.query;
     
@@ -1814,7 +1912,7 @@ app.post('/properties/:id/sync', async (req, res) => {
 });
 
 // POST /portal-connections/:id/test - Test FTP connection
-app.post('/portal-connections/:id/test', async (req, res) => {
+app.post('/portal-connections/:id/test', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -1844,6 +1942,324 @@ app.post('/portal-connections/:id/test', async (req, res) => {
   } catch (error) {
     console.error('Error testing portal connection:', error);
     res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// --- Calendar Integration ---
+
+// Google Calendar: Get Auth URL
+app.get('/calendar/google/auth-url', authMiddleware, async (req, res) => {
+  try {
+    const authUrl = CalendarService.getGoogleAuthUrl();
+    res.json({ authUrl });
+  } catch (error) {
+    console.error('Error generating Google auth URL:', error);
+    res.status(500).json({ error: 'Failed to generate auth URL' });
+  }
+});
+
+// Google Calendar: OAuth Callback
+app.get('/calendar/google/callback', async (req, res) => {
+  try {
+    const { code, state } = req.query;
+    
+    if (!code) {
+      return res.status(400).send('Missing authorization code');
+    }
+
+    // Exchange code for tokens
+    const tokens = await CalendarService.exchangeGoogleCode(code as string);
+
+    // Store tokens in session or redirect with token
+    // For now, redirect to frontend with success
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=google&success=true&email=${encodeURIComponent(tokens.email)}`);
+  } catch (error) {
+    console.error('Error in Google OAuth callback:', error);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=google&error=true`);
+  }
+});
+
+// Google Calendar: Save Configuration
+app.post('/calendar/google/connect', authMiddleware, async (req, res) => {
+  try {
+    const { code } = req.body;
+    const userEmail = req.user!.email;
+
+    if (!code) {
+      return res.status(400).json({ error: 'Missing authorization code' });
+    }
+
+    // Get user's tenantId from database
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Exchange code for tokens
+    const tokens = await CalendarService.exchangeGoogleCode(code);
+
+    // Encrypt tokens before storing
+    const encryptedConfig = {
+      accessToken: encryptionService.encrypt(tokens.accessToken),
+      refreshToken: encryptionService.encrypt(tokens.refreshToken),
+      expiryDate: tokens.expiryDate,
+      email: tokens.email
+    };
+
+    // Update tenant settings
+    await prisma.tenantSettings.upsert({
+      where: { tenantId: user.tenantId },
+      create: {
+        tenantId: user.tenantId,
+        googleCalendarConfig: encryptedConfig as any
+      },
+      update: {
+        googleCalendarConfig: encryptedConfig as any
+      }
+    });
+
+    res.json({ success: true, email: tokens.email });
+  } catch (error) {
+    console.error('Error connecting Google Calendar:', error);
+    res.status(500).json({ error: 'Failed to connect Google Calendar' });
+  }
+});
+
+// Google Calendar: Disconnect
+app.post('/calendar/google/disconnect', authMiddleware, async (req, res) => {
+  try {
+    const userEmail = req.user!.email;
+
+    // Get user's tenantId from database
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await prisma.tenantSettings.update({
+      where: { tenantId: user.tenantId },
+      data: {
+        googleCalendarConfig: Prisma.DbNull
+      }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error disconnecting Google Calendar:', error);
+    res.status(500).json({ error: 'Failed to disconnect Google Calendar' });
+  }
+});
+
+// Outlook Calendar: Get Auth URL
+app.get('/calendar/outlook/auth-url', authMiddleware, async (req, res) => {
+  try {
+    const authUrl = await CalendarService.getOutlookAuthUrl();
+    res.json({ authUrl });
+  } catch (error) {
+    console.error('Error generating Outlook auth URL:', error);
+    res.status(500).json({ error: 'Failed to generate auth URL' });
+  }
+});
+
+// Outlook Calendar: OAuth Callback
+app.get('/calendar/outlook/callback', async (req, res) => {
+  try {
+    const { code } = req.query;
+    
+    if (!code) {
+      return res.status(400).send('Missing authorization code');
+    }
+
+    // Exchange code for tokens
+    const tokens = await CalendarService.exchangeOutlookCode(code as string);
+
+    // Redirect to frontend with success
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=outlook&success=true&email=${encodeURIComponent(tokens.email)}`);
+  } catch (error) {
+    console.error('Error in Outlook OAuth callback:', error);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=outlook&error=true`);
+  }
+});
+
+// Outlook Calendar: Save Configuration
+app.post('/calendar/outlook/connect', authMiddleware, async (req, res) => {
+  try {
+    const { code } = req.body;
+    const userEmail = req.user!.email;
+
+    if (!code) {
+      return res.status(400).json({ error: 'Missing authorization code' });
+    }
+
+    // Get user's tenantId from database
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Exchange code for tokens
+    const tokens = await CalendarService.exchangeOutlookCode(code);
+
+    // Encrypt tokens before storing
+    const encryptedConfig = {
+      accessToken: encryptionService.encrypt(tokens.accessToken),
+      refreshToken: encryptionService.encrypt(tokens.refreshToken),
+      expiryDate: tokens.expiryDate,
+      email: tokens.email
+    };
+
+    // Update tenant settings
+    await prisma.tenantSettings.upsert({
+      where: { tenantId: user.tenantId },
+      create: {
+        tenantId: user.tenantId,
+        outlookCalendarConfig: encryptedConfig as any
+      },
+      update: {
+        outlookCalendarConfig: encryptedConfig as any
+      }
+    });
+
+    res.json({ success: true, email: tokens.email });
+  } catch (error) {
+    console.error('Error connecting Outlook Calendar:', error);
+    res.status(500).json({ error: 'Failed to connect Outlook Calendar' });
+  }
+});
+
+// Outlook Calendar: Disconnect
+app.post('/calendar/outlook/disconnect', authMiddleware, async (req, res) => {
+  try {
+    const userEmail = req.user!.email;
+
+    // Get user's tenantId from database
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await prisma.tenantSettings.update({
+      where: { tenantId: user.tenantId },
+      data: {
+        outlookCalendarConfig: Prisma.DbNull
+      }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error disconnecting Outlook Calendar:', error);
+    res.status(500).json({ error: 'Failed to disconnect Outlook Calendar' });
+  }
+});
+
+// Get Calendar Status
+app.get('/calendar/status', authMiddleware, async (req, res) => {
+  try {
+    const userEmail = req.user!.email;
+
+    // Get user's tenantId from database
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const settings = await prisma.tenantSettings.findUnique({
+      where: { tenantId: user.tenantId },
+      select: {
+        googleCalendarConfig: true,
+        outlookCalendarConfig: true,
+        calendarShareTeam: true
+      }
+    });
+
+    const googleConnected = !!settings?.googleCalendarConfig;
+    const outlookConnected = !!settings?.outlookCalendarConfig;
+
+    let googleEmail = null;
+    let outlookEmail = null;
+
+    if (googleConnected && settings.googleCalendarConfig) {
+      const config = settings.googleCalendarConfig as any;
+      googleEmail = config.email;
+    }
+
+    if (outlookConnected && settings.outlookCalendarConfig) {
+      const config = settings.outlookCalendarConfig as any;
+      outlookEmail = config.email;
+    }
+
+    res.json({
+      google: {
+        connected: googleConnected,
+        email: googleEmail
+      },
+      outlook: {
+        connected: outlookConnected,
+        email: outlookEmail
+      },
+      shareTeam: settings?.calendarShareTeam ?? true
+    });
+  } catch (error) {
+    console.error('Error getting calendar status:', error);
+    res.status(500).json({ error: 'Failed to get calendar status' });
+  }
+});
+
+// Update Calendar Share Setting
+app.post('/calendar/share-team', authMiddleware, async (req, res) => {
+  try {
+    const { shareTeam } = req.body;
+    const userEmail = req.user!.email;
+
+    // Get user's tenantId from database
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await prisma.tenantSettings.upsert({
+      where: { tenantId: user.tenantId },
+      create: {
+        tenantId: user.tenantId,
+        calendarShareTeam: shareTeam
+      },
+      update: {
+        calendarShareTeam: shareTeam
+      }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating calendar share setting:', error);
+    res.status(500).json({ error: 'Failed to update setting' });
   }
 });
 

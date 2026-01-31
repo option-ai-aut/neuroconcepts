@@ -109,11 +109,11 @@ export default function LoginPage() {
               formFields={{
                 signIn: {
                   username: {
-                    placeholder: 'E-Mail Adresse',
+                    placeholder: '',
                     label: 'E-Mail'
                   },
                   password: {
-                    placeholder: 'Passwort',
+                    placeholder: '',
                     label: 'Passwort'
                   }
                 },
@@ -121,46 +121,52 @@ export default function LoginPage() {
                   username: {
                     order: 1,
                     label: 'E-Mail',
-                    placeholder: 'E-Mail Adresse'
+                    placeholder: ''
                   },
                   password: {
                     label: 'Passwort',
-                    placeholder: 'Passwort erstellen',
+                    placeholder: '',
                     order: 2
                   },
                   confirm_password: {
                     label: 'Passwort bestätigen',
-                    placeholder: 'Passwort wiederholen',
+                    placeholder: '',
                     order: 3
                   },
                   given_name: {
                     label: 'Vorname',
-                    placeholder: 'Max',
+                    placeholder: '',
                     order: 4,
                     isRequired: true
                   },
                   family_name: {
                     label: 'Nachname',
-                    placeholder: 'Mustermann',
+                    placeholder: '',
                     order: 5,
                     isRequired: true
                   },
+                  phone_number: {
+                    label: 'Telefonnummer',
+                    placeholder: '',
+                    order: 6,
+                    isRequired: false
+                  },
                   'custom:company_name': {
                     label: 'Firmenname',
-                    placeholder: 'Muster Immobilien GmbH',
-                    order: 6,
+                    placeholder: '',
+                    order: 7,
                     isRequired: true
                   },
                   address: {
-                    label: 'Firmenadresse',
-                    placeholder: 'Musterstraße 1, 1010 Wien',
-                    order: 7,
+                    label: 'Straße & Hausnummer',
+                    placeholder: '',
+                    order: 8,
                     isRequired: false
                   },
                   'custom:employee_count': {
                     label: 'Anzahl Mitarbeiter',
-                    placeholder: 'z.B. 5',
-                    order: 8,
+                    placeholder: '',
+                    order: 9,
                     type: 'number',
                     isRequired: false
                   }

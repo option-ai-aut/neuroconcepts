@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import useSWR from 'swr';
+import { getMe } from '@/lib/api';
 
 export default function SettingsLayout({
   children,
@@ -9,23 +11,25 @@ export default function SettingsLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { data: user } = useSWR('/me', getMe);
+  const isAdmin = user?.role === 'ADMIN';
 
   const tabs = [
     { name: 'Integrationen', href: '/dashboard/settings/integrations' },
-    { name: 'Portale (Firma)', href: '/dashboard/settings/portals' },
-    { name: 'Meine Portale', href: '/dashboard/settings/my-portals' },
+    { name: 'Portale', href: '/dashboard/settings/portals' },
     { name: 'Jarvis (KI)', href: '/dashboard/settings/jarvis' },
-    { name: 'Vorlagen', href: '/dashboard/settings/templates' },
     { name: 'Profil', href: '/dashboard/settings/profile' },
-    { name: 'Abrechnung', href: '/dashboard/settings/billing' },
+    { name: 'Abrechnung', href: '/dashboard/settings/billing', adminOnly: true },
   ];
+
+  const visibleTabs = tabs.filter(tab => !tab.adminOnly || isAdmin);
 
   return (
     <div className="h-full flex flex-col relative bg-white">
       <div className="pt-8 px-8 pb-0">
         <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight mb-6">Einstellungen</h1>
         <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <Link
               key={tab.name}
               href={tab.href}

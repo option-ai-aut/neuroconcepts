@@ -5,8 +5,9 @@ import { useEffect, useRef, useState } from 'react';
 import { 
   Bot, TrendingUp, Clock, ArrowRight, CheckCircle2, Sparkles,
   Users, Building2, Mail, Calendar, FileText, Zap, Shield,
-  ChevronRight, Play, Star, Quote, MousePointer, BarChart3,
-  MessageSquare, Brain, Rocket, Target, Award, Globe
+  ChevronRight, Star, Quote, BarChart3,
+  MessageSquare, Brain, Rocket, Target, Award, Globe, Image,
+  Wand2, Server
 } from 'lucide-react';
 
 // Intersection Observer Hook for scroll animations
@@ -86,6 +87,15 @@ export default function LandingPage() {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
+  // Smooth scroll handler for anchor links
+  const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
+    e.preventDefault();
+    const element = document.getElementById(targetId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   // Scroll animations
   const section1 = useInView();
   const section2 = useInView();
@@ -95,7 +105,7 @@ export default function LandingPage() {
   const section6 = useInView();
 
   return (
-    <div className="min-h-screen bg-white font-sans text-gray-900 overflow-x-hidden">
+    <div className="min-h-screen bg-white font-sans text-gray-900 overflow-x-hidden scroll-smooth">
       {/* Custom Styles */}
       <style jsx global>{`
         @keyframes float {
@@ -158,10 +168,11 @@ export default function LandingPage() {
               <span className="font-bold text-xl tracking-tight">NeuroConcepts</span>
             </div>
             <div className="hidden md:flex items-center space-x-8">
-              <a href="#warum" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Warum wir</a>
-              <a href="#jarvis" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Jarvis KI</a>
-              <a href="#features" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Features</a>
-              <a href="#ergebnisse" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Ergebnisse</a>
+              <a href="#warum" onClick={(e) => handleAnchorClick(e, 'warum')} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Warum wir</a>
+              <a href="#jarvis" onClick={(e) => handleAnchorClick(e, 'jarvis')} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Jarvis KI</a>
+              <a href="#features" onClick={(e) => handleAnchorClick(e, 'features')} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Features</a>
+              <a href="#ergebnisse" onClick={(e) => handleAnchorClick(e, 'ergebnisse')} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Ergebnisse</a>
+              <Link href="/preise" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Preise</Link>
             </div>
             <div className="flex items-center space-x-4">
               <Link href="/login" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
@@ -209,7 +220,7 @@ export default function LandingPage() {
             <div className="text-left">
               <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-indigo-500/10 to-violet-500/10 text-indigo-600 text-sm font-medium mb-8 border border-indigo-200/50 backdrop-blur-sm">
                 <span className="flex w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
-                Jarvis 2.0 ist live — Jetzt mit 50+ KI-Tools
+                Jarvis 1.0
               </div>
               
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 mb-6 leading-[1.05]">
@@ -235,10 +246,11 @@ export default function LandingPage() {
                 </Link>
                 <a 
                   href="#demo" 
+                  onClick={(e) => handleAnchorClick(e, 'demo')}
                   className="group inline-flex items-center justify-center px-8 py-4 text-base font-semibold text-gray-700 bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-all hover:-translate-y-1 shadow-sm"
                 >
-                  <Play className="mr-2 w-5 h-5 text-indigo-600" />
-                  Demo ansehen
+                  <Calendar className="mr-2 w-5 h-5 text-indigo-600" />
+                  Demo buchen
                 </a>
               </div>
 
@@ -253,8 +265,8 @@ export default function LandingPage() {
                   DSGVO-konform
                 </div>
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-green-500" />
-                  Deutscher Support
+                  <Server className="w-4 h-4 text-orange-500" />
+                  AWS Hosting EU
                 </div>
               </div>
             </div>
@@ -363,12 +375,6 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Scroll Indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-          <div className="w-8 h-12 rounded-full border-2 border-gray-300 flex items-start justify-center p-2">
-            <div className="w-1.5 h-3 bg-gray-400 rounded-full animate-pulse" />
-          </div>
-        </div>
       </section>
 
       {/* Problem / Why Section */}
@@ -448,7 +454,7 @@ export default function LandingPage() {
             <div>
               <div className="inline-flex items-center px-4 py-2 rounded-full bg-white/10 text-indigo-300 text-sm font-medium mb-6 border border-white/10">
                 <Brain className="w-4 h-4 mr-2" />
-                Powered by Google Gemini 2.0
+                Powered by Google Gemini 3
               </div>
               
               <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
@@ -464,9 +470,9 @@ export default function LandingPage() {
 
               <div className="space-y-4 mb-10">
                 {[
-                  'Versteht Kontext und antwortet natürlich',
-                  'Lernt deine Objekte und Präferenzen',
-                  'Spricht Deutsch, Englisch, Französisch, Spanisch',
+                  'Vollständiger Zugriff auf CRM, E-Mails, Kalender & Objekte',
+                  'Erstellt professionelle Exposés in Sekunden',
+                  'Bearbeitet Bilder mit KI-Staging (Möbel einbauen)',
                   'Eskaliert automatisch bei komplexen Fällen'
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-3">
@@ -634,6 +640,12 @@ export default function LandingPage() {
                 gradient: 'from-indigo-500 to-violet-500'
               },
               {
+                icon: Wand2,
+                title: 'KI-Bildbearbeitung',
+                description: 'Virtual Staging: Möbel einbauen, Räume umgestalten — ultra-realistisch mit KI.',
+                gradient: 'from-fuchsia-500 to-pink-500'
+              },
+              {
                 icon: Users,
                 title: 'Intelligentes CRM',
                 description: 'Leads mit Anrede, Du/Sie-Präferenz, Suchprofilen und automatischer Qualifizierung.',
@@ -666,7 +678,7 @@ export default function LandingPage() {
               {
                 icon: Globe,
                 title: 'Portal-Anbindung',
-                description: 'ImmoScout, Willhaben, Immowelt — alle Anfragen automatisch verarbeitet.',
+                description: 'Alle gängigen Portale — ImmoScout, Willhaben, Immowelt und mehr.',
                 gradient: 'from-cyan-500 to-blue-500'
               },
               {
@@ -677,8 +689,8 @@ export default function LandingPage() {
               },
               {
                 icon: Shield,
-                title: 'DSGVO-konform',
-                description: 'Hosting in Frankfurt, verschlüsselte Daten, rechtssichere Kommunikation.',
+                title: 'AWS Hosting EU',
+                description: 'DSGVO-konform auf AWS Frankfurt. Verschlüsselte Daten, höchste Sicherheit.',
                 gradient: 'from-slate-500 to-gray-500'
               },
             ].map((feature, i) => (
@@ -697,8 +709,109 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* AI Image Editing / Virtual Staging Section */}
+      <section id="bildbearbeitung" className="py-24 bg-white overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            {/* Left: Image Preview */}
+            <div className="relative">
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl">
+                {/* Before/After Slider Simulation */}
+                <div className="aspect-[4/3] bg-gradient-to-br from-gray-100 to-gray-200 relative">
+                  {/* Before Side */}
+                  <div className="absolute inset-0 w-1/2 bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="w-16 h-16 bg-gray-500/30 rounded-xl flex items-center justify-center mx-auto mb-3">
+                        <Image className="w-8 h-8 text-gray-600" />
+                      </div>
+                      <p className="text-gray-600 font-medium">Vorher</p>
+                      <p className="text-gray-500 text-sm">Leerer Raum</p>
+                    </div>
+                  </div>
+                  {/* After Side */}
+                  <div className="absolute inset-0 left-1/2 w-1/2 bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="w-16 h-16 bg-indigo-500/30 rounded-xl flex items-center justify-center mx-auto mb-3">
+                        <Wand2 className="w-8 h-8 text-indigo-600" />
+                      </div>
+                      <p className="text-indigo-600 font-medium">Nachher</p>
+                      <p className="text-indigo-500 text-sm">Mit Möbeln</p>
+                    </div>
+                  </div>
+                  {/* Divider */}
+                  <div className="absolute inset-y-0 left-1/2 w-1 bg-white shadow-lg transform -translate-x-1/2">
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center">
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Floating Stats */}
+              <div className="absolute -right-4 -bottom-4 bg-white rounded-xl shadow-xl p-4 border border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Mehr Aufmerksamkeit</p>
+                    <p className="text-lg font-bold text-gray-900">+73%</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Content */}
+            <div>
+              <div className="inline-flex items-center px-4 py-2 rounded-full bg-fuchsia-50 text-fuchsia-600 text-sm font-medium mb-6 border border-fuchsia-200">
+                <Wand2 className="w-4 h-4 mr-2" />
+                KI-Bildbearbeitung
+              </div>
+              
+              <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
+                Virtual Staging mit
+                <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-500 to-pink-500">
+                  KI-Präzision
+                </span>
+              </h2>
+              
+              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
+                Verwandle leere Räume in einladende Wohnträume. Unsere KI fügt 
+                <strong className="text-gray-900"> ultra-realistische Möbel</strong> ein — 
+                in Sekunden, nicht Stunden.
+              </p>
+
+              <div className="space-y-4 mb-8">
+                {[
+                  'Möbel automatisch einbauen — passend zum Raum',
+                  'Verschiedene Einrichtungsstile wählbar',
+                  'Erhöht die Vorstellungskraft der Interessenten',
+                  'Mehr Klicks, mehr Anfragen, schnellere Verkäufe'
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-gradient-to-br from-fuchsia-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="text-gray-700">{item}</span>
+                  </div>
+                ))}
+              </div>
+
+              <Link 
+                href="/login" 
+                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-fuchsia-500 to-pink-500 text-white rounded-full font-semibold hover:shadow-lg hover:shadow-fuchsia-500/30 transition-all hover:-translate-y-1"
+              >
+                Jetzt ausprobieren
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* How It Works */}
-      <section className="py-24 bg-white">
+      <section className="py-24 bg-gray-50">
         <div 
           ref={section5.ref}
           className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${section5.isInView ? 'animate-slide-up' : 'opacity-0'}`}
@@ -753,6 +866,69 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Demo Section */}
+      <section id="demo" className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div>
+              <div className="inline-flex items-center px-4 py-2 rounded-full bg-indigo-50 text-indigo-600 text-sm font-medium mb-6 border border-indigo-200">
+                <Calendar className="w-4 h-4 mr-2" />
+                Persönliche Demo
+              </div>
+              
+              <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
+                Erlebe NeuroConcepts
+                <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">
+                  live in Aktion
+                </span>
+              </h2>
+              
+              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
+                In einer 30-minütigen Demo zeigen wir dir, wie Jarvis dein Tagesgeschäft 
+                revolutioniert. Keine Verpflichtungen, keine Verkaufsgespräche — nur Mehrwert.
+              </p>
+
+              <div className="space-y-4 mb-8">
+                {[
+                  'Individuelle Beratung für dein Business',
+                  'Live-Demonstration aller Features',
+                  'Antworten auf alle deine Fragen',
+                  'Unverbindlich und kostenlos'
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    </div>
+                    <span className="text-gray-700">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Calendar Placeholder */}
+            <div className="bg-gray-50 rounded-2xl p-8 border border-gray-200">
+              <h3 className="text-xl font-bold text-gray-900 mb-6 text-center">
+                Wähle einen Termin
+              </h3>
+              <div className="bg-white rounded-xl p-6 border border-gray-100 text-center">
+                <Calendar className="w-16 h-16 text-indigo-600 mx-auto mb-4" />
+                <p className="text-gray-600 mb-6">
+                  Unser Kalender wird in Kürze hier eingebunden.
+                </p>
+                <a 
+                  href="mailto:hello@neuroconcepts.ai?subject=Demo-Anfrage"
+                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-indigo-500/30 transition-all"
+                >
+                  Per E-Mail anfragen
+                  <ArrowRight className="ml-2 w-5 h-5" />
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Final CTA */}
       <section className="py-24 bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 text-white relative overflow-hidden">
         {/* Background Effects */}
@@ -798,7 +974,7 @@ export default function LandingPage() {
           <div className="mt-16 pt-8 border-t border-white/20">
             <p className="text-sm text-white/60 mb-6">Integriert mit den Tools, die du bereits nutzt</p>
             <div className="flex justify-center items-center gap-8 flex-wrap opacity-70">
-              {['ImmoScout24', 'Willhaben', 'Immowelt', 'Google', 'Outlook'].map((name, i) => (
+              {['Alle gängigen Portale', 'Google Workspace', 'Microsoft 365'].map((name, i) => (
                 <div key={i} className="px-4 py-2 bg-white/10 rounded-lg text-sm font-medium">
                   {name}
                 </div>
@@ -830,10 +1006,10 @@ export default function LandingPage() {
             <div>
               <h4 className="font-semibold mb-4">Produkt</h4>
               <ul className="space-y-3 text-gray-400 text-sm">
-                <li><a href="#jarvis" className="hover:text-white transition-colors">Jarvis KI</a></li>
-                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Preise</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Integrationen</a></li>
+                <li><a href="#jarvis" onClick={(e) => handleAnchorClick(e, 'jarvis')} className="hover:text-white transition-colors">Jarvis KI</a></li>
+                <li><a href="#features" onClick={(e) => handleAnchorClick(e, 'features')} className="hover:text-white transition-colors">Features</a></li>
+                <li><Link href="/preise" className="hover:text-white transition-colors">Preise</Link></li>
+                <li><Link href="/integrationen" className="hover:text-white transition-colors">Integrationen</Link></li>
               </ul>
             </div>
 
@@ -841,10 +1017,10 @@ export default function LandingPage() {
             <div>
               <h4 className="font-semibold mb-4">Unternehmen</h4>
               <ul className="space-y-3 text-gray-400 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">Über uns</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Karriere</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Kontakt</a></li>
+                <li><Link href="/ueber-uns" className="hover:text-white transition-colors">Über uns</Link></li>
+                <li><Link href="/blog" className="hover:text-white transition-colors">Blog</Link></li>
+                <li><Link href="/karriere" className="hover:text-white transition-colors">Karriere</Link></li>
+                <li><Link href="/kontakt" className="hover:text-white transition-colors">Kontakt</Link></li>
               </ul>
             </div>
 
@@ -852,10 +1028,9 @@ export default function LandingPage() {
             <div>
               <h4 className="font-semibold mb-4">Rechtliches</h4>
               <ul className="space-y-3 text-gray-400 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">Datenschutz</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">AGB</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Impressum</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Cookie-Einstellungen</a></li>
+                <li><Link href="/datenschutz" className="hover:text-white transition-colors">Datenschutz</Link></li>
+                <li><Link href="/agb" className="hover:text-white transition-colors">AGB</Link></li>
+                <li><Link href="/impressum" className="hover:text-white transition-colors">Impressum</Link></li>
               </ul>
             </div>
           </div>

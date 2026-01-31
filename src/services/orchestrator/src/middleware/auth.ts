@@ -10,6 +10,8 @@ declare global {
         email: string;
         given_name?: string;
         family_name?: string;
+        phone_number?: string;
+        address?: string;
         'custom:company_name'?: string;
         'custom:employee_count'?: string;
         'cognito:groups'?: string[];

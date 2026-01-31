@@ -1,10 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { Bot, Clock, MessageSquare, Zap } from 'lucide-react';
 
 export default function JarvisSettingsPage() {
   const [autoReply, setAutoReply] = useState(true);
   const [delay, setDelay] = useState(5);
+  const [autoMatch, setAutoMatch] = useState(true);
+  const [notifyOnMatch, setNotifyOnMatch] = useState(true);
 
   return (
     <div className="space-y-10">
@@ -15,19 +18,24 @@ export default function JarvisSettingsPage() {
         </p>
 
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-gray-900">Automatische Antwort</span>
-              <span className="text-sm text-gray-500">Soll Jarvis automatisch Exposés an neue Leads senden?</span>
+          {/* Auto Reply */}
+          <div className="flex items-center justify-between py-4 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                <MessageSquare className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-900">Automatische Antwort</span>
+                <p className="text-xs text-gray-500">Jarvis sendet automatisch Exposés an neue Leads</p>
+              </div>
             </div>
             <button
               onClick={() => setAutoReply(!autoReply)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                 autoReply ? 'bg-indigo-600' : 'bg-gray-200'
               }`}
             >
               <span
-                aria-hidden="true"
                 className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
                   autoReply ? 'translate-x-5' : 'translate-x-0'
                 }`}
@@ -35,12 +43,68 @@ export default function JarvisSettingsPage() {
             </button>
           </div>
 
-          <div className="border-t border-gray-200 pt-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Verzögerung (Minuten)</label>
-            <p className="text-sm text-gray-500 mb-3">
-              Wartezeit vor dem Senden, damit es natürlicher wirkt.
-            </p>
-            <div className="w-full max-w-xs">
+          {/* Auto Match */}
+          <div className="flex items-center justify-between py-4 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                <Zap className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-900">Auto-Matching</span>
+                <p className="text-xs text-gray-500">Leads automatisch mit passenden Objekten verbinden</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setAutoMatch(!autoMatch)}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                autoMatch ? 'bg-indigo-600' : 'bg-gray-200'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  autoMatch ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Notify on Match */}
+          <div className="flex items-center justify-between py-4 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                <Bot className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-900">Match-Benachrichtigung</span>
+                <p className="text-xs text-gray-500">Bei neuen Matches benachrichtigen</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setNotifyOnMatch(!notifyOnMatch)}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                notifyOnMatch ? 'bg-indigo-600' : 'bg-gray-200'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  notifyOnMatch ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Delay Setting */}
+          <div className="py-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-gray-600" />
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-900">Verzögerung</span>
+                <p className="text-xs text-gray-500">Wartezeit vor dem Senden, damit es natürlicher wirkt</p>
+              </div>
+            </div>
+            <div className="ml-13 pl-13">
               <input
                 type="range"
                 min="0"
@@ -48,7 +112,7 @@ export default function JarvisSettingsPage() {
                 step="1"
                 value={delay}
                 onChange={(e) => setDelay(parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                className="w-full max-w-xs h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
               />
               <div className="mt-2 text-sm text-gray-900 font-medium">{delay} Minuten</div>
             </div>

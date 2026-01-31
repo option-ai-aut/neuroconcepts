@@ -57,9 +57,16 @@ model User {
   firstName String?
   lastName  String?
   name      String? // Deprecated, keep for backward compatibility
+  phone     String?
   tenantId  String
   tenant    Tenant @relation(fields: [tenantId], references: [id])
   role      Role   @default(AGENT)
+
+  // Address fields
+  street     String?
+  postalCode String?
+  city       String?
+  country    String?
 
   // Relations
   leads    Lead[] // Leads assigned to this agent
@@ -597,6 +604,11 @@ model PortalConnection {
   ftpPassword String? // TODO: Encrypt!
   ftpPath     String? // Remote directory
   useSftp     Boolean @default(false)
+  
+  // REST API Credentials (for portals like ImmobilienScout24)
+  apiKey      String? // API Key
+  apiSecret   String? // API Secret (encrypted)
+  apiEndpoint String? // Optional custom API endpoint
   
   // Portal-specific ID
   providerId  String? // Anbieternummer/Kundennummer beim Portal
