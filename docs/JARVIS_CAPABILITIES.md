@@ -10,14 +10,21 @@ Jarvis ist der zentrale KI-Assistent für NeuroConcepts mit Zugriff auf das **ge
 
 | Tool | Beschreibung | Beispiel |
 |------|--------------|----------|
-| `create_lead` | Lead anlegen | "Leg einen Lead an: Max Mustermann, max@test.de" |
+| `create_lead` | Lead anlegen mit Anrede & Du/Sie | "Leg einen Lead an: Frau Anna Müller, per Du, anna@test.de" |
 | `get_leads` | Alle Leads abrufen | "Zeig mir alle neuen Leads" |
 | `get_lead` | Einzelnen Lead abrufen | "Zeig mir Lead ABC-123" |
-| `update_lead` | Lead aktualisieren | "Ändere den Status von Lead XYZ auf QUALIFIED" |
+| `update_lead` | Lead aktualisieren (inkl. Anrede, Du/Sie) | "Ändere Lead XYZ auf per Sie" |
 | `delete_lead` | Lead löschen | "Lösche Lead ABC-123" |
 | `get_lead_statistics` | Lead-Statistiken | "Wie ist unsere Conversion-Rate diesen Monat?" |
 | `search_properties` | Properties suchen | "Suche Wohnungen in Berlin unter 500k" |
 | `get_dashboard_stats` | Dashboard-Übersicht | "Zeig mir die Stats dieser Woche" |
+
+**Lead-Felder:**
+- `salutation`: Anrede (NONE, MR/Herr, MS/Frau, DIVERSE/Divers)
+- `formalAddress`: Du/Sie Toggle (true = Sie, false = Du)
+- `firstName`, `lastName`, `email`, `phone`
+- `budgetMin`, `budgetMax`, `preferredType`, `preferredLocation`
+- `minRooms`, `minArea`, `timeFrame`, `financingStatus`, `source`
 
 ### 🏠 IMMOBILIEN (6 Tools)
 
@@ -51,7 +58,7 @@ Jarvis ist der zentrale KI-Assistent für NeuroConcepts mit Zugriff auf das **ge
 | `delete_calendar_event` | Termin löschen | 🚧 Coming Soon | "Lösche Termin XYZ" |
 | `get_calendar_availability` | Verfügbarkeit prüfen | ✅ Aktiv | "Bin ich nächste Woche Dienstag frei?" |
 
-### 📄 EXPOSÉS (4 Tools)
+### 📄 EXPOSÉS & TEMPLATES (12 Tools)
 
 | Tool | Beschreibung | Beispiel |
 |------|--------------|----------|
@@ -60,15 +67,41 @@ Jarvis ist der zentrale KI-Assistent für NeuroConcepts mit Zugriff auf das **ge
 | `delete_expose` | Exposé löschen | "Lösche Exposé ABC-123" |
 | `generate_expose_pdf` | PDF generieren | "Generiere PDF für Exposé XYZ" |
 | `get_expose_templates` | Exposé-Templates | "Zeig mir alle Exposé-Vorlagen" |
+| `get_template` | Template abrufen | "Zeig mir Template XYZ" |
+| `update_template` | Template aktualisieren | "Ändere den Namen von Template ABC" |
 
-**Exposé-Editor-Tools** (nur im Editor verfügbar):
-- `create_expose_block` - Block hinzufügen
+**Exposé-Editor-Tools** (im Editor & Chat verfügbar):
+- `create_expose_block` - Block hinzufügen (alle 16 Block-Typen)
 - `update_expose_block` - Block bearbeiten
 - `delete_expose_block` - Block löschen
 - `reorder_expose_blocks` - Blöcke sortieren
 - `create_full_expose` - Komplettes Exposé generieren
 - `set_expose_theme` - Theme ändern
 - `clear_expose_blocks` - Alle Blöcke löschen
+
+**Verfügbare Block-Typen:**
+
+| Kategorie | Blöcke |
+|-----------|--------|
+| **Header** | `hero` (Hero-Bild mit Titel/Untertitel) |
+| **Content** | `text`, `features`, `highlights`, `twoColumn`, `quote` |
+| **Media** | `gallery`, `floorplan`, `video`, `virtualTour` |
+| **Daten** | `stats`, `priceTable`, `energyCertificate`, `location`, `contact`, `leadInfo` |
+| **CTA** | `cta`, `pageBreak` |
+
+**Template-Variablen** (für personalisierte Exposés):
+```
+Property: {{property.title}}, {{property.address}}, {{property.city}}, {{property.price}}, 
+          {{property.rooms}}, {{property.area}}, {{property.bedrooms}}, {{property.bathrooms}},
+          {{property.yearBuilt}}, {{property.propertyType}}, {{property.energyClass}}
+
+Makler:   {{user.name}}, {{user.email}}, {{user.phone}}, {{company.name}}
+
+Lead:     {{lead.name}}, {{lead.firstName}}, {{lead.lastName}}, {{lead.email}}, 
+          {{lead.phone}}, {{lead.greeting}}
+
+Datum:    {{date.today}}, {{date.year}}
+```
 
 ### 💬 TEAM-CHAT (3 Tools)
 
@@ -95,11 +128,12 @@ Jarvis ist der zentrale KI-Assistent für NeuroConcepts mit Zugriff auf das **ge
 - ✅ Zeile-für-Zeile mit Fortschritts-Updates
 - ✅ Fehlertoleranz und Duplikat-Erkennung
 
-## Gesamt: 44 Tools
+## Gesamt: 50+ Tools
 
-- ✅ **38 Tools aktiv**
+- ✅ **44 Tools aktiv**
 - 🚧 **6 Tools in Entwicklung** (E-Mail & Kalender-Integration)
 - ✨ **Native Datei-Verarbeitung** (CSV, Excel, PDF, Bilder, etc.)
+- 🎨 **Live-Editor-Integration** (Jarvis kann Exposés in Echtzeit bearbeiten)
 
 ## Beispiel-Konversationen
 

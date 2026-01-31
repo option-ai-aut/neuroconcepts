@@ -11,6 +11,7 @@ Dieses Dokument definiert die visuellen Richtlinien für die NeuroConcepts AI Pl
 *   **Soft UI (Weiche Formen):** Alles ist abgerundet und freundlich.
 *   **Typografie als Struktur:** Große, fette Überschriften (`text-4xl font-extrabold`) definieren Bereiche, nicht Boxen.
 *   **Split-View:** Listenansichten (Posteingang, Exposés, Chat) nutzen ein vertikales Split-Layout (Liste links, Detail rechts).
+*   **Direkte Navigation:** Bei "Neu anlegen" Aktionen (Lead, Objekt) wird direkt zur Detailseite navigiert, kein Drawer/Modal.
 
 ## 2. Farben
 
@@ -65,3 +66,34 @@ Jede Hauptseite (`/dashboard/...`) folgt diesem Aufbau:
 
 *   **Set:** Lucide React
 *   **Stil:** Schlicht, oft in Kombination mit einem farbigen Hintergrund-Kreis oder -Quadrat (`bg-indigo-50 text-indigo-600`).
+
+## 8. Exposé-Editor
+
+Der Exposé-Editor ist ein zentrales Feature mit eigenem Design-System:
+
+### Layout
+*   **A4-Seiten-Vorschau:** Blöcke werden auf virtuellen A4-Seiten dargestellt
+*   **Drei-Spalten-Layout:** Block-Bibliothek (links) | Preview (mitte) | Block-Optionen (rechts)
+*   **Collapsible Sidebars:** Icons bleiben sichtbar, nur Text verschwindet
+
+### Block-Auswahl
+*   **Glow-Effekt:** Ausgewählte Blöcke haben `ring-1 ring-indigo-400 shadow-[0_0_12px_rgba(99,102,241,0.4)]`
+*   **Controls außerhalb:** Grip-Handle und Buttons erscheinen links vom Block (im grauen Bereich)
+*   **Nur bei Auswahl:** Controls sind nur sichtbar wenn Block ausgewählt ist (nicht bei Hover)
+
+### Template-Variablen
+*   **@-Mentions:** Tippe `@` um Variablen einzufügen (Autocomplete)
+*   **Drag & Drop:** Felder-Sidebar zum Ziehen von Variablen
+*   **Live-Vorschau:** Beispiel-Objekt wählbar, Variablen werden durch echte Daten ersetzt
+
+### Themes
+*   **Schriftstil:** Standard, Modern, Elegant, Minimalist
+*   **Farbpalette:** Getrennt wählbar (Indigo, Emerald, Amber, Rose, Slate)
+*   **Block-Farben:** Individuelle Hintergrund-/Textfarben pro Block möglich
+
+## 9. Lead-Formular
+
+### Anrede & Ansprache
+*   **Anrede-Dropdown:** Keine, Herr, Frau, Divers
+*   **Du/Sie Toggle:** Button-Group mit "Per Sie" (default) und "Per Du"
+*   **5-Spalten-Grid:** Anrede | Du/Sie | Vorname | Nachname (2 Spalten)

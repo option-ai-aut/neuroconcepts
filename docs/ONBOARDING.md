@@ -37,11 +37,24 @@ Dieser Guide beschreibt den Prozess, um einen neuen Mandanten (Immobilienfirma) 
 ### 4. Content & Routing
 
 #### A. Erstes Objekt anlegen
+- Klick auf "Neues Objekt" → Direkt zur Detailseite
 - PDF-Exposé hochladen (Jarvis extrahiert Daten).
 - Stammdaten prüfen: Adresse, Kaltmiete, Zimmer, Fläche.
 - **Jarvis-Fakten:** Wichtige Infos ergänzen, die nicht im Exposé stehen (z.B. "Keine WG", "Hund erlaubt").
 
-#### B. Routing-Regeln
+#### B. Erster Lead anlegen
+- Klick auf "Neuer Lead" → Direkt zur Anlage-Seite
+- **Anrede:** Herr/Frau/Divers oder Keine
+- **Ansprache:** Per Sie (Standard) oder Per Du
+- Kontaktdaten: E-Mail (Pflicht), Telefon, Name
+
+#### C. Exposé-Template erstellen
+- Exposés & Vorlagen → "Neue Vorlage"
+- Blöcke per Drag & Drop hinzufügen
+- Template-Variablen nutzen: `{{property.title}}`, `{{lead.name}}`, etc.
+- **Live-Vorschau:** Beispiel-Objekt wählen um echte Daten zu sehen
+
+#### D. Routing-Regeln
 - Wer bekommt die Leads für dieses Objekt?
 - [ ] Einzelner Makler
 - [ ] Team (Round Robin)

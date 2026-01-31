@@ -58,6 +58,8 @@ graph TD
 ### 2. Core Application
 *   **Orchestrator (Lambda + API Gateway):** Die zentrale Schaltstelle. Verwaltet den Status eines Leads (`NEW` -> `CONTACTED` -> `CONVERSATION` -> `BOOKED`). Entscheidet, wann die KI aufgerufen wird und wann ein Mensch eingreifen muss.
 *   **Tenant Manager:** Verwaltet die Mandanten (Immobilienfirmen), deren Konfigurationen (SMTP-Zugangsdaten, Routing-Regeln) und Benutzerrechte.
+*   **Encryption Service:** AES-256-GCM Verschlüsselung für sensible Daten (FTP-Passwörter, API-Keys).
+*   **PDF Service:** Generiert Exposé-PDFs mit Puppeteer, inkl. QR-Codes für Videos/360°-Touren.
 
 ### 3. Data Layer
 *   **PostgreSQL:** Speichert relationale Daten: Tenants, Users, Leads, Properties, CalendarEvents.
@@ -65,12 +67,14 @@ graph TD
     *   **Prod:** Aurora Serverless v2 für Skalierbarkeit und HA.
 *   **pgvector:** Speichert Embeddings von Exposés und vergangenen Konversationen, um der KI ein "Langzeitgedächtnis" zu geben (RAG - Retrieval Augmented Generation).
 
-### 4. AI Engine (Google Gemini 3 Flash)
-*   **Modell:** Gemini 3 Flash Preview.
+### 4. AI Engine (Google Gemini 2.0 Flash)
+*   **Modell:** Gemini 2.0 Flash.
 *   **Aufgabe:**
     *   **Intent Recognition:** Was will der Lead? (Besichtigung, Frage, Absage?)
     *   **Response Generation:** Erstellen von natürlichen, mehrsprachigen Antworten.
     *   **Extraction:** Strukturierte Daten aus Freitext ziehen (z.B. Terminwunsch "nächsten Dienstag").
+    *   **Exposé-Erstellung:** Live-Bearbeitung von Exposés im Editor via Tool-Calls.
+    *   **Datei-Verarbeitung:** CSV/Excel-Import, PDF-Analyse, Bild-Erkennung.
 
 ### 5. Integration Layer
 *   **E-Mail Outbound:** Der Versand erfolgt **nicht** über AWS SES (um "Via"-Header zu vermeiden), sondern direkt über die SMTP-Credentials des Maklers. Das garantiert 100% White-Labeling und hohe Zustellrate.

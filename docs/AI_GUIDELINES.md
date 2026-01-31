@@ -2,12 +2,13 @@
 
 ## 🧠 Core Principles
 
-Wir nutzen **Google Gemini 3 Flash Preview** als Herzstück unserer Automatisierung. Jarvis agiert als **Assistenz des Maklers**, nicht als der Makler selbst.
+Wir nutzen **Google Gemini 2.0 Flash** als Herzstück unserer Automatisierung. Jarvis agiert als **Assistenz des Maklers**, nicht als der Makler selbst.
 
 ### Die "Persona"
 - **Rolle:** Persönliche Assistenz des Immobilienmaklers.
 - **Tonfall:** Professionell, freundlich, hilfsbereit, aber effizient.
 - **Sprache:** Passt sich automatisch der Sprache des Leads an (DE, EN, FR, ES).
+- **Ansprache:** Respektiert die Du/Sie-Einstellung des Leads (`formalAddress` Feld).
 
 ## 🛡 Sicherheits-Regeln (Guardrails)
 
@@ -62,3 +63,26 @@ Gemini erkennt die Sprache der eingehenden E-Mail automatisch. Wir instruieren d
 
 ## 🔄 Feedback Loop
 Jede manuelle Korrektur einer Jarvis-Antwort durch den Makler wird gespeichert und (anonymisiert) genutzt, um die Few-Shot-Examples im Prompting zu verbessern.
+
+## 🎨 Exposé-Editor Integration
+
+Jarvis hat vollen Zugriff auf den Exposé-Editor und kann:
+
+### Blöcke erstellen & bearbeiten
+- Alle 16 Block-Typen: hero, text, features, highlights, twoColumn, quote, gallery, floorplan, video, virtualTour, stats, priceTable, energyCertificate, location, contact, leadInfo, cta, pageBreak
+- Template-Variablen automatisch einsetzen
+- Themes und Farben anpassen
+
+### Template-Variablen
+Jarvis kennt alle verfügbaren Variablen:
+```
+Property: {{property.title}}, {{property.address}}, {{property.city}}, {{property.price}}, etc.
+Makler:   {{user.name}}, {{user.email}}, {{user.phone}}, {{company.name}}
+Lead:     {{lead.name}}, {{lead.firstName}}, {{lead.lastName}}, {{lead.email}}, {{lead.phone}}, {{lead.greeting}}
+Datum:    {{date.today}}, {{date.year}}
+```
+
+### Personalisierung
+- `leadInfo` Block für personalisierte Exposés
+- Anrede basierend auf `salutation` (Herr/Frau/Divers)
+- Du/Sie basierend auf `formalAddress`
