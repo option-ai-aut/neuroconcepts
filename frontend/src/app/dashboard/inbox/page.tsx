@@ -76,19 +76,19 @@ export default function InboxPage() {
                 Keine Nachrichten gefunden.
               </div>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div>
                 {filteredLeads.map((lead) => (
                   <button
                     key={lead.id}
                     onClick={() => setSelectedLeadId(lead.id)}
-                    className={`w-full text-left p-4 hover:bg-white transition-colors flex flex-col gap-1 border-r-4 ${
+                    className={`w-full text-left p-4 transition-colors flex flex-col gap-1 ${
                       selectedLeadId === lead.id 
-                        ? 'bg-white border-indigo-600' 
-                        : 'border-transparent hover:border-indigo-200'
+                        ? 'bg-gray-100/80 rounded-r-lg' 
+                        : 'bg-transparent hover:bg-gray-50/50'
                     }`}
                   >
-                    <div className={`flex justify-between items-start w-full ${selectedLeadId === lead.id ? '' : ''}`}>
-                      <span className={`text-sm font-semibold truncate ${selectedLeadId === lead.id ? 'text-indigo-900' : 'text-gray-900'}`}>
+                    <div className="flex justify-between items-start w-full">
+                      <span className="text-sm font-semibold truncate text-gray-900">
                         {lead.firstName} {lead.lastName}
                       </span>
                       <span className="text-xs text-gray-400 whitespace-nowrap ml-2">

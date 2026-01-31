@@ -3,23 +3,21 @@
 import { useEffect, useState, use, useRef } from 'react';
 import { getLead, Lead, sendDraftMessage, updateLead, sendManualEmail, deleteLead } from '@/lib/api';
 import { useRouter } from 'next/navigation';
-import { Mail, Phone, User, Send, MessageSquare, FileText, ArrowLeft, MoreVertical, Calendar, Clock, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { Mail, Phone, User, Send, MessageSquare, FileText, ArrowLeft, MoreVertical, Calendar, Clock, ChevronDown, Plus, Trash2, Euro, Home, MapPin, Building, Activity, CheckCircle2, Edit3, FileCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useGlobalState } from '@/context/GlobalStateContext';
+import { getRuntimeConfig } from '@/components/EnvProvider';
 
 export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { openDrawer, updateEmailForm } = useGlobalState();
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activities, setActivities] = useState<any[]>([]);
   
   // Edit State
   const [formData, setFormData] = useState<Partial<Lead>>({});
-  const [showNotes, setShowNotes] = useState(false);
 
-  // Email State
-  const [sendingEmail, setSendingEmail] = useState(false);
-  
   // UI State
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
@@ -57,16 +55,28 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     }
   };
 
-  const loadLead = () => {
-    getLead(id).then((data) => {
+  const loadLead = async () => {
+    try {
+      const data = await getLead(id);
       setLead(data);
       setFormData(data || {});
-      if (data?.notes) setShowNotes(true);
+      
+      // Load activities
+      const config = getRuntimeConfig();
+      const res = await fetch(`${config.apiUrl}/leads/${id}/activities`);
+      if (res.ok) {
+        const activitiesData = await res.json();
+        setActivities(activitiesData);
+      }
+      
       setLoading(false);
-    });
+    } catch (error) {
+      console.error('Error loading lead:', error);
+      setLoading(false);
+    }
   };
 
-  const handleInputChange = (field: keyof Lead, value: string) => {
+  const handleInputChange = (field: keyof Lead, value: any) => {
     setFormData(prev => {
       const newData = { ...prev, [field]: value };
       
@@ -74,7 +84,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current);
       autoSaveTimeoutRef.current = setTimeout(() => {
         saveLead(newData);
-      }, 1000); // Save after 1 second of inactivity
+      }, 1000);
 
       return newData;
     });
@@ -83,7 +93,13 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const saveLead = async (data: Partial<Lead>) => {
     try {
       await updateLead(id, data);
-      // Optional: Show small "Saved" indicator
+      // Reload activities after update
+      const config = getRuntimeConfig();
+      const res = await fetch(`${config.apiUrl}/leads/${id}/activities`);
+      if (res.ok) {
+        const activitiesData = await res.json();
+        setActivities(activitiesData);
+      }
     } catch (error) {
       console.error('Auto-save failed:', error);
     }
@@ -103,47 +119,49 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* Top Bar */}
-      <div className="h-16 bg-white px-6 flex items-center justify-between shrink-0">
-        <div className="flex items-center">
-          <Link href="/dashboard/crm/leads" className="mr-4 p-2 hover:bg-gray-100 rounded-full text-gray-500 hover:text-gray-900 transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <h1 className="text-lg font-bold text-gray-900">
-            {formData.firstName} {formData.lastName}
-          </h1>
-        </div>
+      {/* Header */}
+      <div className="pt-8 px-8 pb-6 shadow-sm">
+        <div className="flex items-end justify-between">
+          <div>
+            <Link href="/dashboard/crm/leads" className="inline-flex items-center text-sm text-gray-500 hover:text-gray-900 mb-3 transition-colors">
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              Zurück zu Leads
+            </Link>
+            <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">
+              {formData.firstName} {formData.lastName}
+            </h1>
+            <p className="text-sm text-gray-500 mt-2">{formData.email}</p>
+          </div>
         
-        <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-4">
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-full cursor-pointer transition-all ${
-                formData.status === 'NEW' ? 'bg-blue-900/50 text-blue-200 hover:bg-blue-900/70' :
-                formData.status === 'CONTACTED' ? 'bg-yellow-900/50 text-yellow-200 hover:bg-yellow-900/70' :
-                formData.status === 'CONVERSATION' ? 'bg-purple-900/50 text-purple-200 hover:bg-purple-900/70' :
-                formData.status === 'BOOKED' ? 'bg-green-900/50 text-green-200 hover:bg-green-900/70' :
-                'bg-gray-800 text-gray-300 hover:bg-gray-700'
+              className={`flex items-center gap-2 px-4 py-2 rounded-md cursor-pointer transition-all font-medium text-sm ${
+                formData.status === 'NEW' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' :
+                formData.status === 'CONTACTED' ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' :
+                formData.status === 'CONVERSATION' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' :
+                formData.status === 'BOOKED' ? 'bg-green-100 text-green-700 hover:bg-green-200' :
+                'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}>
-              <span className="text-sm font-semibold">
+              <span>
                 {formData.status === 'NEW' && 'Neu'}
                 {formData.status === 'CONTACTED' && 'Kontaktiert'}
                 {formData.status === 'CONVERSATION' && 'Im Gespräch'}
                 {formData.status === 'BOOKED' && 'Termin gebucht'}
                 {formData.status === 'LOST' && 'Verloren'}
               </span>
-              <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${statusDropdownOpen ? 'transform rotate-180' : ''}`} />
+              <ChevronDown className={`w-4 h-4 transition-transform ${statusDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
             
-            {/* Custom Dropdown Menu */}
             {statusDropdownOpen && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-slate-800 rounded-xl shadow-lg border border-gray-700 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-100">
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden z-50">
                 {[
-                  { value: 'NEW', label: 'Neu', color: 'text-blue-300 hover:bg-blue-900/30' },
-                  { value: 'CONTACTED', label: 'Kontaktiert', color: 'text-yellow-300 hover:bg-yellow-900/30' },
-                  { value: 'CONVERSATION', label: 'Im Gespräch', color: 'text-purple-300 hover:bg-purple-900/30' },
-                  { value: 'BOOKED', label: 'Termin gebucht', color: 'text-green-300 hover:bg-green-900/30' },
-                  { value: 'LOST', label: 'Verloren', color: 'text-gray-300 hover:bg-gray-700/50' },
+                  { value: 'NEW', label: 'Neu', color: 'text-blue-700 hover:bg-blue-50' },
+                  { value: 'CONTACTED', label: 'Kontaktiert', color: 'text-yellow-700 hover:bg-yellow-50' },
+                  { value: 'CONVERSATION', label: 'Im Gespräch', color: 'text-purple-700 hover:bg-purple-50' },
+                  { value: 'BOOKED', label: 'Termin gebucht', color: 'text-green-700 hover:bg-green-50' },
+                  { value: 'LOST', label: 'Verloren', color: 'text-gray-700 hover:bg-gray-50' },
                 ].map((option) => (
                   <button
                     key={option.value}
@@ -151,9 +169,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       handleInputChange('status', option.value);
                       setStatusDropdownOpen(false);
                     }}
-                    className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors flex items-center justify-between ${
-                      formData.status === option.value ? 'bg-gray-700/50 ' + option.color : option.color
-                    }`}
+                    className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors flex items-center justify-between ${option.color}`}
                   >
                     {option.label}
                     {formData.status === option.value && <div className="w-2 h-2 rounded-full bg-current" />}
@@ -166,13 +182,13 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           <div className="relative" ref={actionMenuRef}>
             <button 
               onClick={() => setActionMenuOpen(!actionMenuOpen)}
-              className="p-2 text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors"
+              className="p-2 text-gray-500 hover:text-gray-900 rounded-md hover:bg-gray-100 transition-colors"
             >
               <MoreVertical className="w-5 h-5" />
             </button>
 
             {actionMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-100">
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden z-50">
                 <button
                   onClick={handleDeleteLead}
                   className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors flex items-center"
@@ -184,163 +200,399 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             )}
           </div>
         </div>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-hidden p-6">
-        <div className="grid grid-cols-12 gap-6 h-full">
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto px-8 pb-8">
+        <div className="max-w-6xl space-y-12 pt-12">
           
-          {/* Left Column: Compact Info */}
-          <div className="col-span-4 flex flex-col space-y-4 overflow-y-auto pr-2">
+          {/* Kontaktdaten */}
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Kontaktdaten</h2>
             
-            {/* Profile Card (Compact) */}
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
-              <div className="flex items-center space-x-4 mb-4">
-                <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg shrink-0">
-                  {lead.firstName?.charAt(0)}{lead.lastName?.charAt(0)}
-                </div>
-                <div className="min-w-0">
-                  <div className="font-semibold text-gray-900 truncate">{lead.firstName} {lead.lastName}</div>
-                  <div className="text-sm text-gray-500 truncate">{lead.email}</div>
-                </div>
+            <div className="grid grid-cols-5 gap-6 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Anrede</label>
+                <select
+                  value={formData.salutation || 'NONE'}
+                  onChange={(e) => handleInputChange('salutation', e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                >
+                  <option value="NONE">Keine</option>
+                  <option value="MR">Herr</option>
+                  <option value="MS">Frau</option>
+                  <option value="DIVERSE">Divers</option>
+                </select>
               </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center text-sm">
-                  <Phone className="w-4 h-4 text-gray-400 mr-3 shrink-0" />
-                  <input 
-                    type="text" 
-                    value={formData.phone || ''}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
-                    className="flex-1 border-none p-0 focus:ring-0 text-gray-700 placeholder-gray-400 bg-transparent text-sm"
-                    placeholder="Telefonnummer hinzufügen..."
-                  />
-                </div>
-                <div className="flex items-center text-sm">
-                  <Mail className="w-4 h-4 text-gray-400 mr-3 shrink-0" />
-                  <input 
-                    type="text" 
-                    value={formData.email || ''}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    className="flex-1 border-none p-0 focus:ring-0 text-gray-700 placeholder-gray-400 bg-transparent text-sm truncate"
-                  />
-                </div>
-                <div className="flex items-center text-sm text-gray-500">
-                  <Calendar className="w-4 h-4 text-gray-400 mr-3 shrink-0" />
-                  <span>{new Date(lead.createdAt).toLocaleDateString()}</span>
-                </div>
-              </div>
-            </div>
 
-            {/* Notes Section */}
-            {showNotes ? (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col transition-all duration-300">
-                <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
-                  <h3 className="font-medium text-gray-900 text-sm flex items-center">
-                    <FileText className="w-4 h-4 mr-2 text-gray-400" />
-                    Notizen
-                  </h3>
-                  <button onClick={() => setShowNotes(false)} className="text-xs text-gray-400 hover:text-gray-600">Minimieren</button>
+              <div className="flex flex-col justify-end">
+                <label className="block text-sm font-medium text-gray-500 mb-2">Ansprache</label>
+                <div className="flex items-center h-[50px]">
+                  <button
+                    type="button"
+                    onClick={() => handleInputChange('formalAddress', true)}
+                    className={`px-4 py-2 text-sm font-medium rounded-l-md border transition-colors ${
+                      formData.formalAddress !== false
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Per Sie
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleInputChange('formalAddress', false)}
+                    className={`px-4 py-2 text-sm font-medium rounded-r-md border-t border-r border-b transition-colors ${
+                      formData.formalAddress === false
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Per Du
+                  </button>
                 </div>
-                <textarea
-                  className="w-full min-h-[150px] p-4 border-none focus:ring-0 bg-yellow-50/30 text-sm leading-relaxed text-gray-700 placeholder-gray-400 resize-y rounded-b-xl"
-                  placeholder="Interne Notizen..."
-                  value={formData.notes || ''}
-                  onChange={(e) => handleInputChange('notes', e.target.value)}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Vorname</label>
+                <input
+                  type="text"
+                  value={formData.firstName || ''}
+                  onChange={(e) => handleInputChange('firstName', e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
                 />
               </div>
-            ) : (
-              <button 
-                onClick={() => setShowNotes(true)}
-                className="w-full py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-500 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all flex items-center justify-center"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Notiz hinzufügen
-              </button>
-            )}
 
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-500 mb-2">Nachname</label>
+                <input
+                  type="text"
+                  value={formData.lastName || ''}
+                  onChange={(e) => handleInputChange('lastName', e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">E-Mail</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="email"
+                    value={formData.email || ''}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Telefon</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Phone className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="tel"
+                    value={formData.phone || ''}
+                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Right Column: Activity Timeline (Main Focus) */}
-          <div className="col-span-8 flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-full">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
-              <h3 className="font-semibold text-gray-900 flex items-center">
-                <MessageSquare className="w-4 h-4 mr-2 text-indigo-600" />
-                Aktivitäten & Kommunikation
-              </h3>
-            </div>
+          {/* Käufer-Präferenzen */}
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Käufer-Präferenzen</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Für automatisches Matching mit passenden Objekten
+            </p>
             
-            <div className="flex-1 overflow-y-auto p-6 bg-gray-50/30">
-              <div className="space-y-8 max-w-3xl mx-auto">
-                {/* Timeline Items */}
-                {lead.messages?.map((msg, index) => (
-                  <div key={msg.id} className="relative pl-8 pb-2 last:pb-0 group">
-                    {/* Timeline Line */}
-                    {index !== lead.messages!.length - 1 && (
-                      <div className="absolute left-3.5 top-8 bottom-[-2rem] w-0.5 bg-gray-200 group-last:hidden"></div>
-                    )}
-                    
-                    {/* Timeline Icon */}
-                    <div className={`absolute left-0 top-1 w-7 h-7 rounded-full flex items-center justify-center border-2 border-white shadow-sm z-10 ${
-                      msg.role === 'USER' ? 'bg-blue-100 text-blue-600' : 'bg-indigo-100 text-indigo-600'
-                    }`}>
-                      {msg.role === 'USER' ? <User className="w-3.5 h-3.5" /> : <MessageSquare className="w-3.5 h-3.5" />}
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex flex-col space-y-1">
-                      <div className="flex justify-between items-start">
-                        <span className="text-sm font-medium text-gray-900">
-                          {msg.role === 'USER' ? 'Nachricht vom Lead' : 'Antwort gesendet'}
-                        </span>
-                        <span className="text-xs text-gray-400 whitespace-nowrap ml-2 flex items-center">
-                          <Clock className="w-3 h-3 mr-1" />
-                          {new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                        </span>
-                      </div>
-                      
-                      {/* Message Bubble */}
-                      <div className={`mt-2 p-4 rounded-xl text-sm border shadow-sm ${
-                        msg.role === 'USER' 
-                        ? 'bg-white border-gray-200 text-gray-700' 
-                        : msg.status === 'DRAFT'
-                        ? 'bg-amber-50 border-amber-200 text-gray-800'
-                        : 'bg-white border-gray-200 text-gray-800'
-                      }`}>
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
-                        
-                        {msg.status === 'DRAFT' && (
-                          <div className="mt-3 pt-3 border-t border-amber-200/50 flex justify-end">
-                            <button
-                              onClick={() => handleSendDraft(msg.id)}
-                              className="text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors shadow-sm flex items-center"
-                            >
-                              <Send className="w-3 h-3 mr-1.5" />
-                              Senden
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Budget Min (€)</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Euro className="h-5 w-5 text-gray-400" />
                   </div>
-                ))}
-
-                {/* Write Email Action */}
-                <div className="relative pl-8 pt-6">
-                    <div className="absolute left-0 top-7 w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center border-2 border-white text-gray-400 z-10">
-                      <Mail className="w-3.5 h-3.5" />
-                    </div>
-                    <button
-                      onClick={() => {
-                        updateEmailForm({ leadId: lead.id });
-                        openDrawer('EMAIL');
-                      }}
-                      className="w-full text-left bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all group"
-                    >
-                      <span className="text-sm font-medium text-gray-500 group-hover:text-indigo-600 flex items-center">
-                        E-Mail schreiben...
-                      </span>
-                    </button>
+                  <input
+                    type="number"
+                    value={formData.budgetMin || ''}
+                    onChange={(e) => handleInputChange('budgetMin', parseFloat(e.target.value))}
+                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                  />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Budget Max (€)</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Euro className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="number"
+                    value={formData.budgetMax || ''}
+                    onChange={(e) => handleInputChange('budgetMax', parseFloat(e.target.value))}
+                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Gewünschte Objektart</label>
+                <select
+                  value={formData.preferredType || ''}
+                  onChange={(e) => handleInputChange('preferredType', e.target.value)}
+                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
+                >
+                  <option value="">Keine Präferenz</option>
+                  <option value="APARTMENT">Wohnung</option>
+                  <option value="HOUSE">Haus</option>
+                  <option value="COMMERCIAL">Gewerbe</option>
+                  <option value="LAND">Grundstück</option>
+                  <option value="GARAGE">Garage/Stellplatz</option>
+                  <option value="OTHER">Sonstiges</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Gewünschte Lage</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <MapPin className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    value={formData.preferredLocation || ''}
+                    onChange={(e) => handleInputChange('preferredLocation', e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Min. Zimmer</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Home className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={formData.minRooms || ''}
+                    onChange={(e) => handleInputChange('minRooms', parseFloat(e.target.value))}
+                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Min. Wohnfläche (m²)</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Building className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="number"
+                    value={formData.minArea || ''}
+                    onChange={(e) => handleInputChange('minArea', parseFloat(e.target.value))}
+                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Zeitrahmen</label>
+                <select
+                  value={formData.timeFrame || ''}
+                  onChange={(e) => handleInputChange('timeFrame', e.target.value)}
+                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
+                >
+                  <option value="">Bitte wählen</option>
+                  <option value="IMMEDIATE">Sofort</option>
+                  <option value="THREE_MONTHS">1-3 Monate</option>
+                  <option value="SIX_MONTHS">3-6 Monate</option>
+                  <option value="TWELVE_MONTHS">6-12 Monate</option>
+                  <option value="LONGTERM">&gt;12 Monate</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Finanzierungsstatus</label>
+                <select
+                  value={formData.financingStatus || 'NOT_CLARIFIED'}
+                  onChange={(e) => handleInputChange('financingStatus', e.target.value)}
+                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
+                >
+                  <option value="NOT_CLARIFIED">Noch nicht geklärt</option>
+                  <option value="PRE_QUALIFIED">Vorqualifiziert</option>
+                  <option value="APPROVED">Genehmigt</option>
+                  <option value="CASH_BUYER">Barzahler</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Lead-Quelle */}
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Lead-Quelle</h2>
+            
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Quelle</label>
+                <select
+                  value={formData.source || 'WEBSITE'}
+                  onChange={(e) => handleInputChange('source', e.target.value)}
+                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
+                >
+                  <option value="WEBSITE">Eigene Website</option>
+                  <option value="PORTAL">Immobilienportal</option>
+                  <option value="REFERRAL">Empfehlung</option>
+                  <option value="SOCIAL_MEDIA">Social Media</option>
+                  <option value="COLD_CALL">Kaltakquise</option>
+                  <option value="EVENT">Veranstaltung</option>
+                  <option value="OTHER">Sonstiges</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Details zur Quelle</label>
+                <input
+                  type="text"
+                  value={formData.sourceDetails || ''}
+                  onChange={(e) => handleInputChange('sourceDetails', e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Notizen */}
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Interne Notizen</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Nur für das Team sichtbar
+            </p>
+            <div>
+              <textarea
+                rows={6}
+                value={formData.notes || ''}
+                onChange={(e) => handleInputChange('notes', e.target.value)}
+                className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all resize-none"
+              />
+            </div>
+          </div>
+
+          {/* Aktivitäten */}
+          <div>
+            <div className="flex items-end justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Aktivitäten</h2>
+              <button
+                onClick={() => {
+                  updateEmailForm({ leadId: lead.id });
+                  openDrawer('EMAIL');
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+              >
+                <Mail className="w-4 h-4" />
+                E-Mail schreiben
+              </button>
+            </div>
+
+            <div className="relative">
+              {/* Timeline Line */}
+              <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+              
+              <div className="space-y-6">
+                {activities.length > 0 ? (
+                  activities.map((activity, index) => {
+                    const isLast = index === activities.length - 1;
+                    
+                    // Icon & Color based on type
+                    let icon = <Activity className="w-4 h-4" />;
+                    let iconBg = 'bg-gray-100 text-gray-600';
+                    
+                    if (activity.type === 'LEAD_CREATED') {
+                      icon = <CheckCircle2 className="w-4 h-4" />;
+                      iconBg = 'bg-green-100 text-green-600';
+                    } else if (activity.type === 'STATUS_CHANGED') {
+                      icon = <Activity className="w-4 h-4" />;
+                      iconBg = 'bg-blue-100 text-blue-600';
+                    } else if (activity.type === 'EMAIL_SENT') {
+                      icon = <Send className="w-4 h-4" />;
+                      iconBg = 'bg-indigo-100 text-indigo-600';
+                    } else if (activity.type === 'EMAIL_RECEIVED') {
+                      icon = <Mail className="w-4 h-4" />;
+                      iconBg = 'bg-purple-100 text-purple-600';
+                    } else if (activity.type === 'NOTE_ADDED') {
+                      icon = <FileText className="w-4 h-4" />;
+                      iconBg = 'bg-yellow-100 text-yellow-600';
+                    } else if (activity.type === 'FIELD_UPDATED') {
+                      icon = <Edit3 className="w-4 h-4" />;
+                      iconBg = 'bg-gray-100 text-gray-600';
+                    }
+                    
+                    return (
+                      <div key={activity.id} className="relative pl-16">
+                        {/* Icon */}
+                        <div className={`absolute left-0 w-12 h-12 rounded-md ${iconBg} flex items-center justify-center shadow-sm z-10`}>
+                          {icon}
+                        </div>
+                        
+                        {/* Content */}
+                        <div className={`bg-white rounded-md p-4 border border-gray-200 ${!isLast ? 'mb-6' : ''}`}>
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="text-sm font-medium text-gray-900">
+                              {activity.description}
+                            </span>
+                            <span className="text-xs text-gray-500 whitespace-nowrap ml-4">
+                              {new Date(activity.createdAt).toLocaleString('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                          
+                          {/* Email Content */}
+                          {activity.content && (
+                            <p className="text-sm text-gray-700 mt-2 whitespace-pre-wrap">
+                              {activity.content}
+                            </p>
+                          )}
+                          
+                          {/* Draft Actions */}
+                          {activity.status === 'DRAFT' && (
+                            <div className="mt-3 pt-3 border-t border-gray-200 flex justify-end">
+                              <button
+                                onClick={() => handleSendDraft(activity.id)}
+                                className="text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-md transition-colors flex items-center"
+                              >
+                                <Send className="w-3 h-3 mr-1.5" />
+                                Senden
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-8 text-gray-500 text-sm">
+                    Noch keine Aktivitäten vorhanden
+                  </div>
+                )}
               </div>
             </div>
           </div>

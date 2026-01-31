@@ -116,14 +116,14 @@ export default function ExposesPage() {
                 <button
                   key={template.id}
                   onClick={() => setSelectedId(template.id)}
-                  className={`w-full text-left p-4 hover:bg-white transition-colors flex flex-col gap-1 border-r-4 ${
+                  className={`w-full text-left p-4 transition-colors flex flex-col gap-1 ${
                     selectedId === template.id 
-                      ? 'bg-white border-indigo-600' 
-                      : 'border-transparent hover:border-indigo-200'
+                      ? 'bg-gray-100/80 rounded-r-lg' 
+                      : 'bg-transparent hover:bg-gray-50/50'
                   }`}
                 >
                   <div className="flex justify-between items-start w-full">
-                    <span className={`text-sm font-semibold truncate ${selectedId === template.id ? 'text-indigo-900' : 'text-gray-900'}`}>
+                    <span className="text-sm font-semibold truncate text-gray-900">
                       {template.name}
                     </span>
                     {template.isDefault && (

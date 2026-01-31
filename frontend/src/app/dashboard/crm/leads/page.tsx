@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Lead, deleteLead, fetcher, API_ENDPOINTS } from '@/lib/api';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { useRouter } from 'next/navigation';
@@ -12,9 +12,16 @@ export default function LeadsPage() {
     revalidateOnFocus: true,
     revalidateOnReconnect: true
   });
-  const { openDrawer } = useGlobalState();
+  const { openDrawer, aiActionPerformed } = useGlobalState();
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const router = useRouter();
+
+  // Refresh when AI performs an action
+  useEffect(() => {
+    if (aiActionPerformed) {
+      mutate();
+    }
+  }, [aiActionPerformed, mutate]);
 
   const toggleSelect = (id: string) => {
     const newSelected = new Set(selectedLeads);
@@ -73,7 +80,7 @@ export default function LeadsPage() {
           )}
         </div>
         <button 
-          onClick={() => openDrawer('LEAD')}
+          onClick={() => router.push('/dashboard/crm/leads/new')}
           className="bg-indigo-600 text-white px-3 py-1.5 text-sm font-medium rounded-md hover:bg-indigo-700 shadow-sm"
         >
           Neuer Lead
@@ -94,46 +101,81 @@ export default function LeadsPage() {
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telefon</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quelle</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Erstellt</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {leads.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-6 py-10 text-center text-gray-500">
+                <td colSpan={7} className="px-6 py-10 text-center text-gray-500">
                   Keine Leads gefunden.
                 </td>
               </tr>
             ) : (
-              leads.map((lead) => (
-                <tr 
-                  key={lead.id} 
-                  onClick={() => router.push(`/dashboard/crm/leads/${lead.id}`)}
-                  className={`hover:bg-gray-50 transition-colors cursor-pointer ${selectedLeads.has(lead.id) ? 'bg-indigo-50/50' : ''}`}
-                >
-                  <td className="px-6 py-3" onClick={(e) => e.stopPropagation()}>
-                    <input 
-                      type="checkbox" 
-                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                      checked={selectedLeads.has(lead.id)}
-                      onChange={() => toggleSelect(lead.id)}
-                    />
-                  </td>
-                  <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {lead.firstName} {lead.lastName}
-                  </td>
-                  <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">{lead.email}</td>
-                  <td className="px-6 py-3 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      lead.status === 'NEW' ? 'bg-blue-100 text-blue-800' :
-                      lead.status === 'CONTACTED' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
-                      {lead.status}
-                    </span>
-                  </td>
-                </tr>
-              ))
+              leads.map((lead) => {
+                const createdDate = new Date(lead.createdAt);
+                const formattedDate = createdDate.toLocaleDateString('de-DE', { 
+                  day: '2-digit', 
+                  month: '2-digit', 
+                  year: 'numeric' 
+                });
+                
+                return (
+                  <tr 
+                    key={lead.id} 
+                    onClick={() => router.push(`/dashboard/crm/leads/${lead.id}`)}
+                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${selectedLeads.has(lead.id) ? 'bg-indigo-50/50' : ''}`}
+                  >
+                    <td className="px-6 py-3" onClick={(e) => e.stopPropagation()}>
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        checked={selectedLeads.has(lead.id)}
+                        onChange={() => toggleSelect(lead.id)}
+                      />
+                    </td>
+                    <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {lead.firstName} {lead.lastName}
+                    </td>
+                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {lead.email || '-'}
+                    </td>
+                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {lead.phone || '-'}
+                    </td>
+                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
+                      <span className="px-2 py-1 bg-gray-100 rounded text-xs">
+                        {lead.source === 'WEBSITE' ? 'Website' :
+                         lead.source === 'EMAIL' ? 'E-Mail' :
+                         lead.source === 'PHONE' ? 'Telefon' :
+                         lead.source === 'REFERRAL' ? 'Empfehlung' :
+                         lead.source || 'Unbekannt'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3 whitespace-nowrap text-sm">
+                      <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                        lead.status === 'NEW' ? 'bg-blue-100 text-blue-700' :
+                        lead.status === 'CONTACTED' ? 'bg-yellow-100 text-yellow-700' :
+                        lead.status === 'QUALIFIED' ? 'bg-green-100 text-green-700' :
+                        lead.status === 'CONVERTED' ? 'bg-indigo-100 text-indigo-700' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>
+                        {lead.status === 'NEW' ? 'Neu' :
+                         lead.status === 'CONTACTED' ? 'Kontaktiert' :
+                         lead.status === 'QUALIFIED' ? 'Qualifiziert' :
+                         lead.status === 'CONVERTED' ? 'Konvertiert' :
+                         lead.status || 'Neu'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {formattedDate}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

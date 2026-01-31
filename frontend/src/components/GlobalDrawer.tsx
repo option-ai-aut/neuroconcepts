@@ -13,6 +13,7 @@ export default function GlobalDrawer() {
     drawerOpen,
     drawerMinimized,
     drawerType,
+    sidebarExpanded,
     closeDrawer,
     minimizeDrawer,
     maximizeDrawer,
@@ -115,15 +116,19 @@ export default function GlobalDrawer() {
 
   return (
     <div
-      className={`fixed bottom-0 left-64 right-80 bg-white shadow-[0_-5px_30px_rgba(0,0,0,0.1)] border-t border-x border-gray-200 rounded-t-xl transition-all duration-300 ease-out z-40 ${
+      className={`fixed bottom-0 right-80 bg-white shadow-[0_-5px_30px_rgba(0,0,0,0.1)] border-t border-x border-gray-200 rounded-t-xl z-40 ${
         drawerMinimized ? 'h-12' : 'h-[450px]'
       }`}
-      style={{ transform: isVisible ? 'translateY(0)' : 'translateY(100%)' }}
+      style={{ 
+        transform: isVisible ? 'translateY(0)' : 'translateY(100%)',
+        left: sidebarExpanded ? '256px' : '80px',
+        transition: 'all 0.3s ease-in-out'
+      }}
     >
       {/* Header */}
       <div 
         className="flex items-center justify-between px-6 h-12 bg-white border-b border-gray-100 rounded-t-xl cursor-pointer hover:bg-gray-50 transition-colors"
-        onClick={drawerMinimized ? maximizeDrawer : undefined}
+        onClick={drawerMinimized ? maximizeDrawer : minimizeDrawer}
       >
         <div className="flex items-center space-x-2">
           <div className={`w-2 h-2 rounded-full ${getHeaderColor()}`} />
@@ -151,7 +156,7 @@ export default function GlobalDrawer() {
       {!drawerMinimized && (
         <div className="p-8 overflow-y-auto h-[calc(450px-48px)] bg-gray-50/50">
           {drawerType === 'EMAIL' && (
-            <div className="max-w-3xl mx-auto space-y-6">
+            <div className="max-w-4xl mx-auto space-y-6">
               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <div className="space-y-4">
                   <div>
@@ -198,7 +203,7 @@ export default function GlobalDrawer() {
           )}
 
           {drawerType === 'LEAD' && (
-            <div className="grid grid-cols-12 gap-8 max-w-5xl mx-auto">
+            <div className="grid grid-cols-12 gap-8 max-w-6xl mx-auto">
               {/* Left Column: Personal Info */}
               <div className="col-span-5 space-y-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -296,7 +301,7 @@ export default function GlobalDrawer() {
           )}
 
           {drawerType === 'PROPERTY' && (
-            <div className="grid grid-cols-12 gap-8 max-w-5xl mx-auto">
+            <div className="grid grid-cols-12 gap-8 max-w-6xl mx-auto">
               <div className="col-span-6 space-y-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                   <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center">

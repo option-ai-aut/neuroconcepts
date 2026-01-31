@@ -1,4 +1,5 @@
 import puppeteer from 'puppeteer';
+import QRCode from 'qrcode';
 
 interface ExposeBlock {
   id: string;
@@ -24,6 +25,12 @@ interface ExposeData {
     email: string;
     phone?: string;
   };
+  lead?: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+  };
 }
 
 // Theme colors
@@ -36,8 +43,33 @@ const THEMES: Record<string, { primary: string; secondary: string; accent: strin
 
 export class PdfService {
   
+  // Generate QR code as data URL
+  private static async generateQrCode(url: string): Promise<string> {
+    try {
+      return await QRCode.toDataURL(url, {
+        width: 120,
+        margin: 1,
+        color: { dark: '#1F2937', light: '#FFFFFF' }
+      });
+    } catch (error) {
+      console.error('QR code generation failed:', error);
+      return '';
+    }
+  }
+  
   static async generateExposePdf(expose: ExposeData): Promise<Buffer> {
-    const html = this.generateHtml(expose);
+    // Pre-generate QR codes for video/tour blocks
+    const qrCodes: Record<string, string> = {};
+    for (const block of expose.blocks) {
+      if (block.type === 'video' && block.videoUrl) {
+        qrCodes[block.id] = await this.generateQrCode(block.videoUrl);
+      }
+      if (block.type === 'virtualTour' && block.tourUrl) {
+        qrCodes[block.id] = await this.generateQrCode(block.tourUrl);
+      }
+    }
+    
+    const html = this.generateHtml(expose, qrCodes);
     
     const browser = await puppeteer.launch({
       headless: true,
@@ -60,7 +92,7 @@ export class PdfService {
     }
   }
 
-  private static generateHtml(expose: ExposeData): string {
+  private static generateHtml(expose: ExposeData, qrCodes: Record<string, string> = {}): string {
     const theme = THEMES[expose.theme] || THEMES.default;
     const blocks = expose.blocks || [];
     
@@ -259,6 +291,48 @@ export class PdfService {
       background: ${theme.primary};
     }
     
+    .media-qr {
+      display: flex;
+      align-items: center;
+      gap: 6mm;
+      background: #F9FAFB;
+      padding: 6mm;
+      border-radius: 3mm;
+      margin-bottom: 8mm;
+    }
+    
+    .media-qr-code {
+      width: 25mm;
+      height: 25mm;
+      flex-shrink: 0;
+    }
+    
+    .media-qr-code img {
+      width: 100%;
+      height: 100%;
+    }
+    
+    .media-qr-content {
+      flex: 1;
+    }
+    
+    .media-qr-title {
+      font-size: 12pt;
+      font-weight: 600;
+      color: ${theme.secondary};
+      margin-bottom: 2mm;
+    }
+    
+    .media-qr-desc {
+      font-size: 9pt;
+      color: #6B7280;
+    }
+    
+    .media-qr-icon {
+      font-size: 20pt;
+      margin-bottom: 1mm;
+    }
+    
     .footer {
       position: fixed;
       bottom: 10mm;
@@ -274,7 +348,7 @@ export class PdfService {
 </head>
 <body>
   <div class="page">
-    ${blocks.map(block => this.renderBlock(block, expose)).join('')}
+    ${blocks.map(block => this.renderBlock(block, expose, qrCodes, theme)).join('')}
     
     <div class="footer">
       Exposé erstellt mit NeuroConcepts.ai • ${new Date().toLocaleDateString('de-DE')}
@@ -285,7 +359,7 @@ export class PdfService {
     `;
   }
 
-  private static renderBlock(block: ExposeBlock, expose: ExposeData): string {
+  private static renderBlock(block: ExposeBlock, expose: ExposeData, qrCodes: Record<string, string> = {}, theme: { primary: string; secondary: string; accent: string } = THEMES.default): string {
     switch (block.type) {
       case 'hero':
         return `
@@ -371,6 +445,20 @@ export class PdfService {
           </div>
         `;
 
+      case 'leadInfo':
+        return `
+          <div style="padding: 6mm; background: linear-gradient(to right, #EEF2FF, #F5F3FF); border-left: 3px solid ${theme.accent}; margin-bottom: 6mm;">
+            ${block.showGreeting !== false ? `<p style="font-size: 10pt; color: #6B7280; margin-bottom: 2mm;">Erstellt für</p>` : ''}
+            <p style="font-size: 14pt; font-weight: 600; color: ${theme.secondary}; margin-bottom: 2mm;">
+              ${block.leadName || expose.lead?.firstName + ' ' + expose.lead?.lastName || ''}
+            </p>
+            <p style="font-size: 10pt; color: #4B5563;">
+              ${block.leadEmail || expose.lead?.email || ''}<br>
+              ${block.leadPhone || expose.lead?.phone || ''}
+            </p>
+          </div>
+        `;
+
       case 'divider':
         return `<div class="divider ${block.style === 'thick' ? 'thick' : ''}"></div>`;
 
@@ -379,6 +467,109 @@ export class PdfService {
         return `
           ${block.title ? `<div class="section-title">${block.title}</div>` : ''}
           <img src="${block.imageUrl}" alt="Grundriss" style="width: 100%; margin-bottom: 8mm;">
+        `;
+
+      case 'video':
+        if (!block.videoUrl || !qrCodes[block.id]) return '';
+        return `
+          <div class="media-qr">
+            <div class="media-qr-code">
+              <img src="${qrCodes[block.id]}" alt="QR Code">
+            </div>
+            <div class="media-qr-content">
+              <div class="media-qr-icon">🎬</div>
+              <div class="media-qr-title">${block.title || 'Objektvideo'}</div>
+              <div class="media-qr-desc">Scannen Sie den QR-Code, um das Video anzusehen</div>
+            </div>
+          </div>
+        `;
+
+      case 'virtualTour':
+        if (!block.tourUrl || !qrCodes[block.id]) return '';
+        return `
+          <div class="media-qr">
+            <div class="media-qr-code">
+              <img src="${qrCodes[block.id]}" alt="QR Code">
+            </div>
+            <div class="media-qr-content">
+              <div class="media-qr-icon">🔮</div>
+              <div class="media-qr-title">${block.title || 'Virtuelle Besichtigung'}</div>
+              <div class="media-qr-desc">Scannen Sie den QR-Code für eine 360° Tour</div>
+            </div>
+          </div>
+        `;
+
+      case 'highlights':
+        const highlights = block.items || [];
+        if (highlights.length === 0) return '';
+        return `
+          ${block.title ? `<div class="section-title">${block.title}</div>` : ''}
+          <div class="features">
+            ${highlights.map((h: any) => `
+              <div class="feature">
+                <div class="feature-icon"></div>
+                <span>${typeof h === 'string' ? h : h.text || h}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+
+      case 'priceTable':
+        const priceItems = block.items || [];
+        if (priceItems.length === 0) return '';
+        return `
+          ${block.title ? `<div class="section-title">${block.title}</div>` : ''}
+          <div style="margin-bottom: 8mm;">
+            ${priceItems.map((item: any) => `
+              <div style="display: flex; justify-content: space-between; padding: 3mm 0; border-bottom: 1px solid #E5E7EB;">
+                <span style="color: #6B7280;">${item.label}</span>
+                <span style="font-weight: 600;">${item.value}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+
+      case 'energyCertificate':
+        if (!block.energyClass) return '';
+        return `
+          <div class="location">
+            <div class="section-title">Energieausweis</div>
+            <div style="display: flex; align-items: center; gap: 4mm; margin-top: 4mm;">
+              <div style="width: 15mm; height: 15mm; border-radius: 50%; background: ${theme.primary}; color: white; display: flex; align-items: center; justify-content: center; font-size: 14pt; font-weight: 700;">
+                ${block.energyClass}
+              </div>
+              <div>
+                <div style="font-size: 9pt; color: #6B7280;">Energieeffizienzklasse</div>
+                <div style="font-weight: 500;">${block.consumption || ''}</div>
+              </div>
+            </div>
+          </div>
+        `;
+
+      case 'cta':
+        return `
+          <div style="background: #F3F4F6; padding: 8mm; border-radius: 3mm; text-align: center; margin-bottom: 8mm;">
+            <div style="font-size: 14pt; font-weight: 600; color: ${theme.secondary}; margin-bottom: 4mm;">${block.title || 'Interesse geweckt?'}</div>
+            <div style="display: inline-block; background: ${theme.primary}; color: white; padding: 3mm 8mm; border-radius: 2mm; font-weight: 500;">
+              ${block.buttonText || 'Jetzt Termin vereinbaren'}
+            </div>
+          </div>
+        `;
+
+      case 'quote':
+        return `
+          <div class="text-block quote">
+            <p>"${block.text || ''}"</p>
+            ${block.author ? `<p style="margin-top: 2mm; font-size: 9pt; font-style: normal;">— ${block.author}</p>` : ''}
+          </div>
+        `;
+
+      case 'twoColumn':
+        return `
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; margin-bottom: 8mm;">
+            <div>${(block.leftContent || '').replace(/\n/g, '<br>')}</div>
+            <div>${(block.rightContent || '').replace(/\n/g, '<br>')}</div>
+          </div>
         `;
 
       default:

@@ -40,11 +40,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       {/* AI Chat Sidebar (Right) */}
       <AiChatSidebar />
       
-      {/* Global Drawer (Bottom) */}
-      <GlobalDrawer />
-
-      {/* Expose Editor (Fullscreen Overlay) */}
-      {drawerOpen && drawerType === 'EXPOSE_EDITOR' && (
+      {/* Conditional rendering based on drawer type */}
+      {drawerOpen && drawerType === 'EXPOSE_EDITOR' ? (
+        /* Expose Editor (Fullscreen Overlay) */
         <ExposeEditor
           exposeId={exposeEditorData?.exposeId}
           propertyId={exposeEditorData?.propertyId}
@@ -52,6 +50,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           isTemplate={exposeEditorData?.isTemplate}
           onClose={closeDrawer}
         />
+      ) : (
+        /* Global Drawer (Bottom) - for other drawer types */
+        <GlobalDrawer />
       )}
     </div>
   );

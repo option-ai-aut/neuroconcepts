@@ -66,6 +66,56 @@ async function main() {
     }
   });
   console.log('Created Template');
+
+  // 5. Seed Portals (DACH Region)
+  const portals = [
+    // Deutschland
+    { name: 'Immowelt', slug: 'immowelt', country: 'DE', websiteUrl: 'https://www.immowelt.de', defaultFtpHost: 'ftp.immowelt.de', connectionType: 'OPENIMMO_FTP' },
+    { name: 'Immonet', slug: 'immonet', country: 'DE', websiteUrl: 'https://www.immonet.de', defaultFtpHost: 'ftp.immonet.de', connectionType: 'OPENIMMO_FTP' },
+    { name: 'Kleinanzeigen', slug: 'kleinanzeigen', country: 'DE', websiteUrl: 'https://www.kleinanzeigen.de', connectionType: 'OPENIMMO_FTP' },
+    { name: 'Kalaydo', slug: 'kalaydo', country: 'DE', websiteUrl: 'https://www.kalaydo.de', connectionType: 'OPENIMMO_FTP' },
+    { name: 'Immozentral', slug: 'immozentral', country: 'DE', websiteUrl: 'https://www.immozentral.com', connectionType: 'OPENIMMO_FTP' },
+    { name: 'Immopool', slug: 'immopool', country: 'DE', websiteUrl: 'https://www.immopool.de', connectionType: 'OPENIMMO_FTP' },
+    { name: '1A Immobilien', slug: '1a-immobilien', country: 'DE', websiteUrl: 'https://www.1a-immobilienmarkt.de', connectionType: 'OPENIMMO_FTP' },
+    { name: 'IVD24', slug: 'ivd24', country: 'DE', websiteUrl: 'https://www.ivd24immobilien.de', connectionType: 'OPENIMMO_FTP' },
+    { name: 'Neubau Kompass', slug: 'neubau-kompass', country: 'DE', websiteUrl: 'https://www.neubaukompass.de', connectionType: 'OPENIMMO_FTP' },
+    { name: 'Süddeutsche Zeitung', slug: 'sz-immo', country: 'DE', websiteUrl: 'https://immobilienmarkt.sueddeutsche.de', connectionType: 'OPENIMMO_FTP' },
+    { name: 'FAZ Immobilien', slug: 'faz-immo', country: 'DE', websiteUrl: 'https://fazimmo.faz.net', connectionType: 'OPENIMMO_FTP' },
+    { name: 'Welt Immobilien', slug: 'welt-immo', country: 'DE', websiteUrl: 'https://www.welt.de/immobilien', connectionType: 'OPENIMMO_FTP' },
+    { name: 'ImmobilienScout24', slug: 'immoscout24-de', country: 'DE', websiteUrl: 'https://www.immobilienscout24.de', connectionType: 'REST_API', isPremium: true },
+    
+    // Österreich
+    { name: 'Willhaben', slug: 'willhaben', country: 'AT', websiteUrl: 'https://www.willhaben.at', connectionType: 'OPENIMMO_FTP' },
+    { name: 'ImmobilienScout24 AT', slug: 'immoscout24-at', country: 'AT', websiteUrl: 'https://www.immobilienscout24.at', connectionType: 'OPENIMMO_FTP' },
+    { name: 'Immmo.at', slug: 'immmo-at', country: 'AT', websiteUrl: 'https://www.immmo.at', connectionType: 'OPENIMMO_FTP' },
+    { name: 'FindMyHome', slug: 'findmyhome', country: 'AT', websiteUrl: 'https://www.findmyhome.at', connectionType: 'OPENIMMO_FTP' },
+    { name: 'Der Standard Immobilien', slug: 'derstandard-immo', country: 'AT', websiteUrl: 'https://immobilien.derstandard.at', connectionType: 'OPENIMMO_FTP' },
+    
+    // Schweiz
+    { name: 'Homegate', slug: 'homegate', country: 'CH', websiteUrl: 'https://www.homegate.ch', connectionType: 'OPENIMMO_FTP' },
+    { name: 'ImmoScout24 CH', slug: 'immoscout24-ch', country: 'CH', websiteUrl: 'https://www.immoscout24.ch', connectionType: 'OPENIMMO_FTP' },
+    { name: 'Comparis', slug: 'comparis', country: 'CH', websiteUrl: 'https://www.comparis.ch/immobilien', connectionType: 'OPENIMMO_FTP' },
+    { name: 'Newhome', slug: 'newhome', country: 'CH', websiteUrl: 'https://www.newhome.ch', connectionType: 'OPENIMMO_FTP' },
+    { name: 'ImmoStreet', slug: 'immostreet', country: 'CH', websiteUrl: 'https://www.immostreet.ch', connectionType: 'OPENIMMO_FTP' },
+    { name: 'Flatfox', slug: 'flatfox', country: 'CH', websiteUrl: 'https://flatfox.ch', connectionType: 'OPENIMMO_FTP' },
+  ];
+
+  for (const portal of portals) {
+    await prisma.portal.upsert({
+      where: { slug: portal.slug },
+      update: {},
+      create: {
+        name: portal.name,
+        slug: portal.slug,
+        country: portal.country,
+        websiteUrl: portal.websiteUrl,
+        defaultFtpHost: portal.defaultFtpHost || null,
+        connectionType: portal.connectionType as any,
+        isPremium: portal.isPremium || false,
+      }
+    });
+  }
+  console.log(`Seeded ${portals.length} portals`);
 }
 
 main()

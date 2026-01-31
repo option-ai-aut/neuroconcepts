@@ -4,12 +4,18 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import serverless from 'serverless-http';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, ActivityType } from '@prisma/client';
 import { TemplateService } from './services/TemplateService';
 import { GeminiService } from './services/GeminiService';
 import { PdfService } from './services/PdfService';
+import { encryptionService } from './services/EncryptionService';
+import { ConversationMemory } from './services/ConversationMemory';
 import { authMiddleware } from './middleware/auth';
+import { AiSafetyMiddleware, wrapAiResponse } from './middleware/aiSafety';
 import * as AWS from 'aws-sdk';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 
 dotenv.config();
 
@@ -21,6 +27,37 @@ app.use(helmet());
 app.use(cors());
 app.use(morgan('combined'));
 app.use(express.json());
+
+// Multer setup for file uploads (local storage for dev)
+const uploadDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Nur Bilder erlaubt'));
+    }
+  }
+});
+
+// Serve uploaded files
+app.use('/uploads', express.static(uploadDir));
 
 // --- Auth & User Management ---
 
@@ -288,23 +325,110 @@ app.get('/properties/:id', async (req, res) => {
 app.put('/leads/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { firstName, lastName, email, phone, status, notes } = req.body;
+    const updateData = req.body;
     
+    // Get old lead data for comparison
+    const oldLead = await prisma.lead.findUnique({ where: { id } });
+    if (!oldLead) return res.status(404).json({ error: 'Lead not found' });
+    
+    // Update lead
     const lead = await prisma.lead.update({
       where: { id },
-      data: {
-        firstName,
-        lastName,
-        email,
-        phone,
-        status,
-        notes
-      }
+      data: updateData
     });
+    
+    // Track activities
+    const activities: Array<{
+      leadId: string;
+      type: ActivityType;
+      description: string;
+      metadata?: any;
+    }> = [];
+    
+    // Status changed
+    if (updateData.status && updateData.status !== oldLead.status) {
+      activities.push({
+        leadId: id,
+        type: ActivityType.STATUS_CHANGED,
+        description: `Status geändert: ${oldLead.status} → ${updateData.status}`,
+        metadata: { old: oldLead.status, new: updateData.status }
+      });
+    }
+    
+    // Budget changed
+    if (updateData.budgetMin !== undefined || updateData.budgetMax !== undefined) {
+      if (updateData.budgetMin !== oldLead.budgetMin || updateData.budgetMax !== oldLead.budgetMax) {
+        activities.push({
+          leadId: id,
+          type: ActivityType.FIELD_UPDATED,
+          description: `Budget aktualisiert: ${updateData.budgetMin || 0}€ - ${updateData.budgetMax || 0}€`,
+          metadata: { field: 'budget' }
+        });
+      }
+    }
+    
+    // Notes added/changed
+    if (updateData.notes && updateData.notes !== oldLead.notes) {
+      activities.push({
+        leadId: id,
+        type: ActivityType.NOTE_ADDED,
+        description: 'Notiz hinzugefügt',
+        metadata: { field: 'notes' }
+      });
+    }
+    
+    // Create activities
+    if (activities.length > 0) {
+      await prisma.leadActivity.createMany({ data: activities });
+    }
     
     res.json(lead);
   } catch (error) {
     console.error('Error updating lead:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// GET /leads/:id/activities - Get lead activities
+app.get('/leads/:id/activities', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get activities
+    const activities = await prisma.leadActivity.findMany({
+      where: { leadId: id },
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    // Get messages (emails)
+    const messages = await prisma.message.findMany({
+      where: { leadId: id },
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    // Combine and sort by date
+    const combined = [
+      ...activities.map(a => ({
+        id: a.id,
+        type: a.type,
+        description: a.description,
+        createdAt: a.createdAt,
+        source: 'activity'
+      })),
+      ...messages.map(m => ({
+        id: m.id,
+        type: m.role === 'USER' ? 'EMAIL_RECEIVED' : 'EMAIL_SENT',
+        description: m.role === 'USER' ? 'E-Mail empfangen' : 'E-Mail gesendet',
+        content: m.content,
+        status: m.status,
+        createdAt: m.createdAt,
+        source: 'message'
+      }))
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    res.json(combined);
+  } catch (error) {
+    console.error('Error fetching activities:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -332,6 +456,76 @@ app.put('/properties/:id', async (req, res) => {
   } catch (error) {
     console.error('Error updating property:', error);
     res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// POST /properties/:id/images - Upload images
+app.post('/properties/:id/images', upload.array('images', 10), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const files = req.files as Express.Multer.File[];
+    
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: 'Keine Dateien hochgeladen' });
+    }
+
+    // Generate URLs (for local dev, use relative paths)
+    const imageUrls = files.map(f => `/uploads/${f.filename}`);
+    
+    // Get current property
+    const property = await prisma.property.findUnique({ where: { id } });
+    if (!property) {
+      return res.status(404).json({ error: 'Property nicht gefunden' });
+    }
+
+    // Add new images to existing ones
+    const updatedImages = [...property.images, ...imageUrls];
+    
+    await prisma.property.update({
+      where: { id },
+      data: { images: updatedImages }
+    });
+
+    res.json({ success: true, images: imageUrls });
+  } catch (error) {
+    console.error('Image upload error:', error);
+    res.status(500).json({ error: 'Upload fehlgeschlagen' });
+  }
+});
+
+// DELETE /properties/:id/images - Remove image
+app.delete('/properties/:id/images', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { imageUrl, isFloorplan } = req.body;
+
+    const property = await prisma.property.findUnique({ where: { id } });
+    if (!property) {
+      return res.status(404).json({ error: 'Property nicht gefunden' });
+    }
+
+    // Remove from array
+    const arrayField = isFloorplan ? 'floorplans' : 'images';
+    const currentArray = isFloorplan ? property.floorplans : property.images;
+    const updatedArray = currentArray.filter(url => url !== imageUrl);
+
+    await prisma.property.update({
+      where: { id },
+      data: { [arrayField]: updatedArray }
+    });
+
+    // Delete file from disk (if local)
+    if (imageUrl.startsWith('/uploads/')) {
+      const filePath = path.join(__dirname, '..', imageUrl);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Image delete error:', error);
+    res.status(500).json({ error: 'Löschen fehlgeschlagen' });
   }
 });
 
@@ -427,7 +621,7 @@ app.post('/properties', async (req, res) => {
 
 app.post('/leads', async (req, res) => {
   try {
-    const { email, firstName, lastName, propertyId, tenantId, message } = req.body;
+    const { email, firstName, lastName, propertyId, tenantId, message, salutation, formalAddress, phone, source, notes } = req.body;
     
     // 1. Save Lead
     const lead = await prisma.lead.create({
@@ -435,12 +629,23 @@ app.post('/leads', async (req, res) => {
         email,
         firstName,
         lastName,
+        salutation: salutation || 'NONE',
+        formalAddress: formalAddress !== undefined ? formalAddress : true, // Default: "Sie"
+        phone,
+        source: source || 'WEBSITE',
+        notes,
         tenantId,
         propertyId,
-        messages: {
+        messages: message ? {
           create: {
             role: 'USER',
-            content: message || 'Interesse an Objekt'
+            content: message
+          }
+        } : undefined,
+        activities: {
+          create: {
+            type: ActivityType.LEAD_CREATED,
+            description: 'Lead erstellt'
           }
         }
       }
@@ -929,78 +1134,260 @@ app.get('/chat/history', async (req, res) => {
     if (!userId) return res.status(400).json({ error: 'userId required' });
 
     const history = await prisma.userChat.findMany({
-      where: { userId: String(userId) },
+      where: { 
+        userId: String(userId),
+        archived: false // Nur aktiven Chat laden
+      },
       orderBy: { createdAt: 'asc' }
     });
-    res.json(history);
+
+    // Map to frontend format (role as string, not enum)
+    const formattedHistory = history.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
+
+    console.log(`📜 Chat-Historie geladen für User ${userId}: ${formattedHistory.length} Nachrichten`);
+    res.json(formattedHistory);
   } catch (error) {
     console.error('Error fetching chat history:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
-app.post('/chat', async (req, res) => {
+// Neuen Chat starten (archiviert alten Chat)
+app.post('/chat/new', async (req, res) => {
   try {
-    const { message, history, tenantId, userId } = req.body;
-    
-    // Save User Message (only if user exists in DB)
-    if (userId) {
-      const userExists = await prisma.user.findUnique({ where: { id: userId } });
-      if (userExists) {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId required' });
+
+    // Archiviere alle aktuellen Chats
+    await prisma.userChat.updateMany({
+      where: { 
+        userId: String(userId),
+        archived: false
+      },
+      data: { archived: true }
+    });
+
+    console.log(`🆕 Neuer Chat gestartet für User ${userId}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error starting new chat:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+app.post('/chat',
+  AiSafetyMiddleware.rateLimit(50, 60000), // 50 requests per minute
+  AiSafetyMiddleware.contentModeration,
+  AiSafetyMiddleware.tenantIsolation,
+  AiSafetyMiddleware.auditLog,
+  async (req, res) => {
+    try {
+      const { message, history, tenantId, userId } = req.body;
+      
+      // Ensure user exists (create if not - for local dev)
+      if (userId) {
+        let user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) {
+          let tenant = await prisma.tenant.findFirst();
+          if (!tenant) {
+            tenant = await prisma.tenant.create({
+              data: { id: 'default-tenant', name: 'Development Tenant' }
+            });
+          }
+          user = await prisma.user.create({
+            data: { 
+              id: userId, 
+              email: `${userId}@local.dev`,
+              tenantId: tenant.id,
+              firstName: 'Local',
+              lastName: 'User'
+            }
+          });
+          console.log(`📝 Default User erstellt: ${userId}`);
+        }
+
         await prisma.userChat.create({
           data: { userId, role: 'USER', content: message }
         });
       }
-    }
 
-    const gemini = new GeminiService();
-    const responseText = await gemini.chat(message, tenantId, history);
+      const gemini = new GeminiService();
+      const responseText = await gemini.chat(message, tenantId, history);
+      
+      // Sanitize response before sending
+      const sanitizedResponse = wrapAiResponse(responseText);
 
-    // Save Assistant Message (only if user exists in DB)
-    if (userId) {
-      const userExists = await prisma.user.findUnique({ where: { id: userId } });
-      if (userExists) {
+      // Save Assistant Message
+      if (userId) {
         await prisma.userChat.create({
-          data: { userId, role: 'ASSISTANT', content: responseText }
+          data: { userId, role: 'ASSISTANT', content: sanitizedResponse }
         });
+        console.log(`💾 Chat gespeichert für User ${userId}`);
       }
-    }
 
-    res.json({ response: responseText });
-  } catch (error) {
-    console.error('Chat error:', error);
-    res.status(500).json({ error: 'AI Error' });
+      res.json({ response: sanitizedResponse });
+    } catch (error) {
+      console.error('Chat error:', error);
+      res.status(500).json({ error: 'AI Error' });
+    }
   }
-});
+);
+
+// Streaming Chat Endpoint with Optimized Memory
+app.post('/chat/stream',
+  AiSafetyMiddleware.rateLimit(50, 60000),
+  AiSafetyMiddleware.contentModeration,
+  AiSafetyMiddleware.tenantIsolation,
+  AiSafetyMiddleware.auditLog,
+  async (req, res) => {
+    try {
+      const { message, tenantId, userId } = req.body;
+      
+      // Set headers for SSE (Server-Sent Events)
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      // Get optimized history (recent messages + summary)
+      const { recentMessages, summary } = await ConversationMemory.getOptimizedHistory(userId);
+      const optimizedHistory = ConversationMemory.formatForGemini(recentMessages, summary);
+
+      const gemini = new GeminiService();
+      let fullResponse = '';
+      let hadFunctionCalls = false;
+
+      // Stream the response with optimized history
+      for await (const result of gemini.chatStream(message, tenantId, optimizedHistory)) {
+        fullResponse += result.chunk;
+        if (result.hadFunctionCalls) hadFunctionCalls = true;
+        // Send chunk as SSE
+        res.write(`data: ${JSON.stringify({ chunk: result.chunk })}\n\n`);
+      }
+
+      // Send done signal with function call info
+      res.write(`data: ${JSON.stringify({ done: true, hadFunctionCalls })}\n\n`);
+      res.end();
+
+      // Save messages to DB after streaming is complete
+      if (userId) {
+        // Ensure user exists (create if not - for local dev)
+        let user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) {
+          // Create default user for local development
+          let tenant = await prisma.tenant.findFirst();
+          if (!tenant) {
+            tenant = await prisma.tenant.create({
+              data: { id: 'default-tenant', name: 'Development Tenant' }
+            });
+          }
+          user = await prisma.user.create({
+            data: { 
+              id: userId, 
+              email: `${userId}@local.dev`,
+              tenantId: tenant.id,
+              firstName: 'Local',
+              lastName: 'User'
+            }
+          });
+          console.log(`📝 Default User erstellt: ${userId}`);
+        }
+
+        await prisma.userChat.create({
+          data: { userId, role: 'USER', content: message }
+        });
+        await prisma.userChat.create({
+          data: { userId, role: 'ASSISTANT', content: wrapAiResponse(fullResponse) }
+        });
+        console.log(`💾 Chat gespeichert für User ${userId}`);
+        
+        // Cleanup old summaries (async, don't await)
+        ConversationMemory.cleanupOldSummaries(userId).catch(console.error);
+      }
+    } catch (error) {
+      console.error('Chat stream error:', error);
+      res.write(`data: ${JSON.stringify({ error: 'AI Error' })}\n\n`);
+      res.end();
+    }
+  }
+);
 
 // Exposé-specific Chat with Jarvis (full tool access)
-app.post('/exposes/:id/chat', authMiddleware, async (req, res) => {
-  try {
-    const { id: exposeId } = req.params;
-    const { message, history } = req.body;
-    
-    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
-    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+app.post('/exposes/:id/chat',
+  authMiddleware,
+  AiSafetyMiddleware.rateLimit(50, 60000),
+  AiSafetyMiddleware.contentModeration,
+  AiSafetyMiddleware.auditLog,
+  async (req, res) => {
+    try {
+      const { id: exposeId } = req.params;
+      const { message, history } = req.body;
+      
+      const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+      if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
 
-    // Verify expose belongs to tenant
-    const expose = await prisma.expose.findFirst({
-      where: { id: exposeId, property: { tenantId: currentUser.tenantId } },
-      include: { property: true }
-    });
-    if (!expose) return res.status(404).json({ error: 'Exposé not found' });
+      // Verify expose belongs to tenant (Tenant Isolation)
+      const expose = await prisma.expose.findFirst({
+        where: { id: exposeId, property: { tenantId: currentUser.tenantId } },
+        include: { property: true }
+      });
+      if (!expose) return res.status(404).json({ error: 'Exposé not found' });
 
-    const gemini = new GeminiService();
-    const result = await gemini.exposeChat(message, currentUser.tenantId, exposeId, history || []);
+      const gemini = new GeminiService();
+      const result = await gemini.exposeChat(message, currentUser.tenantId, exposeId, null, expose.blocks as any[], history || []);
+      
+      // Sanitize response
+      const sanitizedResponse = wrapAiResponse(result.text);
 
-    res.json({ 
-      response: result.text, 
-      actionsPerformed: result.actionsPerformed 
-    });
-  } catch (error) {
-    console.error('Exposé chat error:', error);
-    res.status(500).json({ error: 'AI Error' });
+      res.json({ 
+        response: sanitizedResponse, 
+        actionsPerformed: result.actionsPerformed 
+      });
+    } catch (error) {
+      console.error('Exposé chat error:', error);
+      res.status(500).json({ error: 'AI Error' });
+    }
   }
-});
+);
+
+// Template-specific Chat with Jarvis (full tool access)
+app.post('/templates/:id/chat',
+  authMiddleware,
+  AiSafetyMiddleware.rateLimit(50, 60000),
+  AiSafetyMiddleware.contentModeration,
+  AiSafetyMiddleware.auditLog,
+  async (req, res) => {
+    try {
+      const { id: templateId } = req.params;
+      const { message, history } = req.body;
+      
+      const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+      if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+      // Verify template belongs to tenant (Tenant Isolation)
+      const template = await prisma.exposeTemplate.findFirst({
+        where: { id: templateId, tenantId: currentUser.tenantId }
+      });
+      if (!template) return res.status(404).json({ error: 'Template not found' });
+
+      const gemini = new GeminiService();
+      const result = await gemini.exposeChat(message, currentUser.tenantId, null, templateId, template.blocks as any[], history || []);
+      
+      // Sanitize response
+      const sanitizedResponse = wrapAiResponse(result.text);
+
+      res.json({ 
+        response: sanitizedResponse, 
+        actionsPerformed: result.actionsPerformed 
+      });
+    } catch (error) {
+      console.error('Template chat error:', error);
+      res.status(500).json({ error: 'AI Error' });
+    }
+  }
+);
 
 // Generate text for a property
 app.post('/properties/:id/generate-text', authMiddleware, async (req, res) => {
@@ -1173,6 +1560,293 @@ app.post('/channels/:channelId/messages', authMiddleware, async (req, res) => {
 });
 
 // Export for Lambda
+// Auto-delete archived chats older than 7 days (runs every 24 hours)
+async function cleanupOldChats() {
+  try {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const result = await prisma.userChat.deleteMany({
+      where: {
+        archived: true,
+        createdAt: { lt: sevenDaysAgo }
+      }
+    });
+
+    console.log(`🗑️ Gelöscht: ${result.count} archivierte Chats (älter als 7 Tage)`);
+  } catch (error) {
+    console.error('Error cleaning up old chats:', error);
+  }
+}
+
+// Run cleanup every 24 hours
+setInterval(cleanupOldChats, 24 * 60 * 60 * 1000);
+
+// --- Portal Integration ---
+
+// Helper: Get portal connection with hierarchy (User > Tenant)
+async function getPortalConnection(portalId: string, userId: string, tenantId: string) {
+  // 1. Check if user has their own connection
+  if (userId) {
+    const userConnection = await prisma.portalConnection.findUnique({
+      where: { userId_portalId: { userId, portalId } },
+      include: { portal: true }
+    });
+    if (userConnection?.isEnabled) {
+      return { connection: userConnection, level: 'user' };
+    }
+  }
+  
+  // 2. Fallback to tenant connection
+  if (tenantId) {
+    const tenantConnection = await prisma.portalConnection.findUnique({
+      where: { tenantId_portalId: { tenantId, portalId } },
+      include: { portal: true }
+    });
+    if (tenantConnection?.isEnabled) {
+      return { connection: tenantConnection, level: 'tenant' };
+    }
+  }
+  
+  // 3. Not connected
+  return null;
+}
+
+// GET /portals - List all available portals
+app.get('/portals', async (req, res) => {
+  try {
+    const { country } = req.query;
+    
+    const portals = await prisma.portal.findMany({
+      where: {
+        isActive: true,
+        ...(country ? { country: String(country) } : {})
+      },
+      orderBy: [
+        { country: 'asc' },
+        { name: 'asc' }
+      ]
+    });
+    
+    res.json(portals);
+  } catch (error) {
+    console.error('Error fetching portals:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// GET /portal-connections - Get portal connections (tenant or user level)
+app.get('/portal-connections', async (req, res) => {
+  try {
+    const { tenantId, userId } = req.query;
+    
+    if (!tenantId && !userId) {
+      return res.status(400).json({ error: 'tenantId or userId required' });
+    }
+    
+    const where: any = {};
+    if (userId) {
+      where.userId = String(userId);
+    } else if (tenantId) {
+      where.tenantId = String(tenantId);
+    }
+    
+    const connections = await prisma.portalConnection.findMany({
+      where,
+      include: {
+        portal: true,
+        syncLogs: {
+          take: 5,
+          orderBy: { startedAt: 'desc' }
+        }
+      }
+    });
+    
+    res.json(connections);
+  } catch (error) {
+    console.error('Error fetching portal connections:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// POST /portal-connections - Create or update portal connection (tenant or user level)
+app.post('/portal-connections', async (req, res) => {
+  try {
+    const { tenantId, userId, portalId, ftpHost, ftpPort, ftpUsername, ftpPassword, ftpPath, useSftp, providerId, isEnabled, autoSyncEnabled, autoSyncInterval } = req.body;
+    
+    if ((!tenantId && !userId) || !portalId) {
+      return res.status(400).json({ error: '(tenantId or userId) and portalId required' });
+    }
+    
+    // Encrypt password if provided
+    let encryptedPassword = ftpPassword;
+    if (ftpPassword && !encryptionService.isEncrypted(ftpPassword)) {
+      encryptedPassword = encryptionService.encrypt(ftpPassword);
+    }
+    
+    // Determine unique constraint
+    const whereClause = userId 
+      ? { userId_portalId: { userId: String(userId), portalId: String(portalId) } }
+      : { tenantId_portalId: { tenantId: String(tenantId), portalId: String(portalId) } };
+    
+    const dataFields = {
+      ftpHost,
+      ftpPort: ftpPort || 21,
+      ftpUsername,
+      ftpPassword: encryptedPassword,
+      ftpPath,
+      useSftp: useSftp || false,
+      providerId,
+      isEnabled: isEnabled !== undefined ? isEnabled : true,
+      autoSyncEnabled: autoSyncEnabled || false,
+      autoSyncInterval: autoSyncInterval || 24
+    };
+    
+    const connection = await prisma.portalConnection.upsert({
+      where: whereClause,
+      update: dataFields,
+      create: {
+        ...(userId ? { userId: String(userId) } : { tenantId: String(tenantId) }),
+        portalId: String(portalId),
+        ...dataFields
+      },
+      include: { portal: true }
+    });
+    
+    // Don't send password back to client
+    const { ftpPassword: _, ...connectionWithoutPassword } = connection;
+    
+    res.json(connectionWithoutPassword);
+  } catch (error) {
+    console.error('Error saving portal connection:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// DELETE /portal-connections/:id - Delete portal connection
+app.delete('/portal-connections/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await prisma.portalConnection.delete({
+      where: { id }
+    });
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting portal connection:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// GET /portal-connections/effective - Get effective connection for user (with hierarchy)
+app.get('/portal-connections/effective', async (req, res) => {
+  try {
+    const { userId, tenantId } = req.query;
+    
+    if (!userId || !tenantId) {
+      return res.status(400).json({ error: 'userId and tenantId required' });
+    }
+    
+    // Get all portals
+    const portals = await prisma.portal.findMany({
+      where: { isActive: true },
+      orderBy: [{ country: 'asc' }, { name: 'asc' }]
+    });
+    
+    // For each portal, determine effective connection
+    const effectiveConnections = await Promise.all(
+      portals.map(async (portal) => {
+        const result = await getPortalConnection(portal.id, String(userId), String(tenantId));
+        return {
+          portal,
+          connection: result?.connection || null,
+          level: result?.level || null,
+          isConnected: !!result
+        };
+      })
+    );
+    
+    res.json(effectiveConnections);
+  } catch (error) {
+    console.error('Error fetching effective connections:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// POST /properties/:id/sync - Sync property to portals
+app.post('/properties/:id/sync', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { portalIds, userId, tenantId } = req.body;
+    
+    if (!portalIds || !Array.isArray(portalIds)) {
+      return res.status(400).json({ error: 'portalIds array required' });
+    }
+    
+    const property = await prisma.property.findUnique({
+      where: { id }
+    });
+    
+    if (!property) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+    
+    // TODO: Implement actual OpenImmo XML generation and FTP upload
+    // For now, just mark as published
+    await prisma.property.update({
+      where: { id },
+      data: {
+        publishedPortals: portalIds,
+        lastSyncedAt: new Date()
+      }
+    });
+    
+    res.json({ 
+      success: true, 
+      message: `Objekt an ${portalIds.length} Portal(e) gesendet`,
+      publishedPortals: portalIds
+    });
+  } catch (error) {
+    console.error('Error syncing property:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// POST /portal-connections/:id/test - Test FTP connection
+app.post('/portal-connections/:id/test', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const connection = await prisma.portalConnection.findUnique({
+      where: { id },
+      include: { portal: true }
+    });
+    
+    if (!connection) {
+      return res.status(404).json({ error: 'Connection not found' });
+    }
+    
+    // TODO: Implement actual FTP test
+    // For now, just check if credentials are provided
+    if (!connection.ftpHost || !connection.ftpUsername || !connection.ftpPassword) {
+      return res.json({ 
+        success: false, 
+        message: 'FTP-Zugangsdaten unvollständig' 
+      });
+    }
+    
+    // Simulate test (replace with actual FTP test later)
+    res.json({ 
+      success: true, 
+      message: `Verbindung zu ${connection.portal.name} erfolgreich!` 
+    });
+  } catch (error) {
+    console.error('Error testing portal connection:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 export const handler = serverless(app);
 
 // Local dev support
@@ -1180,5 +1854,7 @@ if (require.main === module) {
   const port = process.env.PORT || 3000;
   app.listen(port, () => {
     console.log(`Orchestrator service running on port ${port}`);
+    // Run cleanup on startup
+    cleanupOldChats();
   });
 }

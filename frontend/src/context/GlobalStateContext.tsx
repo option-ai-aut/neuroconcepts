@@ -20,6 +20,9 @@ interface GlobalState {
   drawerMinimized: boolean;
   drawerType: DrawerType;
   
+  // Sidebar State
+  sidebarExpanded: boolean;
+  
   // Form Data Persistence
   leadFormData: any;
   propertyFormData: any;
@@ -31,12 +34,16 @@ interface GlobalState {
   
   // Active Editor Context (for AI to know what's open)
   activeExposeContext: ExposeEditorContext | null;
+  
+  // AI Action Tracking (for triggering refreshes)
+  aiActionPerformed: number; // Timestamp of last action
 
   // Actions
   openDrawer: (type: DrawerType) => void;
   closeDrawer: () => void;
   minimizeDrawer: () => void;
   maximizeDrawer: () => void;
+  setSidebarExpanded: (expanded: boolean) => void;
   updateLeadForm: (data: any) => void;
   updatePropertyForm: (data: any) => void;
   updateEmailForm: (data: any) => void;
@@ -44,6 +51,7 @@ interface GlobalState {
   setAiChatDraft: (text: string) => void;
   setActiveExposeContext: (context: ExposeEditorContext | null) => void;
   triggerExposeRefresh: () => void;
+  notifyAiAction: () => void; // Call this when AI performs an action
 }
 
 const GlobalStateContext = createContext<GlobalState | undefined>(undefined);
@@ -52,6 +60,7 @@ export function GlobalStateProvider({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMinimized, setDrawerMinimized] = useState(false);
   const [drawerType, setDrawerType] = useState<DrawerType>(null);
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
   
   const [leadFormData, setLeadFormData] = useState({});
   const [propertyFormData, setPropertyFormData] = useState({});
@@ -60,6 +69,7 @@ export function GlobalStateProvider({ children }: { children: ReactNode }) {
   const [aiChatDraft, setAiChatDraft] = useState('');
   const [activeExposeContext, setActiveExposeContext] = useState<ExposeEditorContext | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [aiActionPerformed, setAiActionPerformed] = useState(0);
 
   const openDrawer = (type: DrawerType) => {
     setDrawerType(type);
@@ -104,22 +114,30 @@ export function GlobalStateProvider({ children }: { children: ReactNode }) {
     }
   }, [activeExposeContext]);
 
+  // Notify that AI performed an action (for list refreshes)
+  const notifyAiAction = useCallback(() => {
+    setAiActionPerformed(Date.now());
+  }, []);
+
   return (
     <GlobalStateContext.Provider
       value={{
         drawerOpen,
         drawerMinimized,
         drawerType,
+        sidebarExpanded,
         leadFormData,
         propertyFormData,
         emailFormData,
         exposeEditorData: { ...exposeEditorData, onBlocksUpdated: () => setRefreshTrigger(prev => prev + 1) },
         aiChatDraft,
         activeExposeContext,
+        aiActionPerformed,
         openDrawer,
         closeDrawer,
         minimizeDrawer,
         maximizeDrawer,
+        setSidebarExpanded,
         updateLeadForm,
         updatePropertyForm,
         updateEmailForm,
@@ -127,6 +145,7 @@ export function GlobalStateProvider({ children }: { children: ReactNode }) {
         setAiChatDraft,
         setActiveExposeContext,
         triggerExposeRefresh,
+        notifyAiAction,
       }}
     >
       {children}

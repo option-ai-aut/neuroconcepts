@@ -27,28 +27,112 @@ export interface Message {
 
 export interface Lead {
   id: string;
+  salutation?: 'NONE' | 'MR' | 'MS' | 'DIVERSE';
+  formalAddress?: boolean; // true = "Sie", false = "Du"
   email: string;
   firstName?: string;
   lastName?: string;
+  phone?: string;
+  
+  // Buyer Preferences
+  budgetMin?: number;
+  budgetMax?: number;
+  preferredType?: string;
+  preferredLocation?: string;
+  minRooms?: number;
+  minArea?: number;
+  timeFrame?: string;
+  
+  // Financing
+  financingStatus?: string;
+  hasDownPayment?: boolean;
+  
+  // Lead Source
+  source?: string;
+  sourceDetails?: string;
+  
+  // Status & Notes
   status: string;
-  createdAt: string;
+  notes?: string;
+  
+  // Relations
   propertyId?: string;
   messages?: Message[];
-  notes?: string;
-  phone?: string;
+  createdAt: string;
 }
 
 export interface Property {
   id: string;
   title: string;
   address: string;
-  price?: number;
-  rooms?: number;
-  area?: number;
+  zipCode?: string;
+  city?: string;
+  country?: string;
+  district?: string;
+  
+  // Type & Marketing
+  propertyType?: string;
+  marketingType?: string;
+  
+  // Price (legacy + new)
+  price?: number; // Legacy
+  salePrice?: number;
+  rentCold?: number;
+  rentWarm?: number;
+  additionalCosts?: number;
+  deposit?: string;
+  commission?: string;
+  
+  // Areas & Rooms
+  rooms?: number; // Legacy
+  area?: number; // Legacy
+  livingArea?: number;
+  usableArea?: number;
+  plotArea?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  
+  // Building Info
+  yearBuilt?: number;
+  yearRenovated?: number;
+  condition?: string;
+  buildingType?: string;
+  floor?: number;
+  totalFloors?: number;
+  
+  // Energy Certificate
+  energyCertificateType?: string;
+  energyEfficiencyClass?: string;
+  energyConsumption?: number;
+  primaryEnergySource?: string;
+  energyCertificateValidUntil?: string;
+  
+  // Features
+  features?: any;
+  
+  // Descriptions
   description?: string;
+  locationDescription?: string;
+  equipmentDescription?: string;
+  
+  // AI Context
   aiFacts?: string;
-  images?: string[];      // Property photos
-  floorplans?: string[];  // Floor plan images
+  
+  // Media
+  images?: string[];
+  floorplans?: string[];
+  videos?: string[];
+  virtualTour?: string;
+  
+  // Status
+  status?: string;
+  priority?: string;
+  
+  // Portal Publishing
+  publishedPortals?: string[];
+  lastSyncedAt?: string;
+  
+  createdAt: string;
 }
 
 // Exposé Types

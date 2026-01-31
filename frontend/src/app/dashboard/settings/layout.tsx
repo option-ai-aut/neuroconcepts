@@ -11,12 +11,13 @@ export default function SettingsLayout({
   const pathname = usePathname();
 
   const tabs = [
-    { name: 'E-Mail', href: '/dashboard/settings/email' },
-    { name: 'Kalender', href: '/dashboard/settings/calendar' },
+    { name: 'Integrationen', href: '/dashboard/settings/integrations' },
+    { name: 'Portale (Firma)', href: '/dashboard/settings/portals' },
+    { name: 'Meine Portale', href: '/dashboard/settings/my-portals' },
     { name: 'Jarvis (KI)', href: '/dashboard/settings/jarvis' },
+    { name: 'Vorlagen', href: '/dashboard/settings/templates' },
     { name: 'Profil', href: '/dashboard/settings/profile' },
     { name: 'Abrechnung', href: '/dashboard/settings/billing' },
-    { name: 'Vorlagen', href: '/dashboard/settings/templates' },
   ];
 
   return (
@@ -40,7 +41,7 @@ export default function SettingsLayout({
         </nav>
       </div>
       <div className="flex-1 overflow-auto bg-white p-8 pt-8">
-        <div className="max-w-3xl">
+        <div className="max-w-5xl">
           {children}
         </div>
       </div>

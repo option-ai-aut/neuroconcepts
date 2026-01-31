@@ -1,41 +1,192 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { Send, Bot, User, Paperclip, FileText } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Send, Bot, Paperclip, FileText, RotateCcw, X } from 'lucide-react';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { getRuntimeConfig } from '@/components/EnvProvider';
+import { fetchAuthSession } from 'aws-amplify/auth';
+
+// Get auth headers for API calls
+const getAuthHeaders = async (): Promise<HeadersInit> => {
+  try {
+    const session = await fetchAuthSession();
+    const token = session.tokens?.idToken?.toString();
+    return token ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+  } catch (error) {
+    console.error('Error fetching auth session:', error);
+    return { 'Content-Type': 'application/json' };
+  }
+};
 
 interface Message {
-  role: 'USER' | 'ASSISTANT';
+  role: 'USER' | 'ASSISTANT' | 'SYSTEM';
   content: string;
+  isAction?: boolean; // Flag for action messages
 }
+
+// Contextual tips that show once per context
+interface ContextTip {
+  id: string;
+  context: string; // What triggers this tip
+  message: string;
+}
+
+const CONTEXT_TIPS: ContextTip[] = [
+  { id: 'expose-editor-template', context: 'template', message: 'Ich kann dir beim Erstellen der Vorlage helfen. Sag mir einfach was du brauchst!' },
+  { id: 'expose-editor-expose', context: 'expose', message: 'Ich kann Blöcke hinzufügen, Texte generieren oder das komplette Exposé erstellen.' },
+  { id: 'crm-leads', context: 'crm-leads', message: 'Frag mich nach Lead-Statistiken oder lass mich einen neuen Lead anlegen.' },
+  { id: 'crm-properties', context: 'crm-properties', message: 'Ich kann Objekte suchen, anlegen oder Exposés dafür erstellen.' },
+  { id: 'inbox', context: 'inbox', message: 'Ich kann E-Mails zusammenfassen, beantworten oder Leads daraus erstellen.' },
+];
 
 export default function AiChatSidebar() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const { aiChatDraft, setAiChatDraft, activeExposeContext, triggerExposeRefresh } = useGlobalState();
+  const { aiChatDraft, setAiChatDraft, activeExposeContext, triggerExposeRefresh, notifyAiAction } = useGlobalState();
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [activeTip, setActiveTip] = useState<ContextTip | null>(null);
+  const [tipVisible, setTipVisible] = useState(false);
+  const tipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // TODO: Get real User ID from Auth
   const userId = 'default-user-id'; 
   const tenantId = 'default-tenant';
 
-  useEffect(() => {
-    const config = getRuntimeConfig();
-    if (!config.apiUrl || config.apiUrl === '' || !userId) return;
-
-    // Load history (silent fail if backend not running)
-    fetch(`${config.apiUrl}/chat/history?userId=${userId}`)
-      .then(res => res.ok ? res.json() : [])
-      .then(data => {
-        if (Array.isArray(data)) setMessages(data);
-      })
-      .catch(() => { /* Backend not available - silent fail */ });
+  // Get shown tips from localStorage
+  const getShownTips = useCallback((): string[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      return JSON.parse(localStorage.getItem('jarvis-shown-tips') || '[]');
+    } catch {
+      return [];
+    }
   }, []);
+
+  // Mark tip as shown
+  const markTipAsShown = useCallback((tipId: string) => {
+    if (typeof window === 'undefined') return;
+    const shown = getShownTips();
+    if (!shown.includes(tipId)) {
+      localStorage.setItem('jarvis-shown-tips', JSON.stringify([...shown, tipId]));
+    }
+  }, [getShownTips]);
+
+  // Show tip with animation
+  const showTip = useCallback((tip: ContextTip) => {
+    const shownTips = getShownTips();
+    if (shownTips.includes(tip.id)) return;
+
+    setActiveTip(tip);
+    // Small delay for animation
+    setTimeout(() => setTipVisible(true), 50);
+    markTipAsShown(tip.id);
+
+    // Auto-hide after 10 seconds
+    if (tipTimeoutRef.current) clearTimeout(tipTimeoutRef.current);
+    tipTimeoutRef.current = setTimeout(() => {
+      setTipVisible(false);
+      setTimeout(() => setActiveTip(null), 300);
+    }, 10000);
+  }, [getShownTips, markTipAsShown]);
+
+  // Dismiss tip manually
+  const dismissTip = useCallback(() => {
+    if (tipTimeoutRef.current) clearTimeout(tipTimeoutRef.current);
+    setTipVisible(false);
+    setTimeout(() => setActiveTip(null), 300);
+  }, []);
+
+  // Determine current context and show relevant tip
+  useEffect(() => {
+    let contextKey = '';
+    
+    if (activeExposeContext) {
+      contextKey = activeExposeContext.isTemplate ? 'template' : 'expose';
+    }
+    // Could add more context detection here based on URL, etc.
+
+    if (contextKey) {
+      const tip = CONTEXT_TIPS.find(t => t.context === contextKey);
+      if (tip) {
+        // Small delay to let the UI settle
+        setTimeout(() => showTip(tip), 500);
+      }
+    }
+
+    return () => {
+      if (tipTimeoutRef.current) clearTimeout(tipTimeoutRef.current);
+    };
+  }, [activeExposeContext, showTip]);
+
+  useEffect(() => {
+    let retryCount = 0;
+    const maxRetries = 10;
+
+    const loadHistory = async () => {
+      try {
+        const config = getRuntimeConfig();
+        if (!config.apiUrl || config.apiUrl === '' || !userId) {
+          // Retry after a short delay if config not ready
+          if (retryCount < maxRetries) {
+            retryCount++;
+            setTimeout(loadHistory, 200);
+          }
+          return;
+        }
+
+        // Load history
+        const authHeaders = await getAuthHeaders();
+        const res = await fetch(`${config.apiUrl}/chat/history?userId=${userId}`, {
+          headers: authHeaders
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            console.log(`✅ Chat-Historie geladen: ${data.length} Nachrichten`);
+            setMessages(data);
+          } else {
+            console.log('ℹ️ Keine Chat-Historie gefunden');
+          }
+        } else {
+          console.warn('⚠️ Chat-Historie konnte nicht geladen werden:', res.status);
+        }
+      } catch (error) {
+        console.warn('⚠️ Backend nicht erreichbar, versuche erneut...', error);
+        // Retry if backend not available yet
+        if (retryCount < maxRetries) {
+          retryCount++;
+          setTimeout(loadHistory, 500);
+        }
+      }
+    };
+
+    loadHistory();
+  }, [userId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const handleNewChat = async () => {
+    if (!confirm('Neuen Chat starten? Der aktuelle Chat wird archiviert und nach 7 Tagen gelöscht.')) return;
+    
+    try {
+      const config = getRuntimeConfig();
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`${config.apiUrl}/chat/new`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ userId })
+      });
+      
+      if (res.ok) {
+        setMessages([]);
+        console.log('🆕 Neuer Chat gestartet');
+      }
+    } catch (error) {
+      console.error('Error starting new chat:', error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,59 +200,143 @@ export default function AiChatSidebar() {
     try {
       const config = getRuntimeConfig();
       
-      // Check if we have an active expose context - use expose-specific endpoint
-      if (activeExposeContext?.exposeId && !activeExposeContext.isTemplate) {
-        // Use expose chat endpoint
-        const res = await fetch(`${config.apiUrl}/exposes/${activeExposeContext.exposeId}/chat`, {
+      // Check if we have an active expose/template context - use specific endpoint
+      const hasExposeContext = activeExposeContext?.exposeId && !activeExposeContext.isTemplate;
+      const hasTemplateContext = activeExposeContext?.templateId && activeExposeContext.isTemplate;
+      
+      if (hasExposeContext || hasTemplateContext) {
+        // Show action indicator
+        setMessages(prev => [...prev, { role: 'SYSTEM', content: 'Jarvis führt Aktion aus...', isAction: true }]);
+        
+        // Determine endpoint
+        const endpoint = hasTemplateContext 
+          ? `${config.apiUrl}/templates/${activeExposeContext.templateId}/chat`
+          : `${config.apiUrl}/exposes/${activeExposeContext.exposeId}/chat`;
+        
+        const authHeaders = await getAuthHeaders();
+        const res = await fetch(endpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders,
           body: JSON.stringify({
             message: userMsg.content,
-            history: messages.slice(-10), // Last 10 messages for context
+            history: messages.filter(m => !m.isAction).slice(-10),
             tenantId,
           })
         });
         const data = await res.json();
         
-        setMessages(prev => [...prev, { role: 'ASSISTANT', content: data.response }]);
+        // Remove action indicator and add response
+        setMessages(prev => [
+          ...prev.filter(m => !m.isAction), 
+          { role: 'ASSISTANT', content: data.response }
+        ]);
         
-        // Trigger refresh if AI made changes
         if (data.actionsPerformed && data.actionsPerformed.length > 0) {
           triggerExposeRefresh();
         }
+        setIsLoading(false);
       } else {
-        // Regular chat endpoint
-        const res = await fetch(`${config.apiUrl}/chat`, {
+        // Regular chat endpoint with STREAMING
+        const authHeaders = await getAuthHeaders();
+        const res = await fetch(`${config.apiUrl}/chat/stream`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders,
           body: JSON.stringify({
             message: userMsg.content,
             history: messages,
             tenantId,
             userId,
-            // Pass expose context if available
-            context: activeExposeContext ? {
-              type: 'expose_editor',
-              exposeId: activeExposeContext.exposeId,
-              templateId: activeExposeContext.templateId,
-              propertyId: activeExposeContext.propertyId,
-              isTemplate: activeExposeContext.isTemplate,
-            } : undefined
           })
         });
-        const data = await res.json();
-        
-        setMessages(prev => [...prev, { role: 'ASSISTANT', content: data.response }]);
-        
-        // Trigger refresh if AI made changes to expose
-        if (data.actionsPerformed && activeExposeContext) {
-          triggerExposeRefresh();
+
+        if (!res.body) throw new Error('No response body');
+
+        // Add empty assistant message that we'll update
+        const assistantMsgIndex = messages.length + 1;
+        setMessages(prev => [...prev, { role: 'ASSISTANT', content: '' }]);
+        setIsLoading(false);
+
+        // Read the stream
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let hadFunctionCalls = false;
+        let showingActionMessage = false;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.error) {
+                // Remove action message if showing
+                if (showingActionMessage) {
+                  setMessages(prev => prev.filter(m => !m.isAction));
+                  showingActionMessage = false;
+                }
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  newMessages[assistantMsgIndex] = { role: 'ASSISTANT', content: 'Fehler bei der Verbindung zu Jarvis.' };
+                  return newMessages;
+                });
+                break;
+              }
+              
+              if (data.done) {
+                // Remove action message when done
+                if (showingActionMessage) {
+                  setMessages(prev => prev.filter(m => !m.isAction));
+                  showingActionMessage = false;
+                }
+                
+                // Check if AI performed actions
+                if (data.hadFunctionCalls) {
+                  hadFunctionCalls = true;
+                }
+                break;
+              }
+              
+              if (data.chunk) {
+                // Check if we should show action message
+                // Show it when we detect function calls (usually starts with "[")
+                if (!showingActionMessage && data.chunk.trim().startsWith('[')) {
+                  setMessages(prev => [...prev, { role: 'SYSTEM', content: 'Jarvis führt Aktion aus...', isAction: true }]);
+                  showingActionMessage = true;
+                }
+
+                // Update the assistant message with new chunk
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  // Find the assistant message (not the action message)
+                  const assistantIdx = newMessages.findIndex((m, idx) => idx === assistantMsgIndex && m.role === 'ASSISTANT');
+                  if (assistantIdx !== -1) {
+                    newMessages[assistantIdx] = {
+                      role: 'ASSISTANT',
+                      content: (newMessages[assistantIdx]?.content || '') + data.chunk
+                    };
+                  }
+                  return newMessages;
+                });
+              }
+            }
+          }
+        }
+
+        // Notify if AI performed actions
+        if (hadFunctionCalls) {
+          notifyAiAction();
         }
       }
     } catch (error) {
       console.error('Chat error:', error);
       setMessages(prev => [...prev, { role: 'ASSISTANT', content: 'Fehler bei der Verbindung zu Jarvis.' }]);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -115,24 +350,16 @@ export default function AiChatSidebar() {
           </div>
           <span className="font-bold text-gray-900">Jarvis</span>
         </div>
+        <button
+          onClick={handleNewChat}
+          className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+          title="Neuen Chat starten"
+        >
+          <RotateCcw className="w-4 h-4" />
+        </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-        {/* Expose Context Banner */}
-        {activeExposeContext && (
-          <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 mb-2">
-            <div className="flex items-center gap-2 text-indigo-700">
-              <FileText className="w-4 h-4" />
-              <span className="text-xs font-medium">
-                {activeExposeContext.isTemplate ? 'Vorlage bearbeiten' : 'Exposé-Editor aktiv'}
-              </span>
-            </div>
-            <p className="text-xs text-indigo-600 mt-1">
-              Ich kann dir beim Erstellen helfen. Sag mir einfach was du brauchst!
-            </p>
-          </div>
-        )}
-        
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 space-y-3">
             <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center animate-alive">
@@ -150,17 +377,32 @@ export default function AiChatSidebar() {
           </div>
         )}
         
-        {messages.map((msg, index) => (
-          <div key={index} className={`flex ${msg.role === 'USER' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] rounded-lg p-3 text-sm ${
-              msg.role === 'USER' 
-                ? 'bg-indigo-600 text-white rounded-br-none' 
-                : 'bg-white text-gray-800 rounded-bl-none'
-            }`}>
-              <p className="whitespace-pre-wrap">{msg.content}</p>
+        {messages.map((msg, index) => {
+          // Action message (system)
+          if (msg.isAction) {
+            return (
+              <div key={index} className="flex justify-center">
+                <div className="bg-indigo-50 text-indigo-700 rounded-lg px-4 py-2 text-xs font-medium flex items-center gap-2 animate-pulse">
+                  <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping"></div>
+                  {msg.content}
+                </div>
+              </div>
+            );
+          }
+          
+          // Regular messages
+          return (
+            <div key={index} className={`flex ${msg.role === 'USER' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[85%] rounded-lg p-3 text-sm ${
+                msg.role === 'USER' 
+                  ? 'bg-indigo-600 text-white rounded-br-none' 
+                  : 'bg-white text-gray-800 rounded-bl-none'
+              }`}>
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {isLoading && (
           <div className="flex justify-start">
             <div className="bg-white rounded-lg rounded-bl-none p-3">
@@ -176,31 +418,59 @@ export default function AiChatSidebar() {
       </div>
 
       <div className="p-4 bg-white">
-        <form onSubmit={handleSubmit} className="relative">
-          <div className="relative flex items-center">
-            <input
-              type="text"
-              value={aiChatDraft}
-              onChange={(e) => setAiChatDraft(e.target.value)}
-              placeholder="Nachricht an Jarvis..."
-              className="w-full pl-4 pr-12 py-3 bg-gray-50 border-transparent rounded-md text-sm text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white transition-all placeholder-gray-400"
-            />
-            <div className="absolute right-2 flex items-center space-x-1">
+        {/* Contextual Tip - appears above input */}
+        <div className={`overflow-hidden transition-all duration-300 ease-out ${
+          activeTip && tipVisible ? 'max-h-24 opacity-100 mb-3' : 'max-h-0 opacity-0 mb-0'
+        }`}>
+          {activeTip && (
+            <div className="bg-indigo-50 border border-indigo-100 rounded-md p-3 relative">
               <button
-                type="button"
-                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
-                title="Anhang hinzufügen"
+                onClick={dismissTip}
+                className="absolute top-2 right-2 p-1 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-100 rounded transition-colors"
               >
-                <Paperclip className="w-4 h-4" />
+                <X className="w-3 h-3" />
               </button>
-              <button
-                type="submit"
-                disabled={isLoading || !aiChatDraft.trim()}
-                className="p-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 transition-colors"
-              >
-                <Send className="w-4 h-4" />
-              </button>
+              <p className="text-xs text-indigo-700 pr-6">{activeTip.message}</p>
             </div>
+          )}
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <textarea
+            value={aiChatDraft}
+            onChange={(e) => setAiChatDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(e);
+              }
+            }}
+            placeholder="Nachricht an Jarvis..."
+            rows={1}
+            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white transition-all placeholder-gray-400 resize-none overflow-y-auto"
+            style={{ maxHeight: '5.5rem', minHeight: '2.25rem' }}
+            onInput={(e) => {
+              const target = e.target as HTMLTextAreaElement;
+              target.style.height = 'auto';
+              target.style.height = Math.min(target.scrollHeight, 88) + 'px';
+            }}
+          />
+          <div className="flex items-center justify-between mt-2">
+            <button
+              type="button"
+              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+              title="Anhang hinzufügen"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading || !aiChatDraft.trim()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 transition-colors"
+            >
+              Senden
+              <Send className="w-3.5 h-3.5" />
+            </button>
           </div>
         </form>
       </div>

@@ -25,29 +25,51 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
-/* Global Border Radius */
-* {
+/* Global Border Radius - Override Tailwind defaults */
+:root {
   --radius-sm: 0.25rem;  /* 4px */
   --radius-md: 0.5rem;   /* 8px */
   --radius-lg: 0.75rem;  /* 12px */
   --radius-xl: 1rem;     /* 16px */
 }
 
-/* Apply to common elements */
-.rounded-sm { border-radius: var(--radius-sm); }
-.rounded, .rounded-md { border-radius: var(--radius-md); }
-.rounded-lg { border-radius: var(--radius-lg); }
-.rounded-xl { border-radius: var(--radius-xl); }
-.rounded-2xl { border-radius: 1.75rem; }
-
-/* Specific overrides for consistent look */
-input, textarea, select, button {
-  border-radius: var(--radius-md) !important;
-}
-
-/* Dashboard Cards */
-.shadow-sm {
-  border-radius: var(--radius-xl) !important;
+@layer utilities {
+  .rounded-sm { border-radius: 0.25rem !important; }
+  .rounded-md { border-radius: 0.5rem !important; }
+  .rounded-lg { border-radius: 0.75rem !important; }
+  .rounded-xl { border-radius: 1rem !important; }
+  .rounded-2xl { border-radius: 1.25rem !important; }
+  
+  /* Thin scrollbar styles */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin:hover::-webkit-scrollbar-thumb {
+    background: #9ca3af;
+  }
+  
+  .scrollbar-thumb-gray-300::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+  }
+  
+  .scrollbar-thumb-gray-400::-webkit-scrollbar-thumb {
+    background: #9ca3af;
+  }
+  
+  .scrollbar-track-transparent::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }
 
 @keyframes float-rotate {

@@ -28,6 +28,8 @@ model Tenant {
   exposeTemplates ExposeTemplate[] @relation("TenantExposeTemplates")
   settings        TenantSettings?
   channels        Channel[]
+  aiAuditLogs     AiAuditLog[] @relation("TenantAiAuditLogs")
+  portalConnections PortalConnection[]
 }
 
 model TenantSettings {
@@ -64,6 +66,9 @@ model User {
   chats    UserChat[]
   channelMemberships ChannelMember[]
   channelMessages    ChannelMessage[]
+  aiAuditLogs AiAuditLog[]
+  conversationSummaries ConversationSummary[]
+  portalConnections PortalConnection[]
 }
 
 enum Role {
@@ -80,10 +85,29 @@ model Lead {
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
   
   // Contact Info
+  salutation  Salutation @default(NONE)
+  formalAddress Boolean @default(true) // true = "Sie", false = "Du"
   email     String
   firstName String?
   lastName  String?
   phone     String?
+  
+  // Buyer Preferences (for matching with properties)
+  budgetMin       Decimal?
+  budgetMax       Decimal?
+  preferredType   PropertyType? // Wohnung, Haus, etc.
+  preferredLocation String? // PLZ oder Stadt
+  minRooms        Float?
+  minArea         Float?
+  timeFrame       LeadTimeFrame? // Wann will der Kunde kaufen/mieten?
+  
+  // Financing (for qualification)
+  financingStatus FinancingStatus @default(NOT_CLARIFIED)
+  hasDownPayment  Boolean @default(false)
+  
+  // Lead Source (for marketing ROI)
+  source          LeadSource @default(WEBSITE)
+  sourceDetails   String? // z.B. "ImmoScout24" oder "Google Ads"
   
   // Internal
   notes     String?   @db.Text
@@ -101,11 +125,69 @@ model Lead {
 
   // Conversation History
   messages  Message[]
+  activities LeadActivity[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([tenantId, email, propertyId]) // Prevent duplicates per property
+}
+
+model LeadActivity {
+  id        String   @id @default(uuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  type      ActivityType
+  description String // "Status geändert: Neu → Kontaktiert"
+  metadata  Json? // Zusätzliche Daten (z.B. alte/neue Werte)
+  
+  createdBy String? // User ID
+  createdAt DateTime @default(now())
+  
+  @@index([leadId, createdAt])
+}
+
+enum ActivityType {
+  LEAD_CREATED
+  STATUS_CHANGED
+  FIELD_UPDATED
+  EMAIL_SENT
+  EMAIL_RECEIVED
+  NOTE_ADDED
+  PROPERTY_ASSIGNED
+}
+
+enum LeadTimeFrame {
+  IMMEDIATE       // Sofort
+  THREE_MONTHS    // 1-3 Monate
+  SIX_MONTHS      // 3-6 Monate
+  TWELVE_MONTHS   // 6-12 Monate
+  LONGTERM        // >12 Monate
+}
+
+enum FinancingStatus {
+  NOT_CLARIFIED   // Noch nicht geklärt
+  PRE_QUALIFIED   // Vorqualifiziert
+  APPROVED        // Genehmigt
+  CASH_BUYER      // Barzahler
+}
+
+enum LeadSource {
+  WEBSITE         // Eigene Website
+  PORTAL          // Immobilienportal
+  REFERRAL        // Empfehlung
+  SOCIAL_MEDIA    // Social Media
+  COLD_CALL       // Kaltakquise
+  EVENT           // Veranstaltung
+  OTHER           // Sonstiges
+}
+
+enum Salutation {
+  NONE            // Keine Anrede
+  MR              // Herr
+  MS              // Frau
+  DIVERSE         // Divers
 }
 
 enum LeadStatus {
@@ -121,19 +203,77 @@ model Property {
   tenantId  String
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
   
+  // Basic Info (keep old fields for backward compatibility)
   title       String
   address     String
-  price       Decimal?
-  rooms       Int?
-  area        Float?
-  description String?
+  price       Decimal? // Legacy: now salePrice or rentCold
+  rooms       Int? // Legacy: now rooms (Float)
+  area        Float? // Legacy: now livingArea
+  description String? @db.Text
+  
+  // New: Extended Basic Info
+  zipCode     String?
+  city        String?
+  country     String @default("Deutschland")
+  district    String?
+  
+  // Type & Marketing
+  propertyType PropertyType @default(APARTMENT)
+  marketingType MarketingType @default(SALE)
+  
+  // Price (dynamic)
+  salePrice     Decimal?
+  rentCold      Decimal?
+  rentWarm      Decimal?
+  additionalCosts Decimal?
+  deposit       String?
+  commission    String?
+  
+  // Areas & Rooms (extended)
+  livingArea    Float?
+  usableArea    Float?
+  plotArea      Float?
+  bedrooms      Int?
+  bathrooms     Int?
+  
+  // Building Info
+  yearBuilt     Int?
+  yearRenovated Int?
+  condition     PropertyCondition?
+  buildingType  BuildingType?
+  floor         Int?
+  totalFloors   Int?
+  
+  // Energy Certificate (GEG §87)
+  energyCertificateType EnergyCertificateType?
+  energyEfficiencyClass EnergyEfficiencyClass?
+  energyConsumption     Float?
+  primaryEnergySource   String?
+  energyCertificateValidUntil DateTime?
+  
+  // Features (JSON)
+  features    Json?
+  
+  // Descriptions (extended)
+  locationDescription String? @db.Text
+  equipmentDescription String? @db.Text
   
   // AI Context
-  aiFacts     String? // "No pets allowed", "South facing balcony"
+  aiFacts     String? @db.Text
   
-  // Media - separated for AI to distinguish
-  images      String[] // Array of S3 URLs for property photos
-  floorplans  String[] // Array of S3 URLs for floor plans
+  // Media
+  images      String[]
+  floorplans  String[]
+  videos      String[]
+  virtualTour String?
+  
+  // Status
+  status      PropertyStatus @default(ACTIVE)
+  priority    PropertyPriority @default(MEDIUM)
+  
+  // Portal Publishing
+  publishedPortals String[] // Array of portal IDs where this property is published
+  lastSyncedAt     DateTime?
   
   // Relations
   leads       Lead[]
@@ -141,6 +281,68 @@ model Property {
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+enum PropertyType {
+  APARTMENT
+  HOUSE
+  COMMERCIAL
+  LAND
+  GARAGE
+  OTHER
+}
+
+enum MarketingType {
+  SALE
+  RENT
+  LEASE
+}
+
+enum PropertyCondition {
+  FIRST_OCCUPANCY
+  NEW
+  RENOVATED
+  REFURBISHED
+  WELL_MAINTAINED
+  MODERNIZED
+  NEEDS_RENOVATION
+}
+
+enum BuildingType {
+  NEW_BUILDING
+  OLD_BUILDING
+  MONUMENT
+}
+
+enum EnergyCertificateType {
+  DEMAND
+  CONSUMPTION
+}
+
+enum EnergyEfficiencyClass {
+  A_PLUS
+  A
+  B
+  C
+  D
+  E
+  F
+  G
+  H
+}
+
+enum PropertyStatus {
+  ACTIVE
+  RESERVED
+  SOLD
+  RENTED
+  ARCHIVED
+}
+
+enum PropertyPriority {
+  HIGH
+  MEDIUM
+  LOW
 }
 
 model Message {
@@ -173,7 +375,10 @@ model UserChat {
   user      User     @relation(fields: [userId], references: [id])
   role      MessageRole
   content   String
+  archived  Boolean  @default(false) // Archiviert nach "Neu starten"
   createdAt DateTime @default(now())
+  
+  @@index([userId, archived, createdAt])
 }
 
 // --- Team Chat ---
@@ -297,4 +502,159 @@ model Expose {
 enum ExposeStatus {
   DRAFT
   PUBLISHED
+}
+
+// --- AI Safety & Audit ---
+
+model AiAuditLog {
+  id        String   @id @default(uuid())
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  tenantId  String
+  tenant    Tenant   @relation("TenantAiAuditLogs", fields: [tenantId], references: [id])
+  
+  endpoint  String   // "/chat", "/exposes/:id/chat"
+  message   String   @db.Text
+  response  String?  @db.Text
+  
+  // Safety flags
+  flagged   Boolean  @default(false)
+  flagReason String? // "prompt_injection", "forbidden_keyword", etc.
+  
+  // Metadata
+  ipAddress String?
+  userAgent String?
+  
+  createdAt DateTime @default(now())
+  
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model ConversationSummary {
+  id           String   @id @default(uuid())
+  
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  
+  summary      String   @db.Text
+  messageCount Int      // How many messages were summarized
+  
+  createdAt    DateTime @default(now())
+  
+  @@index([userId, createdAt])
+}
+
+// --- Portal Integration ---
+
+model Portal {
+  id          String   @id @default(uuid())
+  
+  // Portal Info
+  name        String   // z.B. "Immowelt", "Willhaben"
+  slug        String   @unique // z.B. "immowelt", "willhaben"
+  country     String   // "DE", "AT", "CH"
+  logoUrl     String?
+  websiteUrl  String?
+  
+  // Connection Type
+  connectionType PortalConnectionType @default(OPENIMMO_FTP)
+  
+  // Default FTP Settings (can be overridden per tenant)
+  defaultFtpHost String?
+  defaultFtpPort Int @default(21)
+  
+  // Status
+  isActive    Boolean @default(true)
+  isPremium   Boolean @default(false) // Requires paid subscription
+  
+  // Relations
+  connections PortalConnection[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model PortalConnection {
+  id          String   @id @default(uuid())
+  
+  // Hierarchical: Either Tenant-Level (firm) OR User-Level (personal)
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  
+  portalId    String
+  portal      Portal   @relation(fields: [portalId], references: [id])
+  
+  // FTP/SFTP Credentials (encrypted in production!)
+  ftpHost     String?
+  ftpPort     Int @default(21)
+  ftpUsername String?
+  ftpPassword String? // TODO: Encrypt!
+  ftpPath     String? // Remote directory
+  useSftp     Boolean @default(false)
+  
+  // Portal-specific ID
+  providerId  String? // Anbieternummer/Kundennummer beim Portal
+  
+  // Status
+  isEnabled   Boolean @default(true)
+  lastSyncAt  DateTime?
+  lastSyncStatus PortalSyncStatus?
+  lastSyncError String?
+  
+  // Auto-Sync Settings
+  autoSyncEnabled Boolean @default(false)
+  autoSyncInterval Int @default(24) // Hours
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  syncLogs    PortalSyncLog[]
+  
+  @@unique([tenantId, portalId])
+  @@unique([userId, portalId])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model PortalSyncLog {
+  id              String   @id @default(uuid())
+  
+  connectionId    String
+  connection      PortalConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  
+  // Sync Details
+  status          PortalSyncStatus
+  propertiesTotal Int @default(0)
+  propertiesSynced Int @default(0)
+  propertiesFailed Int @default(0)
+  
+  errorMessage    String? @db.Text
+  
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  
+  @@index([connectionId, startedAt])
+}
+
+enum PortalConnectionType {
+  OPENIMMO_FTP    // Standard: OpenImmo XML via FTP
+  OPENIMMO_SFTP   // OpenImmo XML via SFTP
+  REST_API        // Direct REST API (z.B. ImmoScout24)
+  SOAP_API        // SOAP API (z.B. Immowelt)
+  CSV_FTP         // CSV via FTP
+}
+
+enum PortalSyncStatus {
+  PENDING
+  IN_PROGRESS
+  SUCCESS
+  PARTIAL_SUCCESS
+  FAILED
 }
