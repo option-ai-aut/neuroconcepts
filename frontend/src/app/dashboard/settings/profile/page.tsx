@@ -6,7 +6,7 @@ import { getMe, getSeats, inviteSeat } from '@/lib/api';
 import useSWR from 'swr';
 
 export default function ProfileSettingsPage() {
-  const { data: user } = useSWR('/me', getMe);
+  const { data: user, mutate: mutateUser } = useSWR('/me', getMe);
   const { data: seats = [], mutate: mutateSeats } = useSWR('/seats', getSeats);
 
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -86,7 +86,7 @@ export default function ProfileSettingsPage() {
       });
 
       if (response.ok) {
-        mutate(); // Refresh user data
+        mutateUser(); // Refresh user data
         setIsEditingProfile(false);
         alert('Profil erfolgreich gespeichert!');
       } else {
