@@ -79,7 +79,7 @@ export default function PortalsSettingsPage() {
     try {
       const config = getRuntimeConfig();
       const token = localStorage.getItem('token');
-      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
       
       const [portalsRes, tenantConnectionsRes, userConnectionsRes] = await Promise.all([
         fetch(`${config.apiUrl}/portals`),
