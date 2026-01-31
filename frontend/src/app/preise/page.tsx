@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { CheckCircle2, Sparkles, ArrowRight, Zap, Building2, Users } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Zap, Building2, Users } from 'lucide-react';
+import PublicNavigation from '@/components/PublicNavigation';
+import PublicFooter from '@/components/PublicFooter';
 
 export default function PreisePage() {
   const plans = [
@@ -63,77 +65,54 @@ export default function PreisePage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="fixed w-full z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center mr-3 shadow-lg shadow-indigo-500/30">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-bold text-xl tracking-tight">NeuroConcepts</span>
-            </Link>
-            <div className="flex items-center space-x-4">
-              <Link href="/login" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
-                Anmelden
-              </Link>
-              <Link 
-                href="/login" 
-                className="bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/30 transition-all hover:-translate-y-0.5"
-              >
-                Kostenlos starten
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <PublicNavigation currentPage="preise" />
 
       {/* Hero */}
-      <section className="pt-32 pb-16 bg-gradient-to-b from-gray-50 to-white">
+      <section className="pt-24 sm:pt-32 pb-12 sm:pb-16 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-5xl md:text-6xl font-extrabold text-gray-900 mb-6">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-4 sm:mb-6">
             Einfache, transparente Preise
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto px-4">
             Keine versteckten Kosten. Keine Überraschungen. 14 Tage kostenlos testen — ohne Kreditkarte.
           </p>
         </div>
       </section>
 
       {/* Pricing Cards */}
-      <section className="py-16">
+      <section className="py-8 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-6 sm:gap-8">
             {plans.map((plan, i) => (
               <div 
                 key={i} 
-                className={`relative rounded-2xl p-8 ${
+                className={`relative rounded-2xl p-6 sm:p-8 ${
                   plan.popular 
                     ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-xl shadow-indigo-500/30' 
                     : 'bg-white border border-gray-200'
                 }`}
               >
                 {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-amber-400 text-amber-900 text-sm font-semibold rounded-full">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-amber-400 text-amber-900 text-sm font-semibold rounded-full whitespace-nowrap">
                     Beliebteste Wahl
                   </div>
                 )}
                 
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-6 ${
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 sm:mb-6 ${
                   plan.popular ? 'bg-white/20' : 'bg-indigo-100'
                 }`}>
                   <plan.icon className={`w-6 h-6 ${plan.popular ? 'text-white' : 'text-indigo-600'}`} />
                 </div>
 
-                <h3 className={`text-2xl font-bold mb-2 ${plan.popular ? 'text-white' : 'text-gray-900'}`}>
+                <h3 className={`text-xl sm:text-2xl font-bold mb-2 ${plan.popular ? 'text-white' : 'text-gray-900'}`}>
                   {plan.name}
                 </h3>
-                <p className={`text-sm mb-6 ${plan.popular ? 'text-indigo-200' : 'text-gray-500'}`}>
+                <p className={`text-sm mb-4 sm:mb-6 ${plan.popular ? 'text-indigo-200' : 'text-gray-500'}`}>
                   {plan.description}
                 </p>
 
-                <div className="mb-8">
-                  <span className={`text-5xl font-extrabold ${plan.popular ? 'text-white' : 'text-gray-900'}`}>
+                <div className="mb-6 sm:mb-8">
+                  <span className={`text-4xl sm:text-5xl font-extrabold ${plan.popular ? 'text-white' : 'text-gray-900'}`}>
                     {plan.price.startsWith('Auf') ? '' : '€'}{plan.price}
                   </span>
                   <span className={plan.popular ? 'text-indigo-200' : 'text-gray-500'}>
@@ -141,13 +120,13 @@ export default function PreisePage() {
                   </span>
                 </div>
 
-                <ul className="space-y-4 mb-8">
+                <ul className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
                   {plan.features.map((feature, j) => (
                     <li key={j} className="flex items-center gap-3">
                       <CheckCircle2 className={`w-5 h-5 flex-shrink-0 ${
                         plan.popular ? 'text-indigo-200' : 'text-green-500'
                       }`} />
-                      <span className={plan.popular ? 'text-white' : 'text-gray-700'}>
+                      <span className={`text-sm sm:text-base ${plan.popular ? 'text-white' : 'text-gray-700'}`}>
                         {feature}
                       </span>
                     </li>
@@ -172,12 +151,12 @@ export default function PreisePage() {
       </section>
 
       {/* FAQ */}
-      <section className="py-16 bg-gray-50">
+      <section className="py-12 sm:py-16 bg-gray-50">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-8 sm:mb-12">
             Häufige Fragen
           </h2>
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {[
               {
                 q: 'Kann ich jederzeit kündigen?',
@@ -196,21 +175,16 @@ export default function PreisePage() {
                 a: 'Ja, bei jährlicher Zahlung sparst du 20% gegenüber der monatlichen Abrechnung.'
               }
             ].map((faq, i) => (
-              <div key={i} className="bg-white rounded-xl p-6 border border-gray-100">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{faq.q}</h3>
-                <p className="text-gray-600">{faq.a}</p>
+              <div key={i} className="bg-white rounded-xl p-4 sm:p-6 border border-gray-100">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">{faq.q}</h3>
+                <p className="text-sm sm:text-base text-gray-600">{faq.a}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-gray-400">© 2026 NeuroConcepts AI GmbH. Alle Rechte vorbehalten.</p>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

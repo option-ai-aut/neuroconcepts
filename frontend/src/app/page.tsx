@@ -9,6 +9,8 @@ import {
   MessageSquare, Brain, Rocket, Target, Award, Globe, Image,
   Wand2, Server
 } from 'lucide-react';
+import PublicNavigation from '@/components/PublicNavigation';
+import PublicFooter from '@/components/PublicFooter';
 
 // Intersection Observer Hook for scroll animations
 function useInView(options = {}) {
@@ -158,70 +160,7 @@ export default function LandingPage() {
       `}</style>
 
       {/* Navigation */}
-      <nav className="fixed w-full z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center mr-3 shadow-lg shadow-indigo-500/30">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-bold text-xl tracking-tight">NeuroConcepts</span>
-            </Link>
-            <div className="hidden md:flex items-center space-x-6">
-              {/* Produkt Dropdown */}
-              <div className="relative group">
-                <button className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1">
-                  Produkt
-                  <svg className="w-4 h-4 transition-transform group-hover:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                  <div className="bg-white rounded-xl shadow-xl border border-gray-100 py-2 min-w-[200px]">
-                    <a href="#jarvis" onClick={(e) => handleAnchorClick(e, 'jarvis')} className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Jarvis KI</a>
-                    <a href="#features" onClick={(e) => handleAnchorClick(e, 'features')} className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Features</a>
-                    <a href="#bildbearbeitung" onClick={(e) => handleAnchorClick(e, 'bildbearbeitung')} className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">KI-Bildbearbeitung</a>
-                    <Link href="/integrationen" className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Integrationen</Link>
-                  </div>
-                </div>
-              </div>
-
-              <Link href="/preise" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Preise</Link>
-              
-              {/* Unternehmen Dropdown */}
-              <div className="relative group">
-                <button className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1">
-                  Unternehmen
-                  <svg className="w-4 h-4 transition-transform group-hover:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                  <div className="bg-white rounded-xl shadow-xl border border-gray-100 py-2 min-w-[200px]">
-                    <Link href="/ueber-uns" className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Über uns</Link>
-                    <Link href="/blog" className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Blog</Link>
-                    <Link href="/karriere" className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Karriere</Link>
-                    <Link href="/kontakt" className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Kontakt</Link>
-                  </div>
-                </div>
-              </div>
-
-              <a href="#demo" onClick={(e) => handleAnchorClick(e, 'demo')} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Demo</a>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link href="/login" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
-                Anmelden
-              </Link>
-              <Link 
-                href="/login" 
-                className="bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/30 transition-all hover:-translate-y-0.5"
-              >
-                Kostenlos starten
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <PublicNavigation currentPage="home" />
 
       {/* Hero Section - Full Screen with Video/Image Background */}
       <section ref={heroRef} className="relative min-h-screen flex items-center justify-center overflow-hidden">
@@ -1019,65 +958,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-12 mb-12">
-            {/* Brand */}
-            <div>
-              <div className="flex items-center mb-6">
-                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-xl flex items-center justify-center mr-3">
-                  <Sparkles className="w-5 h-5 text-white" />
-                </div>
-                <span className="font-bold text-xl">NeuroConcepts</span>
-              </div>
-              <p className="text-gray-400 text-sm leading-relaxed">
-                Das KI-gesteuerte Betriebssystem für moderne Immobilienmakler. 
-                Mehr Abschlüsse, weniger Büro.
-              </p>
-            </div>
-
-            {/* Product */}
-            <div>
-              <h4 className="font-semibold mb-4">Produkt</h4>
-              <ul className="space-y-3 text-gray-400 text-sm">
-                <li><a href="#jarvis" onClick={(e) => handleAnchorClick(e, 'jarvis')} className="hover:text-white transition-colors">Jarvis KI</a></li>
-                <li><a href="#features" onClick={(e) => handleAnchorClick(e, 'features')} className="hover:text-white transition-colors">Features</a></li>
-                <li><Link href="/preise" className="hover:text-white transition-colors">Preise</Link></li>
-                <li><Link href="/integrationen" className="hover:text-white transition-colors">Integrationen</Link></li>
-              </ul>
-            </div>
-
-            {/* Company */}
-            <div>
-              <h4 className="font-semibold mb-4">Unternehmen</h4>
-              <ul className="space-y-3 text-gray-400 text-sm">
-                <li><Link href="/ueber-uns" className="hover:text-white transition-colors">Über uns</Link></li>
-                <li><Link href="/blog" className="hover:text-white transition-colors">Blog</Link></li>
-                <li><Link href="/karriere" className="hover:text-white transition-colors">Karriere</Link></li>
-                <li><Link href="/kontakt" className="hover:text-white transition-colors">Kontakt</Link></li>
-              </ul>
-            </div>
-
-            {/* Legal */}
-            <div>
-              <h4 className="font-semibold mb-4">Rechtliches</h4>
-              <ul className="space-y-3 text-gray-400 text-sm">
-                <li><Link href="/datenschutz" className="hover:text-white transition-colors">Datenschutz</Link></li>
-                <li><Link href="/agb" className="hover:text-white transition-colors">AGB</Link></li>
-                <li><Link href="/impressum" className="hover:text-white transition-colors">Impressum</Link></li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-gray-500">© 2026 NeuroConcepts AI GmbH. Alle Rechte vorbehalten.</p>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <span className="flex w-2 h-2 bg-green-500 rounded-full"></span>
-              Alle Systeme operational
-            </div>
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

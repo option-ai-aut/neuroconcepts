@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { Sparkles, Calendar, ArrowRight, Clock } from 'lucide-react';
+import { ArrowRight, Clock } from 'lucide-react';
+import PublicNavigation from '@/components/PublicNavigation';
+import PublicFooter from '@/components/PublicFooter';
 
 export default function BlogPage() {
   const posts = [
@@ -51,52 +53,29 @@ export default function BlogPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="fixed w-full z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center mr-3 shadow-lg shadow-indigo-500/30">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-bold text-xl tracking-tight">NeuroConcepts</span>
-            </Link>
-            <div className="flex items-center space-x-4">
-              <Link href="/login" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
-                Anmelden
-              </Link>
-              <Link 
-                href="/login" 
-                className="bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/30 transition-all hover:-translate-y-0.5"
-              >
-                Kostenlos starten
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <PublicNavigation currentPage="blog" />
 
       {/* Hero */}
-      <section className="pt-32 pb-16 bg-gradient-to-b from-gray-50 to-white">
+      <section className="pt-24 sm:pt-32 pb-12 sm:pb-16 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-5xl md:text-6xl font-extrabold text-gray-900 mb-6">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-4 sm:mb-6">
             Blog
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto px-4">
             Insights, Tipps und News rund um KI, Immobilien und effizientes Arbeiten.
           </p>
         </div>
       </section>
 
       {/* Blog Posts */}
-      <section className="py-16">
+      <section className="py-8 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             {posts.map((post, i) => (
               <article key={i} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all">
                 <div className="aspect-[16/9] bg-gradient-to-br from-indigo-100 to-violet-100" />
-                <div className="p-6">
-                  <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
+                <div className="p-4 sm:p-6">
+                  <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-500 mb-2 sm:mb-3">
                     <span className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md text-xs font-medium">
                       {post.category}
                     </span>
@@ -105,14 +84,14 @@ export default function BlogPage() {
                       {post.readTime}
                     </span>
                   </div>
-                  <h2 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2">
+                  <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-2 line-clamp-2">
                     {post.title}
                   </h2>
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                  <p className="text-gray-600 text-sm mb-3 sm:mb-4 line-clamp-2">
                     {post.excerpt}
                   </p>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-400">{post.date}</span>
+                    <span className="text-xs sm:text-sm text-gray-400">{post.date}</span>
                     <span className="text-indigo-600 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all cursor-pointer">
                       Lesen <ArrowRight className="w-4 h-4" />
                     </span>
@@ -125,19 +104,19 @@ export default function BlogPage() {
       </section>
 
       {/* Newsletter */}
-      <section className="py-16 bg-gray-50">
+      <section className="py-12 sm:py-16 bg-gray-50">
         <div className="max-w-2xl mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">
             Newsletter abonnieren
           </h2>
-          <p className="text-gray-600 mb-8">
+          <p className="text-gray-600 mb-6 sm:mb-8 text-sm sm:text-base">
             Erhalte die neuesten Artikel und Produkt-Updates direkt in dein Postfach.
           </p>
-          <div className="flex gap-4 max-w-md mx-auto">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 max-w-md mx-auto">
             <input 
               type="email" 
               placeholder="deine@email.de"
-              className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
             />
             <button className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors">
               Abonnieren
@@ -146,12 +125,7 @@ export default function BlogPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-gray-400">© 2026 NeuroConcepts AI GmbH. Alle Rechte vorbehalten.</p>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }
