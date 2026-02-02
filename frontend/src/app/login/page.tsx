@@ -104,7 +104,14 @@ export default function LoginPage() {
                     <h3 className="text-2xl font-bold text-gray-900">Anmelden</h3>
                     <p className="text-sm text-gray-500 mt-2">Zugang zu deinem Dashboard</p>
                   </div>
-                )
+                ),
+                SignUp: {
+                  Footer: () => (
+                    <div className="text-center mt-4 text-xs text-gray-500">
+                      Adresse und weitere Details kannst du nach der Registrierung in deinem Profil ergänzen.
+                    </div>
+                  )
+                }
               }}
               formFields={{
                 signIn: {
@@ -146,28 +153,9 @@ export default function LoginPage() {
                     isRequired: true
                   },
                   phone_number: {
-                    label: 'Telefonnummer',
-                    placeholder: '',
+                    label: 'Telefonnummer (mit Vorwahl, z.B. +43...)',
+                    placeholder: '+43',
                     order: 6,
-                    isRequired: false
-                  },
-                  'custom:company_name': {
-                    label: 'Firmenname',
-                    placeholder: '',
-                    order: 7,
-                    isRequired: true
-                  },
-                  address: {
-                    label: 'Straße & Hausnummer',
-                    placeholder: '',
-                    order: 8,
-                    isRequired: false
-                  },
-                  'custom:employee_count': {
-                    label: 'Anzahl Mitarbeiter',
-                    placeholder: '',
-                    order: 9,
-                    type: 'number',
                     isRequired: false
                   }
                 }
