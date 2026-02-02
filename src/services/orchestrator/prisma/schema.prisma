@@ -216,17 +216,24 @@ model Property {
   
   // Basic Info (keep old fields for backward compatibility)
   title       String
-  address     String
+  address     String // Legacy: full address string
   price       Decimal? // Legacy: now salePrice or rentCold
   rooms       Int? // Legacy: now rooms (Float)
   area        Float? // Legacy: now livingArea
   description String? @db.Text
   
-  // New: Extended Basic Info
-  zipCode     String?
-  city        String?
-  country     String @default("Deutschland")
-  district    String?
+  // Detailed Address Fields
+  street        String?
+  houseNumber   String?
+  apartmentNumber String? // Türnummer
+  staircase     String? // Stiege
+  block         String? // Block/Gebäude
+  floor         Int?
+  zipCode       String?
+  city          String?
+  district      String? // Bezirk/Stadtteil
+  state         String? // Bundesland/Provinz
+  country       String @default("Deutschland")
   
   // Type & Marketing
   propertyType PropertyType @default(APARTMENT)
@@ -252,7 +259,6 @@ model Property {
   yearRenovated Int?
   condition     PropertyCondition?
   buildingType  BuildingType?
-  floor         Int?
   totalFloors   Int?
   
   // Energy Certificate (GEG §87)

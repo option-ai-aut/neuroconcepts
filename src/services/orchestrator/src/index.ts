@@ -650,7 +650,17 @@ app.delete('/properties/:id', async (req, res) => {
 // POST /properties - Create new property
 app.post('/properties', authMiddleware, async (req, res) => {
   try {
-    const { title, address, price, rooms, area, description, aiFacts, propertyType, status } = req.body;
+    const { 
+      title, address, description, aiFacts, propertyType, status, marketingType,
+      // Address fields
+      street, houseNumber, apartmentNumber, staircase, block, floor, zipCode, city, district, state, country,
+      // Price fields
+      salePrice, rentCold, rentWarm, additionalCosts, deposit, commission,
+      // Details
+      livingArea, rooms, bedrooms, bathrooms, totalFloors, yearBuilt, condition,
+      // Energy
+      energyCertificateType, energyEfficiencyClass, energyConsumption, primaryEnergySource
+    } = req.body;
     
     // Get tenantId from authenticated user
     const userEmail = req.user!.email;
@@ -667,14 +677,44 @@ app.post('/properties', authMiddleware, async (req, res) => {
       data: {
         tenantId: user.tenantId,
         title,
-        address,
-        price,
-        rooms,
-        area,
+        address: address || `${street || ''} ${houseNumber || ''}, ${zipCode || ''} ${city || ''}`.trim(),
         description,
         aiFacts,
         propertyType,
-        status
+        status,
+        marketingType,
+        // Address
+        street,
+        houseNumber,
+        apartmentNumber,
+        staircase,
+        block,
+        floor,
+        zipCode,
+        city,
+        district,
+        state,
+        country,
+        // Price
+        salePrice,
+        rentCold,
+        rentWarm,
+        additionalCosts,
+        deposit,
+        commission,
+        // Details
+        livingArea,
+        rooms,
+        bedrooms,
+        bathrooms,
+        totalFloors,
+        yearBuilt,
+        condition,
+        // Energy
+        energyCertificateType,
+        energyEfficiencyClass,
+        energyConsumption,
+        primaryEnergySource
       }
     });
 
