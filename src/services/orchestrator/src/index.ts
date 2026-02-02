@@ -31,8 +31,11 @@ app.use(cors());
 app.use(morgan('combined'));
 app.use(express.json());
 
-// Multer setup for file uploads (local storage for dev)
-const uploadDir = path.join(__dirname, '../uploads');
+// Multer setup for file uploads
+// In Lambda, use /tmp (the only writable directory)
+// Locally, use ./uploads relative to project
+const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+const uploadDir = isLambda ? '/tmp/uploads' : path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
