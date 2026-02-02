@@ -27,17 +27,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-white">
-      {/* Back Button - Mobile: Top, Desktop: Absolute */}
-      <div className="lg:absolute lg:top-8 lg:left-8 p-4 lg:p-0 z-30">
-        <Link 
-          href="/" 
-          className="group inline-flex items-center px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-white lg:bg-gray-50 hover:bg-gray-100 rounded-full transition-all shadow-sm lg:shadow-none border border-gray-200 lg:border-transparent"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
-          Zurück
-        </Link>
-      </div>
-
       {/* Left Side - Image/Brand (Hidden on Mobile) */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-gray-900 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 to-blue-600/20 z-10" />
@@ -65,9 +54,22 @@ export default function LoginPage() {
       </div>
 
       {/* Right Side - Login Form */}
-      <div className="flex-1 flex flex-col justify-center py-8 lg:py-12 px-4 sm:px-6 lg:px-12 xl:px-20 relative bg-white">
-        {/* Mobile Logo */}
-        <div className="mb-8 lg:hidden text-center">
+      <div className="flex-1 flex flex-col py-6 lg:py-8 px-4 sm:px-6 lg:px-12 xl:px-20 relative bg-white overflow-y-auto">
+        {/* Back Button - Fixed at top */}
+        <div className="flex-shrink-0 mb-4 lg:mb-6">
+          <Link 
+            href="/" 
+            className="group inline-flex items-center px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-full transition-all"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+            Zurück zur Startseite
+          </Link>
+        </div>
+
+        {/* Centered Content */}
+        <div className="flex-1 flex flex-col justify-center">
+          {/* Mobile Logo */}
+          <div className="mb-6 lg:hidden text-center">
           <div className="flex items-center justify-center">
             <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center shadow-lg">
               <span className="text-white font-bold text-2xl">N</span>
@@ -129,10 +131,15 @@ export default function LoginPage() {
                     </div>
                   ),
                   Footer: () => (
-                    <div className="text-center mt-4 text-xs text-gray-400">
-                      Mit der Registrierung akzeptierst du unsere{' '}
-                      <Link href="/agb" className="text-indigo-600 hover:underline">AGB</Link> und{' '}
-                      <Link href="/datenschutz" className="text-indigo-600 hover:underline">Datenschutzerklärung</Link>.
+                    <div className="text-center mt-4 space-y-2">
+                      <p className="text-xs text-gray-500">
+                        Firmenname, Adresse und weitere Details kannst du nach der Registrierung in deinem Profil ergänzen.
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Mit der Registrierung akzeptierst du unsere{' '}
+                        <Link href="/agb" className="text-indigo-600 hover:underline">AGB</Link> und{' '}
+                        <Link href="/datenschutz" className="text-indigo-600 hover:underline">Datenschutzerklärung</Link>.
+                      </p>
                     </div>
                   )
                 }
@@ -176,40 +183,10 @@ export default function LoginPage() {
                     order: 5,
                     isRequired: true
                   },
-                  'custom:company_name': {
-                    label: 'Firmenname',
-                    placeholder: '',
-                    order: 6,
-                    isRequired: false
-                  },
                   phone_number: {
-                    label: 'Telefon (mit Vorwahl)',
+                    label: 'Telefon (mit Vorwahl, z.B. +43...)',
                     placeholder: '+43',
-                    order: 7,
-                    isRequired: false
-                  },
-                  address: {
-                    label: 'Straße & Hausnummer',
-                    placeholder: '',
-                    order: 8,
-                    isRequired: false
-                  },
-                  'custom:postal_code': {
-                    label: 'PLZ',
-                    placeholder: '',
-                    order: 9,
-                    isRequired: false
-                  },
-                  'custom:city': {
-                    label: 'Ort',
-                    placeholder: '',
-                    order: 10,
-                    isRequired: false
-                  },
-                  'custom:country': {
-                    label: 'Land',
-                    placeholder: '',
-                    order: 11,
+                    order: 6,
                     isRequired: false
                   }
                 }
@@ -223,6 +200,7 @@ export default function LoginPage() {
               )}
             </Authenticator>
           </div>
+        </div>
         </div>
       </div>
     </div>
