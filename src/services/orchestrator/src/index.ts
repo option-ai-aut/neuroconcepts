@@ -2229,6 +2229,100 @@ app.get('/calendar/status', authMiddleware, async (req, res) => {
   }
 });
 
+// --- AI Image Editing (Virtual Staging) ---
+
+// POST /ai/image-edit - Edit image with Gemini 3 Pro Image
+app.post('/ai/image-edit', authMiddleware, async (req, res) => {
+  try {
+    const { image, prompt, style, roomType } = req.body;
+    
+    if (!image || !prompt) {
+      return res.status(400).json({ error: 'image and prompt required' });
+    }
+
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Extract base64 data from data URL if needed
+    let imageData = image;
+    let mimeType = 'image/jpeg';
+    
+    if (image.startsWith('data:')) {
+      const matches = image.match(/^data:([^;]+);base64,(.+)$/);
+      if (matches) {
+        mimeType = matches[1];
+        imageData = matches[2];
+      }
+    }
+
+    // Call Gemini 3 Pro Image API
+    const { GoogleGenerativeAI } = await import('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    
+    // Use gemini-3-pro-image-preview model for image editing
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-3-pro-image-preview',
+      generationConfig: {
+        // @ts-ignore - responseModalities is valid for image models
+        responseModalities: ['TEXT', 'IMAGE']
+      }
+    });
+
+    // Create the prompt for virtual staging
+    const stagingPrompt = `You are an expert interior designer and virtual staging specialist. 
+Edit this image to add furniture and decor in a ${style} style for a ${roomType}.
+
+Instructions:
+${prompt}
+
+Important guidelines:
+- Keep the room structure, walls, floors, windows, and doors exactly as they are
+- Add realistic furniture that fits the space proportionally
+- Use appropriate lighting and shadows for photorealism
+- Make the result look like a professional real estate photo
+- The furniture should match the ${style} aesthetic perfectly
+- Ensure the final image looks natural and inviting`;
+
+    const result = await model.generateContent([
+      stagingPrompt,
+      {
+        inlineData: {
+          mimeType,
+          data: imageData
+        }
+      }
+    ]);
+
+    const response = result.response;
+    
+    // Extract the generated image from the response
+    let generatedImage = null;
+    
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        generatedImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        break;
+      }
+    }
+
+    if (!generatedImage) {
+      return res.status(500).json({ error: 'No image generated' });
+    }
+
+    // Log usage for billing (future)
+    console.log(`🎨 Image edited for user ${currentUser.email}, style: ${style}, room: ${roomType}`);
+
+    res.json({ 
+      image: generatedImage,
+      style,
+      roomType
+    });
+  } catch (error) {
+    console.error('Error editing image:', error);
+    res.status(500).json({ error: 'Image editing failed' });
+  }
+});
+
 // Update Calendar Share Setting
 app.post('/calendar/share-team', authMiddleware, async (req, res) => {
   try {

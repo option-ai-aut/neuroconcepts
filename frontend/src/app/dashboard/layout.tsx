@@ -8,6 +8,8 @@ import { useGlobalState } from '@/context/GlobalStateContext';
 import { Authenticator } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 import { Amplify } from 'aws-amplify';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 // Configure Amplify only if env vars are present
 if (process.env.NEXT_PUBLIC_USER_POOL_ID && process.env.NEXT_PUBLIC_USER_POOL_CLIENT_ID) {
@@ -63,6 +65,37 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    // Check if we're in demo mode
+    const demoMode = localStorage.getItem('demo_mode') === 'true';
+    setIsDemoMode(demoMode);
+    setIsLoading(false);
+    
+    // If not in demo mode and no Cognito config, redirect to login
+    if (!demoMode && !process.env.NEXT_PUBLIC_USER_POOL_ID) {
+      router.push('/login');
+    }
+  }, [router]);
+
+  // Show loading while checking auth
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-white">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  // Demo mode - skip Authenticator
+  if (isDemoMode) {
+    return <DashboardContent>{children}</DashboardContent>;
+  }
+
+  // Normal auth flow
   return (
     <Authenticator>
       {({ signOut, user }) => (

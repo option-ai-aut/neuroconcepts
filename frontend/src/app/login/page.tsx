@@ -2,15 +2,16 @@
 
 import { Authenticator, useAuthenticator } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { syncUser } from '@/lib/api';
 
 export default function LoginPage() {
   const { user, authStatus } = useAuthenticator((context) => [context.user, context.authStatus]);
   const router = useRouter();
+  const [isDevMode] = useState(process.env.NODE_ENV === 'development');
 
   useEffect(() => {
     if (authStatus === 'authenticated') {
@@ -24,6 +25,20 @@ export default function LoginPage() {
       });
     }
   }, [authStatus, router]);
+
+  const handleDemoLogin = () => {
+    // Set a demo flag in localStorage
+    localStorage.setItem('demo_mode', 'true');
+    localStorage.setItem('demo_user', JSON.stringify({
+      id: 'demo-user-123',
+      email: 'demo@neuroconcepts.ai',
+      firstName: 'Demo',
+      lastName: 'User',
+      role: 'ADMIN',
+      tenantId: 'demo-tenant'
+    }));
+    router.push('/dashboard');
+  };
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-white">
@@ -111,6 +126,22 @@ export default function LoginPage() {
                 font-weight: 500;
               }
             `}</style>
+{/* Demo Mode Button for Local Development */}
+            {isDevMode && (
+              <div className="mb-6">
+                <button
+                  onClick={handleDemoLogin}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-orange-500/30 transition-all hover:-translate-y-0.5"
+                >
+                  <Sparkles className="w-5 h-5" />
+                  Demo-Modus starten
+                </button>
+                <p className="text-xs text-gray-400 text-center mt-2">
+                  Nur für lokale Entwicklung - ohne Backend
+                </p>
+              </div>
+            )}
+
             <Authenticator 
               initialState="signIn"
               components={{

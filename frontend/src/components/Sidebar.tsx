@@ -14,7 +14,8 @@ import {
   Inbox,
   Calendar,
   FileText,
-  MessageSquare
+  MessageSquare,
+  Wand2
 } from 'lucide-react';
 
 import { useRouter } from 'next/navigation';
@@ -27,8 +28,19 @@ export default function Sidebar() {
   const [isHovered, setIsHovered] = useState(false);
 
   const handleSignOut = async () => {
-    await signOut();
-    router.push('/login');
+    // Check if in demo mode
+    const isDemoMode = localStorage.getItem('demo_mode') === 'true';
+    
+    if (isDemoMode) {
+      // Clear demo mode
+      localStorage.removeItem('demo_mode');
+      localStorage.removeItem('demo_user');
+      router.push('/login');
+    } else {
+      // Normal Cognito sign out
+      await signOut();
+      router.push('/login');
+    }
   };
 
   const mainNavigation = [
@@ -37,6 +49,7 @@ export default function Sidebar() {
     { name: 'CRM', href: '/dashboard/crm/leads', icon: Users },
     { name: 'Kalender', href: '/dashboard/calendar', icon: Calendar },
     { name: 'Exposés', href: '/dashboard/exposes', icon: FileText },
+    { name: 'Bildstudio', href: '/dashboard/image-studio', icon: Wand2 },
     { name: 'Team Chat', href: '/dashboard/assistant', icon: MessageSquare },
   ];
 
