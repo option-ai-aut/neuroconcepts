@@ -3,7 +3,9 @@ import { fetchAuthSession } from 'aws-amplify/auth';
 
 const getApiUrl = () => {
   const config = getRuntimeConfig();
-  return config.apiUrl || 'https://1rnmc2z8eg.execute-api.eu-central-1.amazonaws.com/dev';
+  const url = config.apiUrl || 'https://lcbsl3olre.execute-api.eu-central-1.amazonaws.com/dev';
+  // Remove trailing slash to prevent double slashes
+  return url.replace(/\/+$/, '');
 };
 
 const getAuthHeaders = async (): Promise<HeadersInit> => {

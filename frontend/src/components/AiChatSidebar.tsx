@@ -6,6 +6,13 @@ import { useGlobalState } from '@/context/GlobalStateContext';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
+// Helper to get API URL without trailing slash
+const getApiUrl = () => {
+  const config = getRuntimeConfig();
+  const url = config.apiUrl || '';
+  return url.replace(/\/+$/, '');
+};
+
 // Get auth headers for API calls
 const getAuthHeaders = async (): Promise<HeadersInit> => {
   try {
@@ -124,8 +131,8 @@ export default function AiChatSidebar() {
 
     const loadHistory = async () => {
       try {
-        const config = getRuntimeConfig();
-        if (!config.apiUrl || config.apiUrl === '' || !userId) {
+        const apiUrl = getApiUrl();
+        if (!apiUrl || !userId) {
           // Retry after a short delay if config not ready
           if (retryCount < maxRetries) {
             retryCount++;
@@ -136,7 +143,7 @@ export default function AiChatSidebar() {
 
         // Load history
         const authHeaders = await getAuthHeaders();
-        const res = await fetch(`${config.apiUrl}/chat/history?userId=${userId}`, {
+        const res = await fetch(`${apiUrl}/chat/history?userId=${userId}`, {
           headers: authHeaders
         });
         if (res.ok) {
@@ -171,9 +178,9 @@ export default function AiChatSidebar() {
     if (!confirm('Neuen Chat starten? Der aktuelle Chat wird archiviert und nach 7 Tagen gelöscht.')) return;
     
     try {
-      const config = getRuntimeConfig();
+      const apiUrl = getApiUrl();
       const authHeaders = await getAuthHeaders();
-      const res = await fetch(`${config.apiUrl}/chat/new`, {
+      const res = await fetch(`${apiUrl}/chat/new`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({ userId })
@@ -198,7 +205,7 @@ export default function AiChatSidebar() {
     setIsLoading(true);
 
     try {
-      const config = getRuntimeConfig();
+      const apiUrl = getApiUrl();
       
       // Check if we have an active expose/template context - use specific endpoint
       const hasExposeContext = activeExposeContext?.exposeId && !activeExposeContext.isTemplate;
@@ -210,8 +217,8 @@ export default function AiChatSidebar() {
         
         // Determine endpoint
         const endpoint = hasTemplateContext 
-          ? `${config.apiUrl}/templates/${activeExposeContext.templateId}/chat`
-          : `${config.apiUrl}/exposes/${activeExposeContext.exposeId}/chat`;
+          ? `${apiUrl}/templates/${activeExposeContext.templateId}/chat`
+          : `${apiUrl}/exposes/${activeExposeContext.exposeId}/chat`;
         
         const authHeaders = await getAuthHeaders();
         const res = await fetch(endpoint, {
@@ -238,7 +245,7 @@ export default function AiChatSidebar() {
       } else {
         // Regular chat endpoint with STREAMING
         const authHeaders = await getAuthHeaders();
-        const res = await fetch(`${config.apiUrl}/chat/stream`, {
+        const res = await fetch(`${apiUrl}/chat/stream`, {
           method: 'POST',
           headers: authHeaders,
           body: JSON.stringify({

@@ -18,6 +18,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "NeuroConcepts AI",
   description: "Real Estate AI Platform",
+  icons: {
+    icon: '/icon.svg',
+  },
 };
 
 export const dynamic = 'force-dynamic';
