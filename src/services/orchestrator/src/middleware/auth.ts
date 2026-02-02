@@ -11,9 +11,12 @@ declare global {
         given_name?: string;
         family_name?: string;
         phone_number?: string;
-        address?: string;
+        address?: string | { formatted?: string };
         'custom:company_name'?: string;
         'custom:employee_count'?: string;
+        'custom:postal_code'?: string;
+        'custom:city'?: string;
+        'custom:country'?: string;
         'cognito:groups'?: string[];
       };
     }

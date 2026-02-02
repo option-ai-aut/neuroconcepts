@@ -1,23 +1,10 @@
 'use client';
 
-import { Authenticator } from '@aws-amplify/ui-react';
-import '@aws-amplify/ui-react/styles.css';
-import { Amplify } from 'aws-amplify';
+import { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { fetchAuthSession, signOut } from 'aws-amplify/auth';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { signOut } from 'aws-amplify/auth';
-
-// Configure Amplify globally
-if (process.env.NEXT_PUBLIC_USER_POOL_ID && process.env.NEXT_PUBLIC_USER_POOL_CLIENT_ID) {
-  Amplify.configure({
-    Auth: {
-      Cognito: {
-        userPoolId: process.env.NEXT_PUBLIC_USER_POOL_ID,
-        userPoolClientId: process.env.NEXT_PUBLIC_USER_POOL_CLIENT_ID,
-      }
-    }
-  });
-}
+import { Loader2 } from 'lucide-react';
 
 function AdminSidebar() {
   const pathname = usePathname();
@@ -67,22 +54,48 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const session = await fetchAuthSession();
+        if (session.tokens) {
+          setIsAuthenticated(true);
+        } else {
+          router.replace('/login');
+        }
+      } catch {
+        router.replace('/login');
+      }
+    };
+    checkAuth();
+  }, [router]);
+
+  // Loading state
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
+          <p className="mt-4 text-gray-600">Wird geladen...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Authenticated - show admin
   return (
-    <Authenticator>
-      {({ signOut, user }) => (
-        user ? (
-          <div className="flex h-screen bg-gray-100">
-            <AdminSidebar />
-            <div className="flex-1 flex flex-col overflow-hidden ml-64">
-              <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50">
-                <div className="container mx-auto px-6 py-8">
-                  {children}
-                </div>
-              </main>
-            </div>
+    <div className="flex h-screen bg-gray-100">
+      <AdminSidebar />
+      <div className="flex-1 flex flex-col overflow-hidden ml-64">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50">
+          <div className="container mx-auto px-6 py-8">
+            {children}
           </div>
-        ) : <></>
-      )}
-    </Authenticator>
+        </main>
+      </div>
+    </div>
   );
 }

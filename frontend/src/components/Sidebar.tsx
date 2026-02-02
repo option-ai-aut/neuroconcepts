@@ -28,19 +28,8 @@ export default function Sidebar() {
   const [isHovered, setIsHovered] = useState(false);
 
   const handleSignOut = async () => {
-    // Check if in demo mode
-    const isDemoMode = localStorage.getItem('demo_mode') === 'true';
-    
-    if (isDemoMode) {
-      // Clear demo mode
-      localStorage.removeItem('demo_mode');
-      localStorage.removeItem('demo_user');
-      router.push('/login');
-    } else {
-      // Normal Cognito sign out
-      await signOut();
-      router.push('/login');
-    }
+    await signOut();
+    router.push('/login');
   };
 
   const mainNavigation = [

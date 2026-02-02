@@ -1,27 +1,14 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { fetchAuthSession } from 'aws-amplify/auth';
 import Sidebar from '@/components/Sidebar';
 import AiChatSidebar from '@/components/AiChatSidebar';
 import GlobalDrawer from '@/components/GlobalDrawer';
 import ExposeEditor from '@/components/ExposeEditor';
 import { useGlobalState } from '@/context/GlobalStateContext';
-import { Authenticator } from '@aws-amplify/ui-react';
-import '@aws-amplify/ui-react/styles.css';
-import { Amplify } from 'aws-amplify';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-
-// Configure Amplify only if env vars are present
-if (process.env.NEXT_PUBLIC_USER_POOL_ID && process.env.NEXT_PUBLIC_USER_POOL_CLIENT_ID) {
-  Amplify.configure({
-    Auth: {
-      Cognito: {
-        userPoolId: process.env.NEXT_PUBLIC_USER_POOL_ID,
-        userPoolClientId: process.env.NEXT_PUBLIC_USER_POOL_CLIENT_ID,
-      }
-    }
-  });
-}
+import { Loader2 } from 'lucide-react';
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { drawerOpen, drawerType, exposeEditorData, closeDrawer } = useGlobalState();
@@ -65,42 +52,37 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [isDemoMode, setIsDemoMode] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Check if we're in demo mode
-    const demoMode = localStorage.getItem('demo_mode') === 'true';
-    setIsDemoMode(demoMode);
-    setIsLoading(false);
-    
-    // If not in demo mode and no Cognito config, redirect to login
-    if (!demoMode && !process.env.NEXT_PUBLIC_USER_POOL_ID) {
-      router.push('/login');
-    }
+    const checkAuth = async () => {
+      try {
+        const session = await fetchAuthSession();
+        if (session.tokens) {
+          setIsAuthenticated(true);
+        } else {
+          router.replace('/login');
+        }
+      } catch {
+        router.replace('/login');
+      }
+    };
+    checkAuth();
   }, [router]);
 
-  // Show loading while checking auth
-  if (isLoading) {
+  // Loading state
+  if (isAuthenticated === null) {
     return (
-      <div className="flex h-screen items-center justify-center bg-white">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
+          <p className="mt-4 text-gray-600">Wird geladen...</p>
+        </div>
       </div>
     );
   }
 
-  // Demo mode - skip Authenticator
-  if (isDemoMode) {
-    return <DashboardContent>{children}</DashboardContent>;
-  }
-
-  // Normal auth flow
-  return (
-    <Authenticator>
-      {({ signOut, user }) => (
-        user ? <DashboardContent>{children}</DashboardContent> : <></>
-      )}
-    </Authenticator>
-  );
+  // Authenticated - show dashboard
+  return <DashboardContent>{children}</DashboardContent>;
 }

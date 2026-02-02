@@ -16,7 +16,8 @@ import {
   Check
 } from 'lucide-react';
 import useSWR from 'swr';
-import { getProperties } from '@/lib/api';
+import { getProperties, fetcher } from '@/lib/api';
+import { getRuntimeConfig } from '@/components/EnvProvider';
 
 interface Property {
   id: string;
@@ -101,18 +102,24 @@ export default function ImageStudioPage() {
     setError(null);
     
     try {
-      const token = localStorage.getItem('token');
+      const { fetchAuthSession } = await import('aws-amplify/auth');
+      const session = await fetchAuthSession();
+      const token = session.tokens?.idToken?.toString();
+      
       const prompt = customPrompt || 
         `Füge ${selectedStyle.name.toLowerCase()} Möbel in dieses ${selectedRoom.name.toLowerCase()} ein. ` +
         `Der Stil soll ${selectedStyle.description.toLowerCase()} sein. ` +
         `Behalte die Raumstruktur bei und füge passende Möbel, Dekoration und Beleuchtung hinzu. ` +
         `Das Ergebnis soll fotorealistisch und einladend aussehen.`;
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ai/image-edit`, {
+      const config = getRuntimeConfig();
+      const apiUrl = config.apiUrl || 'http://localhost:3001';
+      
+      const response = await fetch(`${apiUrl}/ai/image-edit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
           image: selectedImage,
@@ -123,6 +130,8 @@ export default function ImageStudioPage() {
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error:', response.status, errorText);
         throw new Error('Bildbearbeitung fehlgeschlagen');
       }
 
@@ -151,7 +160,10 @@ export default function ImageStudioPage() {
     if (!resultImage || !selectedProperty) return;
     
     try {
-      const token = localStorage.getItem('token');
+      const { fetchAuthSession } = await import('aws-amplify/auth');
+      const session = await fetchAuthSession();
+      const token = session.tokens?.idToken?.toString();
+      
       // Convert base64 to blob
       const response = await fetch(resultImage);
       const blob = await response.blob();
@@ -159,10 +171,13 @@ export default function ImageStudioPage() {
       const formData = new FormData();
       formData.append('images', blob, `staged-${selectedRoom.id}-${Date.now()}.png`);
       
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/properties/${selectedProperty.id}/images`, {
+      const config = getRuntimeConfig();
+      const apiUrl = config.apiUrl || 'http://localhost:3001';
+      
+      await fetch(`${apiUrl}/properties/${selectedProperty.id}/images`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: formData
       });

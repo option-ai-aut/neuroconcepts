@@ -18,7 +18,9 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 
-dotenv.config();
+// Load .env.local first (for local dev), then .env as fallback
+dotenv.config({ path: '.env.local' });
+dotenv.config(); // This won't override existing values from .env.local
 
 const app = express();
 const prisma = new PrismaClient();
@@ -67,10 +69,19 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
   try {
     const { sub, email, given_name, family_name, address, phone_number } = req.user!;
     const companyName = req.user!['custom:company_name'];
-    // const employeeCount = req.user!['custom:employee_count']; // Not stored in DB yet, maybe later
+    const postalCode = req.user!['custom:postal_code'];
+    const city = req.user!['custom:city'];
+    const country = req.user!['custom:country'];
     
-    // Note: PLZ, City, Country are not in Cognito custom attributes
-    // They can be added later via the profile page
+    // Handle address - Cognito may return it as object { formatted: "..." } or string
+    let streetAddress: string | undefined;
+    if (address) {
+      if (typeof address === 'object' && address.formatted) {
+        streetAddress = address.formatted;
+      } else if (typeof address === 'string') {
+        streetAddress = address;
+      }
+    }
 
     // 1. Find or Create Tenant
     // Strategy: If user has a tenantId in DB, use it. If not, create new Tenant (assuming first user is Admin/Owner)
@@ -88,7 +99,6 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
       const newTenant = await prisma.tenant.create({
         data: {
           name: companyName || 'My Company',
-          // address: ... (from token if available)
         }
       });
       tenantId = newTenant.id;
@@ -100,7 +110,10 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
           firstName: given_name,
           lastName: family_name,
           phone: phone_number,
-          street: address,
+          street: streetAddress,
+          postalCode,
+          city,
+          country,
           tenantId: newTenant.id,
           role: 'ADMIN' // First user is Admin
         }
@@ -111,14 +124,17 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
         data: { tenantId: newTenant.id }
       });
     } else {
-      // Update existing user
+      // Update existing user with new data from Cognito (only if values are provided)
       user = await prisma.user.update({
         where: { email },
         data: {
-          firstName: given_name,
-          lastName: family_name,
-          phone: phone_number,
-          street: address,
+          firstName: given_name || user.firstName,
+          lastName: family_name || user.lastName,
+          phone: phone_number || user.phone,
+          street: streetAddress || user.street,
+          postalCode: postalCode || user.postalCode,
+          city: city || user.city,
+          country: country || user.country,
           // Don't update tenantId or role here
         }
       });

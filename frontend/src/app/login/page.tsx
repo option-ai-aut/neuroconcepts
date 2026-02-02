@@ -1,48 +1,201 @@
 'use client';
 
-import { Authenticator, useAuthenticator } from '@aws-amplify/ui-react';
-import '@aws-amplify/ui-react/styles.css';
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
+import { signIn, signUp, confirmSignUp, resetPassword, confirmResetPassword, fetchAuthSession } from 'aws-amplify/auth';
+import { Amplify } from 'aws-amplify';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Sparkles } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { syncUser } from '@/lib/api';
+import { useRuntimeConfig } from '@/components/RuntimeConfigProvider';
+
+// Countries with dial codes
+const COUNTRIES = [
+  { code: 'AT', name: 'Österreich', dialCode: '+43' },
+  { code: 'DE', name: 'Deutschland', dialCode: '+49' },
+  { code: 'CH', name: 'Schweiz', dialCode: '+41' },
+  { code: 'LI', name: 'Liechtenstein', dialCode: '+423' },
+];
+
+type AuthView = 'signIn' | 'signUp' | 'confirmSignUp' | 'forgotPassword' | 'confirmReset';
 
 export default function LoginPage() {
-  const { user, authStatus } = useAuthenticator((context) => [context.user, context.authStatus]);
   const router = useRouter();
-  const [isDevMode] = useState(process.env.NODE_ENV === 'development');
-
+  const config = useRuntimeConfig();
+  
+  // Configure Amplify
   useEffect(() => {
-    if (authStatus === 'authenticated') {
-      // Sync user with backend
-      syncUser().then(() => {
-        router.push('/dashboard');
-      }).catch(err => {
-        console.error('Sync failed', err);
-        // Still redirect to dashboard, maybe show error there?
-        router.push('/dashboard');
+    if (config.userPoolId && config.userPoolClientId) {
+      Amplify.configure({
+        Auth: {
+          Cognito: {
+            userPoolId: config.userPoolId,
+            userPoolClientId: config.userPoolClientId,
+          }
+        }
       });
     }
-  }, [authStatus, router]);
+  }, [config]);
 
-  const handleDemoLogin = () => {
-    // Set a demo flag in localStorage
-    localStorage.setItem('demo_mode', 'true');
-    localStorage.setItem('demo_user', JSON.stringify({
-      id: 'demo-user-123',
-      email: 'demo@neuroconcepts.ai',
-      firstName: 'Demo',
-      lastName: 'User',
-      role: 'ADMIN',
-      tenantId: 'demo-tenant'
-    }));
-    router.push('/dashboard');
+  const [view, setView] = useState<AuthView>('signIn');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  
+  // Form fields
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [dialCode, setDialCode] = useState('+43');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [address, setAddress] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [city, setCity] = useState('');
+  const [country, setCountry] = useState('Österreich');
+  const [confirmationCode, setConfirmationCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+
+  // Check if already authenticated
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const session = await fetchAuthSession();
+        if (session.tokens) {
+          router.push('/dashboard');
+        }
+      } catch {
+        // Not authenticated
+      }
+    };
+    checkAuth();
+  }, [router]);
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+    
+    try {
+      await signIn({ username: email, password });
+      await syncUser();
+      router.push('/dashboard');
+    } catch (err: any) {
+      if (err.name === 'UserNotConfirmedException') {
+        setView('confirmSignUp');
+        setError('Bitte bestätige zuerst deine E-Mail-Adresse.');
+      } else {
+        setError(err.message || 'Anmeldung fehlgeschlagen');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    if (password !== confirmPassword) {
+      setError('Passwörter stimmen nicht überein');
+      return;
+    }
+    
+    if (password.length < 8) {
+      setError('Passwort muss mindestens 8 Zeichen lang sein');
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      const fullPhone = phoneNumber ? `${dialCode}${phoneNumber.replace(/^0+/, '')}` : undefined;
+      
+      await signUp({
+        username: email,
+        password,
+        options: {
+          userAttributes: {
+            email,
+            given_name: firstName,
+            family_name: lastName,
+            'custom:company_name': companyName || undefined,
+            phone_number: fullPhone,
+            address: address || undefined,
+            'custom:postal_code': postalCode || undefined,
+            'custom:city': city || undefined,
+            'custom:country': country || undefined,
+          }
+        }
+      });
+      
+      setView('confirmSignUp');
+    } catch (err: any) {
+      setError(err.message || 'Registrierung fehlgeschlagen');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleConfirmSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+    
+    try {
+      await confirmSignUp({ username: email, confirmationCode });
+      // Auto sign in after confirmation
+      await signIn({ username: email, password });
+      await syncUser();
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Bestätigung fehlgeschlagen');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+    
+    try {
+      await resetPassword({ username: email });
+      setView('confirmReset');
+    } catch (err: any) {
+      setError(err.message || 'Fehler beim Zurücksetzen');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleConfirmReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+    
+    try {
+      await confirmResetPassword({ username: email, confirmationCode, newPassword });
+      setView('signIn');
+      setPassword('');
+      setError('');
+    } catch (err: any) {
+      setError(err.message || 'Fehler beim Zurücksetzen');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const inputClass = "w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all";
+  const labelClass = "block text-sm font-medium text-gray-700 mb-1.5";
+  const buttonClass = "w-full py-3 px-4 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed";
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-white">
-      {/* Left Side - Image/Brand (Hidden on Mobile) */}
+      {/* Left Side - Image/Brand */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-gray-900 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 to-blue-600/20 z-10" />
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-40" />
@@ -56,10 +209,9 @@ export default function LoginPage() {
           </div>
           
           <div className="max-w-md">
-            <h2 className="text-4xl font-bold mb-6">Willkommen zurück.</h2>
-            <p className="text-lg text-gray-300 leading-relaxed">
-              Dein intelligenter Assistent für Immobilienvertrieb. Automatisiere Kommunikation, Termine und Exposés, damit du dich auf das Wesentliche konzentrieren kannst.
-            </p>
+            <h2 className="text-4xl font-bold">
+              {view === 'signUp' || view === 'confirmSignUp' ? 'Willkommen.' : 'Willkommen zurück.'}
+            </h2>
           </div>
           
           <div className="text-sm text-gray-400">
@@ -68,9 +220,8 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Right Side - Login Form */}
-      <div className="flex-1 flex flex-col py-6 lg:py-8 px-4 sm:px-6 lg:px-12 xl:px-20 relative bg-white overflow-y-auto">
-        {/* Back Button - Fixed at top */}
+      {/* Right Side - Form */}
+      <div className="flex-1 flex flex-col py-6 lg:py-8 px-4 sm:px-6 lg:px-12 xl:px-20 bg-white overflow-y-auto">
         <div className="flex-shrink-0 mb-4 lg:mb-6">
           <Link 
             href="/" 
@@ -81,184 +232,403 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        {/* Centered Content */}
-        <div className="flex-1 flex flex-col justify-center">
+        <div className="flex-1 flex flex-col pt-4 lg:pt-8">
           {/* Mobile Logo */}
           <div className="mb-6 lg:hidden text-center">
-          <div className="flex items-center justify-center">
-            <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-2xl">N</span>
-            </div>
-          </div>
-          <h2 className="mt-4 text-2xl font-extrabold text-gray-900">
-            NeuroConcepts
-          </h2>
-        </div>
-
-        <div className="mx-auto w-full max-w-md">
-          <div className="bg-white">
-            <style jsx global>{`
-              [data-amplify-authenticator] {
-                --amplify-colors-background-primary: white;
-                --amplify-components-authenticator-router-box-shadow: none;
-                --amplify-components-authenticator-router-border-width: 0;
-                --amplify-components-button-primary-background-color: #4f46e5;
-                --amplify-components-button-primary-hover-background-color: #4338ca;
-                --amplify-components-tabs-item-active-border-color: #4f46e5;
-                --amplify-components-tabs-item-color: #6b7280;
-                --amplify-components-tabs-item-active-color: #4f46e5;
-                --amplify-components-fieldcontrol-border-color: #e5e7eb;
-                --amplify-components-fieldcontrol-focus-border-color: #4f46e5;
-                --amplify-radii-small: 8px;
-                --amplify-radii-medium: 12px;
-              }
-              [data-amplify-authenticator] [data-amplify-router] {
-                border: none;
-                box-shadow: none;
-              }
-              .amplify-input {
-                border-radius: 8px !important;
-              }
-              .amplify-button--primary {
-                border-radius: 8px !important;
-              }
-              .amplify-tabs__item {
-                font-weight: 500;
-              }
-            `}</style>
-{/* Demo Mode Button for Local Development */}
-            {isDevMode && (
-              <div className="mb-6">
-                <button
-                  onClick={handleDemoLogin}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-orange-500/30 transition-all hover:-translate-y-0.5"
-                >
-                  <Sparkles className="w-5 h-5" />
-                  Demo-Modus starten
-                </button>
-                <p className="text-xs text-gray-400 text-center mt-2">
-                  Nur für lokale Entwicklung - ohne Backend
-                </p>
+            <div className="flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center shadow-lg">
+                <span className="text-white font-bold text-2xl">N</span>
               </div>
+            </div>
+            <h2 className="mt-4 text-2xl font-extrabold text-gray-900">NeuroConcepts</h2>
+          </div>
+
+          <div className="mx-auto w-full max-w-md">
+            {/* Sign In Form */}
+            {view === 'signIn' && (
+              <form onSubmit={handleSignIn} className="space-y-5">
+                <div className="text-center mb-8">
+                  <h3 className="text-2xl font-bold text-gray-900">Anmelden</h3>
+                  <p className="text-sm text-gray-500 mt-2">Zugang zu deinem Dashboard</p>
+                </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                    {error}
+                  </div>
+                )}
+
+                <div>
+                  <label className={labelClass}>E-Mail</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={inputClass}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Passwort</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className={inputClass}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setView('forgotPassword')}
+                    className="text-sm text-indigo-600 hover:text-indigo-700"
+                  >
+                    Passwort vergessen?
+                  </button>
+                </div>
+
+                <button type="submit" disabled={isLoading} className={buttonClass}>
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Anmelden'}
+                </button>
+
+                <p className="text-center text-sm text-gray-500">
+                  Noch kein Konto?{' '}
+                  <button
+                    type="button"
+                    onClick={() => { setView('signUp'); setError(''); }}
+                    className="text-indigo-600 hover:text-indigo-700 font-medium"
+                  >
+                    Jetzt registrieren
+                  </button>
+                </p>
+              </form>
             )}
 
-            <Authenticator 
-              initialState="signIn"
-              components={{
-                Header: () => null,
-                SignIn: {
-                  Header: () => (
-                    <div className="text-center mb-6">
-                      <h3 className="text-2xl font-bold text-gray-900">Anmelden</h3>
-                      <p className="text-sm text-gray-500 mt-2">Zugang zu deinem Dashboard</p>
-                    </div>
-                  )
-                },
-                SignUp: {
-                  Header: () => (
-                    <div className="text-center mb-6">
-                      <h3 className="text-2xl font-bold text-gray-900">Konto erstellen</h3>
-                      <p className="text-sm text-gray-500 mt-2">Starte deine 14-tägige Testphase</p>
-                    </div>
-                  ),
-                  Footer: () => (
-                    <div className="text-center mt-4">
-                      <p className="text-xs text-gray-400">
-                        Mit der Registrierung akzeptierst du unsere{' '}
-                        <Link href="/agb" className="text-indigo-600 hover:underline">AGB</Link> und{' '}
-                        <Link href="/datenschutz" className="text-indigo-600 hover:underline">Datenschutzerklärung</Link>.
-                      </p>
-                    </div>
-                  )
-                }
-              }}
-              formFields={{
-                signIn: {
-                  username: {
-                    placeholder: '',
-                    label: 'E-Mail'
-                  },
-                  password: {
-                    placeholder: '',
-                    label: 'Passwort'
-                  }
-                },
-                signUp: {
-                  username: {
-                    order: 1,
-                    label: 'E-Mail',
-                    placeholder: ''
-                  },
-                  password: {
-                    label: 'Passwort',
-                    placeholder: '',
-                    order: 2
-                  },
-                  confirm_password: {
-                    label: 'Passwort bestätigen',
-                    placeholder: '',
-                    order: 3
-                  },
-                  given_name: {
-                    label: 'Vorname',
-                    placeholder: '',
-                    order: 4,
-                    isRequired: true
-                  },
-                  family_name: {
-                    label: 'Nachname',
-                    placeholder: '',
-                    order: 5,
-                    isRequired: true
-                  },
-                  'custom:company_name': {
-                    label: 'Firmenname',
-                    placeholder: '',
-                    order: 6,
-                    isRequired: false
-                  },
-                  phone_number: {
-                    label: 'Telefon (mit Vorwahl)',
-                    placeholder: '+43',
-                    order: 7,
-                    isRequired: false
-                  },
-                  address: {
-                    label: 'Straße & Hausnummer',
-                    placeholder: '',
-                    order: 8,
-                    isRequired: false
-                  },
-                  'custom:postal_code': {
-                    label: 'PLZ',
-                    placeholder: '',
-                    order: 9,
-                    isRequired: false
-                  },
-                  'custom:city': {
-                    label: 'Ort',
-                    placeholder: '',
-                    order: 10,
-                    isRequired: false
-                  },
-                  'custom:country': {
-                    label: 'Land',
-                    placeholder: 'Österreich',
-                    order: 11,
-                    isRequired: false
-                  }
-                }
-              }}
-            >
-              {({ signOut, user }) => (
-                <div className="text-center">
-                  <p>Erfolgreich angemeldet!</p>
-                  <button onClick={signOut}>Abmelden</button>
+            {/* Sign Up Form */}
+            {view === 'signUp' && (
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <div className="text-center mb-6">
+                  <h3 className="text-2xl font-bold text-gray-900">Konto erstellen</h3>
+                  <p className="text-sm text-gray-500 mt-2">Starte deine 14-tägige Testphase</p>
                 </div>
-              )}
-            </Authenticator>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                    {error}
+                  </div>
+                )}
+
+                <div>
+                  <label className={labelClass}>E-Mail *</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={inputClass}
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Passwort *</label>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className={inputClass}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Bestätigen *</label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className={inputClass}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Vorname *</label>
+                    <input
+                      type="text"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      className={inputClass}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Nachname *</label>
+                    <input
+                      type="text"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      className={inputClass}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Firmenname</label>
+                  <input
+                    type="text"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Telefon</label>
+                  <div className="flex">
+                    <select
+                      value={dialCode}
+                      onChange={(e) => setDialCode(e.target.value)}
+                      className="w-24 px-3 py-3 border border-gray-300 border-r-0 rounded-l-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    >
+                      {COUNTRIES.map((c) => (
+                        <option key={c.code} value={c.dialCode}>
+                          {c.dialCode}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="tel"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value.replace(/[^\d]/g, ''))}
+                      placeholder="6701234567"
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-r-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Straße & Hausnummer</label>
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className={labelClass}>PLZ</label>
+                    <input
+                      type="text"
+                      value={postalCode}
+                      onChange={(e) => setPostalCode(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className={labelClass}>Ort</label>
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Land</label>
+                  <select
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                    className={inputClass}
+                  >
+                    {COUNTRIES.map((c) => (
+                      <option key={c.code} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button type="submit" disabled={isLoading} className={buttonClass}>
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Konto erstellen'}
+                </button>
+
+                <p className="text-center text-xs text-gray-400">
+                  Mit der Registrierung akzeptierst du unsere{' '}
+                  <Link href="/agb" className="text-indigo-600 hover:underline">AGB</Link> und{' '}
+                  <Link href="/datenschutz" className="text-indigo-600 hover:underline">Datenschutzerklärung</Link>.
+                </p>
+
+                <p className="text-center text-sm text-gray-500">
+                  Bereits ein Konto?{' '}
+                  <button
+                    type="button"
+                    onClick={() => { setView('signIn'); setError(''); }}
+                    className="text-indigo-600 hover:text-indigo-700 font-medium"
+                  >
+                    Anmelden
+                  </button>
+                </p>
+              </form>
+            )}
+
+            {/* Confirm Sign Up */}
+            {view === 'confirmSignUp' && (
+              <form onSubmit={handleConfirmSignUp} className="space-y-5">
+                <div className="text-center mb-8">
+                  <h3 className="text-2xl font-bold text-gray-900">E-Mail bestätigen</h3>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Wir haben einen Code an <strong>{email}</strong> gesendet
+                  </p>
+                </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                    {error}
+                  </div>
+                )}
+
+                <div>
+                  <label className={labelClass}>Bestätigungscode</label>
+                  <input
+                    type="text"
+                    value={confirmationCode}
+                    onChange={(e) => setConfirmationCode(e.target.value)}
+                    placeholder="123456"
+                    className={`${inputClass} text-center text-2xl tracking-widest`}
+                    required
+                  />
+                </div>
+
+                <button type="submit" disabled={isLoading} className={buttonClass}>
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Bestätigen'}
+                </button>
+
+                <p className="text-center text-sm text-gray-500">
+                  <button
+                    type="button"
+                    onClick={() => setView('signIn')}
+                    className="text-indigo-600 hover:text-indigo-700 font-medium"
+                  >
+                    Zurück zur Anmeldung
+                  </button>
+                </p>
+              </form>
+            )}
+
+            {/* Forgot Password */}
+            {view === 'forgotPassword' && (
+              <form onSubmit={handleForgotPassword} className="space-y-5">
+                <div className="text-center mb-8">
+                  <h3 className="text-2xl font-bold text-gray-900">Passwort zurücksetzen</h3>
+                  <p className="text-sm text-gray-500 mt-2">Gib deine E-Mail-Adresse ein</p>
+                </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                    {error}
+                  </div>
+                )}
+
+                <div>
+                  <label className={labelClass}>E-Mail</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={inputClass}
+                    required
+                  />
+                </div>
+
+                <button type="submit" disabled={isLoading} className={buttonClass}>
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Code senden'}
+                </button>
+
+                <p className="text-center text-sm text-gray-500">
+                  <button
+                    type="button"
+                    onClick={() => setView('signIn')}
+                    className="text-indigo-600 hover:text-indigo-700 font-medium"
+                  >
+                    Zurück zur Anmeldung
+                  </button>
+                </p>
+              </form>
+            )}
+
+            {/* Confirm Reset Password */}
+            {view === 'confirmReset' && (
+              <form onSubmit={handleConfirmReset} className="space-y-5">
+                <div className="text-center mb-8">
+                  <h3 className="text-2xl font-bold text-gray-900">Neues Passwort</h3>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Gib den Code und dein neues Passwort ein
+                  </p>
+                </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                    {error}
+                  </div>
+                )}
+
+                <div>
+                  <label className={labelClass}>Bestätigungscode</label>
+                  <input
+                    type="text"
+                    value={confirmationCode}
+                    onChange={(e) => setConfirmationCode(e.target.value)}
+                    className={inputClass}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Neues Passwort</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className={inputClass}
+                    required
+                  />
+                </div>
+
+                <button type="submit" disabled={isLoading} className={buttonClass}>
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Passwort ändern'}
+                </button>
+
+                <p className="text-center text-sm text-gray-500">
+                  <button
+                    type="button"
+                    onClick={() => setView('signIn')}
+                    className="text-indigo-600 hover:text-indigo-700 font-medium"
+                  >
+                    Zurück zur Anmeldung
+                  </button>
+                </p>
+              </form>
+            )}
           </div>
-        </div>
         </div>
       </div>
     </div>
