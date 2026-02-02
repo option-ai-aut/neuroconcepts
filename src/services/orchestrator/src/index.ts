@@ -648,20 +648,33 @@ app.delete('/properties/:id', async (req, res) => {
 });
 
 // POST /properties - Create new property
-app.post('/properties', async (req, res) => {
+app.post('/properties', authMiddleware, async (req, res) => {
   try {
-    const { title, address, price, rooms, area, description, aiFacts, tenantId } = req.body;
+    const { title, address, price, rooms, area, description, aiFacts, propertyType, status } = req.body;
+    
+    // Get tenantId from authenticated user
+    const userEmail = req.user!.email;
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     
     const property = await prisma.property.create({
       data: {
-        tenantId,
+        tenantId: user.tenantId,
         title,
         address,
         price,
         rooms,
         area,
         description,
-        aiFacts
+        aiFacts,
+        propertyType,
+        status
       }
     });
 
@@ -672,9 +685,22 @@ app.post('/properties', async (req, res) => {
   }
 });
 
-app.post('/leads', async (req, res) => {
+app.post('/leads', authMiddleware, async (req, res) => {
   try {
-    const { email, firstName, lastName, propertyId, tenantId, message, salutation, formalAddress, phone, source, notes } = req.body;
+    const { email, firstName, lastName, propertyId, message, salutation, formalAddress, phone, source, notes } = req.body;
+    
+    // Get tenantId from authenticated user
+    const userEmail = req.user!.email;
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const tenantId = user.tenantId;
     
     // 1. Save Lead
     const lead = await prisma.lead.create({
@@ -736,7 +762,7 @@ app.post('/leads', async (req, res) => {
       console.log('Draft message created for lead:', lead.id);
     }
 
-    res.status(201).json({ message: 'Lead processed', leadId: lead.id });
+    res.status(201).json({ id: lead.id, message: 'Lead processed' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -2245,6 +2271,282 @@ app.get('/calendar/status', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error getting calendar status:', error);
     res.status(500).json({ error: 'Failed to get calendar status' });
+  }
+});
+
+// --- Email Integration (Gmail & Outlook) ---
+
+import { EmailService } from './services/EmailService';
+
+// Gmail: Get Auth URL
+app.get('/email/gmail/auth-url', authMiddleware, async (req, res) => {
+  try {
+    const authUrl = EmailService.getGmailAuthUrl();
+    res.json({ authUrl });
+  } catch (error) {
+    console.error('Error getting Gmail auth URL:', error);
+    res.status(500).json({ error: 'Failed to get auth URL' });
+  }
+});
+
+// Gmail: OAuth Callback
+app.get('/email/gmail/callback', async (req, res) => {
+  try {
+    const { code } = req.query;
+    if (!code) {
+      return res.redirect('/dashboard/settings/integrations?provider=gmail&error=true');
+    }
+
+    const tokens = await EmailService.exchangeGmailCode(code as string);
+    
+    // Redirect with tokens in URL (frontend will save them)
+    const params = new URLSearchParams({
+      provider: 'gmail',
+      success: 'true',
+      email: tokens.email,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiryDate: tokens.expiryDate.toString()
+    });
+    
+    res.redirect(`/dashboard/settings/integrations?${params.toString()}`);
+  } catch (error) {
+    console.error('Error in Gmail OAuth callback:', error);
+    res.redirect('/dashboard/settings/integrations?provider=gmail&error=true');
+  }
+});
+
+// Gmail: Save Configuration
+app.post('/email/gmail/connect', authMiddleware, async (req, res) => {
+  try {
+    const { accessToken, refreshToken, expiryDate, email } = req.body;
+    const userEmail = req.user!.email;
+
+    // Get user's tenantId from database
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Encrypt tokens before storing
+    const encryptedConfig = {
+      accessToken: encryptionService.encrypt(accessToken),
+      refreshToken: encryptionService.encrypt(refreshToken),
+      expiryDate,
+      email
+    };
+
+    await prisma.tenantSettings.upsert({
+      where: { tenantId: user.tenantId },
+      update: {
+        gmailConfig: encryptedConfig as any
+      },
+      create: {
+        tenantId: user.tenantId,
+        gmailConfig: encryptedConfig as any
+      }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error connecting Gmail:', error);
+    res.status(500).json({ error: 'Failed to connect Gmail' });
+  }
+});
+
+// Gmail: Disconnect
+app.post('/email/gmail/disconnect', authMiddleware, async (req, res) => {
+  try {
+    const userEmail = req.user!.email;
+
+    // Get user's tenantId from database
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await prisma.tenantSettings.update({
+      where: { tenantId: user.tenantId },
+      data: {
+        gmailConfig: Prisma.DbNull
+      }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error disconnecting Gmail:', error);
+    res.status(500).json({ error: 'Failed to disconnect Gmail' });
+  }
+});
+
+// Outlook Mail: Get Auth URL
+app.get('/email/outlook/auth-url', authMiddleware, async (req, res) => {
+  try {
+    const authUrl = await EmailService.getOutlookMailAuthUrl();
+    res.json({ authUrl });
+  } catch (error) {
+    console.error('Error getting Outlook Mail auth URL:', error);
+    res.status(500).json({ error: 'Failed to get auth URL' });
+  }
+});
+
+// Outlook Mail: OAuth Callback
+app.get('/email/outlook/callback', async (req, res) => {
+  try {
+    const { code } = req.query;
+    if (!code) {
+      return res.redirect('/dashboard/settings/integrations?provider=outlook-mail&error=true');
+    }
+
+    const tokens = await EmailService.exchangeOutlookMailCode(code as string);
+    
+    // Redirect with tokens in URL (frontend will save them)
+    const params = new URLSearchParams({
+      provider: 'outlook-mail',
+      success: 'true',
+      email: tokens.email,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiryDate: tokens.expiryDate.toString()
+    });
+    
+    res.redirect(`/dashboard/settings/integrations?${params.toString()}`);
+  } catch (error) {
+    console.error('Error in Outlook Mail OAuth callback:', error);
+    res.redirect('/dashboard/settings/integrations?provider=outlook-mail&error=true');
+  }
+});
+
+// Outlook Mail: Save Configuration
+app.post('/email/outlook/connect', authMiddleware, async (req, res) => {
+  try {
+    const { accessToken, refreshToken, expiryDate, email } = req.body;
+    const userEmail = req.user!.email;
+
+    // Get user's tenantId from database
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Encrypt tokens before storing
+    const encryptedConfig = {
+      accessToken: encryptionService.encrypt(accessToken),
+      refreshToken: encryptionService.encrypt(refreshToken),
+      expiryDate,
+      email
+    };
+
+    await prisma.tenantSettings.upsert({
+      where: { tenantId: user.tenantId },
+      update: {
+        outlookMailConfig: encryptedConfig as any
+      },
+      create: {
+        tenantId: user.tenantId,
+        outlookMailConfig: encryptedConfig as any
+      }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error connecting Outlook Mail:', error);
+    res.status(500).json({ error: 'Failed to connect Outlook Mail' });
+  }
+});
+
+// Outlook Mail: Disconnect
+app.post('/email/outlook/disconnect', authMiddleware, async (req, res) => {
+  try {
+    const userEmail = req.user!.email;
+
+    // Get user's tenantId from database
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await prisma.tenantSettings.update({
+      where: { tenantId: user.tenantId },
+      data: {
+        outlookMailConfig: Prisma.DbNull
+      }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error disconnecting Outlook Mail:', error);
+    res.status(500).json({ error: 'Failed to disconnect Outlook Mail' });
+  }
+});
+
+// Get Email Status
+app.get('/email/status', authMiddleware, async (req, res) => {
+  try {
+    const userEmail = req.user!.email;
+
+    // Get user's tenantId from database
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const settings = await prisma.tenantSettings.findUnique({
+      where: { tenantId: user.tenantId },
+      select: {
+        gmailConfig: true,
+        outlookMailConfig: true
+      }
+    });
+
+    const gmailConnected = !!settings?.gmailConfig;
+    const outlookConnected = !!settings?.outlookMailConfig;
+
+    let gmailEmail = null;
+    let outlookEmail = null;
+
+    if (gmailConnected && settings.gmailConfig) {
+      const config = settings.gmailConfig as any;
+      gmailEmail = config.email;
+    }
+    if (outlookConnected && settings.outlookMailConfig) {
+      const config = settings.outlookMailConfig as any;
+      outlookEmail = config.email;
+    }
+
+    res.json({
+      gmail: {
+        connected: gmailConnected,
+        email: gmailEmail
+      },
+      outlook: {
+        connected: outlookConnected,
+        email: outlookEmail
+      }
+    });
+  } catch (error) {
+    console.error('Error getting email status:', error);
+    res.status(500).json({ error: 'Failed to get email status' });
   }
 });
 

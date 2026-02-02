@@ -7,6 +7,45 @@ import { createLead, createProperty, sendManualEmail, API_ENDPOINTS } from '@/li
 import { useRouter } from 'next/navigation';
 import { mutate } from 'swr';
 
+const SALUTATION_OPTIONS = [
+  { value: 'NONE', label: 'Keine Anrede' },
+  { value: 'MR', label: 'Herr' },
+  { value: 'MS', label: 'Frau' },
+  { value: 'DIVERSE', label: 'Divers' },
+];
+
+const SOURCE_OPTIONS = [
+  { value: 'WEBSITE', label: 'Website' },
+  { value: 'PORTAL', label: 'Immobilienportal' },
+  { value: 'REFERRAL', label: 'Empfehlung' },
+  { value: 'SOCIAL_MEDIA', label: 'Social Media' },
+  { value: 'COLD_CALL', label: 'Kaltakquise' },
+  { value: 'EVENT', label: 'Veranstaltung' },
+  { value: 'OTHER', label: 'Sonstiges' },
+];
+
+const PROPERTY_TYPE_OPTIONS = [
+  { value: 'APARTMENT', label: 'Wohnung' },
+  { value: 'HOUSE', label: 'Haus' },
+  { value: 'LAND', label: 'Grundstück' },
+  { value: 'COMMERCIAL', label: 'Gewerbe' },
+  { value: 'OTHER', label: 'Sonstiges' },
+];
+
+const STATUS_OPTIONS = [
+  { value: 'ACTIVE', label: 'Aktiv' },
+  { value: 'RESERVED', label: 'Reserviert' },
+  { value: 'SOLD', label: 'Verkauft' },
+  { value: 'RENTED', label: 'Vermietet' },
+  { value: 'INACTIVE', label: 'Inaktiv' },
+];
+
+// Consistent input styles
+const inputClass = "block w-full rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 sm:text-sm py-2.5 px-3 transition-all outline-none";
+const selectClass = "block w-full rounded-lg border border-gray-300 bg-white text-gray-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 sm:text-sm py-2.5 px-3 transition-all outline-none";
+const labelClass = "block text-xs font-medium text-gray-600 mb-1.5";
+const textareaClass = "block w-full rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 sm:text-sm py-2.5 px-3 transition-all outline-none resize-none";
+
 export default function GlobalDrawer() {
   const router = useRouter();
   const {
@@ -27,6 +66,7 @@ export default function GlobalDrawer() {
 
   // Animation state
   const [isVisible, setIsVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Animate in when drawer opens
   useEffect(() => {
@@ -47,50 +87,51 @@ export default function GlobalDrawer() {
   };
 
   const handleCreateLead = async () => {
-    console.log('Creating lead with data:', leadFormData);
+    setLoading(true);
     try {
-      const payload = {
-        ...leadFormData,
-        tenantId: 'default-tenant', // TODO: Get from Auth
-      };
-      console.log('Sending payload:', payload);
-      
-      const result = await createLead(payload);
-      console.log('Create lead result:', result);
-      
-      closeDrawer();
-      mutate(API_ENDPOINTS.LEADS); // Trigger revalidation
-      router.refresh(); // Refresh list
+      const result = await createLead(leadFormData);
+      handleAnimatedClose();
+      mutate(API_ENDPOINTS.LEADS);
+      router.push(`/dashboard/crm/leads/${result.id}`);
     } catch (error) {
       console.error('Error creating lead:', error);
       alert('Fehler beim Erstellen des Leads: ' + error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleCreateProperty = async () => {
+    setLoading(true);
     try {
-      await createProperty({
+      const result = await createProperty({
         ...propertyFormData,
-        tenantId: 'default-tenant', // TODO: Get from Auth
+        price: Number(propertyFormData.price),
+        rooms: Number(propertyFormData.rooms),
+        area: Number(propertyFormData.area),
       });
-      closeDrawer();
-      mutate(API_ENDPOINTS.PROPERTIES); // Trigger revalidation
-      router.refresh(); // Refresh list
+      handleAnimatedClose();
+      mutate(API_ENDPOINTS.PROPERTIES);
+      router.push(`/dashboard/crm/properties/${result.id}`);
     } catch (error) {
       alert('Fehler beim Erstellen des Objekts: ' + error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSendEmail = async () => {
     if (!emailFormData.subject || !emailFormData.body || !emailFormData.leadId) return;
+    setLoading(true);
     try {
       await sendManualEmail(emailFormData.leadId, emailFormData.subject, emailFormData.body);
-      closeDrawer();
+      handleAnimatedClose();
       router.refresh();
-      // Reset form
       updateEmailForm({ subject: '', body: '' });
     } catch (error) {
       alert('Fehler beim Senden: ' + error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -107,17 +148,17 @@ export default function GlobalDrawer() {
 
   const getHeaderColor = () => {
     switch (drawerType) {
-      case 'LEAD': return 'bg-blue-500';
-      case 'PROPERTY': return 'bg-purple-500';
-      case 'EMAIL': return 'bg-green-500';
+      case 'LEAD': return 'bg-indigo-500';
+      case 'PROPERTY': return 'bg-indigo-500';
+      case 'EMAIL': return 'bg-indigo-500';
       default: return 'bg-gray-500';
     }
   };
 
   return (
     <div
-      className={`fixed bottom-0 right-80 bg-white shadow-[0_-5px_30px_rgba(0,0,0,0.1)] border-t border-x border-gray-200 rounded-t-xl z-40 ${
-        drawerMinimized ? 'h-12' : 'h-[450px]'
+      className={`fixed bottom-0 right-80 bg-white shadow-[0_-5px_30px_rgba(0,0,0,0.15)] border-t border-x border-gray-200 rounded-t-xl z-40 ${
+        drawerMinimized ? 'h-12' : 'h-[520px]'
       }`}
       style={{ 
         transform: isVisible ? 'translateY(0)' : 'translateY(100%)',
@@ -154,250 +195,311 @@ export default function GlobalDrawer() {
 
       {/* Body */}
       {!drawerMinimized && (
-        <div className="p-8 overflow-y-auto h-[calc(450px-48px)] bg-gray-50/50">
+        <div className="p-6 overflow-y-auto h-[calc(520px-48px)]">
           {drawerType === 'EMAIL' && (
-            <div className="max-w-4xl mx-auto space-y-6">
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <div className="space-y-4">
-                  <div>
-                    <input
-                      type="text"
-                      value={emailFormData.subject || ''}
-                      onChange={(e) => updateEmailForm({ subject: e.target.value })}
-                      className="block w-full border-0 border-b border-gray-200 focus:border-indigo-500 focus:ring-0 text-lg font-medium placeholder-gray-400 px-0 py-2"
-                      placeholder="Betreff"
-                    />
-                  </div>
-                  <div>
-                    <textarea
-                      rows={8}
-                      value={emailFormData.body || ''}
-                      onChange={(e) => updateEmailForm({ body: e.target.value })}
-                      className="block w-full border-0 focus:ring-0 text-sm text-gray-700 placeholder-gray-400 px-0 resize-none"
-                      placeholder="Schreiben Sie Ihre Nachricht..."
-                    />
-                  </div>
-                </div>
-                <div className="mt-4 pt-4 border-t border-gray-50 flex justify-between items-center">
-                  <button className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-50">
-                    <Paperclip className="w-5 h-5" />
+            <div className="max-w-4xl mx-auto space-y-4">
+              <div>
+                <input
+                  type="text"
+                  value={emailFormData.subject || ''}
+                  onChange={(e) => updateEmailForm({ subject: e.target.value })}
+                  className={inputClass}
+                  placeholder="Betreff"
+                />
+              </div>
+              <div>
+                <textarea
+                  rows={10}
+                  value={emailFormData.body || ''}
+                  onChange={(e) => updateEmailForm({ body: e.target.value })}
+                  className={textareaClass}
+                  placeholder="Schreiben Sie Ihre Nachricht..."
+                />
+              </div>
+              <div className="flex justify-between items-center pt-4">
+                <button className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100">
+                  <Paperclip className="w-5 h-5" />
+                </button>
+                <div className="flex space-x-3">
+                  <button 
+                    onClick={handleAnimatedClose}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Verwerfen
                   </button>
-                  <div className="flex space-x-3">
-                    <button 
-                      onClick={handleAnimatedClose}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none"
-                    >
-                      Verwerfen
-                    </button>
-                    <button 
-                      onClick={handleSendEmail}
-                      className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none shadow-sm flex items-center"
-                    >
-                      <Send className="w-4 h-4 mr-2" />
-                      Senden
-                    </button>
-                  </div>
+                  <button 
+                    onClick={handleSendEmail}
+                    disabled={loading}
+                    className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center"
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    {loading ? 'Senden...' : 'Senden'}
+                  </button>
                 </div>
               </div>
             </div>
           )}
 
           {drawerType === 'LEAD' && (
-            <div className="grid grid-cols-12 gap-8 max-w-6xl mx-auto">
-              {/* Left Column: Personal Info */}
-              <div className="col-span-5 space-y-6">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center">
-                    <span className="w-1 h-4 bg-indigo-500 rounded-full mr-2"></span>
-                    Kontaktinformationen
-                  </h4>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Vorname</label>
-                        <input
-                          type="text"
-                          value={leadFormData.firstName || ''}
-                          onChange={(e) => updateLeadForm({ firstName: e.target.value })}
-                          className="block w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2.5 px-3 transition-colors"
-                          placeholder="Max"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Nachname</label>
-                        <input
-                          type="text"
-                          value={leadFormData.lastName || ''}
-                          onChange={(e) => updateLeadForm({ lastName: e.target.value })}
-                          className="block w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2.5 px-3 transition-colors"
-                          placeholder="Mustermann"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">E-Mail Adresse</label>
-                      <input
-                        type="email"
-                        value={leadFormData.email || ''}
-                        onChange={(e) => updateLeadForm({ email: e.target.value })}
-                        className="block w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2.5 px-3 transition-colors"
-                        placeholder="max.mustermann@example.com"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Telefon (Optional)</label>
-                      <input
-                        type="tel"
-                        className="block w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2.5 px-3 transition-colors"
-                        placeholder="+49 123 456789"
-                      />
-                    </div>
+            <div className="max-w-4xl mx-auto space-y-5">
+              {/* Anrede & Name */}
+              <div className="grid grid-cols-12 gap-4">
+                <div className="col-span-2">
+                  <label className={labelClass}>Anrede</label>
+                  <select
+                    value={leadFormData.salutation || 'NONE'}
+                    onChange={(e) => updateLeadForm({ salutation: e.target.value })}
+                    className={selectClass}
+                  >
+                    {SALUTATION_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className={labelClass}>Ansprache</label>
+                  <div className="flex h-[42px]">
+                    <button
+                      type="button"
+                      onClick={() => updateLeadForm({ formalAddress: true })}
+                      className={`flex-1 px-3 py-2 text-sm font-medium rounded-l-lg border transition-colors ${
+                        leadFormData.formalAddress !== false
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Sie
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateLeadForm({ formalAddress: false })}
+                      className={`flex-1 px-3 py-2 text-sm font-medium rounded-r-lg border-t border-r border-b transition-colors ${
+                        leadFormData.formalAddress === false
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Du
+                    </button>
                   </div>
+                </div>
+                <div className="col-span-4">
+                  <label className={labelClass}>Vorname</label>
+                  <input
+                    type="text"
+                    value={leadFormData.firstName || ''}
+                    onChange={(e) => updateLeadForm({ firstName: e.target.value })}
+                    className={inputClass}
+                    placeholder="Max"
+                  />
+                </div>
+                <div className="col-span-4">
+                  <label className={labelClass}>Nachname</label>
+                  <input
+                    type="text"
+                    value={leadFormData.lastName || ''}
+                    onChange={(e) => updateLeadForm({ lastName: e.target.value })}
+                    className={inputClass}
+                    placeholder="Mustermann"
+                  />
                 </div>
               </div>
 
-              {/* Right Column: Context & Actions */}
-              <div className="col-span-7 space-y-6">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full flex flex-col">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center">
-                    <span className="w-1 h-4 bg-indigo-500 rounded-full mr-2"></span>
-                    Anfrage Details
-                  </h4>
-                  <div className="flex-1 space-y-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Interesse an Objekt</label>
-                      <select className="block w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2.5 px-3 transition-colors">
-                        <option>Bitte wählen...</option>
-                        <option>Penthouse Berlin Mitte</option>
-                        <option>Loft Kreuzberg</option>
-                      </select>
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Notiz / Nachricht</label>
-                      <textarea
-                        rows={6}
-                        className="block w-full h-32 rounded-lg border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2.5 px-3 transition-colors resize-none"
-                        placeholder="Interessiert sich besonders für..."
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-6 pt-6 border-t border-gray-50 flex justify-end space-x-3">
-                    <button 
-                      onClick={handleAnimatedClose}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      Abbrechen
-                    </button>
-                    <button 
-                      onClick={handleCreateLead}
-                      className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm"
-                    >
-                      Lead anlegen
-                    </button>
-                  </div>
+              {/* Kontakt */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>E-Mail *</label>
+                  <input
+                    type="email"
+                    value={leadFormData.email || ''}
+                    onChange={(e) => updateLeadForm({ email: e.target.value })}
+                    className={inputClass}
+                    placeholder="max.mustermann@example.com"
+                  />
                 </div>
+                <div>
+                  <label className={labelClass}>Telefon</label>
+                  <input
+                    type="tel"
+                    value={leadFormData.phone || ''}
+                    onChange={(e) => updateLeadForm({ phone: e.target.value })}
+                    className={inputClass}
+                    placeholder="+49 123 456789"
+                  />
+                </div>
+              </div>
+
+              {/* Quelle */}
+              <div>
+                <label className={labelClass}>Quelle</label>
+                <select
+                  value={leadFormData.source || 'WEBSITE'}
+                  onChange={(e) => updateLeadForm({ source: e.target.value })}
+                  className={selectClass}
+                >
+                  {SOURCE_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Notizen */}
+              <div>
+                <label className={labelClass}>Notizen</label>
+                <textarea
+                  rows={3}
+                  value={leadFormData.notes || ''}
+                  onChange={(e) => updateLeadForm({ notes: e.target.value })}
+                  className={textareaClass}
+                  placeholder="Erste Informationen zum Lead..."
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end space-x-3 pt-4">
+                <button 
+                  onClick={handleAnimatedClose}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Abbrechen
+                </button>
+                <button 
+                  onClick={handleCreateLead}
+                  disabled={loading || !leadFormData.email}
+                  className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                >
+                  {loading ? 'Speichern...' : 'Lead anlegen'}
+                </button>
               </div>
             </div>
           )}
 
           {drawerType === 'PROPERTY' && (
-            <div className="grid grid-cols-12 gap-8 max-w-6xl mx-auto">
-              <div className="col-span-6 space-y-6">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center">
-                    <span className="w-1 h-4 bg-purple-500 rounded-full mr-2"></span>
-                    Stammdaten
-                  </h4>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Interner Titel</label>
-                      <input
-                        type="text"
-                        value={propertyFormData.title || ''}
-                        onChange={(e) => updatePropertyForm({ title: e.target.value })}
-                        className="block w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2.5 px-3 transition-colors"
-                        placeholder="z.B. Penthouse Berlin Mitte"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Adresse</label>
-                      <input
-                        type="text"
-                        value={propertyFormData.address || ''}
-                        onChange={(e) => updatePropertyForm({ address: e.target.value })}
-                        className="block w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2.5 px-3 transition-colors"
-                        placeholder="Straße, PLZ Stadt"
-                      />
-                    </div>
-                  </div>
+            <div className="max-w-4xl mx-auto space-y-5">
+              {/* Titel & Typ */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>Titel (Intern) *</label>
+                  <input
+                    type="text"
+                    value={propertyFormData.title || ''}
+                    onChange={(e) => updatePropertyForm({ title: e.target.value })}
+                    className={inputClass}
+                    placeholder="z.B. Altbauwohnung Mariahilf"
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Objekttyp</label>
+                  <select
+                    value={propertyFormData.propertyType || 'APARTMENT'}
+                    onChange={(e) => updatePropertyForm({ propertyType: e.target.value })}
+                    className={selectClass}
+                  >
+                    {PROPERTY_TYPE_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              <div className="col-span-6 space-y-6">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full flex flex-col">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center">
-                    <span className="w-1 h-4 bg-purple-500 rounded-full mr-2"></span>
-                    Eckdaten
-                  </h4>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Kaltmiete</label>
-                      <div className="relative rounded-md shadow-sm">
-                        <input
-                          type="number"
-                          value={propertyFormData.price || ''}
-                          onChange={(e) => updatePropertyForm({ price: parseFloat(e.target.value) })}
-                          className="block w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2.5 pl-3 pr-8 transition-colors"
-                          placeholder="0"
-                        />
-                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                          <span className="text-gray-500 sm:text-sm">€</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Zimmer</label>
-                      <input
-                        type="number"
-                        value={propertyFormData.rooms || ''}
-                        onChange={(e) => updatePropertyForm({ rooms: parseFloat(e.target.value) })}
-                        className="block w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2.5 px-3 transition-colors"
-                        placeholder="z.B. 3.5"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Wohnfläche</label>
-                      <div className="relative rounded-md shadow-sm">
-                        <input
-                          type="number"
-                          value={propertyFormData.area || ''}
-                          onChange={(e) => updatePropertyForm({ area: parseFloat(e.target.value) })}
-                          className="block w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2.5 pl-3 pr-8 transition-colors"
-                          placeholder="0"
-                        />
-                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                          <span className="text-gray-500 sm:text-sm">m²</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-auto pt-6 border-t border-gray-50 flex justify-end space-x-3">
-                    <button 
-                      onClick={handleAnimatedClose}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      Abbrechen
-                    </button>
-                    <button 
-                      onClick={handleCreateProperty}
-                      className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm"
-                    >
-                      Objekt anlegen
-                    </button>
-                  </div>
+              {/* Adresse */}
+              <div>
+                <label className={labelClass}>Adresse *</label>
+                <input
+                  type="text"
+                  value={propertyFormData.address || ''}
+                  onChange={(e) => updatePropertyForm({ address: e.target.value })}
+                  className={inputClass}
+                  placeholder="Straße, PLZ Ort"
+                />
+              </div>
+
+              {/* Preis, Zimmer, Fläche, Status */}
+              <div className="grid grid-cols-4 gap-4">
+                <div>
+                  <label className={labelClass}>Preis (€) *</label>
+                  <input
+                    type="number"
+                    value={propertyFormData.price || ''}
+                    onChange={(e) => updatePropertyForm({ price: e.target.value })}
+                    className={inputClass}
+                    placeholder="350000"
+                  />
                 </div>
+                <div>
+                  <label className={labelClass}>Zimmer</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={propertyFormData.rooms || ''}
+                    onChange={(e) => updatePropertyForm({ rooms: e.target.value })}
+                    className={inputClass}
+                    placeholder="3"
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Fläche (m²)</label>
+                  <input
+                    type="number"
+                    value={propertyFormData.area || ''}
+                    onChange={(e) => updatePropertyForm({ area: e.target.value })}
+                    className={inputClass}
+                    placeholder="85"
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Status</label>
+                  <select
+                    value={propertyFormData.status || 'ACTIVE'}
+                    onChange={(e) => updatePropertyForm({ status: e.target.value })}
+                    className={selectClass}
+                  >
+                    {STATUS_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Beschreibung */}
+              <div>
+                <label className={labelClass}>Beschreibung</label>
+                <textarea
+                  rows={2}
+                  value={propertyFormData.description || ''}
+                  onChange={(e) => updatePropertyForm({ description: e.target.value })}
+                  className={textareaClass}
+                  placeholder="Öffentliche Beschreibung des Objekts..."
+                />
+              </div>
+
+              {/* Jarvis-Fakten */}
+              <div>
+                <label className={labelClass}>Jarvis-Fakten (Intern)</label>
+                <textarea
+                  rows={2}
+                  value={propertyFormData.aiFacts || ''}
+                  onChange={(e) => updatePropertyForm({ aiFacts: e.target.value })}
+                  className={textareaClass}
+                  placeholder="z.B. Keine Haustiere, Südbalkon..."
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end space-x-3 pt-4">
+                <button 
+                  onClick={handleAnimatedClose}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Abbrechen
+                </button>
+                <button 
+                  onClick={handleCreateProperty}
+                  disabled={loading || !propertyFormData.title || !propertyFormData.address}
+                  className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                >
+                  {loading ? 'Speichern...' : 'Objekt anlegen'}
+                </button>
               </div>
             </div>
           )}

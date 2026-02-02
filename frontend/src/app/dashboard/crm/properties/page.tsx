@@ -80,7 +80,7 @@ export default function PropertiesPage() {
           )}
         </div>
         <button 
-          onClick={() => router.push('/dashboard/crm/properties/new')}
+          onClick={() => openDrawer('PROPERTY')}
           className="bg-indigo-600 text-white px-3 py-1.5 text-sm font-medium rounded-md hover:bg-indigo-700 shadow-sm transition-colors"
         >
           Neues Objekt

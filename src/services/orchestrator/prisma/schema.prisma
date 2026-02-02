@@ -47,6 +47,10 @@ model TenantSettings {
   outlookCalendarConfig Json? // { accessToken, refreshToken, expiryDate, email }
   calendarShareTeam Boolean @default(true)
   
+  // Email Integration (Tokens must be encrypted!)
+  gmailConfig Json? // { accessToken, refreshToken, expiryDate, email }
+  outlookMailConfig Json? // { accessToken, refreshToken, expiryDate, email }
+  
   // Auto-Reply Settings
   autoReplyEnabled Boolean @default(false) // If true, Jarvis sends emails automatically
 }

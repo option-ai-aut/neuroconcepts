@@ -4,10 +4,29 @@ import { useState, useEffect } from 'react';
 import { Mail, Calendar, Check, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { getRuntimeConfig } from '@/components/EnvProvider';
+import { fetchAuthSession } from 'aws-amplify/auth';
+
+// Helper to get API URL without trailing slash
+const getApiUrl = () => {
+  const config = getRuntimeConfig();
+  const url = config.apiUrl || '';
+  return url.replace(/\/+$/, '');
+};
+
+// Get auth headers
+const getAuthHeaders = async (): Promise<HeadersInit> => {
+  try {
+    const session = await fetchAuthSession();
+    const token = session.tokens?.idToken?.toString();
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
+  } catch (error) {
+    console.error('Error fetching auth session:', error);
+    return {};
+  }
+};
 
 export default function IntegrationsSettingsPage() {
   const searchParams = useSearchParams();
-  const config = getRuntimeConfig();
   const tenantId = 'default-tenant'; 
   const inboundEmail = `${tenantId}@inbound.neuroconcepts.ai`;
 
@@ -19,17 +38,25 @@ export default function IntegrationsSettingsPage() {
   });
   const [showPassword, setShowPassword] = useState(false);
 
-  const [googleConnected, setGoogleConnected] = useState(false);
-  const [outlookConnected, setOutlookConnected] = useState(false);
-  const [googleEmail, setGoogleEmail] = useState<string | null>(null);
-  const [outlookEmail, setOutlookEmail] = useState<string | null>(null);
+  // Calendar state
+  const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false);
+  const [outlookCalendarConnected, setOutlookCalendarConnected] = useState(false);
+  const [googleCalendarEmail, setGoogleCalendarEmail] = useState<string | null>(null);
+  const [outlookCalendarEmail, setOutlookCalendarEmail] = useState<string | null>(null);
   const [shareCalendar, setShareCalendar] = useState(true);
+  
+  // Email state
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [outlookMailConnected, setOutlookMailConnected] = useState(false);
+  const [gmailEmail, setGmailEmail] = useState<string | null>(null);
+  const [outlookMailEmail, setOutlookMailEmail] = useState<string | null>(null);
+  
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Load calendar status
+  // Load status
   useEffect(() => {
-    loadCalendarStatus();
+    loadStatus();
   }, []);
 
   // Handle OAuth callback
@@ -38,58 +65,96 @@ export default function IntegrationsSettingsPage() {
     const success = searchParams.get('success');
     const error = searchParams.get('error');
     const email = searchParams.get('email');
+    const accessToken = searchParams.get('accessToken');
+    const refreshToken = searchParams.get('refreshToken');
+    const expiryDate = searchParams.get('expiryDate');
 
     if (success === 'true' && provider) {
-      setMessage({
-        type: 'success',
-        text: `${provider === 'google' ? 'Google' : 'Outlook'} Calendar erfolgreich verbunden!`
-      });
+      // Handle email OAuth callbacks
+      if ((provider === 'gmail' || provider === 'outlook-mail') && accessToken && refreshToken) {
+        saveEmailConfig(provider, {
+          accessToken,
+          refreshToken,
+          expiryDate: expiryDate ? parseInt(expiryDate) : Date.now() + 3600000,
+          email: email ? decodeURIComponent(email) : ''
+        });
+      }
       
+      // Handle calendar OAuth callbacks
       if (provider === 'google') {
-        setGoogleConnected(true);
-        if (email) setGoogleEmail(decodeURIComponent(email));
-      } else {
-        setOutlookConnected(true);
-        if (email) setOutlookEmail(decodeURIComponent(email));
+        setGoogleCalendarConnected(true);
+        if (email) setGoogleCalendarEmail(decodeURIComponent(email));
+        setMessage({ type: 'success', text: 'Google Calendar erfolgreich verbunden!' });
+      } else if (provider === 'outlook') {
+        setOutlookCalendarConnected(true);
+        if (email) setOutlookCalendarEmail(decodeURIComponent(email));
+        setMessage({ type: 'success', text: 'Outlook Calendar erfolgreich verbunden!' });
+      } else if (provider === 'gmail') {
+        setGmailConnected(true);
+        if (email) setGmailEmail(decodeURIComponent(email));
+        setMessage({ type: 'success', text: 'Gmail erfolgreich verbunden!' });
+      } else if (provider === 'outlook-mail') {
+        setOutlookMailConnected(true);
+        if (email) setOutlookMailEmail(decodeURIComponent(email));
+        setMessage({ type: 'success', text: 'Outlook Mail erfolgreich verbunden!' });
       }
 
       // Clear URL params
       window.history.replaceState({}, '', '/dashboard/settings/integrations');
       
       // Reload status
-      setTimeout(() => loadCalendarStatus(), 1000);
+      setTimeout(() => loadStatus(), 1000);
     } else if (error === 'true' && provider) {
-      setMessage({
-        type: 'error',
-        text: `Fehler beim Verbinden mit ${provider === 'google' ? 'Google' : 'Outlook'} Calendar`
-      });
+      const providerName = provider === 'google' ? 'Google Calendar' : 
+                          provider === 'outlook' ? 'Outlook Calendar' :
+                          provider === 'gmail' ? 'Gmail' : 'Outlook Mail';
+      setMessage({ type: 'error', text: `Fehler beim Verbinden mit ${providerName}` });
     }
   }, [searchParams]);
 
-  const loadCalendarStatus = async () => {
+  const saveEmailConfig = async (provider: string, config: any) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${config.apiUrl}/calendar/status`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const apiUrl = getApiUrl();
+      const headers = await getAuthHeaders();
+      const endpoint = provider === 'gmail' ? '/email/gmail/connect' : '/email/outlook/connect';
+      
+      await fetch(`${apiUrl}${endpoint}`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
       });
+    } catch (error) {
+      console.error('Error saving email config:', error);
+    }
+  };
 
-      if (response.ok) {
-        const data = await response.json();
-        setGoogleConnected(data.google.connected);
-        setGoogleEmail(data.google.email);
-        setOutlookConnected(data.outlook.connected);
-        setOutlookEmail(data.outlook.email);
+  const loadStatus = async () => {
+    try {
+      const apiUrl = getApiUrl();
+      const headers = await getAuthHeaders();
+      
+      // Load calendar status
+      const calendarResponse = await fetch(`${apiUrl}/calendar/status`, { headers });
+      if (calendarResponse.ok) {
+        const data = await calendarResponse.json();
+        setGoogleCalendarConnected(data.google.connected);
+        setGoogleCalendarEmail(data.google.email);
+        setOutlookCalendarConnected(data.outlook.connected);
+        setOutlookCalendarEmail(data.outlook.email);
         setShareCalendar(data.shareTeam);
-      } else if (response.status === 401) {
-        console.warn('Not authenticated - calendar status not loaded');
-        // Set default values for unauthenticated state
-        setGoogleConnected(false);
-        setOutlookConnected(false);
+      }
+      
+      // Load email status
+      const emailResponse = await fetch(`${apiUrl}/email/status`, { headers });
+      if (emailResponse.ok) {
+        const data = await emailResponse.json();
+        setGmailConnected(data.gmail.connected);
+        setGmailEmail(data.gmail.email);
+        setOutlookMailConnected(data.outlook.connected);
+        setOutlookMailEmail(data.outlook.email);
       }
     } catch (error) {
-      console.error('Error loading calendar status:', error);
+      console.error('Error loading status:', error);
     } finally {
       setLoading(false);
     }
@@ -99,73 +164,102 @@ export default function IntegrationsSettingsPage() {
     setSmtpConfig({ ...smtpConfig, [e.target.name]: e.target.value });
   };
 
-  const handleConnect = async (provider: 'google' | 'outlook') => {
+  const handleConnectCalendar = async (provider: 'google' | 'outlook') => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${config.apiUrl}/calendar/${provider}/auth-url`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const apiUrl = getApiUrl();
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${apiUrl}/calendar/${provider}/auth-url`, { headers });
 
       if (response.ok) {
         const data = await response.json();
-        // Redirect to OAuth provider
         window.location.href = data.authUrl;
       } else {
-        setMessage({
-          type: 'error',
-          text: 'Fehler beim Starten der Authentifizierung'
-        });
+        setMessage({ type: 'error', text: 'Fehler beim Starten der Authentifizierung' });
       }
     } catch (error) {
       console.error('Error connecting calendar:', error);
-      setMessage({
-        type: 'error',
-        text: 'Fehler beim Verbinden des Kalenders'
-      });
+      setMessage({ type: 'error', text: 'Fehler beim Verbinden des Kalenders' });
     }
   };
 
-  const handleDisconnect = async (provider: 'google' | 'outlook') => {
+  const handleDisconnectCalendar = async (provider: 'google' | 'outlook') => {
     if (!confirm(`Möchten Sie ${provider === 'google' ? 'Google' : 'Outlook'} Calendar wirklich trennen?`)) {
       return;
     }
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${config.apiUrl}/calendar/${provider}/disconnect`, {
+      const apiUrl = getApiUrl();
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${apiUrl}/calendar/${provider}/disconnect`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers: { ...headers, 'Content-Type': 'application/json' }
       });
 
       if (response.ok) {
         if (provider === 'google') {
-          setGoogleConnected(false);
-          setGoogleEmail(null);
+          setGoogleCalendarConnected(false);
+          setGoogleCalendarEmail(null);
         } else {
-          setOutlookConnected(false);
-          setOutlookEmail(null);
+          setOutlookCalendarConnected(false);
+          setOutlookCalendarEmail(null);
         }
-        setMessage({
-          type: 'success',
-          text: 'Kalender erfolgreich getrennt'
-        });
+        setMessage({ type: 'success', text: 'Kalender erfolgreich getrennt' });
       } else {
-        setMessage({
-          type: 'error',
-          text: 'Fehler beim Trennen des Kalenders'
-        });
+        setMessage({ type: 'error', text: 'Fehler beim Trennen des Kalenders' });
       }
     } catch (error) {
       console.error('Error disconnecting calendar:', error);
-      setMessage({
-        type: 'error',
-        text: 'Fehler beim Trennen des Kalenders'
+      setMessage({ type: 'error', text: 'Fehler beim Trennen des Kalenders' });
+    }
+  };
+
+  const handleConnectEmail = async (provider: 'gmail' | 'outlook') => {
+    try {
+      const apiUrl = getApiUrl();
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${apiUrl}/email/${provider}/auth-url`, { headers });
+
+      if (response.ok) {
+        const data = await response.json();
+        window.location.href = data.authUrl;
+      } else {
+        setMessage({ type: 'error', text: 'Fehler beim Starten der Authentifizierung' });
+      }
+    } catch (error) {
+      console.error('Error connecting email:', error);
+      setMessage({ type: 'error', text: 'Fehler beim Verbinden der E-Mail' });
+    }
+  };
+
+  const handleDisconnectEmail = async (provider: 'gmail' | 'outlook') => {
+    const providerName = provider === 'gmail' ? 'Gmail' : 'Outlook Mail';
+    if (!confirm(`Möchten Sie ${providerName} wirklich trennen?`)) {
+      return;
+    }
+
+    try {
+      const apiUrl = getApiUrl();
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${apiUrl}/email/${provider}/disconnect`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' }
       });
+
+      if (response.ok) {
+        if (provider === 'gmail') {
+          setGmailConnected(false);
+          setGmailEmail(null);
+        } else {
+          setOutlookMailConnected(false);
+          setOutlookMailEmail(null);
+        }
+        setMessage({ type: 'success', text: `${providerName} erfolgreich getrennt` });
+      } else {
+        setMessage({ type: 'error', text: `Fehler beim Trennen von ${providerName}` });
+      }
+    } catch (error) {
+      console.error('Error disconnecting email:', error);
+      setMessage({ type: 'error', text: `Fehler beim Trennen von ${providerName}` });
     }
   };
 
@@ -174,13 +268,11 @@ export default function IntegrationsSettingsPage() {
     setShareCalendar(newValue);
 
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`${config.apiUrl}/calendar/share-team`, {
+      const apiUrl = getApiUrl();
+      const headers = await getAuthHeaders();
+      await fetch(`${apiUrl}/calendar/share-team`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ shareTeam: newValue })
       });
     } catch (error) {
@@ -213,12 +305,78 @@ export default function IntegrationsSettingsPage() {
           <h3 className="text-lg font-semibold text-gray-900">E-Mail</h3>
         </div>
 
+        {/* Gmail */}
+        <div className="flex items-center justify-between py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <svg viewBox="0 0 24 24" className="w-8 h-8">
+              <path fill="#EA4335" d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/>
+            </svg>
+            <div>
+              <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                Gmail
+                {gmailConnected && <Check className="w-4 h-4 text-green-500" />}
+              </div>
+              <div className="text-xs text-gray-500">
+                {gmailConnected ? `Verbunden als ${gmailEmail}` : 'E-Mails über Gmail senden und empfangen'}
+              </div>
+            </div>
+          </div>
+          {gmailConnected ? (
+            <button
+              onClick={() => handleDisconnectEmail('gmail')}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+            >
+              Trennen
+            </button>
+          ) : (
+            <button
+              onClick={() => handleConnectEmail('gmail')}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+            >
+              Verbinden
+            </button>
+          )}
+        </div>
+
+        {/* Outlook Mail */}
+        <div className="flex items-center justify-between py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <svg viewBox="0 0 24 24" className="w-8 h-8">
+              <path fill="#0078D4" d="M24 7.387v10.478c0 .23-.08.424-.238.576-.158.152-.354.228-.586.228h-8.547v-6.959l1.2.914c.088.064.19.096.308.096.117 0 .22-.032.308-.096l7.317-5.478c.088-.064.158-.14.21-.228.053-.088.028-.176-.028-.264-.064-.088-.14-.14-.228-.14H14.63v-1.47c0-.23.076-.424.228-.576.152-.152.346-.228.576-.228h7.99c.23 0 .424.076.576.228.152.152.228.346.228.576v2.343zM14.63 19.478H.576c-.23 0-.424-.076-.576-.228C0 19.098 0 18.904 0 18.674V5.326c0-.23.076-.424.228-.576C.38 4.598.576 4.522.806 4.522h13.824v14.956zm-7.315-2.87c1.624 0 2.94-.476 3.948-1.428 1.008-.952 1.512-2.196 1.512-3.732 0-1.536-.504-2.78-1.512-3.732-1.008-.952-2.324-1.428-3.948-1.428-1.624 0-2.94.476-3.948 1.428C2.359 8.668 1.855 9.912 1.855 11.448c0 1.536.504 2.78 1.512 3.732 1.008.952 2.324 1.428 3.948 1.428zm0-1.764c-.952 0-1.708-.308-2.268-.924-.56-.616-.84-1.428-.84-2.436 0-1.008.28-1.82.84-2.436.56-.616 1.316-.924 2.268-.924.952 0 1.708.308 2.268.924.56.616.84 1.428.84 2.436 0 1.008-.28 1.82-.84 2.436-.56.616-1.316.924-2.268.924z"/>
+            </svg>
+            <div>
+              <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                Outlook Mail
+                {outlookMailConnected && <Check className="w-4 h-4 text-green-500" />}
+              </div>
+              <div className="text-xs text-gray-500">
+                {outlookMailConnected ? `Verbunden als ${outlookMailEmail}` : 'E-Mails über Outlook senden und empfangen'}
+              </div>
+            </div>
+          </div>
+          {outlookMailConnected ? (
+            <button
+              onClick={() => handleDisconnectEmail('outlook')}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+            >
+              Trennen
+            </button>
+          ) : (
+            <button
+              onClick={() => handleConnectEmail('outlook')}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+            >
+              Verbinden
+            </button>
+          )}
+        </div>
+
         {/* Inbound */}
-        <div className="space-y-3">
+        <div className="space-y-3 pt-4">
           <div>
-            <div className="text-sm font-medium text-gray-900 mb-1">Empfangsadresse</div>
+            <div className="text-sm font-medium text-gray-900 mb-1">Empfangsadresse (Weiterleitung)</div>
             <p className="text-xs text-gray-500">
-              Leiten Sie Portal-Anfragen an diese Adresse weiter.
+              Alternativ: Leiten Sie Portal-Anfragen an diese Adresse weiter.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -234,73 +392,75 @@ export default function IntegrationsSettingsPage() {
           </div>
         </div>
 
-        {/* SMTP */}
-        <div className="space-y-4 pt-4">
-          <div>
-            <div className="text-sm font-medium text-gray-900 mb-1">SMTP Versand</div>
+        {/* SMTP (collapsed by default) */}
+        <details className="pt-4">
+          <summary className="cursor-pointer text-sm font-medium text-gray-600 hover:text-gray-900">
+            Erweitert: Eigener SMTP-Server
+          </summary>
+          <div className="space-y-4 pt-4">
             <p className="text-xs text-gray-500">
-              Eigene E-Mail-Adresse für Versand nutzen.
+              Optional: Eigene E-Mail-Adresse für Versand nutzen.
             </p>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-3">
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Host</label>
+                <input 
+                  name="host"
+                  type="text" 
+                  value={smtpConfig.host}
+                  onChange={handleSmtpChange}
+                  className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Port</label>
+                <input 
+                  name="port"
+                  type="number" 
+                  value={smtpConfig.port}
+                  onChange={handleSmtpChange}
+                  className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+            
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Host</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Benutzername</label>
               <input 
-                name="host"
+                name="user"
                 type="text" 
-                value={smtpConfig.host}
+                value={smtpConfig.user}
                 onChange={handleSmtpChange}
                 className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
+            
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Port</label>
-              <input 
-                name="port"
-                type="number" 
-                value={smtpConfig.port}
-                onChange={handleSmtpChange}
-                className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+              <label className="block text-xs font-medium text-gray-600 mb-1">Passwort</label>
+              <div className="relative">
+                <input 
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={smtpConfig.password}
+                  onChange={handleSmtpChange}
+                  className="w-full px-3 py-2 pr-10 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
+            
+            <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
+              Testen & Speichern
+            </button>
           </div>
-          
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Benutzername</label>
-            <input 
-              name="user"
-              type="text" 
-              value={smtpConfig.user}
-              onChange={handleSmtpChange}
-              className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Passwort</label>
-            <div className="relative">
-              <input 
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                value={smtpConfig.password}
-                onChange={handleSmtpChange}
-                className="w-full px-3 py-2 pr-10 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
-          
-          <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
-            Testen & Speichern
-          </button>
-        </div>
+        </details>
       </div>
 
       {/* Calendar Section */}
@@ -321,23 +481,23 @@ export default function IntegrationsSettingsPage() {
             <div>
               <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
                 Google Calendar
-                {googleConnected && <Check className="w-4 h-4 text-green-500" />}
+                {googleCalendarConnected && <Check className="w-4 h-4 text-green-500" />}
               </div>
               <div className="text-xs text-gray-500">
-                {googleConnected ? `Verbunden als ${googleEmail}` : 'Nicht verbunden'}
+                {googleCalendarConnected ? `Verbunden als ${googleCalendarEmail}` : 'Nicht verbunden'}
               </div>
             </div>
           </div>
-          {googleConnected ? (
+          {googleCalendarConnected ? (
             <button
-              onClick={() => handleDisconnect('google')}
+              onClick={() => handleDisconnectCalendar('google')}
               className="px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
             >
               Trennen
             </button>
           ) : (
             <button
-              onClick={() => handleConnect('google')}
+              onClick={() => handleConnectCalendar('google')}
               className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
             >
               Verbinden
@@ -356,23 +516,23 @@ export default function IntegrationsSettingsPage() {
             <div>
               <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
                 Outlook Calendar
-                {outlookConnected && <Check className="w-4 h-4 text-green-500" />}
+                {outlookCalendarConnected && <Check className="w-4 h-4 text-green-500" />}
               </div>
               <div className="text-xs text-gray-500">
-                {outlookConnected ? `Verbunden als ${outlookEmail}` : 'Nicht verbunden'}
+                {outlookCalendarConnected ? `Verbunden als ${outlookCalendarEmail}` : 'Nicht verbunden'}
               </div>
             </div>
           </div>
-          {outlookConnected ? (
+          {outlookCalendarConnected ? (
             <button
-              onClick={() => handleDisconnect('outlook')}
+              onClick={() => handleDisconnectCalendar('outlook')}
               className="px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
             >
               Trennen
             </button>
           ) : (
             <button
-              onClick={() => handleConnect('outlook')}
+              onClick={() => handleConnectCalendar('outlook')}
               className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
             >
               Verbinden

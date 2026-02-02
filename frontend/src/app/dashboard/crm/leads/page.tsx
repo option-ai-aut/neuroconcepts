@@ -80,8 +80,8 @@ export default function LeadsPage() {
           )}
         </div>
         <button 
-          onClick={() => router.push('/dashboard/crm/leads/new')}
-          className="bg-indigo-600 text-white px-3 py-1.5 text-sm font-medium rounded-md hover:bg-indigo-700 shadow-sm"
+          onClick={() => openDrawer('LEAD')}
+          className="bg-indigo-600 text-white px-3 py-1.5 text-sm font-medium rounded-md hover:bg-indigo-700 shadow-sm transition-colors"
         >
           Neuer Lead
         </button>
