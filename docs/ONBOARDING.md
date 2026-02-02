@@ -12,41 +12,58 @@ Dieser Guide beschreibt den Prozess, um einen neuen Mandanten (Immobilienfirma) 
 
 ### 2. User-Onboarding (Zusammen mit Kunden)
 - [ ] Kunde geht auf `/login`.
-- [ ] Kunde klickt "Create Account" und registriert sich mit seiner Firmen-E-Mail.
+- [ ] Kunde klickt "Registrieren" und erstellt Account mit Firmen-E-Mail.
+- [ ] Verifizierungscode eingeben.
 - [ ] Admin weist dem neuen User die `tenantId` in der Datenbank zu.
 
-### 3. Tech-Setup (Im Dashboard)
+### 3. Tech-Setup (Im Dashboard unter Einstellungen → Integrationen)
 
 #### A. E-Mail Verbindung (White-Labeling)
 *Das System muss E-Mails im Namen des Maklers senden können.*
-- **Option 1: Google/Microsoft (Empfohlen)**
-    - Klick auf "Connect Account".
-    - OAuth Consent Screen bestätigen.
-- **Option 2: SMTP/IMAP (für eigene Domains)**
-    - SMTP Host (z.B. `smtp.ionos.de`)
-    - SMTP Port (meist `465` oder `587`)
-    - Benutzername & Passwort
-    - *Test-E-Mail senden lassen zur Bestätigung.*
+
+**Option 1: Gmail (Empfohlen für Google Workspace)**
+- Klick auf "Gmail verbinden"
+- Google OAuth Consent Screen bestätigen
+- Berechtigungen für E-Mail-Zugriff erteilen
+
+**Option 2: Outlook (Empfohlen für Microsoft 365)**
+- Klick auf "Outlook verbinden"
+- Microsoft OAuth Consent Screen bestätigen
+- Berechtigungen für E-Mail-Zugriff erteilen
+
+**Option 3: SMTP/IMAP (für eigene Domains)**
+- "Erweitert" aufklappen
+- SMTP Host (z.B. `smtp.ionos.de`)
+- SMTP Port (meist `465` oder `587`)
+- Benutzername & Passwort
+- *Test-E-Mail senden lassen zur Bestätigung.*
 
 #### B. Kalender Integration
 *Damit Jarvis Termine buchen kann.*
-- Klick auf "Connect Calendar".
-- Auswahl der Kalender, die auf "Verfügbarkeit" geprüft werden sollen (z.B. "Arbeit", aber nicht "Privat").
-- Konfiguration der Arbeitszeiten (z.B. Mo-Fr, 09:00 - 17:00).
+- Klick auf "Google Kalender verbinden" oder "Outlook Kalender verbinden"
+- OAuth Consent Screen bestätigen
+- Auswahl der Kalender, die auf "Verfügbarkeit" geprüft werden sollen
+- Konfiguration der Arbeitszeiten (z.B. Mo-Fr, 09:00 - 17:00)
 
 ### 4. Content & Routing
 
 #### A. Erstes Objekt anlegen
-- Klick auf "Neues Objekt" → Direkt zur Detailseite
-- PDF-Exposé hochladen (Jarvis extrahiert Daten).
-- Stammdaten prüfen: Adresse, Kaltmiete, Zimmer, Fläche.
-- **Jarvis-Fakten:** Wichtige Infos ergänzen, die nicht im Exposé stehen (z.B. "Keine WG", "Hund erlaubt").
+- Klick auf "Neues Objekt" → GlobalDrawer öffnet sich
+- **Titel (Intern):** Interner Name für das Objekt
+- **Objekttyp:** Wohnung, Haus, Grundstück, Gewerbe, Sonstiges
+- **Adresse:** Vollständige Adresse
+- **Preis, Zimmer, Fläche:** Eckdaten
+- **Status:** Aktiv (Standard)
+- **Beschreibung:** Öffentliche Beschreibung
+- **Jarvis-Fakten:** Wichtige Infos für die KI (z.B. "Keine WG", "Hund erlaubt")
 
 #### B. Erster Lead anlegen
-- Klick auf "Neuer Lead" → Direkt zur Anlage-Seite
+- Klick auf "Neuer Lead" → GlobalDrawer öffnet sich
 - **Anrede:** Herr/Frau/Divers oder Keine
 - **Ansprache:** Per Sie (Standard) oder Per Du
-- Kontaktdaten: E-Mail (Pflicht), Telefon, Name
+- **Kontaktdaten:** E-Mail (Pflicht), Telefon, Name
+- **Quelle:** Website, Portal, Empfehlung, etc.
+- **Notizen:** Erste Informationen
 
 #### C. Exposé-Template erstellen
 - Exposés & Vorlagen → "Neue Vorlage"
@@ -76,6 +93,10 @@ Dieser Guide beschreibt den Prozess, um einen neuen Mandanten (Immobilienfirma) 
 7.  Termin erscheint im Kalender des Maklers.
 
 ## 🆘 Troubleshooting
+
+**Gmail/Outlook Verbindung schlägt fehl:**
+- Prüfen: Hat der User die richtigen Berechtigungen erteilt?
+- Re-Connect durchführen (Disconnect → Connect).
 
 **SMTP-Verbindung schlägt fehl:**
 - Prüfen: Ist 2-Faktor-Authentifizierung (2FA) beim Provider aktiv? -> Dann wird oft ein "App-Passwort" benötigt.

@@ -11,7 +11,7 @@ Dieses Dokument definiert die visuellen Richtlinien für die NeuroConcepts AI Pl
 *   **Soft UI (Weiche Formen):** Alles ist abgerundet und freundlich.
 *   **Typografie als Struktur:** Große, fette Überschriften (`text-4xl font-extrabold`) definieren Bereiche, nicht Boxen.
 *   **Split-View:** Listenansichten (Posteingang, Exposés, Chat) nutzen ein vertikales Split-Layout (Liste links, Detail rechts).
-*   **Direkte Navigation:** Bei "Neu anlegen" Aktionen (Lead, Objekt) wird direkt zur Detailseite navigiert, kein Drawer/Modal.
+*   **GlobalDrawer für Formulare:** Bei "Neu anlegen" Aktionen (Lead, Objekt) öffnet sich der GlobalDrawer von unten - keine separaten Seiten.
 
 ## 2. Farben
 
@@ -20,6 +20,7 @@ Dieses Dokument definiert die visuellen Richtlinien für die NeuroConcepts AI Pl
 *   **Hintergrund (Listen/Sidebar):** `bg-gray-50/30` (Subtile Abhebung)
 *   **Text (Haupt):** `text-gray-900`
 *   **Text (Sekundär):** `text-gray-500`
+*   **Focus-Farbe:** Indigo (`focus:border-indigo-500 focus:ring-indigo-500`)
 
 ## 3. Typografie
 
@@ -67,7 +68,40 @@ Jede Hauptseite (`/dashboard/...`) folgt diesem Aufbau:
 *   **Set:** Lucide React
 *   **Stil:** Schlicht, oft in Kombination mit einem farbigen Hintergrund-Kreis oder -Quadrat (`bg-indigo-50 text-indigo-600`).
 
-## 8. Exposé-Editor
+## 8. GlobalDrawer
+
+Der GlobalDrawer ist das zentrale UI-Element für alle "Neu anlegen" Aktionen. Er öffnet sich von unten und überlagert den Content.
+
+### Dimensionen
+*   **Höhe:** `720px` (für Lead, Property, Email Formulare)
+*   **Header-Höhe:** `48px` (12 = h-12)
+*   **Content-Höhe:** `672px` (720px - 48px)
+*   **Minimiert:** `48px` (nur Header sichtbar)
+
+### Design-Prinzipien
+*   **Kein Card-Design:** Keine umrandeten Boxen innerhalb des Drawers
+*   **Linienlos:** Struktur durch Whitespace, nicht durch Borders
+*   **Indigo Focus:** Alle Inputs nutzen `focus:border-indigo-500 focus:ring-indigo-500`
+*   **Dunkle Schrift:** `text-gray-900` für Input-Text, `text-gray-600` für Labels
+
+### Input-Styles
+```css
+/* Standard Input */
+block w-full rounded-lg border border-gray-300 bg-white text-gray-900 
+placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 
+focus:ring-opacity-20 sm:text-sm py-2.5 px-3 transition-all outline-none
+
+/* Label */
+block text-xs font-medium text-gray-600 mb-1.5
+```
+
+### Drawer-Typen
+*   **LEAD:** Neuen Lead erfassen (Indigo-Punkt)
+*   **PROPERTY:** Neues Objekt anlegen (Indigo-Punkt)
+*   **EMAIL:** E-Mail verfassen (Indigo-Punkt)
+*   **EXPOSE_EDITOR:** Exposé bearbeiten (eigenes Layout, andere Höhe)
+
+## 9. Exposé-Editor
 
 Der Exposé-Editor ist ein zentrales Feature mit eigenem Design-System:
 
@@ -91,9 +125,35 @@ Der Exposé-Editor ist ein zentrales Feature mit eigenem Design-System:
 *   **Farbpalette:** Getrennt wählbar (Indigo, Emerald, Amber, Rose, Slate)
 *   **Block-Farben:** Individuelle Hintergrund-/Textfarben pro Block möglich
 
-## 9. Lead-Formular
+## 10. Lead-Formular (im GlobalDrawer)
 
-### Anrede & Ansprache
-*   **Anrede-Dropdown:** Keine, Herr, Frau, Divers
-*   **Du/Sie Toggle:** Button-Group mit "Per Sie" (default) und "Per Du"
-*   **5-Spalten-Grid:** Anrede | Du/Sie | Vorname | Nachname (2 Spalten)
+### Felder
+*   **Anrede:** Dropdown (Keine, Herr, Frau, Divers)
+*   **Ansprache:** Button-Group (Sie/Du)
+*   **Vorname, Nachname:** Text-Inputs
+*   **E-Mail:** Pflichtfeld
+*   **Telefon:** Optional
+*   **Quelle:** Dropdown (Website, Portal, Empfehlung, Social Media, Kaltakquise, Event, Sonstiges)
+*   **Notizen:** Textarea
+
+### Layout
+*   12-Spalten-Grid für flexible Anordnung
+*   Anrede (2 Spalten) | Ansprache (2 Spalten) | Vorname (4 Spalten) | Nachname (4 Spalten)
+
+## 11. Property-Formular (im GlobalDrawer)
+
+### Felder
+*   **Titel (Intern):** Pflichtfeld
+*   **Objekttyp:** Dropdown (Wohnung, Haus, Grundstück, Gewerbe, Sonstiges)
+*   **Adresse:** Pflichtfeld
+*   **Preis (€):** Pflichtfeld, Number-Input
+*   **Zimmer:** Number-Input mit 0.5-Schritten
+*   **Fläche (m²):** Number-Input
+*   **Status:** Dropdown (Aktiv, Reserviert, Verkauft, Vermietet, Inaktiv)
+*   **Beschreibung:** Textarea
+*   **Jarvis-Fakten:** Textarea für interne KI-Infos
+
+### Layout
+*   2-Spalten für Titel/Typ
+*   Volle Breite für Adresse
+*   4-Spalten für Preis/Zimmer/Fläche/Status

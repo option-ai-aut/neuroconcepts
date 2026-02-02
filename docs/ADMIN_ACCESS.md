@@ -6,13 +6,13 @@ Der Admin-Bereich ist das Herzstück der Plattform für dich als Founder und dei
 
 ### Wie komme ich hin?
 
-Aktuell ist der Admin-Bereich noch nicht als separater Frontend-Screen implementiert. In Phase 1 (MVP) nutzen wir **direkten Datenbank-Zugriff** oder API-Calls, um Admins zu verwalten.
+**Frontend URL (Dev):** `https://LAMBDA-URL.lambda-url.eu-central-1.on.aws/admin`
 
-**Frontend URL (Dev):** `https://5qpdhyx77rhge5sphj356r4rty0tipol.lambda-url.eu-central-1.on.aws/`
+Der Admin-Bereich ist über `/admin` erreichbar und durch eine Middleware geschützt, die prüft ob `user.role === 'SUPER_ADMIN'` ist.
 
 ### Admin-User erstellen (Manuell)
 
-Da wir noch keine Registrierungsseite haben, musst du den ersten Super-Admin direkt in der Datenbank anlegen.
+Da wir noch keine Admin-Registrierungsseite haben, musst du den ersten Super-Admin direkt in der Datenbank anlegen.
 
 1.  **Verbinde dich mit der Datenbank:**
     *   Hole dir das Passwort aus dem AWS Secrets Manager (`NeuroConcepts-DB-Secret-dev`).
@@ -35,6 +35,7 @@ Da wir noch keine Registrierungsseite haben, musst du den ersten Super-Admin dir
     *   `ADMIN`: Darf nur seinen eigenen Tenant verwalten.
     *   `AGENT`: Darf nur Leads bearbeiten.
 *   **Schutz:** Der Admin-Bereich im Frontend wird durch eine Middleware geschützt, die prüft, ob `user.role === 'SUPER_ADMIN'` ist.
+*   **Auth:** Custom Login-Formular mit AWS Cognito (keine Amplify Authenticator UI).
 
 ---
 
@@ -48,3 +49,22 @@ Wir haben die Konfiguration angepasst (`serverlessV2MaxCapacity: 4`).
 ### Frontend "Cold Starts"
 
 Da das Frontend auf Lambda läuft, kann der erste Aufruf nach einer Pause 3-5 Sekunden dauern. Das ist normal und spart Kosten (Scale to Zero).
+
+### GitHub Actions "Queued"
+
+Falls GitHub Actions Deployments in "queued" hängen bleiben:
+- Prüfen ob GitHub-Limits erreicht sind
+- Alternativ: Manuelles Deployment via CDK (siehe DEV_ENVIRONMENT_SETUP.md)
+
+### CORS Fehler auf Dev Stage
+
+Falls 502 Fehler mit CORS auftreten:
+- Lambda Logs prüfen (`aws logs tail /aws/lambda/NeuroConcepts-Dev-OrchestratorLambda...`)
+- Häufige Ursache: Dateisystem-Zugriff außerhalb von `/tmp` in Lambda
+- Lösung: Uploads müssen in `/tmp/uploads` statt `./uploads` gespeichert werden
+
+### Doppelte Slashes in API URLs
+
+Falls API-Calls mit `//` in der URL fehlschlagen:
+- `getApiUrl()` Helper in `lib/api.ts` entfernt trailing slashes automatisch
+- Prüfen ob alle API-Calls diesen Helper nutzen

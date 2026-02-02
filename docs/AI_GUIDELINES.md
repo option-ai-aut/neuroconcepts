@@ -43,7 +43,7 @@ Wann übergibt Jarvis an den Menschen?
 | **Confidence Score < 80%** | Erstellt Entwurf, sendet nicht | `Draft` |
 | **Expliziter Wunsch nach Mensch** | "Gerne, mein Kollege ruft Sie an." | `Call Scheduled` |
 
-## 🗣 Prompting-Strategie (Gemini 3)
+## 🗣 Prompting-Strategie (Gemini)
 
 Wir nutzen einen **System-Prompt**, der bei jeder Interaktion mit Kontext angereichert wird (RAG).
 
@@ -86,3 +86,32 @@ Datum:    {{date.today}}, {{date.year}}
 - `leadInfo` Block für personalisierte Exposés
 - Anrede basierend auf `salutation` (Herr/Frau/Divers)
 - Du/Sie basierend auf `formalAddress`
+
+## 🛠 Jarvis Tools (Function Calling)
+
+Jarvis hat Zugriff auf folgende Tools:
+
+### CRM Tools
+- `createLead`: Neuen Lead anlegen
+- `updateLead`: Lead-Daten aktualisieren
+- `createProperty`: Neues Objekt anlegen
+- `updateProperty`: Objekt-Daten aktualisieren
+- `searchLeads`: Leads durchsuchen
+- `searchProperties`: Objekte durchsuchen
+
+### Kalender Tools
+- `getAvailability`: Verfügbare Termine abrufen
+- `createAppointment`: Termin erstellen
+- `cancelAppointment`: Termin absagen
+
+### Exposé Tools
+- `createExpose`: Neues Exposé erstellen
+- `updateExposeBlock`: Block bearbeiten
+- `addExposeBlock`: Block hinzufügen
+- `removeExposeBlock`: Block entfernen
+- `generatePDF`: PDF generieren
+
+### Kommunikation Tools
+- `sendEmail`: E-Mail senden
+- `createDraft`: Entwurf erstellen
+- `escalateToHuman`: An Makler eskalieren

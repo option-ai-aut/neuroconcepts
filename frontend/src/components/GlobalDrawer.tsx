@@ -158,7 +158,7 @@ export default function GlobalDrawer() {
   return (
     <div
       className={`fixed bottom-0 right-80 bg-white shadow-[0_-5px_30px_rgba(0,0,0,0.15)] border-t border-x border-gray-200 rounded-t-xl z-40 ${
-        drawerMinimized ? 'h-12' : 'h-[520px]'
+        drawerMinimized ? 'h-12' : 'h-[720px]'
       }`}
       style={{ 
         transform: isVisible ? 'translateY(0)' : 'translateY(100%)',
@@ -195,7 +195,7 @@ export default function GlobalDrawer() {
 
       {/* Body */}
       {!drawerMinimized && (
-        <div className="p-6 overflow-y-auto h-[calc(520px-48px)]">
+        <div className="p-6 overflow-y-auto h-[calc(720px-48px)]">
           {drawerType === 'EMAIL' && (
             <div className="max-w-4xl mx-auto space-y-4">
               <div>

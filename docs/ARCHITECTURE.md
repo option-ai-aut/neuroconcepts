@@ -28,13 +28,14 @@ graph TD
     end
 
     subgraph "AI Engine"
-        Orchestrator -->|Context| Gemini[Google Gemini 3 Flash]
+        Orchestrator -->|Context| Gemini[Google Gemini 2.0 Flash]
         Gemini -->|Response| Orchestrator
     end
 
     subgraph "Integration Layer"
-        Orchestrator -->|SMTP| UserSMTP[User SMTP Server]
+        Orchestrator -->|SMTP/OAuth| UserSMTP[User Email Server]
         Orchestrator -->|Sync| Cal[Google/MS Calendar]
+        Orchestrator -->|Sync| Mail[Google/MS Mail]
         Billing -->|Events| Stripe[Stripe API]
     end
 
@@ -58,12 +59,15 @@ graph TD
 ### 2. Core Application
 *   **Orchestrator (Lambda + API Gateway):** Die zentrale Schaltstelle. Verwaltet den Status eines Leads (`NEW` -> `CONTACTED` -> `CONVERSATION` -> `BOOKED`). Entscheidet, wann die KI aufgerufen wird und wann ein Mensch eingreifen muss.
 *   **Tenant Manager:** Verwaltet die Mandanten (Immobilienfirmen), deren Konfigurationen (SMTP-Zugangsdaten, Routing-Regeln) und Benutzerrechte.
-*   **Encryption Service:** AES-256-GCM Verschlüsselung für sensible Daten (FTP-Passwörter, API-Keys).
+*   **Encryption Service:** AES-256-GCM Verschlüsselung für sensible Daten (FTP-Passwörter, API-Keys, OAuth-Tokens).
 *   **PDF Service:** Generiert Exposé-PDFs mit Puppeteer, inkl. QR-Codes für Videos/360°-Touren.
+*   **Email Service:** OAuth-Integration für Gmail und Outlook Mail (Token-Management, Senden/Empfangen).
+*   **Calendar Service:** OAuth-Integration für Google Calendar und Microsoft Outlook Calendar.
 
 ### 3. Data Layer
 *   **PostgreSQL:** Speichert relationale Daten: Tenants, Users, Leads, Properties, CalendarEvents.
     *   **Dev/Stage:** RDS Single Instance (`t4g.micro`) zur Kostenoptimierung.
+    *   **Lokal:** Neon.tech (serverless Postgres) für lokale Entwicklung.
     *   **Prod:** Aurora Serverless v2 für Skalierbarkeit und HA.
 *   **pgvector:** Speichert Embeddings von Exposés und vergangenen Konversationen, um der KI ein "Langzeitgedächtnis" zu geben (RAG - Retrieval Augmented Generation).
 
@@ -77,7 +81,9 @@ graph TD
     *   **Datei-Verarbeitung:** CSV/Excel-Import, PDF-Analyse, Bild-Erkennung.
 
 ### 5. Integration Layer
-*   **E-Mail Outbound:** Der Versand erfolgt **nicht** über AWS SES (um "Via"-Header zu vermeiden), sondern direkt über die SMTP-Credentials des Maklers. Das garantiert 100% White-Labeling und hohe Zustellrate.
+*   **E-Mail Outbound:**
+    *   **Option 1 (OAuth):** Gmail oder Outlook Mail über OAuth-Integration.
+    *   **Option 2 (SMTP):** Direkter Versand über die SMTP-Credentials des Maklers für 100% White-Labeling.
 *   **Kalender:** Direkte Integration via Google Calendar API und Microsoft Graph API. Wir nutzen Refresh Tokens für dauerhaften Zugriff.
 *   **Stripe:** Abwicklung von Subscriptions. Webhooks von Stripe aktualisieren den Lizenz-Status im `Tenant Manager`.
 
@@ -86,17 +92,18 @@ graph TD
 *   **Hosting:** **AWS Lambda (Docker Image)**.
     *   Wir nutzen den **AWS Lambda Web Adapter**, um die Next.js App als normalen Webserver im Container laufen zu lassen.
     *   Dies ermöglicht "Scale to Zero" (0€ Kosten bei Inaktivität) und unendliche Skalierung bei Last.
-*   **Auth:** AWS Cognito User Pool für sicheren Login/Registrierung.
+*   **Auth:** AWS Cognito User Pool für sicheren Login/Registrierung (Custom UI, keine Amplify Authenticator).
 
 ## 🔒 Sicherheit & Compliance
 
 ### Datenhaltung
 *   **Region:** Alle Daten verbleiben in AWS `eu-central-1` (Frankfurt).
 *   **Verschlüsselung:** Datenbanken sind `At-Rest` verschlüsselt (AWS KMS). API-Traffic ist `In-Transit` verschlüsselt (TLS 1.3).
-*   **Credentials:** SMTP-Passwörter und OAuth-Tokens werden im **AWS Secrets Manager** oder verschlüsselt in der DB gespeichert.
+*   **Credentials:** SMTP-Passwörter und OAuth-Tokens werden mit AES-256-GCM verschlüsselt in der DB gespeichert.
 
 ### Multi-Tenancy
 *   **Logische Trennung:** Jede Datenbank-Abfrage erzwingt einen `WHERE tenant_id = X` Filter.
+*   **Automatische TenantId:** API-Endpoints holen die `tenantId` automatisch vom authentifizierten User.
 *   **Rollen-Konzept:**
     *   `SUPER_ADMIN`: Systemweiter Zugriff.
     *   `ADMIN`: Verwaltet Firma, Billing, User.
@@ -110,7 +117,7 @@ Wir nutzen **AWS CDK (Cloud Development Kit)**, um die gesamte Infrastruktur im 
 ### Environment-Strategie
 1.  **Dev** (`NeuroConcepts-Dev`):
     *   Für die tägliche Entwicklung.
-    *   **Deployment:** Automatisch bei Push auf `main`.
+    *   **Deployment:** Automatisch bei Push auf `main` (GitHub Actions).
     *   Ressourcen: RDS Micro, Lambda Frontend (Scale to Zero).
 2.  **Stage** (`NeuroConcepts-Stage`):
     *   Spiegelbild der Produktion.
@@ -119,3 +126,9 @@ Wir nutzen **AWS CDK (Cloud Development Kit)**, um die gesamte Infrastruktur im 
     *   Das Live-System.
     *   **Deployment:** Manuell via GitHub Actions (Workflow Dispatch).
     *   Backups und High-Availability aktiviert.
+
+### Lokale Entwicklung
+*   **Frontend:** `npm run dev` auf Port 3000
+*   **Backend:** `npm run dev` auf Port 3001 (mit nodemon)
+*   **Datenbank:** Neon.tech (kostenlose serverless Postgres)
+*   **Uploads:** Lokal in `./uploads`, auf Lambda in `/tmp/uploads`
