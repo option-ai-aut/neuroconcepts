@@ -26,8 +26,19 @@ export default function LoginPage() {
   }, [authStatus, router]);
 
   return (
-    <div className="min-h-screen flex bg-white">
-      {/* Left Side - Image/Brand */}
+    <div className="min-h-screen flex flex-col lg:flex-row bg-white">
+      {/* Back Button - Mobile: Top, Desktop: Absolute */}
+      <div className="lg:absolute lg:top-8 lg:left-8 p-4 lg:p-0 z-30">
+        <Link 
+          href="/" 
+          className="group inline-flex items-center px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-white lg:bg-gray-50 hover:bg-gray-100 rounded-full transition-all shadow-sm lg:shadow-none border border-gray-200 lg:border-transparent"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+          Zurück
+        </Link>
+      </div>
+
+      {/* Left Side - Image/Brand (Hidden on Mobile) */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-gray-900 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 to-blue-600/20 z-10" />
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-40" />
@@ -54,29 +65,20 @@ export default function LoginPage() {
       </div>
 
       {/* Right Side - Login Form */}
-      <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-20 xl:px-24 relative bg-white">
-        <div className="absolute top-8 right-8">
-          <Link 
-            href="/" 
-            className="group flex items-center px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-full transition-all"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
-            Zurück zur Startseite
-          </Link>
+      <div className="flex-1 flex flex-col justify-center py-8 lg:py-12 px-4 sm:px-6 lg:px-12 xl:px-20 relative bg-white">
+        {/* Mobile Logo */}
+        <div className="mb-8 lg:hidden text-center">
+          <div className="flex items-center justify-center">
+            <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-2xl">N</span>
+            </div>
+          </div>
+          <h2 className="mt-4 text-2xl font-extrabold text-gray-900">
+            NeuroConcepts
+          </h2>
         </div>
 
-        <div className="mx-auto w-full max-w-sm lg:w-96">
-          <div className="mb-10 lg:hidden">
-            <div className="flex items-center justify-center">
-              <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-xl">N</span>
-              </div>
-            </div>
-            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-              NeuroConcepts
-            </h2>
-          </div>
-
+        <div className="mx-auto w-full max-w-md">
           <div className="bg-white">
             <style jsx global>{`
               [data-amplify-authenticator] {
@@ -88,27 +90,49 @@ export default function LoginPage() {
                 --amplify-components-tabs-item-active-border-color: #4f46e5;
                 --amplify-components-tabs-item-color: #6b7280;
                 --amplify-components-tabs-item-active-color: #4f46e5;
+                --amplify-components-fieldcontrol-border-color: #e5e7eb;
+                --amplify-components-fieldcontrol-focus-border-color: #4f46e5;
+                --amplify-radii-small: 8px;
+                --amplify-radii-medium: 12px;
               }
-              /* Hide the password show/hide button from tab order but keep it clickable */
-              .amplify-passwordfield__show-password {
-                tab-index: -1 !important;
+              [data-amplify-authenticator] [data-amplify-router] {
+                border: none;
+                box-shadow: none;
               }
-              /* Optional: If you want to hide it completely visually */
-              /* .amplify-passwordfield__show-password { display: none; } */
+              .amplify-input {
+                border-radius: 8px !important;
+              }
+              .amplify-button--primary {
+                border-radius: 8px !important;
+              }
+              .amplify-tabs__item {
+                font-weight: 500;
+              }
             `}</style>
             <Authenticator 
               initialState="signIn"
               components={{
-                Header: () => (
-                  <div className="text-center mb-8">
-                    <h3 className="text-2xl font-bold text-gray-900">Anmelden</h3>
-                    <p className="text-sm text-gray-500 mt-2">Zugang zu deinem Dashboard</p>
-                  </div>
-                ),
+                Header: () => null,
+                SignIn: {
+                  Header: () => (
+                    <div className="text-center mb-6">
+                      <h3 className="text-2xl font-bold text-gray-900">Anmelden</h3>
+                      <p className="text-sm text-gray-500 mt-2">Zugang zu deinem Dashboard</p>
+                    </div>
+                  )
+                },
                 SignUp: {
+                  Header: () => (
+                    <div className="text-center mb-6">
+                      <h3 className="text-2xl font-bold text-gray-900">Konto erstellen</h3>
+                      <p className="text-sm text-gray-500 mt-2">Starte deine 14-tägige Testphase</p>
+                    </div>
+                  ),
                   Footer: () => (
-                    <div className="text-center mt-4 text-xs text-gray-500">
-                      Adresse und weitere Details kannst du nach der Registrierung in deinem Profil ergänzen.
+                    <div className="text-center mt-4 text-xs text-gray-400">
+                      Mit der Registrierung akzeptierst du unsere{' '}
+                      <Link href="/agb" className="text-indigo-600 hover:underline">AGB</Link> und{' '}
+                      <Link href="/datenschutz" className="text-indigo-600 hover:underline">Datenschutzerklärung</Link>.
                     </div>
                   )
                 }
@@ -152,10 +176,40 @@ export default function LoginPage() {
                     order: 5,
                     isRequired: true
                   },
-                  phone_number: {
-                    label: 'Telefonnummer (mit Vorwahl, z.B. +43...)',
-                    placeholder: '+43',
+                  'custom:company_name': {
+                    label: 'Firmenname',
+                    placeholder: '',
                     order: 6,
+                    isRequired: false
+                  },
+                  phone_number: {
+                    label: 'Telefon (mit Vorwahl)',
+                    placeholder: '+43',
+                    order: 7,
+                    isRequired: false
+                  },
+                  address: {
+                    label: 'Straße & Hausnummer',
+                    placeholder: '',
+                    order: 8,
+                    isRequired: false
+                  },
+                  'custom:postal_code': {
+                    label: 'PLZ',
+                    placeholder: '',
+                    order: 9,
+                    isRequired: false
+                  },
+                  'custom:city': {
+                    label: 'Ort',
+                    placeholder: '',
+                    order: 10,
+                    isRequired: false
+                  },
+                  'custom:country': {
+                    label: 'Land',
+                    placeholder: '',
+                    order: 11,
                     isRequired: false
                   }
                 }
