@@ -131,10 +131,7 @@ export default function LoginPage() {
                     </div>
                   ),
                   Footer: () => (
-                    <div className="text-center mt-4 space-y-2">
-                      <p className="text-xs text-gray-500">
-                        Firmenname, Adresse und weitere Details kannst du nach der Registrierung in deinem Profil ergänzen.
-                      </p>
+                    <div className="text-center mt-4">
                       <p className="text-xs text-gray-400">
                         Mit der Registrierung akzeptierst du unsere{' '}
                         <Link href="/agb" className="text-indigo-600 hover:underline">AGB</Link> und{' '}
@@ -183,10 +180,40 @@ export default function LoginPage() {
                     order: 5,
                     isRequired: true
                   },
-                  phone_number: {
-                    label: 'Telefon (mit Vorwahl, z.B. +43...)',
-                    placeholder: '+43',
+                  'custom:company_name': {
+                    label: 'Firmenname',
+                    placeholder: '',
                     order: 6,
+                    isRequired: false
+                  },
+                  phone_number: {
+                    label: 'Telefon (mit Vorwahl)',
+                    placeholder: '+43',
+                    order: 7,
+                    isRequired: false
+                  },
+                  address: {
+                    label: 'Straße & Hausnummer',
+                    placeholder: '',
+                    order: 8,
+                    isRequired: false
+                  },
+                  'custom:postal_code': {
+                    label: 'PLZ',
+                    placeholder: '',
+                    order: 9,
+                    isRequired: false
+                  },
+                  'custom:city': {
+                    label: 'Ort',
+                    placeholder: '',
+                    order: 10,
+                    isRequired: false
+                  },
+                  'custom:country': {
+                    label: 'Land',
+                    placeholder: 'Österreich',
+                    order: 11,
                     isRequired: false
                   }
                 }
