@@ -184,6 +184,7 @@ export class NeuroConceptsStack extends cdk.Stack {
               `npm install @prisma/client@5.10.2 prisma@5.10.2`,
               `npx prisma generate`,
               `rm -rf node_modules/@prisma/engines`,
+              `rm -rf node_modules/.bin`,
               `rm -rf node_modules/prisma`,
             ];
           },
