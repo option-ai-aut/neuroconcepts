@@ -175,7 +175,8 @@ Antworte immer auf Deutsch. Sei freundlich und hilfsbereit. Erkläre kurz was du
 
     // If there are function calls, execute them first
     if (functionCalls && functionCalls.length > 0) {
-      yield { chunk: '[Jarvis führt Aktion aus...]', hadFunctionCalls: true };
+      // Signal that action is being executed (frontend shows visual indicator)
+      yield { chunk: '', hadFunctionCalls: true };
       
       const toolOutputs = await this.executeToolCalls(functionCalls, tenantId);
       

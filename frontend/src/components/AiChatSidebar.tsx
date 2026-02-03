@@ -385,13 +385,14 @@ export default function AiChatSidebar() {
         )}
         
         {messages.map((msg, index) => {
-          // Action message (system)
+          // Action message (system) - just show visual indicator, no text
           if (msg.isAction) {
             return (
               <div key={index} className="flex justify-center">
-                <div className="bg-indigo-50 text-indigo-700 rounded-lg px-4 py-2 text-xs font-medium flex items-center gap-2 animate-pulse">
-                  <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping"></div>
-                  {msg.content}
+                <div className="bg-indigo-50 text-indigo-600 rounded-full px-3 py-1.5 text-xs font-medium flex items-center gap-1.5">
+                  <div className="w-1 h-1 bg-indigo-500 rounded-full animate-ping"></div>
+                  <div className="w-1 h-1 bg-indigo-500 rounded-full animate-ping delay-75"></div>
+                  <div className="w-1 h-1 bg-indigo-500 rounded-full animate-ping delay-150"></div>
                 </div>
               </div>
             );

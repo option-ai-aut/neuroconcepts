@@ -6,6 +6,14 @@ let prisma: PrismaClient;
 
 export function setPrismaClient(client: PrismaClient) {
   prisma = client;
+  console.log('✅ AiTools: Prisma client injected');
+}
+
+function getPrisma(): PrismaClient {
+  if (!prisma) {
+    throw new Error('Prisma client not initialized in AiTools. Call setPrismaClient first.');
+  }
+  return prisma;
 }
 
 export const CRM_TOOLS = {
@@ -126,13 +134,24 @@ export const CRM_TOOLS = {
   },
   delete_lead: {
     name: "delete_lead",
-    description: "Deletes a lead from the CRM. Use with caution!",
+    description: "Deletes a single lead from the CRM by ID. Use with caution!",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         leadId: { type: SchemaType.STRING, description: "ID of the lead to delete" } as FunctionDeclarationSchema,
       },
       required: ["leadId"]
+    }
+  },
+  delete_all_leads: {
+    name: "delete_all_leads",
+    description: "Deletes ALL leads from the CRM. DANGEROUS! Always ask for confirmation first. Returns the count of deleted leads.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        confirmed: { type: SchemaType.BOOLEAN, description: "Must be true to confirm deletion. Always ask user for confirmation first!" } as FunctionDeclarationSchema,
+      },
+      required: ["confirmed"]
     }
   },
   get_properties: {
@@ -188,13 +207,24 @@ export const CRM_TOOLS = {
   },
   delete_property: {
     name: "delete_property",
-    description: "Deletes a property from the CRM. Use with caution!",
+    description: "Deletes a single property from the CRM by ID. Use with caution!",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         propertyId: { type: SchemaType.STRING, description: "ID of the property to delete" } as FunctionDeclarationSchema,
       },
       required: ["propertyId"]
+    }
+  },
+  delete_all_properties: {
+    name: "delete_all_properties",
+    description: "Deletes ALL properties from the CRM. DANGEROUS! Always ask for confirmation first. Returns the count of deleted properties.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        confirmed: { type: SchemaType.BOOLEAN, description: "Must be true to confirm deletion. Always ask user for confirmation first!" } as FunctionDeclarationSchema,
+      },
+      required: ["confirmed"]
     }
   },
   // === EMAIL TOOLS ===
@@ -355,13 +385,24 @@ export const CRM_TOOLS = {
   },
   delete_expose: {
     name: "delete_expose",
-    description: "Deletes an Exposé.",
+    description: "Deletes a single Exposé by ID.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         exposeId: { type: SchemaType.STRING, description: "ID of the Exposé to delete" } as FunctionDeclarationSchema,
       },
       required: ["exposeId"]
+    }
+  },
+  delete_all_exposes: {
+    name: "delete_all_exposes",
+    description: "Deletes ALL Exposés from the CRM. DANGEROUS! Always ask for confirmation first. Returns the count of deleted exposés.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        confirmed: { type: SchemaType.BOOLEAN, description: "Must be true to confirm deletion. Always ask user for confirmation first!" } as FunctionDeclarationSchema,
+      },
+      required: ["confirmed"]
     }
   },
   generate_expose_pdf: {
@@ -756,7 +797,7 @@ export class AiToolExecutor {
           minRooms, minArea, timeFrame, financingStatus, source
         } = args;
         
-        return await prisma.lead.create({
+        return await getPrisma().lead.create({
           data: {
             salutation: salutation || 'NONE',
             formalAddress: formalAddress !== undefined ? formalAddress : true,
@@ -783,7 +824,7 @@ export class AiToolExecutor {
 
       case 'get_leads': {
         const { status, limit = 50 } = args;
-        return await prisma.lead.findMany({
+        return await getPrisma().lead.findMany({
           where: { 
             tenantId,
             ...(status && { status })
@@ -795,7 +836,7 @@ export class AiToolExecutor {
 
       case 'get_lead': {
         const { leadId } = args;
-        return await prisma.lead.findFirst({
+        return await getPrisma().lead.findFirst({
           where: { id: leadId, tenantId },
           include: { messages: true }
         });
@@ -803,7 +844,7 @@ export class AiToolExecutor {
 
       case 'update_lead': {
         const { leadId, ...updateData } = args;
-        return await prisma.lead.update({
+        return await getPrisma().lead.update({
           where: { id: leadId },
           data: updateData
         });
@@ -811,8 +852,17 @@ export class AiToolExecutor {
 
       case 'delete_lead': {
         const { leadId } = args;
-        await prisma.lead.delete({ where: { id: leadId } });
+        await getPrisma().lead.delete({ where: { id: leadId } });
         return `Lead ${leadId} wurde gelöscht.`;
+      }
+
+      case 'delete_all_leads': {
+        const { confirmed } = args;
+        if (!confirmed) {
+          return 'Löschung abgebrochen. Bitte bestätige mit confirmed: true.';
+        }
+        const result = await getPrisma().lead.deleteMany({ where: { tenantId } });
+        return `${result.count} Lead(s) wurden gelöscht.`;
       }
 
       case 'create_property':
@@ -820,7 +870,7 @@ export class AiToolExecutor {
 
       case 'get_properties': {
         const { limit = 50 } = args;
-        return await prisma.property.findMany({
+        return await getPrisma().property.findMany({
           where: { tenantId },
           take: limit,
           orderBy: { createdAt: 'desc' }
@@ -829,14 +879,14 @@ export class AiToolExecutor {
 
       case 'get_property': {
         const { propertyId } = args;
-        return await prisma.property.findFirst({
+        return await getPrisma().property.findFirst({
           where: { id: propertyId, tenantId }
         });
       }
 
       case 'update_property': {
         const { propertyId, ...updateData } = args;
-        return await prisma.property.update({
+        return await getPrisma().property.update({
           where: { id: propertyId },
           data: updateData
         });
@@ -844,14 +894,23 @@ export class AiToolExecutor {
 
       case 'delete_property': {
         const { propertyId } = args;
-        await prisma.property.delete({ where: { id: propertyId } });
-        return `Property ${propertyId} wurde gelöscht.`;
+        await getPrisma().property.delete({ where: { id: propertyId } });
+        return `Objekt ${propertyId} wurde gelöscht.`;
+      }
+
+      case 'delete_all_properties': {
+        const { confirmed } = args;
+        if (!confirmed) {
+          return 'Löschung abgebrochen. Bitte bestätige mit confirmed: true.';
+        }
+        const result = await getPrisma().property.deleteMany({ where: { tenantId } });
+        return `${result.count} Objekt(e) wurden gelöscht.`;
       }
 
       case 'search_properties': {
         const { query, minPrice, maxPrice } = args;
         
-        return await prisma.property.findMany({
+        return await getPrisma().property.findMany({
           where: {
             tenantId,
             OR: [
@@ -923,7 +982,7 @@ export class AiToolExecutor {
       // === EXPOSÉ TOOLS (non-editor) ===
       case 'get_exposes': {
         const { status, propertyId, limit = 50 } = args;
-        return await prisma.expose.findMany({
+        return await getPrisma().expose.findMany({
           where: {
             property: { tenantId },
             ...(status && { status }),
@@ -937,17 +996,17 @@ export class AiToolExecutor {
 
       case 'create_expose_from_template': {
         const { propertyId, templateId } = args;
-        const template = await prisma.exposeTemplate.findFirst({
+        const template = await getPrisma().exposeTemplate.findFirst({
           where: { id: templateId, tenantId }
         });
         if (!template) return { error: "Template nicht gefunden" };
 
-        const property = await prisma.property.findFirst({
+        const property = await getPrisma().property.findFirst({
           where: { id: propertyId, tenantId }
         });
         if (!property) return { error: "Property nicht gefunden" };
 
-        const expose = await prisma.expose.create({
+        const expose = await getPrisma().expose.create({
           data: {
             tenantId,
             propertyId,
@@ -961,8 +1020,17 @@ export class AiToolExecutor {
 
       case 'delete_expose': {
         const { exposeId } = args;
-        await prisma.expose.delete({ where: { id: exposeId } });
+        await getPrisma().expose.delete({ where: { id: exposeId } });
         return `Exposé ${exposeId} wurde gelöscht.`;
+      }
+
+      case 'delete_all_exposes': {
+        const { confirmed } = args;
+        if (!confirmed) {
+          return 'Löschung abgebrochen. Bitte bestätige mit confirmed: true.';
+        }
+        const result = await getPrisma().expose.deleteMany({ where: { tenantId } });
+        return `${result.count} Exposé(s) wurden gelöscht.`;
       }
 
       case 'generate_expose_pdf': {
@@ -973,7 +1041,7 @@ export class AiToolExecutor {
       // === TEAM CHAT TOOLS ===
       case 'get_channels': {
         const { limit = 50 } = args;
-        return await prisma.channel.findMany({
+        return await getPrisma().channel.findMany({
           where: { tenantId },
           take: limit,
           orderBy: { createdAt: 'desc' }
@@ -982,7 +1050,7 @@ export class AiToolExecutor {
 
       case 'get_channel_messages': {
         const { channelId, limit = 50 } = args;
-        return await prisma.channelMessage.findMany({
+        return await getPrisma().channelMessage.findMany({
           where: { channelId },
           include: { user: { select: { firstName: true, lastName: true, email: true } } },
           take: limit,
@@ -994,7 +1062,7 @@ export class AiToolExecutor {
         const { channelId, content } = args;
         // TODO: Get actual userId from context
         const userId = 'jarvis-bot-id'; // Placeholder
-        const message = await prisma.channelMessage.create({
+        const message = await getPrisma().channelMessage.create({
           data: {
             channelId,
             userId,
@@ -1028,7 +1096,7 @@ export class AiToolExecutor {
         const { period = 'month' } = args;
         const startDate = getStartDateForPeriod(period);
         
-        const leads = await prisma.lead.findMany({
+        const leads = await getPrisma().lead.findMany({
           where: { tenantId, createdAt: { gte: startDate } }
         });
 
@@ -1049,7 +1117,7 @@ export class AiToolExecutor {
         const { period = 'month' } = args;
         const startDate = getStartDateForPeriod(period);
         
-        const properties = await prisma.property.findMany({
+        const properties = await getPrisma().property.findMany({
           where: { tenantId, createdAt: { gte: startDate } }
         });
 
@@ -1069,7 +1137,7 @@ export class AiToolExecutor {
       // === TEMPLATE TOOLS ===
       case 'get_email_templates': {
         const { limit = 50 } = args;
-        return await prisma.emailTemplate.findMany({
+        return await getPrisma().emailTemplate.findMany({
           where: { tenantId },
           take: limit,
           orderBy: { createdAt: 'desc' }
@@ -1078,7 +1146,7 @@ export class AiToolExecutor {
 
       case 'get_expose_templates': {
         const { limit = 50 } = args;
-        return await prisma.exposeTemplate.findMany({
+        return await getPrisma().exposeTemplate.findMany({
           where: { tenantId },
           take: limit,
           orderBy: { createdAt: 'desc' }
@@ -1095,7 +1163,7 @@ export class AiToolExecutor {
         
         // Determine if we're working with an expose or template
         if (templateId) {
-          const template = await prisma.exposeTemplate.findFirst({
+          const template = await getPrisma().exposeTemplate.findFirst({
             where: { id: templateId, tenantId }
           });
           if (!template) throw new Error('Template not found or access denied');
@@ -1103,7 +1171,7 @@ export class AiToolExecutor {
           targetId = templateId;
           isTemplate = true;
         } else if (exposeId) {
-          const expose = await prisma.expose.findFirst({
+          const expose = await getPrisma().expose.findFirst({
             where: { id: exposeId, property: { tenantId } },
             include: { property: true }
           });
@@ -1168,12 +1236,12 @@ export class AiToolExecutor {
 
         // Update the target
         if (isTemplate) {
-          await prisma.exposeTemplate.update({
+          await getPrisma().exposeTemplate.update({
             where: { id: targetId },
             data: { blocks }
           });
         } else {
-          await prisma.expose.update({
+          await getPrisma().expose.update({
             where: { id: targetId },
             data: { blocks }
           });
@@ -1191,7 +1259,7 @@ export class AiToolExecutor {
         
         // Determine if we're working with an expose or template
         if (templateId) {
-          const template = await prisma.exposeTemplate.findFirst({
+          const template = await getPrisma().exposeTemplate.findFirst({
             where: { id: templateId, tenantId }
           });
           if (!template) throw new Error('Template not found or access denied');
@@ -1199,7 +1267,7 @@ export class AiToolExecutor {
           targetId = templateId;
           isTemplate = true;
         } else if (exposeId) {
-          const expose = await prisma.expose.findFirst({
+          const expose = await getPrisma().expose.findFirst({
             where: { id: exposeId, property: { tenantId } }
           });
           if (!expose) throw new Error('Exposé not found or access denied');
@@ -1236,12 +1304,12 @@ export class AiToolExecutor {
 
         // Update the target
         if (isTemplate) {
-          await prisma.exposeTemplate.update({
+          await getPrisma().exposeTemplate.update({
             where: { id: targetId },
             data: { blocks }
           });
         } else {
-          await prisma.expose.update({
+          await getPrisma().expose.update({
             where: { id: targetId },
             data: { blocks }
           });
@@ -1258,7 +1326,7 @@ export class AiToolExecutor {
         let isTemplate = false;
         
         if (templateId) {
-          const template = await prisma.exposeTemplate.findFirst({
+          const template = await getPrisma().exposeTemplate.findFirst({
             where: { id: templateId, tenantId }
           });
           if (!template) throw new Error('Template not found or access denied');
@@ -1266,7 +1334,7 @@ export class AiToolExecutor {
           targetId = templateId;
           isTemplate = true;
         } else if (exposeId) {
-          const expose = await prisma.expose.findFirst({
+          const expose = await getPrisma().expose.findFirst({
             where: { id: exposeId, property: { tenantId } }
           });
           if (!expose) throw new Error('Exposé not found or access denied');
@@ -1283,12 +1351,12 @@ export class AiToolExecutor {
         }
 
         if (isTemplate) {
-          await prisma.exposeTemplate.update({
+          await getPrisma().exposeTemplate.update({
             where: { id: targetId },
             data: { blocks: newBlocks }
           });
         } else {
-          await prisma.expose.update({
+          await getPrisma().expose.update({
             where: { id: targetId },
             data: { blocks: newBlocks }
           });
@@ -1305,7 +1373,7 @@ export class AiToolExecutor {
         let isTemplate = false;
         
         if (templateId) {
-          const template = await prisma.exposeTemplate.findFirst({
+          const template = await getPrisma().exposeTemplate.findFirst({
             where: { id: templateId, tenantId }
           });
           if (!template) throw new Error('Template not found or access denied');
@@ -1313,7 +1381,7 @@ export class AiToolExecutor {
           targetId = templateId;
           isTemplate = true;
         } else if (exposeId) {
-          const expose = await prisma.expose.findFirst({
+          const expose = await getPrisma().expose.findFirst({
             where: { id: exposeId, property: { tenantId } }
           });
           if (!expose) throw new Error('Exposé not found or access denied');
@@ -1332,12 +1400,12 @@ export class AiToolExecutor {
         blocks.splice(insertPos, 0, block);
 
         if (isTemplate) {
-          await prisma.exposeTemplate.update({
+          await getPrisma().exposeTemplate.update({
             where: { id: targetId },
             data: { blocks }
           });
         } else {
-          await prisma.expose.update({
+          await getPrisma().expose.update({
             where: { id: targetId },
             data: { blocks }
           });
@@ -1349,7 +1417,7 @@ export class AiToolExecutor {
       case 'generate_expose_text': {
         const { propertyId, textType, tone = 'professional', maxLength = 500 } = args;
         
-        const property = await prisma.property.findFirst({
+        const property = await getPrisma().property.findFirst({
           where: { id: propertyId, tenantId }
         });
         if (!property) throw new Error('Property not found or access denied');
@@ -1373,7 +1441,7 @@ export class AiToolExecutor {
       case 'get_expose_status': {
         const { exposeId } = args;
         
-        const expose = await prisma.expose.findFirst({
+        const expose = await getPrisma().expose.findFirst({
           where: { id: exposeId, property: { tenantId } },
           include: { property: true, template: true }
         });
@@ -1407,12 +1475,12 @@ export class AiToolExecutor {
           throw new Error('Invalid status. Must be DRAFT or PUBLISHED');
         }
 
-        const expose = await prisma.expose.findFirst({
+        const expose = await getPrisma().expose.findFirst({
           where: { id: exposeId, property: { tenantId } }
         });
         if (!expose) throw new Error('Exposé not found or access denied');
 
-        await prisma.expose.update({
+        await getPrisma().expose.update({
           where: { id: exposeId },
           data: { status }
         });
@@ -1423,7 +1491,7 @@ export class AiToolExecutor {
       case 'create_full_expose': {
         const { exposeId, style = 'professional', includeBlocks, theme = 'default', customInstructions } = args;
         
-        const expose = await prisma.expose.findFirst({
+        const expose = await getPrisma().expose.findFirst({
           where: { id: exposeId, property: { tenantId } },
           include: { property: true }
         });
@@ -1579,7 +1647,7 @@ export class AiToolExecutor {
         }
 
         // Update expose with new blocks and theme
-        await prisma.expose.update({
+        await getPrisma().expose.update({
           where: { id: exposeId },
           data: { 
             blocks,
@@ -1604,12 +1672,12 @@ export class AiToolExecutor {
           throw new Error(`Invalid theme. Must be one of: ${validThemes.join(', ')}`);
         }
 
-        const expose = await prisma.expose.findFirst({
+        const expose = await getPrisma().expose.findFirst({
           where: { id: exposeId, property: { tenantId } }
         });
         if (!expose) throw new Error('Exposé not found or access denied');
 
-        await prisma.expose.update({
+        await getPrisma().expose.update({
           where: { id: exposeId },
           data: { theme }
         });
@@ -1621,24 +1689,24 @@ export class AiToolExecutor {
         const { exposeId, templateId } = args;
         
         if (templateId) {
-          const template = await prisma.exposeTemplate.findFirst({
+          const template = await getPrisma().exposeTemplate.findFirst({
             where: { id: templateId, tenantId }
           });
           if (!template) throw new Error('Template not found or access denied');
 
-          await prisma.exposeTemplate.update({
+          await getPrisma().exposeTemplate.update({
             where: { id: templateId },
             data: { blocks: [] }
           });
 
           return { success: true, message: 'Alle Blöcke wurden aus dem Template entfernt.', isTemplate: true };
         } else if (exposeId) {
-          const expose = await prisma.expose.findFirst({
+          const expose = await getPrisma().expose.findFirst({
             where: { id: exposeId, property: { tenantId } }
           });
           if (!expose) throw new Error('Exposé not found or access denied');
 
-          await prisma.expose.update({
+          await getPrisma().expose.update({
             where: { id: exposeId },
             data: { blocks: [] }
           });
@@ -1652,7 +1720,7 @@ export class AiToolExecutor {
       case 'get_template': {
         const { templateId } = args;
         
-        const template = await prisma.exposeTemplate.findFirst({
+        const template = await getPrisma().exposeTemplate.findFirst({
           where: { id: templateId, tenantId }
         });
         if (!template) throw new Error('Template not found or access denied');
@@ -1672,7 +1740,7 @@ export class AiToolExecutor {
       case 'update_template': {
         const { templateId, name, theme, isDefault } = args;
         
-        const template = await prisma.exposeTemplate.findFirst({
+        const template = await getPrisma().exposeTemplate.findFirst({
           where: { id: templateId, tenantId }
         });
         if (!template) throw new Error('Template not found or access denied');
@@ -1688,7 +1756,7 @@ export class AiToolExecutor {
         }
         if (isDefault !== undefined) updateData.isDefault = isDefault;
 
-        await prisma.exposeTemplate.update({
+        await getPrisma().exposeTemplate.update({
           where: { id: templateId },
           data: updateData
         });
@@ -1856,7 +1924,8 @@ function getStartDateForPeriod(period: string): Date {
 
 // Tool executor for create_property
 async function executeCreateProperty(args: any, tenantId: string) {
-  const property = await prisma.property.create({
+  const db = getPrisma();
+  const property = await db.property.create({
     data: {
       tenantId,
       title: args.title,
