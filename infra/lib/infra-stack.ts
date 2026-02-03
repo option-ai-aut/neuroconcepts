@@ -174,13 +174,15 @@ export class NeuroConceptsStack extends cdk.Stack {
           },
           afterBundling(inputDir: string, outputDir: string): string[] {
             // inputDir is the entry file's directory: .../src/services/orchestrator/src
-            // We need to go up one level to get to prisma folder
             // Schema is at: .../src/services/orchestrator/prisma/schema.prisma
-            const schemaPath = inputDir.replace(/\/src$/, '/prisma/schema.prisma');
+            // We need to go up one level from /src to get to /prisma
+            const orchestratorDir = inputDir.replace(/\/src$/, '');
+            const schemaPath = `${orchestratorDir}/prisma/schema.prisma`;
             return [
               `cd ${outputDir}`,
               `npm init -y`,
-              `npm install @prisma/client prisma --save`,
+              // Use specific Prisma version that matches our schema (5.x, not 7.x)
+              `npm install @prisma/client@5.10.2 prisma@5.10.2 --save`,
               `npx prisma generate --schema=${schemaPath}`,
               `cp -r node_modules/.prisma .`,
               `cp -r node_modules/@prisma .`,
