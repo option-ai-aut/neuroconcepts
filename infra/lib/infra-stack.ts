@@ -173,15 +173,14 @@ export class NeuroConceptsStack extends cdk.Stack {
             return [];
           },
           afterBundling(inputDir: string, outputDir: string): string[] {
-            // Copy Prisma client and generate for Lambda target
+            // The inputDir for NodejsFunction is the directory containing the entry file
+            // Schema is relative to the project root, not the entry file
+            const projectRoot = inputDir.replace('/src/services/orchestrator/src', '');
             return [
-              // Install Prisma in output directory
               `cd ${outputDir}`,
               `npm init -y`,
               `npm install @prisma/client prisma --save`,
-              // Generate Prisma client with Lambda binary target
-              `npx prisma generate --schema=${inputDir}/src/services/orchestrator/prisma/schema.prisma`,
-              // Copy the generated client to the bundle
+              `npx prisma generate --schema=${projectRoot}/src/services/orchestrator/prisma/schema.prisma`,
               `cp -r node_modules/.prisma .`,
               `cp -r node_modules/@prisma .`,
             ];
