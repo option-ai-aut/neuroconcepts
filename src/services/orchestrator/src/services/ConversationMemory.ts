@@ -1,8 +1,13 @@
 import { PrismaClient, MessageRole } from '@prisma/client';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const prisma = new PrismaClient();
+// Prisma client will be injected from index.ts
+let prisma: PrismaClient;
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '');
+
+export function setPrismaClient(client: PrismaClient) {
+  prisma = client;
+}
 
 interface Message {
   role: MessageRole;

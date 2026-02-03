@@ -5,12 +5,13 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import serverless from 'serverless-http';
 import { PrismaClient, Prisma, ActivityType } from '@prisma/client';
-import { TemplateService } from './services/TemplateService';
+import { TemplateService, setPrismaClient as setTemplatePrisma } from './services/TemplateService';
 import { GeminiService } from './services/GeminiService';
 import { PdfService } from './services/PdfService';
 import { encryptionService } from './services/EncryptionService';
-import { ConversationMemory } from './services/ConversationMemory';
+import { ConversationMemory, setPrismaClient as setConversationPrisma } from './services/ConversationMemory';
 import { CalendarService } from './services/CalendarService';
+import { setPrismaClient as setAiToolsPrisma } from './services/AiTools';
 import { authMiddleware } from './middleware/auth';
 import { AiSafetyMiddleware, wrapAiResponse } from './middleware/aiSafety';
 import * as AWS from 'aws-sdk';
@@ -34,6 +35,10 @@ async function initializePrisma() {
   // If DATABASE_URL is already set (local dev), use it
   if (process.env.DATABASE_URL) {
     prisma = new PrismaClient();
+    // Inject prisma into services
+    setTemplatePrisma(prisma);
+    setConversationPrisma(prisma);
+    setAiToolsPrisma(prisma);
     return prisma;
   }
   
@@ -47,6 +52,10 @@ async function initializePrisma() {
         const dbUrl = `postgresql://${credentials.username}:${credentials.password}@${credentials.host}:${credentials.port}/postgres?schema=public`;
         process.env.DATABASE_URL = dbUrl;
         prisma = new PrismaClient();
+        // Inject prisma into services
+        setTemplatePrisma(prisma);
+        setConversationPrisma(prisma);
+        setAiToolsPrisma(prisma);
       }
     } catch (error) {
       console.error('Failed to get DB credentials from Secrets Manager:', error);
@@ -56,6 +65,10 @@ async function initializePrisma() {
   
   if (!prisma) {
     prisma = new PrismaClient();
+    // Inject prisma into services
+    setTemplatePrisma(prisma);
+    setConversationPrisma(prisma);
+    setAiToolsPrisma(prisma);
   }
   
   return prisma;
@@ -64,6 +77,10 @@ async function initializePrisma() {
 // Initialize Prisma on startup for local dev
 if (!process.env.AWS_LAMBDA_FUNCTION_NAME && process.env.DATABASE_URL) {
   prisma = new PrismaClient();
+  // Inject prisma into services
+  setTemplatePrisma(prisma);
+  setConversationPrisma(prisma);
+  setAiToolsPrisma(prisma);
 }
 
 const cognito = new AWS.CognitoIdentityServiceProvider();

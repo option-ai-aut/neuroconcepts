@@ -1,6 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+// Prisma client will be injected from index.ts
+let prisma: PrismaClient;
+
+export function setPrismaClient(client: PrismaClient) {
+  prisma = client;
+}
 
 export class TemplateService {
   
