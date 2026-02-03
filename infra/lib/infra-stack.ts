@@ -167,25 +167,24 @@ export class NeuroConceptsStack extends cdk.Stack {
       bundling: { 
         minify: true, 
         sourceMap: true,
-        // Prisma: include as nodeModules so they're not bundled by esbuild
-        nodeModules: ['@prisma/client', 'prisma'],
-        // Prisma needs special handling for Lambda
+        // Prisma needs special handling for Lambda - do everything in afterBundling
         commandHooks: {
           beforeBundling(inputDir: string, outputDir: string): string[] {
             return [];
           },
           beforeInstall(inputDir: string, outputDir: string): string[] {
-            // Use pre-calculated absolute path (inputDir is NOT the entry file dir!)
-            return [
-              `cp -R ${prismaDir} ${outputDir}/`,
-            ];
+            return [];
           },
           afterBundling(inputDir: string, outputDir: string): string[] {
-            // Generate Prisma client and clean up engines to reduce size
+            // Copy prisma schema, install prisma with specific version, generate client
             return [
+              `cp -R ${prismaDir} ${outputDir}/`,
               `cd ${outputDir}`,
+              `npm init -y`,
+              `npm install @prisma/client@5.10.2 prisma@5.10.2`,
               `npx prisma generate`,
               `rm -rf node_modules/@prisma/engines`,
+              `rm -rf node_modules/prisma`,
             ];
           },
         },
