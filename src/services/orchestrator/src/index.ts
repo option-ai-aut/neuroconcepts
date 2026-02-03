@@ -23,8 +23,61 @@ dotenv.config({ path: '.env.local' });
 dotenv.config(); // This won't override existing values from .env.local
 
 const app = express();
-const prisma = new PrismaClient();
+
+// Initialize Prisma - will be set up after getting DB credentials
+let prisma: PrismaClient;
+
+// Function to initialize Prisma with DATABASE_URL from AWS Secrets Manager
+async function initializePrisma() {
+  if (prisma) return prisma;
+  
+  // If DATABASE_URL is already set (local dev), use it
+  if (process.env.DATABASE_URL) {
+    prisma = new PrismaClient();
+    return prisma;
+  }
+  
+  // In Lambda, get credentials from Secrets Manager
+  if (process.env.DB_SECRET_ARN) {
+    const secretsManager = new AWS.SecretsManager();
+    try {
+      const secret = await secretsManager.getSecretValue({ SecretId: process.env.DB_SECRET_ARN }).promise();
+      if (secret.SecretString) {
+        const credentials = JSON.parse(secret.SecretString);
+        const dbUrl = `postgresql://${credentials.username}:${credentials.password}@${credentials.host}:${credentials.port}/postgres?schema=public`;
+        process.env.DATABASE_URL = dbUrl;
+        prisma = new PrismaClient();
+      }
+    } catch (error) {
+      console.error('Failed to get DB credentials from Secrets Manager:', error);
+      throw error;
+    }
+  }
+  
+  if (!prisma) {
+    prisma = new PrismaClient();
+  }
+  
+  return prisma;
+}
+
+// Initialize Prisma on startup for local dev
+if (!process.env.AWS_LAMBDA_FUNCTION_NAME && process.env.DATABASE_URL) {
+  prisma = new PrismaClient();
+}
+
 const cognito = new AWS.CognitoIdentityServiceProvider();
+
+// Middleware to ensure Prisma is initialized before handling requests
+app.use(async (req, res, next) => {
+  try {
+    await initializePrisma();
+    next();
+  } catch (error) {
+    console.error('Failed to initialize Prisma:', error);
+    res.status(500).json({ error: 'Database connection failed' });
+  }
+});
 
 app.use(helmet());
 app.use(cors());
@@ -2715,6 +2768,130 @@ app.post('/calendar/share-team', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error updating calendar share setting:', error);
     res.status(500).json({ error: 'Failed to update setting' });
+  }
+});
+
+// --- Admin: Run Migrations ---
+app.post('/admin/migrate', async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    
+    // Check what tables exist
+    const tables = await db.$queryRaw`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'` as any[];
+    
+    res.json({ success: true, tables: tables.map((t: any) => t.table_name) });
+  } catch (error: any) {
+    console.error('Migration error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Full database setup - run init migration
+app.post('/admin/setup-db', async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    
+    // Read and execute the init migration file
+    // In Lambda, the file is in /var/task/
+    let migrationPath = path.join(process.cwd(), 'prisma/migrations/20260202171831_init/migration.sql');
+    
+    // Try alternative paths
+    if (!fs.existsSync(migrationPath)) {
+      migrationPath = '/var/task/prisma/migrations/20260202171831_init/migration.sql';
+    }
+    if (!fs.existsSync(migrationPath)) {
+      migrationPath = path.join(__dirname, '../prisma/migrations/20260202171831_init/migration.sql');
+    }
+    
+    if (!fs.existsSync(migrationPath)) {
+      // List what's in /var/task
+      let taskFiles: string[] = [];
+      try { taskFiles = fs.readdirSync('/var/task'); } catch (e) {}
+      
+      return res.status(404).json({ 
+        error: 'Migration file not found', 
+        tried: [
+          path.join(process.cwd(), 'prisma/migrations/20260202171831_init/migration.sql'),
+          '/var/task/prisma/migrations/20260202171831_init/migration.sql',
+          path.join(__dirname, '../prisma/migrations/20260202171831_init/migration.sql')
+        ],
+        cwd: process.cwd(),
+        dirname: __dirname,
+        taskFiles
+      });
+    }
+    
+    const migrationSql = fs.readFileSync(migrationPath, 'utf-8');
+    
+    // Debug: return file size and first 500 chars
+    if (req.query.debug === 'true') {
+      return res.json({
+        fileSize: migrationSql.length,
+        preview: migrationSql.substring(0, 500),
+        path: migrationPath
+      });
+    }
+    
+    // Split by semicolon followed by newline (to avoid splitting inside strings)
+    const rawStatements = migrationSql.split(/;\s*\n/);
+    const statements: string[] = [];
+    
+    for (const raw of rawStatements) {
+      // Remove comment lines
+      const lines = raw.split('\n')
+        .filter(line => !line.trim().startsWith('--'))
+        .join('\n')
+        .trim();
+      if (lines.length > 0) {
+        statements.push(lines);
+      }
+    }
+    
+    let executed = 0;
+    const errors: string[] = [];
+    
+    for (const statement of statements) {
+      try {
+        await db.$executeRawUnsafe(statement + ';');
+        executed++;
+      } catch (error: any) {
+        // Ignore "already exists" errors
+        if (!error.message.includes('already exists') && !error.message.includes('duplicate key')) {
+          errors.push(`${statement.substring(0, 80)}...: ${error.message}`);
+        } else {
+          executed++; // Count as executed if it already exists
+        }
+      }
+    }
+    
+    // Also run the email config migration
+    try {
+      await db.$executeRawUnsafe(`ALTER TABLE "TenantSettings" ADD COLUMN IF NOT EXISTS "gmailConfig" JSONB;`);
+      await db.$executeRawUnsafe(`ALTER TABLE "TenantSettings" ADD COLUMN IF NOT EXISTS "outlookMailConfig" JSONB;`);
+      executed += 2;
+    } catch (e) {}
+    
+    // And the property address fields
+    try {
+      await db.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "street" TEXT;`);
+      await db.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "houseNumber" TEXT;`);
+      await db.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "apartmentNumber" TEXT;`);
+      await db.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "staircase" TEXT;`);
+      await db.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "block" TEXT;`);
+      await db.$executeRawUnsafe(`ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "state" TEXT;`);
+      executed += 6;
+    } catch (e) {}
+    
+    res.json({ 
+      success: true, 
+      executed,
+      total: statements.length,
+      migrationPath,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error: any) {
+    console.error('Setup error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
