@@ -173,14 +173,15 @@ export class NeuroConceptsStack extends cdk.Stack {
             return [];
           },
           afterBundling(inputDir: string, outputDir: string): string[] {
-            // The inputDir for NodejsFunction is the directory containing the entry file
-            // Schema is relative to the project root, not the entry file
-            const projectRoot = inputDir.replace('/src/services/orchestrator/src', '');
+            // inputDir is the entry file's directory: .../src/services/orchestrator/src
+            // We need to go up one level to get to prisma folder
+            // Schema is at: .../src/services/orchestrator/prisma/schema.prisma
+            const schemaPath = inputDir.replace(/\/src$/, '/prisma/schema.prisma');
             return [
               `cd ${outputDir}`,
               `npm init -y`,
               `npm install @prisma/client prisma --save`,
-              `npx prisma generate --schema=${projectRoot}/src/services/orchestrator/prisma/schema.prisma`,
+              `npx prisma generate --schema=${schemaPath}`,
               `cp -r node_modules/.prisma .`,
               `cp -r node_modules/@prisma .`,
             ];
