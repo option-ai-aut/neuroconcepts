@@ -145,6 +145,34 @@ export class NeuroConceptsStack extends cdk.Stack {
     const lambdaVpc = props.stageName === 'dev' ? undefined : this.vpc;
     const lambdaSg = props.stageName === 'dev' ? undefined : [dbSg]; 
 
+    // App secrets (API keys, OAuth credentials, encryption keys)
+    // These are stored securely in Secrets Manager and read at runtime
+    const appSecret = new secretsmanager.Secret(this, 'AppSecret', {
+      secretName: `NeuroConcepts-App-Secret-${props.stageName}`,
+      description: 'Application secrets (API keys, OAuth, encryption)',
+      // Initial empty structure - values must be set manually in AWS Console
+      secretStringTemplate: JSON.stringify({
+        GEMINI_API_KEY: '',
+        ENCRYPTION_KEY: '',
+        GOOGLE_CALENDAR_CLIENT_ID: '',
+        GOOGLE_CALENDAR_CLIENT_SECRET: '',
+        MICROSOFT_CLIENT_ID: '',
+        MICROSOFT_CLIENT_SECRET: '',
+      }),
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({
+          GEMINI_API_KEY: '',
+          GOOGLE_CALENDAR_CLIENT_ID: '',
+          GOOGLE_CALENDAR_CLIENT_SECRET: '',
+          MICROSOFT_CLIENT_ID: '',
+          MICROSOFT_CLIENT_SECRET: '',
+        }),
+        generateStringKey: 'ENCRYPTION_KEY',
+        excludePunctuation: false,
+        passwordLength: 32,
+      },
+    });
+
     // Pre-calculate absolute path to prisma folder (resolved at CDK synth time)
     const prismaDir = path.resolve(__dirname, '../../src/services/orchestrator/prisma');
     
@@ -163,6 +191,7 @@ export class NeuroConceptsStack extends cdk.Stack {
         DB_ENDPOINT: this.dbEndpoint,
         USER_POOL_ID: this.userPool.userPoolId,
         CLIENT_ID: this.userPoolClient.userPoolClientId,
+        APP_SECRET_ARN: appSecret.secretArn,
       },
       bundling: { 
         minify: true, 
@@ -193,6 +222,7 @@ export class NeuroConceptsStack extends cdk.Stack {
     });
 
     this.dbSecret.grantRead(orchestratorLambda);
+    appSecret.grantRead(orchestratorLambda);
     
     const api = new apigateway.LambdaRestApi(this, 'OrchestratorApi', {
       handler: orchestratorLambda,

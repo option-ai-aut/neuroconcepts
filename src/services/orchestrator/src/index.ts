@@ -28,9 +28,49 @@ const app = express();
 // Initialize Prisma - will be set up after getting DB credentials
 let prisma: PrismaClient;
 
+// Cache for app secrets
+let appSecretsLoaded = false;
+
+// Function to load app secrets from AWS Secrets Manager
+async function loadAppSecrets() {
+  if (appSecretsLoaded) return;
+  
+  // Skip in local dev - secrets come from .env.local
+  if (!process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    appSecretsLoaded = true;
+    return;
+  }
+  
+  if (process.env.APP_SECRET_ARN) {
+    const secretsManager = new AWS.SecretsManager();
+    try {
+      const secret = await secretsManager.getSecretValue({ SecretId: process.env.APP_SECRET_ARN }).promise();
+      if (secret.SecretString) {
+        const secrets = JSON.parse(secret.SecretString);
+        // Set environment variables from secrets
+        if (secrets.GEMINI_API_KEY) process.env.GEMINI_API_KEY = secrets.GEMINI_API_KEY;
+        if (secrets.ENCRYPTION_KEY) process.env.ENCRYPTION_KEY = secrets.ENCRYPTION_KEY;
+        if (secrets.GOOGLE_CALENDAR_CLIENT_ID) process.env.GOOGLE_CALENDAR_CLIENT_ID = secrets.GOOGLE_CALENDAR_CLIENT_ID;
+        if (secrets.GOOGLE_CALENDAR_CLIENT_SECRET) process.env.GOOGLE_CALENDAR_CLIENT_SECRET = secrets.GOOGLE_CALENDAR_CLIENT_SECRET;
+        if (secrets.MICROSOFT_CLIENT_ID) process.env.MICROSOFT_CLIENT_ID = secrets.MICROSOFT_CLIENT_ID;
+        if (secrets.MICROSOFT_CLIENT_SECRET) process.env.MICROSOFT_CLIENT_SECRET = secrets.MICROSOFT_CLIENT_SECRET;
+        console.log('✅ App secrets loaded from Secrets Manager');
+      }
+    } catch (error) {
+      console.error('Failed to load app secrets from Secrets Manager:', error);
+      // Don't throw - some features may still work without all secrets
+    }
+  }
+  
+  appSecretsLoaded = true;
+}
+
 // Function to initialize Prisma with DATABASE_URL from AWS Secrets Manager
 async function initializePrisma() {
   if (prisma) return prisma;
+  
+  // Load app secrets first
+  await loadAppSecrets();
   
   // If DATABASE_URL is already set (local dev), use it
   if (process.env.DATABASE_URL) {
