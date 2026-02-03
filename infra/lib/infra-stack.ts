@@ -164,13 +164,7 @@ export class NeuroConceptsStack extends cdk.Stack {
       bundling: { 
         minify: true, 
         sourceMap: true,
-        // Copy Prisma engines for Lambda - use forceDockerBundling to ensure consistent environment
-        externalModules: ['@aws-sdk/*', '@smithy/*'],
-        nodeModules: ['@prisma/client', 'prisma'],
-        // Use npm install instead of npm ci to avoid lock file issues
-        installCommands: [
-          'npm install --no-save @prisma/client prisma',
-        ],
+        // Prisma needs special handling for Lambda
         commandHooks: {
           beforeBundling(inputDir: string, outputDir: string): string[] {
             return [];
@@ -179,9 +173,17 @@ export class NeuroConceptsStack extends cdk.Stack {
             return [];
           },
           afterBundling(inputDir: string, outputDir: string): string[] {
+            // Copy Prisma client and generate for Lambda target
             return [
+              // Install Prisma in output directory
               `cd ${outputDir}`,
+              `npm init -y`,
+              `npm install @prisma/client prisma --save`,
+              // Generate Prisma client with Lambda binary target
               `npx prisma generate --schema=${inputDir}/src/services/orchestrator/prisma/schema.prisma`,
+              // Copy the generated client to the bundle
+              `cp -r node_modules/.prisma .`,
+              `cp -r node_modules/@prisma .`,
             ];
           },
         },
