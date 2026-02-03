@@ -161,7 +161,26 @@ export class NeuroConceptsStack extends cdk.Stack {
         USER_POOL_ID: this.userPool.userPoolId,
         CLIENT_ID: this.userPoolClient.userPoolClientId,
       },
-      bundling: { minify: true, sourceMap: true },
+      bundling: { 
+        minify: true, 
+        sourceMap: true,
+        // Copy Prisma engines for Lambda
+        nodeModules: ['@prisma/client', 'prisma'],
+        commandHooks: {
+          beforeBundling(inputDir: string, outputDir: string): string[] {
+            return [];
+          },
+          beforeInstall(inputDir: string, outputDir: string): string[] {
+            return [];
+          },
+          afterBundling(inputDir: string, outputDir: string): string[] {
+            return [
+              `cd ${outputDir}`,
+              `npx prisma generate --schema=${inputDir}/src/services/orchestrator/prisma/schema.prisma`,
+            ];
+          },
+        },
+      },
     });
 
     this.dbSecret.grantRead(orchestratorLambda);
