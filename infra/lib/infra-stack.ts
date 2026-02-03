@@ -145,6 +145,9 @@ export class NeuroConceptsStack extends cdk.Stack {
     const lambdaVpc = props.stageName === 'dev' ? undefined : this.vpc;
     const lambdaSg = props.stageName === 'dev' ? undefined : [dbSg]; 
 
+    // Pre-calculate absolute path to prisma folder (resolved at CDK synth time)
+    const prismaDir = path.resolve(__dirname, '../../src/services/orchestrator/prisma');
+    
     const orchestratorLambda = new lambdaNode.NodejsFunction(this, 'OrchestratorLambda', {
       runtime: lambda.Runtime.NODEJS_22_X,
       entry: path.join(__dirname, '../../src/services/orchestrator/src/index.ts'),
@@ -172,12 +175,9 @@ export class NeuroConceptsStack extends cdk.Stack {
             return [];
           },
           beforeInstall(inputDir: string, outputDir: string): string[] {
-            // inputDir is the directory containing the entry file
-            // Copy prisma schema to output directory
-            // Entry is at: src/services/orchestrator/src/index.ts
-            // Schema is at: src/services/orchestrator/prisma/schema.prisma
+            // Use pre-calculated absolute path (inputDir is NOT the entry file dir!)
             return [
-              `cp -R ${inputDir}/../prisma ${outputDir}/`,
+              `cp -R ${prismaDir} ${outputDir}/`,
             ];
           },
           afterBundling(inputDir: string, outputDir: string): string[] {
