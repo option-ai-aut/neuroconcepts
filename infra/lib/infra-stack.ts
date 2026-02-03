@@ -164,8 +164,13 @@ export class NeuroConceptsStack extends cdk.Stack {
       bundling: { 
         minify: true, 
         sourceMap: true,
-        // Copy Prisma engines for Lambda
+        // Copy Prisma engines for Lambda - use forceDockerBundling to ensure consistent environment
+        externalModules: ['@aws-sdk/*', '@smithy/*'],
         nodeModules: ['@prisma/client', 'prisma'],
+        // Use npm install instead of npm ci to avoid lock file issues
+        installCommands: [
+          'npm install --no-save @prisma/client prisma',
+        ],
         commandHooks: {
           beforeBundling(inputDir: string, outputDir: string): string[] {
             return [];
