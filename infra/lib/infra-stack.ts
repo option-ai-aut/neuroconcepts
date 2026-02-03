@@ -150,15 +150,6 @@ export class NeuroConceptsStack extends cdk.Stack {
     const appSecret = new secretsmanager.Secret(this, 'AppSecret', {
       secretName: `NeuroConcepts-App-Secret-${props.stageName}`,
       description: 'Application secrets (API keys, OAuth, encryption)',
-      // Initial empty structure - values must be set manually in AWS Console
-      secretStringTemplate: JSON.stringify({
-        GEMINI_API_KEY: '',
-        ENCRYPTION_KEY: '',
-        GOOGLE_CALENDAR_CLIENT_ID: '',
-        GOOGLE_CALENDAR_CLIENT_SECRET: '',
-        MICROSOFT_CLIENT_ID: '',
-        MICROSOFT_CLIENT_SECRET: '',
-      }),
       generateSecretString: {
         secretStringTemplate: JSON.stringify({
           GEMINI_API_KEY: '',
