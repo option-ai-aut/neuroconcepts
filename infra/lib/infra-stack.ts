@@ -147,22 +147,12 @@ export class NeuroConceptsStack extends cdk.Stack {
 
     // App secrets (API keys, OAuth credentials, encryption keys)
     // These are stored securely in Secrets Manager and read at runtime
-    const appSecret = new secretsmanager.Secret(this, 'AppSecret', {
-      secretName: `NeuroConcepts-App-Secret-${props.stageName}`,
-      description: 'Application secrets (API keys, OAuth, encryption)',
-      generateSecretString: {
-        secretStringTemplate: JSON.stringify({
-          GEMINI_API_KEY: '',
-          GOOGLE_CALENDAR_CLIENT_ID: '',
-          GOOGLE_CALENDAR_CLIENT_SECRET: '',
-          MICROSOFT_CLIENT_ID: '',
-          MICROSOFT_CLIENT_SECRET: '',
-        }),
-        generateStringKey: 'ENCRYPTION_KEY',
-        excludePunctuation: false,
-        passwordLength: 32,
-      },
-    });
+    // Note: Secret values must be set manually in AWS Console after deployment
+    const appSecret = secretsmanager.Secret.fromSecretNameV2(
+      this, 
+      'AppSecret', 
+      `NeuroConcepts-App-Secret-${props.stageName}`
+    );
 
     // Pre-calculate absolute path to prisma folder (resolved at CDK synth time)
     const prismaDir = path.resolve(__dirname, '../../src/services/orchestrator/prisma');
