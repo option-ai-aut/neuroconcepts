@@ -145,9 +145,6 @@ export class NeuroConceptsStack extends cdk.Stack {
     const lambdaVpc = props.stageName === 'dev' ? undefined : this.vpc;
     const lambdaSg = props.stageName === 'dev' ? undefined : [dbSg]; 
 
-    // Calculate schema path relative to this file
-    const orchestratorSchemaPath = path.join(__dirname, '../../src/services/orchestrator/prisma/schema.prisma');
-    
     const orchestratorLambda = new lambdaNode.NodejsFunction(this, 'OrchestratorLambda', {
       runtime: lambda.Runtime.NODEJS_22_X,
       entry: path.join(__dirname, '../../src/services/orchestrator/src/index.ts'),
@@ -167,24 +164,28 @@ export class NeuroConceptsStack extends cdk.Stack {
       bundling: { 
         minify: true, 
         sourceMap: true,
+        // Prisma: include as nodeModules so they're not bundled by esbuild
+        nodeModules: ['@prisma/client', 'prisma'],
         // Prisma needs special handling for Lambda
         commandHooks: {
           beforeBundling(inputDir: string, outputDir: string): string[] {
             return [];
           },
           beforeInstall(inputDir: string, outputDir: string): string[] {
-            return [];
+            // inputDir is the directory containing the entry file
+            // Copy prisma schema to output directory
+            // Entry is at: src/services/orchestrator/src/index.ts
+            // Schema is at: src/services/orchestrator/prisma/schema.prisma
+            return [
+              `cp -R ${inputDir}/../prisma ${outputDir}/`,
+            ];
           },
           afterBundling(inputDir: string, outputDir: string): string[] {
-            // Use the pre-calculated absolute path to schema
+            // Generate Prisma client and clean up engines to reduce size
             return [
               `cd ${outputDir}`,
-              `npm init -y`,
-              // Use specific Prisma version that matches our schema (5.x, not 7.x)
-              `npm install @prisma/client@5.10.2 prisma@5.10.2 --save`,
-              `npx prisma generate --schema=${orchestratorSchemaPath}`,
-              `cp -r node_modules/.prisma .`,
-              `cp -r node_modules/@prisma .`,
+              `npx prisma generate`,
+              `rm -rf node_modules/@prisma/engines`,
             ];
           },
         },
