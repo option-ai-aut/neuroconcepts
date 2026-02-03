@@ -145,6 +145,9 @@ export class NeuroConceptsStack extends cdk.Stack {
     const lambdaVpc = props.stageName === 'dev' ? undefined : this.vpc;
     const lambdaSg = props.stageName === 'dev' ? undefined : [dbSg]; 
 
+    // Calculate schema path relative to this file
+    const orchestratorSchemaPath = path.join(__dirname, '../../src/services/orchestrator/prisma/schema.prisma');
+    
     const orchestratorLambda = new lambdaNode.NodejsFunction(this, 'OrchestratorLambda', {
       runtime: lambda.Runtime.NODEJS_22_X,
       entry: path.join(__dirname, '../../src/services/orchestrator/src/index.ts'),
@@ -173,17 +176,13 @@ export class NeuroConceptsStack extends cdk.Stack {
             return [];
           },
           afterBundling(inputDir: string, outputDir: string): string[] {
-            // inputDir is the entry file's directory: .../src/services/orchestrator/src
-            // Schema is at: .../src/services/orchestrator/prisma/schema.prisma
-            // We need to go up one level from /src to get to /prisma
-            const orchestratorDir = inputDir.replace(/\/src$/, '');
-            const schemaPath = `${orchestratorDir}/prisma/schema.prisma`;
+            // Use the pre-calculated absolute path to schema
             return [
               `cd ${outputDir}`,
               `npm init -y`,
               // Use specific Prisma version that matches our schema (5.x, not 7.x)
               `npm install @prisma/client@5.10.2 prisma@5.10.2 --save`,
-              `npx prisma generate --schema=${schemaPath}`,
+              `npx prisma generate --schema=${orchestratorSchemaPath}`,
               `cp -r node_modules/.prisma .`,
               `cp -r node_modules/@prisma .`,
             ];
