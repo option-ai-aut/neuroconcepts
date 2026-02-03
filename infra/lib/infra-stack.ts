@@ -218,7 +218,12 @@ export class NeuroConceptsStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(30),
       environment: {
         // RUNTIME_ vars are read at runtime by the /api/config endpoint
-        // NEXT_PUBLIC_ vars are baked in at build time and won't work for dynamic values
+        // These work because they're not prefixed with NEXT_PUBLIC_ (which gets replaced at build time)
+        RUNTIME_API_URL: api.url,
+        RUNTIME_USER_POOL_ID: this.userPool.userPoolId,
+        RUNTIME_USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
+        RUNTIME_AWS_REGION: this.region,
+        // Keep NEXT_PUBLIC_ for backwards compatibility (baked in at build time)
         NEXT_PUBLIC_API_URL: api.url,
         NEXT_PUBLIC_USER_POOL_ID: this.userPool.userPoolId,
         NEXT_PUBLIC_USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
