@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 import serverless from 'serverless-http';
 import { PrismaClient, Prisma, ActivityType } from '@prisma/client';
 import { TemplateService, setPrismaClient as setTemplatePrisma } from './services/TemplateService';
-import { OpenRouterService } from './services/OpenRouterService';
+import { OpenAIService } from './services/OpenAIService';
 import { PdfService } from './services/PdfService';
 import { encryptionService } from './services/EncryptionService';
 import { ConversationMemory, setPrismaClient as setConversationPrisma } from './services/ConversationMemory';
@@ -48,8 +48,7 @@ async function loadAppSecrets() {
       if (secret.SecretString) {
         const secrets = JSON.parse(secret.SecretString);
         // Set environment variables from secrets
-        if (secrets.OPENROUTER_API_KEY) process.env.OPENROUTER_API_KEY = secrets.OPENROUTER_API_KEY;
-        if (secrets.GEMINI_API_KEY) process.env.GEMINI_API_KEY = secrets.GEMINI_API_KEY; // Legacy
+        if (secrets.OPENAI_API_KEY) process.env.OPENAI_API_KEY = secrets.OPENAI_API_KEY;
         if (secrets.ENCRYPTION_KEY) process.env.ENCRYPTION_KEY = secrets.ENCRYPTION_KEY;
         if (secrets.GOOGLE_CALENDAR_CLIENT_ID) process.env.GOOGLE_CALENDAR_CLIENT_ID = secrets.GOOGLE_CALENDAR_CLIENT_ID;
         if (secrets.GOOGLE_CALENDAR_CLIENT_SECRET) process.env.GOOGLE_CALENDAR_CLIENT_SECRET = secrets.GOOGLE_CALENDAR_CLIENT_SECRET;
@@ -1444,7 +1443,7 @@ app.post('/chat',
         });
       }
 
-      const gemini = new OpenRouterService();
+      const gemini = new OpenAIService();
       const responseText = await gemini.chat(message, tenantId, history);
       
       // Sanitize response before sending
@@ -1485,7 +1484,7 @@ app.post('/chat/stream',
       const { recentMessages, summary } = await ConversationMemory.getOptimizedHistory(userId);
       const optimizedHistory = ConversationMemory.formatForGemini(recentMessages, summary);
 
-      const gemini = new OpenRouterService();
+      const gemini = new OpenAIService();
       let fullResponse = '';
       let hadFunctionCalls = false;
 
@@ -1565,7 +1564,7 @@ app.post('/exposes/:id/chat',
       });
       if (!expose) return res.status(404).json({ error: 'Exposé not found' });
 
-      const gemini = new OpenRouterService();
+      const gemini = new OpenAIService();
       const result = await gemini.exposeChat(message, currentUser.tenantId, exposeId, null, expose.blocks as any[], history || []);
       
       // Sanitize response
@@ -1602,7 +1601,7 @@ app.post('/templates/:id/chat',
       });
       if (!template) return res.status(404).json({ error: 'Template not found' });
 
-      const gemini = new OpenRouterService();
+      const gemini = new OpenAIService();
       const result = await gemini.exposeChat(message, currentUser.tenantId, null, templateId, template.blocks as any[], history || []);
       
       // Sanitize response
@@ -1634,7 +1633,7 @@ app.post('/properties/:id/generate-text', authMiddleware, async (req, res) => {
     });
     if (!property) return res.status(404).json({ error: 'Property not found' });
 
-    const gemini = new OpenRouterService();
+    const gemini = new OpenAIService();
     const result = await gemini.generatePropertyText(propertyId, textType || 'description', currentUser.tenantId, {
       tone: tone || 'professional',
       maxLength: maxLength || 500

@@ -25,6 +25,9 @@ function convertToolsToOpenAI(tools: Record<string, any>): OpenAI.Chat.ChatCompl
   }));
 }
 
+// Model to use - GPT-4o-mini is fast and capable
+const MODEL = 'gpt-4o-mini';
+
 const SYSTEM_PROMPT = `Du bist Jarvis, der KI-Assistent für NeuroConcepts - eine Immobilien-CRM-Plattform.
 
 DEINE PERSÖNLICHKEIT:
@@ -164,18 +167,12 @@ VARIABLEN für Vorlagen:
 
 Antworte immer auf Deutsch. Sei freundlich und hilfsbereit. Erkläre kurz was du gemacht hast.`;
 
-export class OpenRouterService {
+export class OpenAIService {
   private client: OpenAI;
-  private model = 'openai/gpt-5-mini';
 
   constructor() {
     this.client = new OpenAI({
-      baseURL: 'https://openrouter.ai/api/v1',
-      apiKey: process.env.OPENROUTER_API_KEY || '',
-      defaultHeaders: {
-        'HTTP-Referer': 'https://neuroconcepts.ai',
-        'X-Title': 'NeuroConcepts CRM',
-      },
+      apiKey: process.env.OPENAI_API_KEY || '',
     });
   }
 
@@ -190,7 +187,7 @@ export class OpenRouterService {
     ];
 
     const response = await this.client.chat.completions.create({
-      model: this.model,
+      model: MODEL,
       messages,
       tools: convertToolsToOpenAI(CRM_TOOLS),
       tool_choice: 'auto',
@@ -210,7 +207,7 @@ export class OpenRouterService {
       ];
 
       const finalResponse = await this.client.chat.completions.create({
-        model: this.model,
+        model: MODEL,
         messages: followUpMessages,
       });
 
@@ -231,47 +228,87 @@ export class OpenRouterService {
       { role: 'user', content: message },
     ];
 
-    // First call to check for tool calls
-    const response = await this.client.chat.completions.create({
-      model: this.model,
+    // First call with streaming to check for tool calls
+    const stream = await this.client.chat.completions.create({
+      model: MODEL,
       messages,
       tools: convertToolsToOpenAI(CRM_TOOLS),
       tool_choice: 'auto',
+      stream: true,
     });
 
-    const responseMessage = response.choices[0].message;
+    // Collect the full response to check for tool calls
+    let fullContent = '';
+    const toolCalls: OpenAI.Chat.ChatCompletionMessageToolCall[] = [];
+    const toolCallsInProgress: Map<number, { id: string; type: 'function'; function: { name: string; arguments: string } }> = new Map();
 
-    // Handle tool calls
-    if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta;
+      
+      // Collect content
+      if (delta?.content) {
+        fullContent += delta.content;
+        yield { chunk: delta.content, hadFunctionCalls: false };
+      }
+      
+      // Collect tool calls
+      if (delta?.tool_calls) {
+        for (const tc of delta.tool_calls) {
+          if (tc.index !== undefined) {
+            if (!toolCallsInProgress.has(tc.index)) {
+              toolCallsInProgress.set(tc.index, {
+                id: tc.id || '',
+                type: 'function',
+                function: { name: '', arguments: '' }
+              });
+            }
+            const existing = toolCallsInProgress.get(tc.index)!;
+            if (tc.id) existing.id = tc.id;
+            if (tc.function?.name) existing.function.name += tc.function.name;
+            if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
+          }
+        }
+      }
+    }
+
+    // Convert collected tool calls
+    for (const [_, tc] of toolCallsInProgress) {
+      if (tc.id && tc.function.name) {
+        toolCalls.push(tc as OpenAI.Chat.ChatCompletionMessageToolCall);
+      }
+    }
+
+    // Handle tool calls if any
+    if (toolCalls.length > 0) {
       yield { chunk: '', hadFunctionCalls: true };
       
-      const toolResults = await this.executeToolCalls(responseMessage.tool_calls, tenantId);
+      const toolResults = await this.executeToolCalls(toolCalls, tenantId);
+      
+      // Build assistant message with tool calls
+      const assistantMessage: OpenAI.Chat.ChatCompletionMessageParam = {
+        role: 'assistant',
+        content: fullContent || null,
+        tool_calls: toolCalls,
+      };
       
       // Stream final response
       const followUpMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
         ...messages,
-        responseMessage,
+        assistantMessage,
         ...toolResults,
       ];
 
-      const stream = await this.client.chat.completions.create({
-        model: this.model,
+      const finalStream = await this.client.chat.completions.create({
+        model: MODEL,
         messages: followUpMessages,
         stream: true,
       });
 
-      for await (const chunk of stream) {
+      for await (const chunk of finalStream) {
         const content = chunk.choices[0]?.delta?.content;
         if (content) {
           yield { chunk: content, hadFunctionCalls: true };
         }
-      }
-    } else {
-      // No tool calls, stream the response
-      const content = responseMessage.content || '';
-      const words = content.split(' ');
-      for (let i = 0; i < words.length; i++) {
-        yield { chunk: words[i] + (i < words.length - 1 ? ' ' : ''), hadFunctionCalls: false };
       }
     }
   }
@@ -324,7 +361,7 @@ WICHTIG: Nutze IMMER exposeId="${targetId}" bei allen Tool-Aufrufen!`;
 
     while (iterations < maxIterations) {
       const response = await this.client.chat.completions.create({
-        model: this.model,
+        model: MODEL,
         messages: currentMessages,
         tools: convertToolsToOpenAI(ALL_TOOLS),
         tool_choice: 'auto',
