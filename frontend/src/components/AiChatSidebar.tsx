@@ -495,14 +495,14 @@ export default function AiChatSidebar() {
                   showingActionMessage = true;
                 }
 
-                // Update the assistant message with new chunk
+                // Update the assistant message with new chunk (preserve toolsUsed)
                 setMessages(prev => {
                   const newMessages = [...prev];
                   // Find the assistant message (not the action message)
                   const assistantIdx = newMessages.findIndex((m, idx) => idx === assistantMsgIndex && m.role === 'ASSISTANT');
                   if (assistantIdx !== -1) {
                     newMessages[assistantIdx] = {
-                      role: 'ASSISTANT',
+                      ...newMessages[assistantIdx], // Preserve existing properties like toolsUsed
                       content: (newMessages[assistantIdx]?.content || '') + data.chunk
                     };
                   }
