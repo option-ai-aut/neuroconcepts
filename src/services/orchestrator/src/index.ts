@@ -417,13 +417,17 @@ app.get('/health', (req, res) => {
 
 // --- Lead Intake ---
 
-// GET /leads - List all leads
-app.get('/leads', async (req, res) => {
+// GET /leads - List all leads (tenant-isolated)
+app.get('/leads', authMiddleware, async (req, res) => {
   try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
     const leads = await prisma.lead.findMany({
+      where: { tenantId: currentUser.tenantId },
       orderBy: { createdAt: 'desc' },
       include: {
-        property: true, // Include property details if needed
+        property: true,
       }
     });
     res.json(leads);
@@ -433,12 +437,15 @@ app.get('/leads', async (req, res) => {
   }
 });
 
-// GET /leads/:id - Get lead details with messages
-app.get('/leads/:id', async (req, res) => {
+// GET /leads/:id - Get lead details with messages (tenant-isolated)
+app.get('/leads/:id', authMiddleware, async (req, res) => {
   try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
     const { id } = req.params;
-    const lead = await prisma.lead.findUnique({
-      where: { id },
+    const lead = await prisma.lead.findFirst({
+      where: { id, tenantId: currentUser.tenantId },
       include: {
         property: true,
         messages: {
@@ -455,10 +462,14 @@ app.get('/leads/:id', async (req, res) => {
   }
 });
 
-// GET /properties - List all properties
-app.get('/properties', async (req, res) => {
+// GET /properties - List all properties (tenant-isolated)
+app.get('/properties', authMiddleware, async (req, res) => {
   try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
     const properties = await prisma.property.findMany({
+      where: { tenantId: currentUser.tenantId },
       orderBy: { createdAt: 'desc' }
     });
     res.json(properties);
@@ -468,12 +479,15 @@ app.get('/properties', async (req, res) => {
   }
 });
 
-// GET /properties/:id - Get property details
-app.get('/properties/:id', async (req, res) => {
+// GET /properties/:id - Get property details (tenant-isolated)
+app.get('/properties/:id', authMiddleware, async (req, res) => {
   try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
     const { id } = req.params;
-    const property = await prisma.property.findUnique({
-      where: { id }
+    const property = await prisma.property.findFirst({
+      where: { id, tenantId: currentUser.tenantId }
     });
     
     if (!property) return res.status(404).json({ error: 'Property not found' });
@@ -484,14 +498,17 @@ app.get('/properties/:id', async (req, res) => {
   }
 });
 
-// PUT /leads/:id - Update lead details
-app.put('/leads/:id', async (req, res) => {
+// PUT /leads/:id - Update lead details (tenant-isolated)
+app.put('/leads/:id', authMiddleware, async (req, res) => {
   try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
     const { id } = req.params;
     const updateData = req.body;
     
-    // Get old lead data for comparison
-    const oldLead = await prisma.lead.findUnique({ where: { id } });
+    // Get old lead data for comparison - tenant-isolated
+    const oldLead = await prisma.lead.findFirst({ where: { id, tenantId: currentUser.tenantId } });
     if (!oldLead) return res.status(404).json({ error: 'Lead not found' });
     
     // Update lead
@@ -552,10 +569,17 @@ app.put('/leads/:id', async (req, res) => {
   }
 });
 
-// GET /leads/:id/activities - Get lead activities
-app.get('/leads/:id/activities', async (req, res) => {
+// GET /leads/:id/activities - Get lead activities (tenant-isolated)
+app.get('/leads/:id/activities', authMiddleware, async (req, res) => {
   try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
     const { id } = req.params;
+    
+    // Verify lead belongs to tenant
+    const lead = await prisma.lead.findFirst({ where: { id, tenantId: currentUser.tenantId } });
+    if (!lead) return res.status(404).json({ error: 'Lead not found' });
     
     // Get activities
     const activities = await prisma.leadActivity.findMany({
@@ -596,10 +620,18 @@ app.get('/leads/:id/activities', async (req, res) => {
   }
 });
 
-// PUT /properties/:id - Update property details
-app.put('/properties/:id', async (req, res) => {
+// PUT /properties/:id - Update property details (tenant-isolated)
+app.put('/properties/:id', authMiddleware, async (req, res) => {
   try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
     const { id } = req.params;
+    
+    // Verify property belongs to tenant
+    const existing = await prisma.property.findFirst({ where: { id, tenantId: currentUser.tenantId } });
+    if (!existing) return res.status(404).json({ error: 'Property not found' });
+
     const { title, address, price, rooms, area, description, aiFacts } = req.body;
     
     const property = await prisma.property.update({
@@ -622,9 +654,12 @@ app.put('/properties/:id', async (req, res) => {
   }
 });
 
-// POST /properties/:id/images - Upload images
-app.post('/properties/:id/images', upload.array('images', 10), async (req, res) => {
+// POST /properties/:id/images - Upload images (tenant-isolated)
+app.post('/properties/:id/images', authMiddleware, upload.array('images', 10), async (req, res) => {
   try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
     const { id } = req.params;
     const files = req.files as Express.Multer.File[];
     
@@ -632,14 +667,14 @@ app.post('/properties/:id/images', upload.array('images', 10), async (req, res) 
       return res.status(400).json({ error: 'Keine Dateien hochgeladen' });
     }
 
-    // Generate URLs (for local dev, use relative paths)
-    const imageUrls = files.map(f => `/uploads/${f.filename}`);
-    
-    // Get current property
-    const property = await prisma.property.findUnique({ where: { id } });
+    // Verify property belongs to tenant
+    const property = await prisma.property.findFirst({ where: { id, tenantId: currentUser.tenantId } });
     if (!property) {
       return res.status(404).json({ error: 'Property nicht gefunden' });
     }
+
+    // Generate URLs (for local dev, use relative paths)
+    const imageUrls = files.map(f => `/uploads/${f.filename}`);
 
     // Add new images to existing ones
     const updatedImages = [...property.images, ...imageUrls];
@@ -656,13 +691,17 @@ app.post('/properties/:id/images', upload.array('images', 10), async (req, res) 
   }
 });
 
-// DELETE /properties/:id/images - Remove image
-app.delete('/properties/:id/images', async (req, res) => {
+// DELETE /properties/:id/images - Remove image (tenant-isolated)
+app.delete('/properties/:id/images', authMiddleware, async (req, res) => {
   try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
     const { id } = req.params;
     const { imageUrl, isFloorplan } = req.body;
 
-    const property = await prisma.property.findUnique({ where: { id } });
+    // Verify property belongs to tenant
+    const property = await prisma.property.findFirst({ where: { id, tenantId: currentUser.tenantId } });
     if (!property) {
       return res.status(404).json({ error: 'Property nicht gefunden' });
     }
@@ -692,13 +731,17 @@ app.delete('/properties/:id/images', async (req, res) => {
   }
 });
 
-// POST /leads/:id/email - Send manual email
-app.post('/leads/:id/email', async (req, res) => {
+// POST /leads/:id/email - Send manual email (tenant-isolated)
+app.post('/leads/:id/email', authMiddleware, async (req, res) => {
   try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
     const { id } = req.params;
     const { subject, body } = req.body;
     
-    const lead = await prisma.lead.findUnique({ where: { id } });
+    // Verify lead belongs to tenant
+    const lead = await prisma.lead.findFirst({ where: { id, tenantId: currentUser.tenantId } });
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
 
     // --- REAL SENDING LOGIC WOULD GO HERE (SMTP) ---
@@ -725,10 +768,18 @@ app.post('/leads/:id/email', async (req, res) => {
   }
 });
 
-// DELETE /leads/:id - Delete a lead
-app.delete('/leads/:id', async (req, res) => {
+// DELETE /leads/:id - Delete a lead (tenant-isolated)
+app.delete('/leads/:id', authMiddleware, async (req, res) => {
   try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
     const { id } = req.params;
+    
+    // Verify lead belongs to tenant
+    const lead = await prisma.lead.findFirst({ where: { id, tenantId: currentUser.tenantId } });
+    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
     // Delete related messages first (cascade delete would be better in schema)
     await prisma.message.deleteMany({ where: { leadId: id } });
     await prisma.lead.delete({ where: { id } });
@@ -739,10 +790,18 @@ app.delete('/leads/:id', async (req, res) => {
   }
 });
 
-// DELETE /properties/:id - Delete a property
-app.delete('/properties/:id', async (req, res) => {
+// DELETE /properties/:id - Delete a property (tenant-isolated)
+app.delete('/properties/:id', authMiddleware, async (req, res) => {
   try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
     const { id } = req.params;
+    
+    // Verify property belongs to tenant
+    const property = await prisma.property.findFirst({ where: { id, tenantId: currentUser.tenantId } });
+    if (!property) return res.status(404).json({ error: 'Property not found' });
+
     // Check if property has leads
     const leadCount = await prisma.lead.count({ where: { propertyId: id } });
     if (leadCount > 0) {
@@ -920,16 +979,19 @@ app.post('/leads', authMiddleware, async (req, res) => {
 });
 
 // POST /messages/:id/send - Approve and send a draft message
-app.post('/messages/:id/send', async (req, res) => {
+app.post('/messages/:id/send', authMiddleware, async (req, res) => {
   try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
     const { id } = req.params;
     
     const message = await prisma.message.findUnique({ where: { id } });
     if (!message) return res.status(404).json({ error: 'Message not found' });
     if (message.status !== 'DRAFT') return res.status(400).json({ error: 'Message is not a draft' });
     
-    // Fetch Lead to get email
-    const lead = await prisma.lead.findUnique({ where: { id: message.leadId } });
+    // Fetch Lead and verify tenant ownership
+    const lead = await prisma.lead.findFirst({ where: { id: message.leadId, tenantId: currentUser.tenantId } });
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
 
     // --- REAL SENDING LOGIC WOULD GO HERE (SMTP) ---
@@ -958,7 +1020,8 @@ app.post('/messages/:id/send', async (req, res) => {
 });
 
 // --- Template Management ---
-app.post('/templates/render', (req, res) => {
+// POST /templates/render - Render a template (requires auth)
+app.post('/templates/render', authMiddleware, (req, res) => {
   const { templateBody, context } = req.body;
   const result = TemplateService.render(templateBody, context);
   res.json({ result });
@@ -1813,7 +1876,8 @@ async function getPortalConnection(portalId: string, userId: string, tenantId: s
 }
 
 // GET /portals - List all available portals
-app.get('/portals', async (req, res) => {
+// GET /portals - List available portals (requires auth for consistency)
+app.get('/portals', authMiddleware, async (req, res) => {
   try {
     const { country } = req.query;
     
@@ -2039,17 +2103,22 @@ app.get('/portal-connections/effective', authMiddleware, async (req, res) => {
 });
 
 // POST /properties/:id/sync - Sync property to portals
-app.post('/properties/:id/sync', async (req, res) => {
+// POST /properties/:id/sync - Sync property to portals (tenant-isolated)
+app.post('/properties/:id/sync', authMiddleware, async (req, res) => {
   try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
     const { id } = req.params;
-    const { portalIds, userId, tenantId } = req.body;
+    const { portalIds } = req.body;
     
     if (!portalIds || !Array.isArray(portalIds)) {
       return res.status(400).json({ error: 'portalIds array required' });
     }
     
-    const property = await prisma.property.findUnique({
-      where: { id }
+    // Verify property belongs to tenant
+    const property = await prisma.property.findFirst({
+      where: { id, tenantId: currentUser.tenantId }
     });
     
     if (!property) {
@@ -2799,8 +2868,14 @@ app.post('/calendar/share-team', authMiddleware, async (req, res) => {
   }
 });
 
-// --- Admin: Run Migrations ---
+// --- Admin: Run Migrations (PROTECTED - requires admin secret) ---
 app.post('/admin/migrate', async (req, res) => {
+  // Require admin secret for admin operations
+  const adminSecret = req.headers['x-admin-secret'];
+  if (adminSecret !== process.env.ADMIN_SECRET && process.env.NODE_ENV !== 'development') {
+    return res.status(403).json({ error: 'Forbidden - Admin access required' });
+  }
+
   try {
     const db = await initializePrisma();
     
@@ -2814,8 +2889,13 @@ app.post('/admin/migrate', async (req, res) => {
   }
 });
 
-// Full database setup - run init migration
+// Full database setup - run init migration (PROTECTED)
 app.post('/admin/setup-db', async (req, res) => {
+  // Require admin secret for admin operations
+  const adminSecret = req.headers['x-admin-secret'];
+  if (adminSecret !== process.env.ADMIN_SECRET && process.env.NODE_ENV !== 'development') {
+    return res.status(403).json({ error: 'Forbidden - Admin access required' });
+  }
   try {
     const db = await initializePrisma();
     
