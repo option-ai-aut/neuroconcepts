@@ -605,26 +605,6 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
             </div>
           </div>
 
-          {/* Jarvis-Kontext */}
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Jarvis-Kontext</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              Diese Informationen nutzt Jarvis, um Fragen zu beantworten, die nicht in den Stammdaten stehen.
-            </p>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-500 mb-2">Zusätzliche Fakten</label>
-              <textarea
-                rows={6}
-                // @ts-ignore
-                value={formData.aiFacts || ''}
-                // @ts-ignore
-                onChange={(e) => handleInputChange('aiFacts', e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all resize-none"
-              />
-            </div>
-          </div>
-
           {/* Exposé */}
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Exposé</h2>
