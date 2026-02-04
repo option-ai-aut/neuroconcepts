@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { SchemaType, FunctionDeclarationSchema } from '@google/generative-ai';
+import { randomUUID } from 'crypto';
 
 // Prisma client will be injected from index.ts
 let prisma: PrismaClient;
@@ -381,6 +382,19 @@ export const CRM_TOOLS = {
         templateId: { type: SchemaType.STRING, description: "ID of the template to use" } as FunctionDeclarationSchema,
       },
       required: ["propertyId", "templateId"]
+    }
+  },
+  create_expose_template: {
+    name: "create_expose_template",
+    description: "Creates a new Exposé template with optional blocks. Use this to create reusable templates for exposés.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        name: { type: SchemaType.STRING, description: "Name of the template (e.g. 'Modern', 'Elegant', 'Minimalist')" } as FunctionDeclarationSchema,
+        theme: { type: SchemaType.STRING, description: "Theme: 'default', 'modern', 'elegant', 'minimal'" } as FunctionDeclarationSchema,
+        isDefault: { type: SchemaType.BOOLEAN, description: "Set as default template for new exposés" } as FunctionDeclarationSchema,
+      },
+      required: ["name"]
     }
   },
   delete_expose: {
@@ -1016,6 +1030,36 @@ export class AiToolExecutor {
           }
         });
         return `Exposé erstellt (ID: ${expose.id}) für Property "${property.title}".`;
+      }
+
+      case 'create_expose_template': {
+        const { name, theme = 'default', isDefault = false } = args;
+        
+        // Create template with default blocks based on theme
+        const defaultBlocks = [
+          { id: randomUUID(), type: 'hero', title: '{{property.title}}', subtitle: '{{property.address}}' },
+          { id: randomUUID(), type: 'stats', items: [
+            { label: 'Zimmer', value: '{{property.rooms}}' },
+            { label: 'Wohnfläche', value: '{{property.area}} m²' },
+            { label: 'Preis', value: '{{property.price}} €' }
+          ]},
+          { id: randomUUID(), type: 'text', title: 'Beschreibung', content: '{{property.description}}' },
+          { id: randomUUID(), type: 'features', title: 'Ausstattung', items: [] },
+          { id: randomUUID(), type: 'location', title: 'Lage', address: '{{property.address}}' },
+          { id: randomUUID(), type: 'contact', title: 'Ihr Ansprechpartner', name: '{{user.name}}', email: '{{user.email}}' },
+        ];
+
+        const template = await getPrisma().exposeTemplate.create({
+          data: {
+            tenantId,
+            name,
+            theme,
+            isDefault,
+            blocks: defaultBlocks,
+          }
+        });
+        
+        return `Exposé-Vorlage "${name}" erstellt (ID: ${template.id}). Die Vorlage enthält ${defaultBlocks.length} Standard-Blöcke und kann im Exposé-Editor angepasst werden.`;
       }
 
       case 'delete_expose': {
