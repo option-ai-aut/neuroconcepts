@@ -389,9 +389,21 @@ export default function AiChatSidebar() {
             if (line.startsWith('data: ')) {
               const data = JSON.parse(line.slice(6));
               
-              // Capture tools used
+              // Capture tools used and update message immediately
               if (data.toolsUsed && data.toolsUsed.length > 0) {
                 toolsUsed = data.toolsUsed;
+                // Update the assistant message with tools immediately
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  const assistantIdx = newMessages.findIndex((m, idx) => idx === assistantMsgIndex && m.role === 'ASSISTANT');
+                  if (assistantIdx !== -1) {
+                    newMessages[assistantIdx] = {
+                      ...newMessages[assistantIdx],
+                      toolsUsed: toolsUsed
+                    };
+                  }
+                  return newMessages;
+                });
               }
               
               if (data.error) {
@@ -415,21 +427,9 @@ export default function AiChatSidebar() {
                   showingActionMessage = false;
                 }
                 
-                // Check if AI performed actions and add tools to message
+                // Check if AI performed actions
                 if (data.hadFunctionCalls) {
                   hadFunctionCalls = true;
-                  // Update the assistant message with tools used
-                  setMessages(prev => {
-                    const newMessages = [...prev];
-                    const assistantIdx = newMessages.findIndex((m, idx) => idx === assistantMsgIndex && m.role === 'ASSISTANT');
-                    if (assistantIdx !== -1) {
-                      newMessages[assistantIdx] = {
-                        ...newMessages[assistantIdx],
-                        toolsUsed: data.toolsUsed || toolsUsed
-                      };
-                    }
-                    return newMessages;
-                  });
                 }
                 break;
               }
