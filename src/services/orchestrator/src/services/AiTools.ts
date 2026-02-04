@@ -58,14 +58,14 @@ export const CRM_TOOLS = {
   // === LEAD TOOLS ===
   create_lead: {
     name: "create_lead",
-    description: "Creates a new lead in the CRM with contact info and buyer preferences.",
+    description: "Creates a new lead in the CRM. IMPORTANT: Always include firstName and lastName! For test leads use 'Max Mustermann' or similar.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         salutation: { type: SchemaType.STRING, description: "Salutation: NONE, MR (Herr), MS (Frau), DIVERSE (Divers)" } as FunctionDeclarationSchema,
         formalAddress: { type: SchemaType.BOOLEAN, description: "Use formal address (Sie) if true, informal (Du) if false. Default: true" } as FunctionDeclarationSchema,
-        firstName: { type: SchemaType.STRING, description: "First name of the lead" } as FunctionDeclarationSchema,
-        lastName: { type: SchemaType.STRING, description: "Last name of the lead" } as FunctionDeclarationSchema,
+        firstName: { type: SchemaType.STRING, description: "First name of the lead - REQUIRED for proper lead management" } as FunctionDeclarationSchema,
+        lastName: { type: SchemaType.STRING, description: "Last name of the lead - REQUIRED for proper lead management" } as FunctionDeclarationSchema,
         email: { type: SchemaType.STRING, description: "Email address" } as FunctionDeclarationSchema,
         phone: { type: SchemaType.STRING, description: "Phone number" } as FunctionDeclarationSchema,
         message: { type: SchemaType.STRING, description: "Initial message or note" } as FunctionDeclarationSchema,
@@ -79,7 +79,7 @@ export const CRM_TOOLS = {
         financingStatus: { type: SchemaType.STRING, description: "Financing status: NOT_CLARIFIED, PRE_QUALIFIED, APPROVED, CASH_BUYER" } as FunctionDeclarationSchema,
         source: { type: SchemaType.STRING, description: "Lead source: WEBSITE, PORTAL, REFERRAL, SOCIAL_MEDIA, COLD_CALL, EVENT, OTHER" } as FunctionDeclarationSchema,
       },
-      required: ["email"]
+      required: ["email", "firstName", "lastName"]
     }
   },
   create_property: {
@@ -124,11 +124,12 @@ export const CRM_TOOLS = {
   },
   get_leads: {
     name: "get_leads",
-    description: "Retrieves all leads from the CRM. Can filter by status.",
+    description: "Retrieves leads from the CRM. Can filter by status or search by name/email.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         status: { type: SchemaType.STRING, description: "Filter by status: NEW, CONTACTED, QUALIFIED, LOST" } as FunctionDeclarationSchema,
+        search: { type: SchemaType.STRING, description: "Search by name or email (partial match)" } as FunctionDeclarationSchema,
         limit: { type: SchemaType.NUMBER, description: "Maximum number of leads to return (default: 50)" } as FunctionDeclarationSchema,
       }
     }
@@ -173,11 +174,11 @@ export const CRM_TOOLS = {
   },
   delete_lead: {
     name: "delete_lead",
-    description: "Deletes a single lead from the CRM by ID. Use with caution!",
+    description: "Deletes a single lead from the CRM by ID. IMPORTANT: First use get_leads to find the lead ID, then delete. Use with caution!",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        leadId: { type: SchemaType.STRING, description: "ID of the lead to delete" } as FunctionDeclarationSchema,
+        leadId: { type: SchemaType.STRING, description: "ID of the lead to delete. Get this from get_leads first!" } as FunctionDeclarationSchema,
       },
       required: ["leadId"]
     }
@@ -998,14 +999,35 @@ export class AiToolExecutor {
       }
 
       case 'get_leads': {
-        const { status, limit = 50 } = args;
+        const { status, search, limit = 50 } = args;
+        
+        // Build search conditions
+        const searchConditions = search ? {
+          OR: [
+            { firstName: { contains: search, mode: 'insensitive' as const } },
+            { lastName: { contains: search, mode: 'insensitive' as const } },
+            { email: { contains: search, mode: 'insensitive' as const } },
+          ]
+        } : {};
+        
         return await getPrisma().lead.findMany({
           where: { 
             tenantId,
-            ...(status && { status })
+            ...(status && { status }),
+            ...searchConditions
           },
           take: limit,
-          orderBy: { createdAt: 'desc' }
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            status: true,
+            createdAt: true,
+            propertyId: true
+          }
         });
       }
 
