@@ -763,6 +763,184 @@ app.delete('/properties/:id/images', authMiddleware, async (req, res) => {
   }
 });
 
+// === DOCUMENT MANAGEMENT ===
+
+// Document type definition
+interface Document {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+  uploadedAt: string;
+}
+
+// POST /properties/:id/documents - Upload documents to property
+app.post('/properties/:id/documents', authMiddleware, upload.array('documents', 20), async (req, res) => {
+  try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    const files = req.files as Express.Multer.File[];
+    
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: 'Keine Dateien hochgeladen' });
+    }
+
+    const property = await prisma.property.findFirst({ where: { id, tenantId: currentUser.tenantId } });
+    if (!property) return res.status(404).json({ error: 'Property nicht gefunden' });
+
+    // Create document entries
+    const newDocs: Document[] = files.map(f => ({
+      id: Math.random().toString(36).substr(2, 9),
+      name: f.originalname,
+      url: `/uploads/${f.filename}`,
+      type: f.mimetype,
+      size: f.size,
+      uploadedAt: new Date().toISOString()
+    }));
+
+    // Merge with existing documents
+    const existingDocs = (property.documents as Document[] | null) || [];
+    const updatedDocs = [...existingDocs, ...newDocs];
+
+    await prisma.property.update({
+      where: { id },
+      data: { documents: updatedDocs }
+    });
+
+    res.json({ success: true, documents: newDocs });
+  } catch (error) {
+    console.error('Document upload error:', error);
+    res.status(500).json({ error: 'Upload fehlgeschlagen' });
+  }
+});
+
+// DELETE /properties/:id/documents - Delete a document from property
+app.delete('/properties/:id/documents', authMiddleware, async (req, res) => {
+  try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    const { documentId } = req.body;
+
+    const property = await prisma.property.findFirst({ where: { id, tenantId: currentUser.tenantId } });
+    if (!property) return res.status(404).json({ error: 'Property nicht gefunden' });
+
+    const existingDocs = (property.documents as Document[] | null) || [];
+    const docToDelete = existingDocs.find(d => d.id === documentId);
+    
+    if (!docToDelete) {
+      return res.status(404).json({ error: 'Dokument nicht gefunden' });
+    }
+
+    const updatedDocs = existingDocs.filter(d => d.id !== documentId);
+
+    await prisma.property.update({
+      where: { id },
+      data: { documents: updatedDocs }
+    });
+
+    // Delete file from disk
+    if (docToDelete.url.startsWith('/uploads/')) {
+      const filePath = path.join(__dirname, '..', docToDelete.url);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Document delete error:', error);
+    res.status(500).json({ error: 'Löschen fehlgeschlagen' });
+  }
+});
+
+// POST /leads/:id/documents - Upload documents to lead
+app.post('/leads/:id/documents', authMiddleware, upload.array('documents', 20), async (req, res) => {
+  try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    const files = req.files as Express.Multer.File[];
+    
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: 'Keine Dateien hochgeladen' });
+    }
+
+    const lead = await prisma.lead.findFirst({ where: { id, tenantId: currentUser.tenantId } });
+    if (!lead) return res.status(404).json({ error: 'Lead nicht gefunden' });
+
+    // Create document entries
+    const newDocs: Document[] = files.map(f => ({
+      id: Math.random().toString(36).substr(2, 9),
+      name: f.originalname,
+      url: `/uploads/${f.filename}`,
+      type: f.mimetype,
+      size: f.size,
+      uploadedAt: new Date().toISOString()
+    }));
+
+    // Merge with existing documents
+    const existingDocs = (lead.documents as Document[] | null) || [];
+    const updatedDocs = [...existingDocs, ...newDocs];
+
+    await prisma.lead.update({
+      where: { id },
+      data: { documents: updatedDocs }
+    });
+
+    res.json({ success: true, documents: newDocs });
+  } catch (error) {
+    console.error('Document upload error:', error);
+    res.status(500).json({ error: 'Upload fehlgeschlagen' });
+  }
+});
+
+// DELETE /leads/:id/documents - Delete a document from lead
+app.delete('/leads/:id/documents', authMiddleware, async (req, res) => {
+  try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    const { documentId } = req.body;
+
+    const lead = await prisma.lead.findFirst({ where: { id, tenantId: currentUser.tenantId } });
+    if (!lead) return res.status(404).json({ error: 'Lead nicht gefunden' });
+
+    const existingDocs = (lead.documents as Document[] | null) || [];
+    const docToDelete = existingDocs.find(d => d.id === documentId);
+    
+    if (!docToDelete) {
+      return res.status(404).json({ error: 'Dokument nicht gefunden' });
+    }
+
+    const updatedDocs = existingDocs.filter(d => d.id !== documentId);
+
+    await prisma.lead.update({
+      where: { id },
+      data: { documents: updatedDocs }
+    });
+
+    // Delete file from disk
+    if (docToDelete.url.startsWith('/uploads/')) {
+      const filePath = path.join(__dirname, '..', docToDelete.url);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Document delete error:', error);
+    res.status(500).json({ error: 'Löschen fehlgeschlagen' });
+  }
+});
+
 // POST /leads/:id/email - Send manual email (tenant-isolated)
 app.post('/leads/:id/email', authMiddleware, async (req, res) => {
   try {

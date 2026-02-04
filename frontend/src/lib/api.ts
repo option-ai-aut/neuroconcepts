@@ -60,6 +60,10 @@ export interface Lead {
   // Relations
   propertyId?: string;
   messages?: Message[];
+  
+  // Documents
+  documents?: DocumentFile[];
+  
   createdAt: string;
 }
 
@@ -138,7 +142,20 @@ export interface Property {
   defaultExposeTemplateId?: string;
   defaultExposeTemplate?: { id: string; name: string };
   
+  // Documents
+  documents?: DocumentFile[];
+  
   createdAt: string;
+}
+
+// Document type
+export interface DocumentFile {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+  uploadedAt: string;
 }
 
 // Exposé Types
@@ -585,4 +602,64 @@ export async function downloadTemplatePdf(templateId: string): Promise<void> {
   a.click();
   document.body.removeChild(a);
   window.URL.revokeObjectURL(url);
+}
+
+// --- Document Management ---
+
+export async function uploadPropertyDocuments(propertyId: string, files: File[]): Promise<DocumentFile[]> {
+  const headers = await getAuthHeaders();
+  const formData = new FormData();
+  files.forEach(file => formData.append('documents', file));
+  
+  const res = await fetch(`${getApiUrl()}/properties/${propertyId}/documents`, {
+    method: 'POST',
+    headers: {
+      'Authorization': (headers as Record<string, string>)['Authorization'] || '',
+    },
+    body: formData
+  });
+  
+  if (!res.ok) throw new Error('Failed to upload documents');
+  const data = await res.json();
+  return data.documents;
+}
+
+export async function deletePropertyDocument(propertyId: string, documentId: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/properties/${propertyId}/documents`, {
+    method: 'DELETE',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ documentId })
+  });
+  
+  if (!res.ok) throw new Error('Failed to delete document');
+}
+
+export async function uploadLeadDocuments(leadId: string, files: File[]): Promise<DocumentFile[]> {
+  const headers = await getAuthHeaders();
+  const formData = new FormData();
+  files.forEach(file => formData.append('documents', file));
+  
+  const res = await fetch(`${getApiUrl()}/leads/${leadId}/documents`, {
+    method: 'POST',
+    headers: {
+      'Authorization': (headers as Record<string, string>)['Authorization'] || '',
+    },
+    body: formData
+  });
+  
+  if (!res.ok) throw new Error('Failed to upload documents');
+  const data = await res.json();
+  return data.documents;
+}
+
+export async function deleteLeadDocument(leadId: string, documentId: string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/leads/${leadId}/documents`, {
+    method: 'DELETE',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ documentId })
+  });
+  
+  if (!res.ok) throw new Error('Failed to delete document');
 }

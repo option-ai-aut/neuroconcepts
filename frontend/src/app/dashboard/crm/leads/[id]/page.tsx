@@ -1,12 +1,24 @@
 'use client';
 
 import { useEffect, useState, use, useRef } from 'react';
-import { getLead, Lead, sendDraftMessage, updateLead, sendManualEmail, deleteLead } from '@/lib/api';
+import { getLead, Lead, sendDraftMessage, updateLead, sendManualEmail, deleteLead, uploadLeadDocuments, deleteLeadDocument, DocumentFile, getAuthHeaders } from '@/lib/api';
 import { useRouter } from 'next/navigation';
-import { Mail, Phone, User, Send, MessageSquare, FileText, ArrowLeft, MoreVertical, Calendar, Clock, ChevronDown, Plus, Trash2, Euro, Home, MapPin, Building, Activity, CheckCircle2, Edit3, FileCheck } from 'lucide-react';
+import { Mail, Phone, User, Send, MessageSquare, FileText, ArrowLeft, MoreVertical, Calendar, Clock, ChevronDown, Plus, Trash2, Euro, Home, MapPin, Building, Activity, CheckCircle2, Edit3, FileCheck, Upload, Download, File, FileSpreadsheet, FileType } from 'lucide-react';
 import Link from 'next/link';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { getRuntimeConfig } from '@/components/EnvProvider';
+
+// Helper to get full file URL
+const getFileUrl = (url: string): string => {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  if (url.startsWith('/uploads/')) {
+    const config = getRuntimeConfig();
+    const apiUrl = config.apiUrl || '';
+    return `${apiUrl}${url}`;
+  }
+  return url;
+};
 
 export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -23,6 +35,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
+  
+  // Document Upload State
+  const [uploadingDocs, setUploadingDocs] = useState(false);
+  const documentInputRef = useRef<HTMLInputElement>(null);
 
   const router = useRouter();
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -112,6 +128,63 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     } catch (error) {
       alert('Fehler beim Senden: ' + error);
     }
+  };
+
+  // Document upload handlers
+  const handleDocumentSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    await uploadDocuments(files);
+    e.target.value = '';
+  };
+
+  const uploadDocuments = async (files: File[]) => {
+    if (files.length === 0) return;
+    
+    setUploadingDocs(true);
+    try {
+      await uploadLeadDocuments(id, files);
+      await loadLead();
+    } catch (error) {
+      console.error('Document upload error:', error);
+      alert('Fehler beim Hochladen');
+    } finally {
+      setUploadingDocs(false);
+    }
+  };
+
+  const removeDocument = async (documentId: string) => {
+    try {
+      await deleteLeadDocument(id, documentId);
+      await loadLead();
+    } catch (error) {
+      console.error('Document delete error:', error);
+      alert('Fehler beim Löschen');
+    }
+  };
+
+  const downloadDocument = (doc: DocumentFile) => {
+    const url = getFileUrl(doc.url);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = doc.name;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const getDocumentIcon = (type: string) => {
+    if (type.includes('pdf')) return <FileText className="w-5 h-5 text-red-500" />;
+    if (type.includes('word') || type.includes('document')) return <FileType className="w-5 h-5 text-blue-500" />;
+    if (type.includes('sheet') || type.includes('excel')) return <FileSpreadsheet className="w-5 h-5 text-green-500" />;
+    return <File className="w-5 h-5 text-gray-500" />;
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
   if (loading) return <div className="p-8 text-center text-gray-500">Laden...</div>;
@@ -490,6 +563,73 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all resize-none"
               />
             </div>
+          </div>
+
+          {/* Dokumente */}
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Dokumente</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Führerschein, Pass, Mietverträge, etc.
+            </p>
+
+            <input
+              ref={documentInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.jpg,.jpeg,.png"
+              onChange={handleDocumentSelect}
+              className="hidden"
+            />
+
+            {/* Document Upload Zone */}
+            <div
+              onClick={() => documentInputRef.current?.click()}
+              className="border-2 border-dashed rounded-xl p-4 transition-all cursor-pointer border-gray-200 bg-gray-100 hover:bg-gray-50 mb-4"
+            >
+              <div className="py-4 text-center">
+                <Upload className="w-10 h-10 mx-auto mb-2 text-gray-400" />
+                <p className="text-sm text-gray-600 font-medium">
+                  {uploadingDocs ? 'Wird hochgeladen...' : 'Dokumente hochladen'}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">PDF, Word, Excel, Bilder bis 10MB</p>
+              </div>
+            </div>
+
+            {/* Document List */}
+            {lead.documents && lead.documents.length > 0 && (
+              <div className="space-y-2">
+                {lead.documents.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {getDocumentIcon(doc.type)}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-900 truncate">{doc.name}</p>
+                        <p className="text-xs text-gray-500">{formatFileSize(doc.size)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => downloadDocument(doc)}
+                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                        title="Herunterladen"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => removeDocument(doc.id)}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                        title="Löschen"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Aktivitäten */}

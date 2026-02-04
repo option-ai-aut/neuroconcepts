@@ -138,6 +138,9 @@ model Lead {
   messages  Message[]
   activities LeadActivity[]
   
+  // Documents (Führerschein, Pass, Mietverträge, etc.) - stored as JSON array
+  documents   Json?    // Array of { name: string, url: string, type: string, uploadedAt: string }
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -283,6 +286,9 @@ model Property {
   floorplans  String[]
   videos      String[]
   virtualTour String?
+  
+  // Documents (PDFs, Word, Excel, etc.) - stored as JSON array with name and url
+  documents   Json?    // Array of { name: string, url: string, type: string, uploadedAt: string }
   
   // Status
   status      PropertyStatus @default(ACTIVE)
