@@ -1357,14 +1357,15 @@ function replacePlaceholders(blocks: any[], property: any, user: any, lead?: any
 }
 
 // --- AI Assistant ---
-app.get('/chat/history', async (req, res) => {
+app.get('/chat/history', authMiddleware, async (req, res) => {
   try {
-    const { userId } = req.query;
-    if (!userId) return res.status(400).json({ error: 'userId required' });
+    // Get user from auth - only return history for authenticated user
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
 
     const history = await prisma.userChat.findMany({
       where: { 
-        userId: String(userId),
+        userId: currentUser.id,
         archived: false // Nur aktiven Chat laden
       },
       orderBy: { createdAt: 'asc' }
@@ -1376,7 +1377,7 @@ app.get('/chat/history', async (req, res) => {
       content: msg.content
     }));
 
-    console.log(`📜 Chat-Historie geladen für User ${userId}: ${formattedHistory.length} Nachrichten`);
+    console.log(`📜 Chat-Historie geladen für User ${currentUser.id}: ${formattedHistory.length} Nachrichten`);
     res.json(formattedHistory);
   } catch (error) {
     console.error('Error fetching chat history:', error);
@@ -1385,21 +1386,22 @@ app.get('/chat/history', async (req, res) => {
 });
 
 // Neuen Chat starten (archiviert alten Chat)
-app.post('/chat/new', async (req, res) => {
+app.post('/chat/new', authMiddleware, async (req, res) => {
   try {
-    const { userId } = req.body;
-    if (!userId) return res.status(400).json({ error: 'userId required' });
+    // Get user from auth
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
 
-    // Archiviere alle aktuellen Chats
+    // Archiviere alle aktuellen Chats für den authentifizierten User
     await prisma.userChat.updateMany({
       where: { 
-        userId: String(userId),
+        userId: currentUser.id,
         archived: false
       },
       data: { archived: true }
     });
 
-    console.log(`🆕 Neuer Chat gestartet für User ${userId}`);
+    console.log(`🆕 Neuer Chat gestartet für User ${currentUser.id}`);
     res.json({ success: true });
   } catch (error) {
     console.error('Error starting new chat:', error);
@@ -1408,54 +1410,36 @@ app.post('/chat/new', async (req, res) => {
 });
 
 app.post('/chat',
+  authMiddleware,
   AiSafetyMiddleware.rateLimit(50, 60000), // 50 requests per minute
   AiSafetyMiddleware.contentModeration,
-  AiSafetyMiddleware.tenantIsolation,
   AiSafetyMiddleware.auditLog,
   async (req, res) => {
     try {
-      const { message, history, tenantId, userId } = req.body;
+      const { message, history } = req.body;
       
-      // Ensure user exists (create if not - for local dev)
-      if (userId) {
-        let user = await prisma.user.findUnique({ where: { id: userId } });
-        if (!user) {
-          let tenant = await prisma.tenant.findFirst();
-          if (!tenant) {
-            tenant = await prisma.tenant.create({
-              data: { id: 'default-tenant', name: 'Development Tenant' }
-            });
-          }
-          user = await prisma.user.create({
-            data: { 
-              id: userId, 
-              email: `${userId}@local.dev`,
-              tenantId: tenant.id,
-              firstName: 'Local',
-              lastName: 'User'
-            }
-          });
-          console.log(`📝 Default User erstellt: ${userId}`);
-        }
+      // Get user from auth - CRITICAL: tenantId comes from authenticated user!
+      const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+      if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+      
+      const userId = currentUser.id;
+      const tenantId = currentUser.tenantId;
 
-        await prisma.userChat.create({
-          data: { userId, role: 'USER', content: message }
-        });
-      }
+      await prisma.userChat.create({
+        data: { userId, role: 'USER', content: message }
+      });
 
-      const gemini = new OpenAIService();
-      const responseText = await gemini.chat(message, tenantId, history);
+      const openai = new OpenAIService();
+      const responseText = await openai.chat(message, tenantId, history);
       
       // Sanitize response before sending
       const sanitizedResponse = wrapAiResponse(responseText);
 
       // Save Assistant Message
-      if (userId) {
-        await prisma.userChat.create({
-          data: { userId, role: 'ASSISTANT', content: sanitizedResponse }
-        });
-        console.log(`💾 Chat gespeichert für User ${userId}`);
-      }
+      await prisma.userChat.create({
+        data: { userId, role: 'ASSISTANT', content: sanitizedResponse }
+      });
+      console.log(`💾 Chat gespeichert für User ${userId}`);
 
       res.json({ response: sanitizedResponse });
     } catch (error) {
@@ -1467,13 +1451,24 @@ app.post('/chat',
 
 // Streaming Chat Endpoint with Optimized Memory
 app.post('/chat/stream',
+  authMiddleware,
   AiSafetyMiddleware.rateLimit(50, 60000),
   AiSafetyMiddleware.contentModeration,
-  AiSafetyMiddleware.tenantIsolation,
   AiSafetyMiddleware.auditLog,
   async (req, res) => {
     try {
-      const { message, tenantId, userId } = req.body;
+      const { message } = req.body;
+      
+      // Get user from auth - CRITICAL: tenantId comes from authenticated user, not request!
+      const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+      if (!currentUser) {
+        res.write(`data: ${JSON.stringify({ error: 'Unauthorized' })}\n\n`);
+        res.end();
+        return;
+      }
+      
+      const userId = currentUser.id;
+      const tenantId = currentUser.tenantId;
       
       // Set headers for SSE (Server-Sent Events)
       res.setHeader('Content-Type', 'text/event-stream');
@@ -1482,14 +1477,14 @@ app.post('/chat/stream',
 
       // Get optimized history (recent messages + summary)
       const { recentMessages, summary } = await ConversationMemory.getOptimizedHistory(userId);
-      const optimizedHistory = ConversationMemory.formatForGemini(recentMessages, summary);
+      const optimizedHistory = ConversationMemory.formatForOpenAI(recentMessages, summary);
 
-      const gemini = new OpenAIService();
+      const openai = new OpenAIService();
       let fullResponse = '';
       let hadFunctionCalls = false;
 
       // Stream the response with optimized history
-      for await (const result of gemini.chatStream(message, tenantId, optimizedHistory)) {
+      for await (const result of openai.chatStream(message, tenantId, optimizedHistory)) {
         fullResponse += result.chunk;
         if (result.hadFunctionCalls) hadFunctionCalls = true;
         // Send chunk as SSE
@@ -1501,40 +1496,16 @@ app.post('/chat/stream',
       res.end();
 
       // Save messages to DB after streaming is complete
-      if (userId) {
-        // Ensure user exists (create if not - for local dev)
-        let user = await prisma.user.findUnique({ where: { id: userId } });
-        if (!user) {
-          // Create default user for local development
-          let tenant = await prisma.tenant.findFirst();
-          if (!tenant) {
-            tenant = await prisma.tenant.create({
-              data: { id: 'default-tenant', name: 'Development Tenant' }
-            });
-          }
-          user = await prisma.user.create({
-            data: { 
-              id: userId, 
-              email: `${userId}@local.dev`,
-              tenantId: tenant.id,
-              firstName: 'Local',
-              lastName: 'User'
-            }
-          });
-          console.log(`📝 Default User erstellt: ${userId}`);
-        }
-
-        await prisma.userChat.create({
-          data: { userId, role: 'USER', content: message }
-        });
-        await prisma.userChat.create({
-          data: { userId, role: 'ASSISTANT', content: wrapAiResponse(fullResponse) }
-        });
-        console.log(`💾 Chat gespeichert für User ${userId}`);
-        
-        // Cleanup old summaries (async, don't await)
-        ConversationMemory.cleanupOldSummaries(userId).catch(console.error);
-      }
+      await prisma.userChat.create({
+        data: { userId, role: 'USER', content: message }
+      });
+      await prisma.userChat.create({
+        data: { userId, role: 'ASSISTANT', content: wrapAiResponse(fullResponse) }
+      });
+      console.log(`💾 Chat gespeichert für User ${userId}`);
+      
+      // Cleanup old summaries (async, don't await)
+      ConversationMemory.cleanupOldSummaries(userId).catch(console.error);
     } catch (error) {
       console.error('Chat stream error:', error);
       res.write(`data: ${JSON.stringify({ error: 'AI Error' })}\n\n`);

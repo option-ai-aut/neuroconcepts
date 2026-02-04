@@ -55,10 +55,6 @@ export default function AiChatSidebar() {
   const [tipVisible, setTipVisible] = useState(false);
   const tipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // TODO: Get real User ID from Auth
-  const userId = 'default-user-id'; 
-  const tenantId = 'default-tenant';
-
   // Get shown tips from localStorage
   const getShownTips = useCallback((): string[] => {
     if (typeof window === 'undefined') return [];
@@ -132,7 +128,7 @@ export default function AiChatSidebar() {
     const loadHistory = async () => {
       try {
         const apiUrl = getApiUrl();
-        if (!apiUrl || !userId) {
+        if (!apiUrl) {
           // Retry after a short delay if config not ready
           if (retryCount < maxRetries) {
             retryCount++;
@@ -141,9 +137,9 @@ export default function AiChatSidebar() {
           return;
         }
 
-        // Load history
+        // Load history - userId comes from auth token on backend
         const authHeaders = await getAuthHeaders();
-        const res = await fetch(`${apiUrl}/chat/history?userId=${userId}`, {
+        const res = await fetch(`${apiUrl}/chat/history`, {
           headers: authHeaders
         });
         if (res.ok) {
@@ -168,7 +164,7 @@ export default function AiChatSidebar() {
     };
 
     loadHistory();
-  }, [userId]);
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -180,10 +176,11 @@ export default function AiChatSidebar() {
     try {
       const apiUrl = getApiUrl();
       const authHeaders = await getAuthHeaders();
+      // userId comes from auth token on backend
       const res = await fetch(`${apiUrl}/chat/new`, {
         method: 'POST',
         headers: authHeaders,
-        body: JSON.stringify({ userId })
+        body: JSON.stringify({})
       });
       
       if (res.ok) {
@@ -227,7 +224,6 @@ export default function AiChatSidebar() {
           body: JSON.stringify({
             message: userMsg.content,
             history: messages.filter(m => !m.isAction).slice(-10),
-            tenantId,
           })
         });
         const data = await res.json();
@@ -244,15 +240,13 @@ export default function AiChatSidebar() {
         setIsLoading(false);
       } else {
         // Regular chat endpoint with STREAMING
+        // Note: userId and tenantId come from auth token on backend
         const authHeaders = await getAuthHeaders();
         const res = await fetch(`${apiUrl}/chat/stream`, {
           method: 'POST',
           headers: authHeaders,
           body: JSON.stringify({
             message: userMsg.content,
-            history: messages,
-            tenantId,
-            userId,
           })
         });
 

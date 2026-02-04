@@ -34,7 +34,7 @@ const BLOCK_HEIGHTS: Record<string, number> = {
 };
 
 export default function ExposesPage() {
-  const { openDrawer, updateExposeEditor } = useGlobalState();
+  const { openDrawer, updateExposeEditor, aiActionPerformed } = useGlobalState();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
@@ -46,8 +46,15 @@ export default function ExposesPage() {
   const { data: templates = [], mutate, isValidating } = useSWR<ExposeTemplate[]>(
     API_ENDPOINTS.EXPOSE_TEMPLATES,
     getExposeTemplates,
-    { revalidateOnFocus: true }
+    { revalidateOnFocus: true, revalidateOnReconnect: true }
   );
+
+  // Revalidate when AI performs an action
+  useEffect(() => {
+    if (aiActionPerformed) {
+      mutate();
+    }
+  }, [aiActionPerformed, mutate]);
 
   // Fetch properties for preview
   const { data: properties = [] } = useSWR<Property[]>(

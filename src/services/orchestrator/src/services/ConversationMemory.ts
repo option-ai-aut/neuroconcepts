@@ -112,20 +112,20 @@ Zusammenfassung:`;
   }
 
   /**
-   * Format history for Gemini API
+   * Format history for OpenAI API
    */
-  static formatForGemini(recentMessages: Message[], summary: string | null): any[] {
+  static formatForOpenAI(recentMessages: Message[], summary: string | null): any[] {
     const history: any[] = [];
 
     // Add summary as system context if available
     if (summary) {
       history.push({
         role: 'user',
-        parts: [{ text: `[Zusammenfassung des bisherigen Gesprächs: ${summary}]` }]
+        content: `[Zusammenfassung des bisherigen Gesprächs: ${summary}]`
       });
       history.push({
-        role: 'model',
-        parts: [{ text: 'Verstanden, ich erinnere mich an den Kontext.' }]
+        role: 'assistant',
+        content: 'Verstanden, ich erinnere mich an den Kontext.'
       });
     }
 
@@ -133,11 +133,18 @@ Zusammenfassung:`;
     history.push(...recentMessages
       .filter(m => m.role === 'USER' || m.role === 'ASSISTANT')
       .map(m => ({
-        role: m.role === 'USER' ? 'user' : 'model',
-        parts: [{ text: m.content }]
+        role: m.role === 'USER' ? 'user' : 'assistant',
+        content: m.content
       })));
 
     return history;
+  }
+
+  /**
+   * @deprecated Use formatForOpenAI instead
+   */
+  static formatForGemini(recentMessages: Message[], summary: string | null): any[] {
+    return this.formatForOpenAI(recentMessages, summary);
   }
 
   /**

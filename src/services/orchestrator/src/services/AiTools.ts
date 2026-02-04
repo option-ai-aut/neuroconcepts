@@ -386,15 +386,14 @@ export const CRM_TOOLS = {
   },
   create_expose_template: {
     name: "create_expose_template",
-    description: "Creates a new Exposé template with optional blocks. Use this to create reusable templates for exposés.",
+    description: "Creates a new Exposé template. BE CREATIVE! Choose a unique, descriptive name yourself (e.g. 'Luxus Villa', 'Stadtapartment Modern', 'Landhaus Klassik'). Pick a fitting theme. Do NOT ask the user - just create something great!",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        name: { type: SchemaType.STRING, description: "Name of the template (e.g. 'Modern', 'Elegant', 'Minimalist')" } as FunctionDeclarationSchema,
-        theme: { type: SchemaType.STRING, description: "Theme: 'default', 'modern', 'elegant', 'minimal'" } as FunctionDeclarationSchema,
-        isDefault: { type: SchemaType.BOOLEAN, description: "Set as default template for new exposés" } as FunctionDeclarationSchema,
+        name: { type: SchemaType.STRING, description: "Creative name for the template - choose yourself, don't ask! Examples: 'Premium Penthouse', 'Gemütliches Zuhause', 'Business Loft'" } as FunctionDeclarationSchema,
+        theme: { type: SchemaType.STRING, description: "Visual theme: 'modern' (clean lines), 'elegant' (luxurious), 'minimal' (simple), 'classic' (traditional). Pick what fits the name!" } as FunctionDeclarationSchema,
       },
-      required: ["name"]
+      required: []
     }
   },
   delete_expose: {
@@ -1033,20 +1032,30 @@ export class AiToolExecutor {
       }
 
       case 'create_expose_template': {
-        const { name, theme = 'default', isDefault = false } = args;
+        // Generate creative name if not provided
+        const creativeNames = [
+          'Premium Residenz', 'Stadtleben Modern', 'Landhaus Charme', 'Urban Loft', 
+          'Elegantes Zuhause', 'Business Edition', 'Familientraum', 'Luxus Ambiente',
+          'Stilvolle Oase', 'Metropolitan', 'Klassik Deluxe', 'Zeitlos Schön'
+        ];
+        const randomName = creativeNames[Math.floor(Math.random() * creativeNames.length)];
+        const name = args.name || randomName;
+        const theme = args.theme || 'modern';
         
-        // Create template with default blocks based on theme
+        // Create template with blocks based on theme
         const defaultBlocks = [
-          { id: randomUUID(), type: 'hero', title: '{{property.title}}', subtitle: '{{property.address}}' },
+          { id: randomUUID(), type: 'hero', title: '{{property.title}}', subtitle: '{{property.address}}', style: { overlay: theme === 'elegant' ? 'dark' : 'light' } },
           { id: randomUUID(), type: 'stats', items: [
-            { label: 'Zimmer', value: '{{property.rooms}}' },
-            { label: 'Wohnfläche', value: '{{property.area}} m²' },
-            { label: 'Preis', value: '{{property.price}} €' }
+            { label: 'Zimmer', value: '{{property.rooms}}', icon: 'door' },
+            { label: 'Wohnfläche', value: '{{property.area}} m²', icon: 'area' },
+            { label: 'Preis', value: '{{property.price}} €', icon: 'euro' }
           ]},
-          { id: randomUUID(), type: 'text', title: 'Beschreibung', content: '{{property.description}}' },
-          { id: randomUUID(), type: 'features', title: 'Ausstattung', items: [] },
-          { id: randomUUID(), type: 'location', title: 'Lage', address: '{{property.address}}' },
-          { id: randomUUID(), type: 'contact', title: 'Ihr Ansprechpartner', name: '{{user.name}}', email: '{{user.email}}' },
+          { id: randomUUID(), type: 'gallery', title: 'Impressionen', layout: theme === 'minimal' ? 'grid' : 'masonry' },
+          { id: randomUUID(), type: 'text', title: 'Objektbeschreibung', content: '{{property.description}}' },
+          { id: randomUUID(), type: 'features', title: 'Ausstattung & Highlights', items: [], columns: 2 },
+          { id: randomUUID(), type: 'location', title: 'Lage & Umgebung', address: '{{property.address}}', showMap: true },
+          { id: randomUUID(), type: 'floorplan', title: 'Grundriss' },
+          { id: randomUUID(), type: 'contact', title: 'Ihr Ansprechpartner', name: '{{user.name}}', email: '{{user.email}}', phone: '{{user.phone}}' },
         ];
 
         const template = await getPrisma().exposeTemplate.create({
@@ -1054,12 +1063,12 @@ export class AiToolExecutor {
             tenantId,
             name,
             theme,
-            isDefault,
+            isDefault: false,
             blocks: defaultBlocks,
           }
         });
         
-        return `Exposé-Vorlage "${name}" erstellt (ID: ${template.id}). Die Vorlage enthält ${defaultBlocks.length} Standard-Blöcke und kann im Exposé-Editor angepasst werden.`;
+        return `Exposé-Vorlage "${name}" mit Theme "${theme}" erstellt! Die Vorlage enthält ${defaultBlocks.length} Blöcke: Hero-Bild, Statistiken, Galerie, Beschreibung, Ausstattung, Lage mit Karte, Grundriss und Kontakt. Du kannst sie jetzt im Vorlagen-Editor unter Einstellungen > Vorlagen anpassen.`;
       }
 
       case 'delete_expose': {

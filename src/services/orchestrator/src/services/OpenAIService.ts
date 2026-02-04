@@ -81,10 +81,11 @@ DEINE FÄHIGKEITEN:
 - Zeiträume: heute, Woche, Monat, Jahr
 
 EXPOSÉ-VORLAGEN ERSTELLEN:
-Wenn der Nutzer eine Vorlage erstellen will, nutze create_expose_template mit:
-- name: Name der Vorlage (z.B. "Modern", "Elegant", "Minimalist")
-- theme: 'default', 'modern', 'elegant', 'minimal'
-- isDefault: true wenn es die Standard-Vorlage sein soll
+Wenn der Nutzer eine Vorlage erstellen will, SEI KREATIV und erstelle sie sofort mit create_expose_template.
+FRAGE NICHT NACH - wähle selbst einen passenden Namen und Theme!
+- Wähle kreative Namen wie "Premium Residenz", "Urban Loft", "Landhaus Charme"
+- Wähle ein passendes Theme: 'modern', 'elegant', 'minimal', 'classic'
+- Erstelle einfach - der Nutzer kann sie danach anpassen
 
 VERFÜGBARE BLOCK-TYPEN für Exposés:
 - hero: Titelbild mit Überschrift
@@ -177,11 +178,14 @@ export class OpenAIService {
   }
 
   async chat(message: string, tenantId: string, history: any[] = []) {
+    // Filter out messages with null/empty content
+    const validHistory = history.filter(h => h.content != null && h.content !== '');
+    
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: 'system', content: SYSTEM_PROMPT },
-      ...history.map(h => ({
+      ...validHistory.map(h => ({
         role: (h.role === 'assistant' || h.role === 'ASSISTANT' ? 'assistant' : 'user') as 'assistant' | 'user',
-        content: h.content,
+        content: h.content || '',
       })),
       { role: 'user', content: message },
     ];
@@ -219,11 +223,14 @@ export class OpenAIService {
 
   // Streaming version of chat with Function Calling support
   async *chatStream(message: string, tenantId: string, history: any[] = []): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean }> {
+    // Filter out messages with null/empty content
+    const validHistory = history.filter(h => h.content != null && h.content !== '');
+    
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: 'system', content: SYSTEM_PROMPT },
-      ...history.map(h => ({
+      ...validHistory.map(h => ({
         role: (h.role === 'assistant' || h.role === 'ASSISTANT' ? 'assistant' : 'user') as 'assistant' | 'user',
-        content: h.content,
+        content: h.content || '',
       })),
       { role: 'user', content: message },
     ];
@@ -375,7 +382,9 @@ WICHTIG: Nutze IMMER exposeId="${targetId}" bei allen Tool-Aufrufen!`;
 
       // Track and execute tool calls
       for (const call of responseMessage.tool_calls) {
-        actionsPerformed.push(call.function.name);
+        if (call.type === 'function') {
+          actionsPerformed.push(call.function.name);
+        }
       }
 
       const toolResults = await this.executeToolCalls(responseMessage.tool_calls, tenantId);
@@ -408,6 +417,9 @@ WICHTIG: Nutze IMMER exposeId="${targetId}" bei allen Tool-Aufrufen!`;
     const results: OpenAI.Chat.ChatCompletionToolMessageParam[] = [];
     
     for (const call of toolCalls) {
+      // Only handle function-type tool calls
+      if (call.type !== 'function') continue;
+      
       try {
         console.log(`Executing tool ${call.function.name} for tenant ${tenantId} with args:`, call.function.arguments);
         const args = JSON.parse(call.function.arguments);
