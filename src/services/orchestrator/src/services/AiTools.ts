@@ -228,6 +228,18 @@ export const CRM_TOOLS = {
       required: ["confirmed"]
     }
   },
+  upload_images_to_property: {
+    name: "upload_images_to_property",
+    description: "Uploads images that were attached to the chat message to a specific property. Use this when the user sends images and asks to add them to a property. The images are automatically taken from the chat attachments.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        propertyId: { type: SchemaType.STRING, description: "ID of the property to upload images to" } as FunctionDeclarationSchema,
+        isFloorplan: { type: SchemaType.BOOLEAN, description: "If true, uploads as floorplans instead of regular images. Default: false" } as FunctionDeclarationSchema,
+      },
+      required: ["propertyId"]
+    }
+  },
   // === EMAIL TOOLS ===
   get_emails: {
     name: "get_emails",
@@ -918,6 +930,36 @@ export class AiToolExecutor {
         }
         const result = await getPrisma().property.deleteMany({ where: { tenantId } });
         return `${result.count} Objekt(e) wurden gelöscht.`;
+      }
+
+      case 'upload_images_to_property': {
+        const { propertyId, isFloorplan = false, _uploadedFiles } = args;
+        
+        if (!_uploadedFiles || _uploadedFiles.length === 0) {
+          return 'Keine Bilder zum Hochladen gefunden. Bitte hänge zuerst Bilder an deine Nachricht an.';
+        }
+        
+        // Verify property belongs to tenant
+        const property = await getPrisma().property.findFirst({ 
+          where: { id: propertyId, tenantId } 
+        });
+        
+        if (!property) {
+          return `Objekt mit ID ${propertyId} nicht gefunden.`;
+        }
+        
+        // Add uploaded files to property
+        const arrayField = isFloorplan ? 'floorplans' : 'images';
+        const currentArray = isFloorplan ? property.floorplans : property.images;
+        const updatedArray = [...currentArray, ..._uploadedFiles];
+        
+        await getPrisma().property.update({
+          where: { id: propertyId },
+          data: { [arrayField]: updatedArray }
+        });
+        
+        const typeLabel = isFloorplan ? 'Grundriss(e)' : 'Bild(er)';
+        return `${_uploadedFiles.length} ${typeLabel} wurden zum Objekt "${property.title}" hinzugefügt.`;
       }
 
       case 'search_properties': {

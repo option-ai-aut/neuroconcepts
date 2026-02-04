@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Bot, Paperclip, FileText, RotateCcw, X } from 'lucide-react';
+import { Send, Bot, Paperclip, FileText, RotateCcw, X, Image as ImageIcon } from 'lucide-react';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 import { fetchAuthSession } from 'aws-amplify/auth';
@@ -25,10 +25,20 @@ const getAuthHeaders = async (): Promise<HeadersInit> => {
   }
 };
 
+interface UploadedFile {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  preview?: string; // Base64 preview for images
+  file: File;
+}
+
 interface Message {
   role: 'USER' | 'ASSISTANT' | 'SYSTEM';
   content: string;
   isAction?: boolean; // Flag for action messages
+  attachments?: { name: string; type: string }[]; // Show attachments in message
 }
 
 // Contextual tips that show once per context
@@ -54,6 +64,10 @@ export default function AiChatSidebar() {
   const [activeTip, setActiveTip] = useState<ContextTip | null>(null);
   const [tipVisible, setTipVisible] = useState(false);
   const tipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // File upload state
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get shown tips from localStorage
   const getShownTips = useCallback((): string[] => {
@@ -192,13 +206,61 @@ export default function AiChatSidebar() {
     }
   };
 
+  // File upload handlers
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    processFiles(files);
+    e.target.value = ''; // Reset input
+  };
+
+  const processFiles = async (files: File[]) => {
+    const newFiles: UploadedFile[] = [];
+    
+    for (const file of files) {
+      const uploadedFile: UploadedFile = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        file: file,
+      };
+      
+      // Generate preview for images
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        uploadedFile.preview = await new Promise((resolve) => {
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.readAsDataURL(file);
+        });
+      }
+      
+      newFiles.push(uploadedFile);
+    }
+    
+    setUploadedFiles(prev => [...prev, ...newFiles]);
+  };
+
+  const removeFile = (fileId: string) => {
+    setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!aiChatDraft.trim()) return;
+    if (!aiChatDraft.trim() && uploadedFiles.length === 0) return;
 
-    const userMsg = { role: 'USER' as const, content: aiChatDraft };
+    // Create user message with attachments info
+    const attachments = uploadedFiles.map(f => ({ name: f.name, type: f.type }));
+    const userMsg: Message = { 
+      role: 'USER', 
+      content: aiChatDraft || (uploadedFiles.length > 0 ? `[${uploadedFiles.length} Datei(en) angehängt]` : ''),
+      attachments: attachments.length > 0 ? attachments : undefined
+    };
     setMessages(prev => [...prev, userMsg]);
+    
+    // Store files for upload before clearing
+    const filesToUpload = [...uploadedFiles];
     setAiChatDraft('');
+    setUploadedFiles([]);
     setIsLoading(true);
 
     try {
@@ -241,15 +303,33 @@ export default function AiChatSidebar() {
       } else {
         // Regular chat endpoint with STREAMING
         // Note: userId and tenantId come from auth token on backend
-        // Send page context so Jarvis knows where the user is
         const authHeaders = await getAuthHeaders();
-        const res = await fetch(`${apiUrl}/chat/stream`, {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({
-            message: userMsg.content,
-          })
-        });
+        
+        // Use FormData if we have files, otherwise JSON
+        let res: Response;
+        if (filesToUpload.length > 0) {
+          const formData = new FormData();
+          formData.append('message', userMsg.content);
+          filesToUpload.forEach((f, idx) => {
+            formData.append('files', f.file);
+          });
+          
+          res = await fetch(`${apiUrl}/chat/stream`, {
+            method: 'POST',
+            headers: {
+              'Authorization': (authHeaders as Record<string, string>)['Authorization'] || '',
+            },
+            body: formData
+          });
+        } else {
+          res = await fetch(`${apiUrl}/chat/stream`, {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify({
+              message: userMsg.content,
+            })
+          });
+        }
 
         if (!res.body) throw new Error('No response body');
 
@@ -401,6 +481,17 @@ export default function AiChatSidebar() {
                   ? 'bg-indigo-600 text-white rounded-br-none' 
                   : 'bg-white text-gray-800 rounded-bl-none'
               }`}>
+                {/* Show attachments if any */}
+                {msg.attachments && msg.attachments.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {msg.attachments.map((att, i) => (
+                      <div key={i} className="flex items-center gap-1 bg-white/20 rounded px-1.5 py-0.5 text-[10px]">
+                        {att.type.startsWith('image/') ? <ImageIcon className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+                        <span className="truncate max-w-[80px]">{att.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               </div>
             </div>
@@ -438,7 +529,43 @@ export default function AiChatSidebar() {
           )}
         </div>
 
+        {/* File Upload Preview */}
+        {uploadedFiles.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {uploadedFiles.map((file) => (
+              <div key={file.id} className="relative group">
+                {file.preview ? (
+                  <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-200">
+                    <img src={file.preview} alt={file.name} className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="w-16 h-16 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center">
+                    <FileText className="w-6 h-6 text-gray-400" />
+                    <span className="text-[8px] text-gray-500 mt-1 truncate max-w-[56px] px-1">{file.name}</span>
+                  </div>
+                )}
+                <button
+                  onClick={() => removeFile(file.id)}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit}>
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,.pdf,.doc,.docx,.txt"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          
           <textarea
             value={aiChatDraft}
             onChange={(e) => setAiChatDraft(e.target.value)}
@@ -461,14 +588,15 @@ export default function AiChatSidebar() {
           <div className="flex items-center justify-between mt-2">
             <button
               type="button"
+              onClick={() => fileInputRef.current?.click()}
               className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
-              title="Anhang hinzufügen"
+              title="Dateien anhängen"
             >
               <Paperclip className="w-4 h-4" />
             </button>
             <button
               type="submit"
-              disabled={isLoading || !aiChatDraft.trim()}
+              disabled={isLoading || (!aiChatDraft.trim() && uploadedFiles.length === 0)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 transition-colors"
             >
               Senden

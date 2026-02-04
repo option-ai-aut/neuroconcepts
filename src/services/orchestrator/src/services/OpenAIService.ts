@@ -49,6 +49,12 @@ DEINE FÄHIGKEITEN:
 - Properties erstellen, abrufen, aktualisieren, löschen
 - Nach Properties suchen (Preis, Ort, Typ)
 - Property-Statistiken anzeigen (verfügbar, verkauft, vermietet)
+- Bilder/Grundrisse zu Properties hochladen (wenn der User Bilder anhängt)
+
+📎 DATEI-UPLOADS:
+Wenn der User Bilder oder Dateien an seine Nachricht anhängt, siehst du [HOCHGELADENE BILDER: ...] im Kontext.
+Du kannst diese mit upload_images_to_property zu einem Objekt hinzufügen.
+Frage nach der Property-ID oder suche das Objekt, wenn der User sagt "füge diese Bilder zu [Objektname] hinzu".
 
 📧 E-MAILS:
 - E-Mails lesen und abrufen
@@ -170,6 +176,7 @@ Antworte immer auf Deutsch. Sei freundlich und hilfsbereit. Erkläre kurz was du
 
 export class OpenAIService {
   private client: OpenAI;
+  private uploadedFiles: string[] = []; // Files uploaded in current chat session
 
   constructor() {
     this.client = new OpenAI({
@@ -222,7 +229,9 @@ export class OpenAIService {
   }
 
   // Streaming version of chat with Function Calling support
-  async *chatStream(message: string, tenantId: string, history: any[] = []): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean }> {
+  async *chatStream(message: string, tenantId: string, history: any[] = [], uploadedFiles: string[] = []): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean }> {
+    // Store uploaded files for tool access
+    this.uploadedFiles = uploadedFiles;
     // Filter out messages with null/empty content
     const validHistory = history.filter(h => h.content != null && h.content !== '');
     
@@ -423,6 +432,12 @@ WICHTIG: Nutze IMMER exposeId="${targetId}" bei allen Tool-Aufrufen!`;
       try {
         console.log(`Executing tool ${call.function.name} for tenant ${tenantId} with args:`, call.function.arguments);
         const args = JSON.parse(call.function.arguments);
+        
+        // Pass uploaded files to the tool if it's the upload tool
+        if (call.function.name === 'upload_images_to_property' && this.uploadedFiles.length > 0) {
+          args._uploadedFiles = this.uploadedFiles;
+        }
+        
         const output = await AiToolExecutor.execute(call.function.name, args, tenantId);
         results.push({
           role: 'tool',

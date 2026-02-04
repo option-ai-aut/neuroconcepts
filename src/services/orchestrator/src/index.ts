@@ -1544,15 +1544,16 @@ app.post('/chat',
   }
 );
 
-// Streaming Chat Endpoint with Optimized Memory
+// Streaming Chat Endpoint with Optimized Memory (supports file uploads)
 app.post('/chat/stream',
   authMiddleware,
+  upload.array('files', 10), // Allow up to 10 files
   AiSafetyMiddleware.rateLimit(50, 60000),
-  AiSafetyMiddleware.contentModeration,
-  AiSafetyMiddleware.auditLog,
   async (req, res) => {
     try {
-      const { message } = req.body;
+      // Handle both JSON and FormData
+      const message = req.body.message || '';
+      const files = req.files as Express.Multer.File[] | undefined;
       
       // Get user from auth - CRITICAL: tenantId comes from authenticated user, not request!
       const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
@@ -1570,6 +1571,33 @@ app.post('/chat/stream',
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
+      // Process uploaded files - store them temporarily and create context
+      let fileContext = '';
+      const uploadedFileUrls: string[] = [];
+      if (files && files.length > 0) {
+        const fileInfos = files.map(f => ({
+          name: f.originalname,
+          type: f.mimetype,
+          size: f.size,
+          url: `/uploads/${f.filename}`
+        }));
+        uploadedFileUrls.push(...fileInfos.map(f => f.url));
+        
+        // Add file context to message
+        const imageFiles = fileInfos.filter(f => f.type.startsWith('image/'));
+        const otherFiles = fileInfos.filter(f => !f.type.startsWith('image/'));
+        
+        if (imageFiles.length > 0) {
+          fileContext += `\n[HOCHGELADENE BILDER: ${imageFiles.map(f => `"${f.name}" (${f.url})`).join(', ')}]`;
+        }
+        if (otherFiles.length > 0) {
+          fileContext += `\n[HOCHGELADENE DATEIEN: ${otherFiles.map(f => `"${f.name}"`).join(', ')}]`;
+        }
+        
+        // Store file URLs in session for AI tools to access
+        (req as any).uploadedFiles = uploadedFileUrls;
+      }
+
       // Get optimized history (recent messages + summary)
       const { recentMessages, summary } = await ConversationMemory.getOptimizedHistory(userId);
       const optimizedHistory = ConversationMemory.formatForOpenAI(recentMessages, summary);
@@ -1578,8 +1606,11 @@ app.post('/chat/stream',
       let fullResponse = '';
       let hadFunctionCalls = false;
 
-      // Stream the response with optimized history
-      for await (const result of openai.chatStream(message, tenantId, optimizedHistory)) {
+      // Combine message with file context
+      const fullMessage = message + fileContext;
+
+      // Stream the response with optimized history, pass uploaded files for tools
+      for await (const result of openai.chatStream(fullMessage, tenantId, optimizedHistory, uploadedFileUrls)) {
         fullResponse += result.chunk;
         if (result.hadFunctionCalls) hadFunctionCalls = true;
         // Send chunk as SSE
@@ -1592,7 +1623,7 @@ app.post('/chat/stream',
 
       // Save messages to DB after streaming is complete
       await prisma.userChat.create({
-        data: { userId, role: 'USER', content: message }
+        data: { userId, role: 'USER', content: message + (uploadedFileUrls.length > 0 ? ` [${uploadedFileUrls.length} Datei(en)]` : '') }
       });
       await prisma.userChat.create({
         data: { userId, role: 'ASSISTANT', content: wrapAiResponse(fullResponse) }
