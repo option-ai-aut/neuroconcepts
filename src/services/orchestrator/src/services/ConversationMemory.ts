@@ -175,6 +175,38 @@ Zusammenfassung:`;
   }
 
   /**
+   * Get the last archived conversation (previous chat session)
+   * Use this when user asks about "last conversation" or "what we discussed before"
+   */
+  static async getLastArchivedConversation(
+    userId: string,
+    limit: number = 20
+  ): Promise<ChatSearchResult[]> {
+    const messages = await prisma.userChat.findMany({
+      where: {
+        userId,
+        archived: true
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        content: true,
+        role: true,
+        createdAt: true,
+        archived: true
+      }
+    });
+
+    // Return in chronological order
+    return messages.reverse().map(m => ({
+      content: m.content,
+      role: m.role,
+      date: m.createdAt.toISOString(),
+      isArchived: m.archived
+    }));
+  }
+
+  /**
    * Search through chat history (including archived chats)
    * Used by AI to find relevant context from past conversations
    */

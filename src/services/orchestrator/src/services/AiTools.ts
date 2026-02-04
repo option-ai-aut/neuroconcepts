@@ -55,6 +55,18 @@ export const CRM_TOOLS = {
     }
   },
 
+  get_last_conversation: {
+    name: "get_last_conversation",
+    description: "Get the last/previous conversation (archived chat session). Use this when user asks 'what did we discuss?', 'our last conversation', 'remember what we talked about?', etc.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        limit: { type: SchemaType.NUMBER, description: "Number of messages to retrieve (default: 20)" } as FunctionDeclarationSchema,
+      },
+      required: []
+    }
+  },
+
   // === LEAD TOOLS ===
   create_lead: {
     name: "create_lead",
@@ -962,6 +974,26 @@ export class AiToolExecutor {
         return {
           message: 'Langzeit-Gedächtnis:',
           summary
+        };
+      }
+
+      case 'get_last_conversation': {
+        if (!userId) return { error: 'User ID required' };
+        const { limit = 20 } = args;
+        
+        const messages = await ConversationMemory.getLastArchivedConversation(userId, limit);
+
+        if (messages.length === 0) {
+          return { message: 'Keine vorherige Unterhaltung gefunden. Dies ist unser erstes Gespräch oder der Verlauf wurde gelöscht.' };
+        }
+
+        return {
+          message: `Letzte Unterhaltung (${messages.length} Nachrichten):`,
+          conversation: messages.map(m => ({
+            role: m.role === 'USER' ? 'Du' : 'Jarvis',
+            content: m.content.substring(0, 500) + (m.content.length > 500 ? '...' : ''),
+            date: new Date(m.date).toLocaleDateString('de-DE')
+          }))
         };
       }
 

@@ -63,6 +63,7 @@ const TOOL_LABELS: Record<string, string> = {
   search_chat_history: 'Chat-Verlauf durchsucht',
   get_conversation_context: 'Kontext abgerufen',
   get_memory_summary: 'Gedächtnis abgerufen',
+  get_last_conversation: 'Letzte Unterhaltung abgerufen',
   upload_images_to_property: 'Bilder hochgeladen',
   get_property_images: 'Bilder abgerufen',
   delete_property_image: 'Bild gelöscht',
