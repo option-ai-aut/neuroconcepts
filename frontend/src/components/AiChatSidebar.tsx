@@ -44,32 +44,85 @@ interface Message {
 
 // Human-readable tool names
 const TOOL_LABELS: Record<string, string> = {
+  // Leads
   create_lead: 'Lead erstellt',
   get_leads: 'Leads abgerufen',
   get_lead: 'Lead abgerufen',
   update_lead: 'Lead aktualisiert',
   delete_lead: 'Lead gelöscht',
-  delete_all_leads: 'Leads gelöscht',
+  delete_all_leads: 'Alle Leads gelöscht',
+  get_lead_statistics: 'Lead-Statistiken',
+  
+  // Properties
   create_property: 'Objekt erstellt',
   get_properties: 'Objekte abgerufen',
   get_property: 'Objekt abgerufen',
   update_property: 'Objekt aktualisiert',
   delete_property: 'Objekt gelöscht',
-  get_emails: 'E-Mails abgerufen',
-  send_email: 'E-Mail gesendet',
-  create_email_draft: 'E-Mail-Entwurf erstellt',
-  get_calendar_events: 'Termine abgerufen',
-  create_calendar_event: 'Termin erstellt',
-  search_chat_history: 'Chat-Verlauf durchsucht',
-  get_conversation_context: 'Kontext abgerufen',
-  get_memory_summary: 'Gedächtnis abgerufen',
-  get_last_conversation: 'Letzte Unterhaltung abgerufen',
+  delete_all_properties: 'Alle Objekte gelöscht',
+  search_properties: 'Objekte durchsucht',
+  get_property_statistics: 'Objekt-Statistiken',
+  
+  // Property Images
   upload_images_to_property: 'Bilder hochgeladen',
   get_property_images: 'Bilder abgerufen',
   delete_property_image: 'Bild gelöscht',
+  delete_all_property_images: 'Alle Bilder gelöscht',
+  move_image_to_floorplan: 'Bild verschoben',
+  
+  // E-Mails
+  get_emails: 'E-Mails abgerufen',
+  get_email: 'E-Mail abgerufen',
+  send_email: 'E-Mail gesendet',
+  reply_to_email: 'E-Mail beantwortet',
+  draft_email: 'E-Mail-Entwurf erstellt',
+  get_email_templates: 'E-Mail-Vorlagen abgerufen',
+  
+  // Calendar
+  get_calendar_events: 'Termine abgerufen',
+  create_calendar_event: 'Termin erstellt',
+  update_calendar_event: 'Termin aktualisiert',
+  delete_calendar_event: 'Termin gelöscht',
+  get_calendar_availability: 'Verfügbarkeit geprüft',
+  
+  // Memory & Context
+  search_chat_history: 'Chat-Verlauf durchsucht',
+  get_conversation_context: 'Kontext abgerufen',
+  get_memory_summary: 'Gedächtnis abgerufen',
+  get_last_conversation: 'Letzte Unterhaltung',
+  
+  // Exposés
+  get_exposes: 'Exposés abgerufen',
+  create_expose_from_template: 'Exposé erstellt',
+  create_full_expose: 'Exposé erstellt',
+  delete_expose: 'Exposé gelöscht',
+  delete_all_exposes: 'Alle Exposés gelöscht',
+  get_expose_status: 'Exposé-Status',
+  set_expose_status: 'Exposé-Status geändert',
+  set_expose_theme: 'Exposé-Design geändert',
+  generate_expose_pdf: 'PDF generiert',
+  generate_expose_text: 'Text generiert',
+  
+  // Exposé Blocks
+  create_expose_block: 'Block hinzugefügt',
+  update_expose_block: 'Block aktualisiert',
+  delete_expose_block: 'Block gelöscht',
+  clear_expose_blocks: 'Blöcke gelöscht',
+  reorder_expose_blocks: 'Blöcke sortiert',
+  
+  // Templates
   create_expose_template: 'Vorlage erstellt',
   get_expose_templates: 'Vorlagen abgerufen',
-  generate_expose_text: 'Text generiert',
+  get_template: 'Vorlage abgerufen',
+  update_template: 'Vorlage aktualisiert',
+  
+  // Team Chat
+  get_channels: 'Kanäle abgerufen',
+  get_channel_messages: 'Nachrichten abgerufen',
+  send_channel_message: 'Nachricht gesendet',
+  
+  // Dashboard
+  get_dashboard_stats: 'Dashboard-Statistiken',
 };
 
 // Contextual tips that show once per context
