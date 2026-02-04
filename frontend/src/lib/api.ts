@@ -8,7 +8,7 @@ const getApiUrl = () => {
   return url.replace(/\/+$/, '');
 };
 
-const getAuthHeaders = async (): Promise<HeadersInit> => {
+export const getAuthHeaders = async (): Promise<HeadersInit> => {
   try {
     const session = await fetchAuthSession();
     const token = session.tokens?.idToken?.toString();
@@ -133,6 +133,10 @@ export interface Property {
   // Portal Publishing
   publishedPortals?: string[];
   lastSyncedAt?: string;
+  
+  // Auto-Exposé Template
+  defaultExposeTemplateId?: string;
+  defaultExposeTemplate?: { id: string; name: string };
   
   createdAt: string;
 }

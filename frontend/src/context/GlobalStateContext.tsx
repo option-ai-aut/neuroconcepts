@@ -14,15 +14,6 @@ interface ExposeEditorContext {
   onBlocksUpdated?: () => void;
 }
 
-// Page Context - tells Jarvis what page the user is on
-export interface PageContext {
-  page: string; // e.g. 'dashboard', 'crm/leads', 'crm/properties', 'crm/properties/[id]'
-  propertyId?: string; // If on property detail page
-  leadId?: string; // If on lead detail page
-  propertyData?: any; // Current property data if available
-  leadData?: any; // Current lead data if available
-}
-
 interface GlobalState {
   // Drawer State
   drawerOpen: boolean;
@@ -47,9 +38,6 @@ interface GlobalState {
   // AI Action Tracking (for triggering refreshes)
   aiActionPerformed: number; // Timestamp of last action
 
-  // Page Context (for AI to know current page)
-  pageContext: PageContext | null;
-
   // Actions
   openDrawer: (type: DrawerType) => void;
   closeDrawer: () => void;
@@ -64,7 +52,6 @@ interface GlobalState {
   setActiveExposeContext: (context: ExposeEditorContext | null) => void;
   triggerExposeRefresh: () => void;
   notifyAiAction: () => void; // Call this when AI performs an action
-  setPageContext: (context: PageContext | null) => void;
 }
 
 const GlobalStateContext = createContext<GlobalState | undefined>(undefined);
@@ -83,7 +70,6 @@ export function GlobalStateProvider({ children }: { children: ReactNode }) {
   const [activeExposeContext, setActiveExposeContext] = useState<ExposeEditorContext | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [aiActionPerformed, setAiActionPerformed] = useState(0);
-  const [pageContext, setPageContext] = useState<PageContext | null>(null);
 
   const openDrawer = (type: DrawerType) => {
     setDrawerType(type);
@@ -147,7 +133,6 @@ export function GlobalStateProvider({ children }: { children: ReactNode }) {
         aiChatDraft,
         activeExposeContext,
         aiActionPerformed,
-        pageContext,
         openDrawer,
         closeDrawer,
         minimizeDrawer,
@@ -161,7 +146,6 @@ export function GlobalStateProvider({ children }: { children: ReactNode }) {
         setActiveExposeContext,
         triggerExposeRefresh,
         notifyAiAction,
-        setPageContext,
       }}
     >
       {children}

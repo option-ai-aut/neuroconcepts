@@ -292,6 +292,10 @@ model Property {
   publishedPortals String[] // Array of portal IDs where this property is published
   lastSyncedAt     DateTime?
   
+  // Auto-Exposé: Selected template for automatic expose generation when leads come in
+  defaultExposeTemplateId String?
+  defaultExposeTemplate   ExposeTemplate? @relation(fields: [defaultExposeTemplateId], references: [id])
+  
   // Relations
   leads       Lead[]
   exposes     Expose[]
@@ -486,6 +490,9 @@ model ExposeTemplate {
   
   // Instances created from this template
   exposes   Expose[]
+  
+  // Properties using this as default template
+  defaultForProperties Property[]
 }
 
 model Expose {

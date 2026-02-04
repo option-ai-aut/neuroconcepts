@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, use, useRef } from 'react';
-import { getProperty, Property, updateProperty, deleteProperty, getExposes, Expose, downloadExposePdf } from '@/lib/api';
+import { getProperty, Property, updateProperty, deleteProperty, getExposes, Expose, downloadExposePdf, getExposeTemplates, ExposeTemplate, getAuthHeaders } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { Building, MapPin, Euro, Maximize, Home, FileText, ArrowLeft, MoreVertical, Trash2, Save, FileImage, Plus, Upload, X, Image as ImageIcon, Globe, Check, Download } from 'lucide-react';
 import Link from 'next/link';
@@ -12,6 +12,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const { id } = use(params);
   const [property, setProperty] = useState<Property | null>(null);
   const [exposes, setExposes] = useState<Expose[]>([]);
+  const [exposeTemplates, setExposeTemplates] = useState<ExposeTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Edit State
@@ -38,7 +39,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
 
   const router = useRouter();
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { openDrawer, updateExposeEditor, setPageContext, aiActionPerformed } = useGlobalState();
+  const { openDrawer, updateExposeEditor, aiActionPerformed } = useGlobalState();
 
   useEffect(() => {
     loadProperty();
@@ -51,12 +52,10 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
     }
     document.addEventListener("mousedown", handleClickOutside);
     
-    // Cleanup: clear page context when leaving
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
-      setPageContext(null);
     };
-  }, [id, setPageContext]);
+  }, [id]);
 
   // Reload property when AI performs an action
   useEffect(() => {
@@ -76,22 +75,15 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   };
 
   const loadProperty = async () => {
-    const [propertyData, exposesData] = await Promise.all([
+    const [propertyData, exposesData, templatesData] = await Promise.all([
       getProperty(id),
-      getExposes(id).catch(() => [])
+      getExposes(id).catch(() => []),
+      getExposeTemplates().catch(() => [])
     ]);
     setProperty(propertyData);
     setFormData(propertyData || {});
     setExposes(exposesData);
-    
-    // Set page context for AI
-    if (propertyData) {
-      setPageContext({
-        page: 'crm/properties/detail',
-        propertyId: id,
-        propertyData: propertyData,
-      });
-    }
+    setExposeTemplates(templatesData);
     
     // Load published portals
     if (propertyData?.publishedPortals) {
@@ -202,21 +194,23 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
     setIsDragging(false);
   };
 
-  const handleDrop = async (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent, isFloorplan: boolean = false) => {
     e.preventDefault();
     setIsDragging(false);
     
     const files = Array.from(e.dataTransfer.files);
-    await uploadImages(files);
+    await uploadImages(files, isFloorplan);
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, isFloorplan: boolean = false) => {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
-    await uploadImages(files);
+    await uploadImages(files, isFloorplan);
+    // Reset input so same file can be selected again
+    e.target.value = '';
   };
 
-  const uploadImages = async (files: File[]) => {
+  const uploadImages = async (files: File[], isFloorplan: boolean = false) => {
     const imageFiles = files.filter(f => f.type.startsWith('image/'));
     if (imageFiles.length === 0) {
       alert('Bitte nur Bilder hochladen');
@@ -226,11 +220,16 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
     setUploading(true);
     try {
       const config = getRuntimeConfig();
+      const authHeaders = await getAuthHeaders();
       const formData = new FormData();
       imageFiles.forEach(file => formData.append('images', file));
+      formData.append('isFloorplan', String(isFloorplan));
 
       const res = await fetch(`${config.apiUrl}/properties/${id}/images`, {
         method: 'POST',
+        headers: {
+          'Authorization': (authHeaders as Record<string, string>)['Authorization'] || '',
+        },
         body: formData
       });
 
@@ -628,8 +627,33 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
 
           {/* Exposé */}
           <div>
-            <div className="flex items-end justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Exposé</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Exposé</h2>
+            
+            {/* Template Selection for Auto-Generation */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-500 mb-2">
+                Vorlage für automatische Exposé-Erstellung
+              </label>
+              <p className="text-xs text-gray-400 mb-3">
+                Wenn ein Lead für dieses Objekt eingeht, wird automatisch ein Exposé mit dieser Vorlage erstellt und als PDF beim Lead abgelegt.
+              </p>
+              <select
+                value={formData.defaultExposeTemplateId || ''}
+                onChange={(e) => handleInputChange('defaultExposeTemplateId', e.target.value || null)}
+                className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+              >
+                <option value="">Keine automatische Erstellung</option>
+                {exposeTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name} {template.isDefault && '(Standard)'}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Existing Exposes */}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-700">Erstellte Exposés</h3>
               <button
                 onClick={() => handleOpenExposeEditor()}
                 className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
@@ -687,7 +711,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12 text-gray-400">
+              <div className="text-center py-12 text-gray-400 bg-gray-50 rounded-lg">
                 <FileImage className="w-16 h-16 mx-auto mb-4 text-gray-300" />
                 <p className="text-base">Noch kein Exposé erstellt</p>
                 <p className="text-sm mt-1">Klicke auf "Erstellen" um loszulegen</p>
@@ -704,7 +728,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               type="file"
               multiple
               accept="image/*"
-              onChange={handleFileSelect}
+              onChange={(e) => handleFileSelect(e, false)}
               className="hidden"
             />
 
@@ -713,7 +737,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               onClick={() => fileInputRef.current?.click()}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
+              onDrop={(e) => handleDrop(e, false)}
               className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
                 isDragging 
                   ? 'border-indigo-500 bg-indigo-50/50' 
@@ -758,23 +782,34 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               type="file"
               multiple
               accept="image/*"
-              onChange={handleFileSelect}
+              onChange={(e) => handleFileSelect(e, true)}
               className="hidden"
             />
 
-            <div 
+            {/* Drag & Drop Zone - Clickable */}
+            <div
               onClick={() => floorplanInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center bg-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, true)}
+              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
+                isDragging 
+                  ? 'border-indigo-500 bg-indigo-50/50' 
+                  : 'border-gray-200 bg-gray-100 hover:bg-gray-50'
+              }`}
             >
-              <FileText className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-              <p className="text-base text-gray-600 font-medium">Grundrisse hochladen</p>
-              <p className="text-sm text-gray-400 mt-1">Klicken oder hierher ziehen</p>
+              <Upload className={`w-12 h-12 mx-auto mb-3 ${isDragging ? 'text-indigo-600' : 'text-gray-400'}`} />
+              <p className="text-base text-gray-600 font-medium">
+                {uploading ? 'Wird hochgeladen...' : 'Grundrisse hierher ziehen oder klicken'}
+              </p>
+              <p className="text-xs text-gray-400 mt-2">JPG, PNG, WEBP bis 10MB</p>
             </div>
 
+            {/* Floorplan Grid */}
             {property.floorplans && property.floorplans.length > 0 && (
-              <div className="grid grid-cols-3 gap-4 mt-6">
+              <div className="grid grid-cols-4 gap-4 mt-6">
                 {property.floorplans.map((fp, idx) => (
-                  <div key={idx} className="relative group aspect-video">
+                  <div key={idx} className="relative group aspect-square">
                     <img 
                       src={fp} 
                       alt={`Grundriss ${idx + 1}`}

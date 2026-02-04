@@ -48,7 +48,7 @@ const CONTEXT_TIPS: ContextTip[] = [
 
 export default function AiChatSidebar() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const { aiChatDraft, setAiChatDraft, activeExposeContext, triggerExposeRefresh, notifyAiAction, pageContext } = useGlobalState();
+  const { aiChatDraft, setAiChatDraft, activeExposeContext, triggerExposeRefresh, notifyAiAction } = useGlobalState();
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [activeTip, setActiveTip] = useState<ContextTip | null>(null);
@@ -248,7 +248,6 @@ export default function AiChatSidebar() {
           headers: authHeaders,
           body: JSON.stringify({
             message: userMsg.content,
-            pageContext: pageContext || undefined,
           })
         });
 
