@@ -137,7 +137,34 @@ app.use(async (req, res, next) => {
 });
 
 app.use(helmet());
-app.use(cors());
+
+// CORS configuration - restrict to known origins in production
+const allowedOrigins = [
+  'http://localhost:3000',  // Local frontend dev
+  'http://localhost:3001',  // Local backend dev
+  process.env.FRONTEND_URL, // Production frontend
+  'https://dev.neuroconcepts.ai',
+  'https://neuroconcepts.ai',
+  'https://www.neuroconcepts.ai',
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, Postman, or server-to-server)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`[CORS] Blocked request from origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Secret'],
+}));
+
 app.use(morgan('combined'));
 app.use(express.json());
 
@@ -172,7 +199,9 @@ const upload = multer({
   }
 });
 
-// Serve uploaded files
+// Serve uploaded files - Note: In production, use signed URLs from S3
+// For now, files are publicly accessible if you know the URL
+// This is acceptable for property images which are meant to be shared
 app.use('/uploads', express.static(uploadDir));
 
 // --- Auth & User Management ---
