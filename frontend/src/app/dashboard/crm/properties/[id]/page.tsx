@@ -632,16 +632,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
             </div>
 
             {/* Existing Exposes */}
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-700">Erstellte Exposés</h3>
-              <button
-                onClick={() => handleOpenExposeEditor()}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                {exposes.length > 0 ? 'Bearbeiten' : 'Erstellen'}
-              </button>
-            </div>
+            <h3 className="text-lg font-semibold text-gray-700 mb-4">Erstellte Exposés</h3>
 
             {exposes.length > 0 ? (
               <div className="space-y-3">
@@ -712,45 +703,56 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               className="hidden"
             />
 
-            {/* Drag & Drop Zone - Clickable */}
+            {/* Combined Upload Zone with Images */}
             <div
-              onClick={() => fileInputRef.current?.click()}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, false)}
-              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
+              className={`border-2 border-dashed rounded-xl p-4 transition-all ${
                 isDragging 
                   ? 'border-indigo-500 bg-indigo-50/50' 
-                  : 'border-gray-200 bg-gray-100 hover:bg-gray-50'
+                  : 'border-gray-200 bg-gray-100'
               }`}
             >
-              <Upload className={`w-12 h-12 mx-auto mb-3 ${isDragging ? 'text-indigo-600' : 'text-gray-400'}`} />
-              <p className="text-base text-gray-600 font-medium">
-                {uploading ? 'Wird hochgeladen...' : 'Bilder hierher ziehen oder klicken'}
-              </p>
-              <p className="text-xs text-gray-400 mt-2">JPG, PNG, WEBP bis 10MB</p>
-            </div>
-
-            {/* Image Grid */}
-            {property.images && property.images.length > 0 && (
-              <div className="grid grid-cols-4 gap-4 mt-6">
-                {property.images.map((img, idx) => (
-                  <div key={idx} className="relative group aspect-square">
-                    <img 
-                      src={img} 
-                      alt={`Bild ${idx + 1}`}
-                      className="w-full h-full object-cover rounded-xl"
-                    />
-                    <button
-                      onClick={() => removeImage(img, false)}
-                      className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+              {property.images && property.images.length > 0 ? (
+                <div className="grid grid-cols-4 gap-3">
+                  {property.images.map((img, idx) => (
+                    <div key={idx} className="relative group aspect-square">
+                      <img 
+                        src={img} 
+                        alt={`Bild ${idx + 1}`}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removeImage(img, false); }}
+                        className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {/* Add More Button */}
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-all"
+                  >
+                    <Plus className="w-8 h-8 text-gray-400" />
+                    <span className="text-xs text-gray-500 mt-1">Hinzufügen</span>
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              ) : (
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="py-8 text-center cursor-pointer"
+                >
+                  <Upload className={`w-12 h-12 mx-auto mb-3 ${isDragging ? 'text-indigo-600' : 'text-gray-400'}`} />
+                  <p className="text-base text-gray-600 font-medium">
+                    {uploading ? 'Wird hochgeladen...' : 'Bilder hierher ziehen oder klicken'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-2">JPG, PNG, WEBP bis 10MB</p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Grundrisse */}
@@ -766,45 +768,56 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               className="hidden"
             />
 
-            {/* Drag & Drop Zone - Clickable */}
+            {/* Combined Upload Zone with Floorplans */}
             <div
-              onClick={() => floorplanInputRef.current?.click()}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, true)}
-              className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
+              className={`border-2 border-dashed rounded-xl p-4 transition-all ${
                 isDragging 
                   ? 'border-indigo-500 bg-indigo-50/50' 
-                  : 'border-gray-200 bg-gray-100 hover:bg-gray-50'
+                  : 'border-gray-200 bg-gray-100'
               }`}
             >
-              <Upload className={`w-12 h-12 mx-auto mb-3 ${isDragging ? 'text-indigo-600' : 'text-gray-400'}`} />
-              <p className="text-base text-gray-600 font-medium">
-                {uploading ? 'Wird hochgeladen...' : 'Grundrisse hierher ziehen oder klicken'}
-              </p>
-              <p className="text-xs text-gray-400 mt-2">JPG, PNG, WEBP bis 10MB</p>
-            </div>
-
-            {/* Floorplan Grid */}
-            {property.floorplans && property.floorplans.length > 0 && (
-              <div className="grid grid-cols-4 gap-4 mt-6">
-                {property.floorplans.map((fp, idx) => (
-                  <div key={idx} className="relative group aspect-square">
-                    <img 
-                      src={fp} 
-                      alt={`Grundriss ${idx + 1}`}
-                      className="w-full h-full object-cover rounded-xl"
-                    />
-                    <button
-                      onClick={() => removeImage(fp, true)}
-                      className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+              {property.floorplans && property.floorplans.length > 0 ? (
+                <div className="grid grid-cols-4 gap-3">
+                  {property.floorplans.map((fp, idx) => (
+                    <div key={idx} className="relative group aspect-square">
+                      <img 
+                        src={fp} 
+                        alt={`Grundriss ${idx + 1}`}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removeImage(fp, true); }}
+                        className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {/* Add More Button */}
+                  <div 
+                    onClick={() => floorplanInputRef.current?.click()}
+                    className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-all"
+                  >
+                    <Plus className="w-8 h-8 text-gray-400" />
+                    <span className="text-xs text-gray-500 mt-1">Hinzufügen</span>
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              ) : (
+                <div 
+                  onClick={() => floorplanInputRef.current?.click()}
+                  className="py-8 text-center cursor-pointer"
+                >
+                  <Upload className={`w-12 h-12 mx-auto mb-3 ${isDragging ? 'text-indigo-600' : 'text-gray-400'}`} />
+                  <p className="text-base text-gray-600 font-medium">
+                    {uploading ? 'Wird hochgeladen...' : 'Grundrisse hierher ziehen oder klicken'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-2">JPG, PNG, WEBP bis 10MB</p>
+                </div>
+              )}
+            </div>
           </div>
 
         </div>
