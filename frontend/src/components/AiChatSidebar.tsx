@@ -39,7 +39,37 @@ interface Message {
   content: string;
   isAction?: boolean; // Flag for action messages
   attachments?: { name: string; type: string }[]; // Show attachments in message
+  toolsUsed?: string[]; // Tools that were used for this response
 }
+
+// Human-readable tool names
+const TOOL_LABELS: Record<string, string> = {
+  create_lead: 'Lead erstellt',
+  get_leads: 'Leads abgerufen',
+  get_lead: 'Lead abgerufen',
+  update_lead: 'Lead aktualisiert',
+  delete_lead: 'Lead gelöscht',
+  delete_all_leads: 'Leads gelöscht',
+  create_property: 'Objekt erstellt',
+  get_properties: 'Objekte abgerufen',
+  get_property: 'Objekt abgerufen',
+  update_property: 'Objekt aktualisiert',
+  delete_property: 'Objekt gelöscht',
+  get_emails: 'E-Mails abgerufen',
+  send_email: 'E-Mail gesendet',
+  create_email_draft: 'E-Mail-Entwurf erstellt',
+  get_calendar_events: 'Termine abgerufen',
+  create_calendar_event: 'Termin erstellt',
+  search_chat_history: 'Chat-Verlauf durchsucht',
+  get_conversation_context: 'Kontext abgerufen',
+  get_memory_summary: 'Gedächtnis abgerufen',
+  upload_images_to_property: 'Bilder hochgeladen',
+  get_property_images: 'Bilder abgerufen',
+  delete_property_image: 'Bild gelöscht',
+  create_expose_template: 'Vorlage erstellt',
+  get_expose_templates: 'Vorlagen abgerufen',
+  generate_expose_text: 'Text generiert',
+};
 
 // Contextual tips that show once per context
 interface ContextTip {
@@ -343,6 +373,7 @@ export default function AiChatSidebar() {
         const decoder = new TextDecoder();
         let buffer = '';
         let hadFunctionCalls = false;
+        let toolsUsed: string[] = [];
         let showingActionMessage = false;
 
         while (true) {
@@ -356,6 +387,11 @@ export default function AiChatSidebar() {
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               const data = JSON.parse(line.slice(6));
+              
+              // Capture tools used
+              if (data.toolsUsed && data.toolsUsed.length > 0) {
+                toolsUsed = data.toolsUsed;
+              }
               
               if (data.error) {
                 // Remove action message if showing
@@ -378,9 +414,21 @@ export default function AiChatSidebar() {
                   showingActionMessage = false;
                 }
                 
-                // Check if AI performed actions
+                // Check if AI performed actions and add tools to message
                 if (data.hadFunctionCalls) {
                   hadFunctionCalls = true;
+                  // Update the assistant message with tools used
+                  setMessages(prev => {
+                    const newMessages = [...prev];
+                    const assistantIdx = newMessages.findIndex((m, idx) => idx === assistantMsgIndex && m.role === 'ASSISTANT');
+                    if (assistantIdx !== -1) {
+                      newMessages[assistantIdx] = {
+                        ...newMessages[assistantIdx],
+                        toolsUsed: data.toolsUsed || toolsUsed
+                      };
+                    }
+                    return newMessages;
+                  });
                 }
                 break;
               }
@@ -481,6 +529,17 @@ export default function AiChatSidebar() {
                   ? 'bg-indigo-600 text-white rounded-br-none' 
                   : 'bg-white text-gray-800 rounded-bl-none'
               }`}>
+                {/* Show tools used as tags */}
+                {msg.toolsUsed && msg.toolsUsed.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {msg.toolsUsed.map((tool, i) => (
+                      <span key={i} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 rounded-full px-2 py-0.5 text-[10px] font-medium">
+                        <span className="w-1 h-1 bg-indigo-500 rounded-full"></span>
+                        {TOOL_LABELS[tool] || tool}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {/* Show attachments if any */}
                 {msg.attachments && msg.attachments.length > 0 && (
                   <div className="flex flex-wrap gap-1 mb-2">

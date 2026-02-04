@@ -1788,15 +1788,21 @@ app.post('/chat/stream',
       const fullMessage = message + fileContext;
 
       // Stream the response with optimized history, pass uploaded files and userId for tools
+      let toolsUsed: string[] = [];
       for await (const result of openai.chatStream(fullMessage, tenantId, optimizedHistory, uploadedFileUrls, currentUser.id)) {
         fullResponse += result.chunk;
         if (result.hadFunctionCalls) hadFunctionCalls = true;
-        // Send chunk as SSE
-        res.write(`data: ${JSON.stringify({ chunk: result.chunk })}\n\n`);
+        if (result.toolsUsed) toolsUsed = result.toolsUsed;
+        // Send chunk as SSE (include tools info when available)
+        if (result.toolsUsed) {
+          res.write(`data: ${JSON.stringify({ chunk: result.chunk, toolsUsed: result.toolsUsed })}\n\n`);
+        } else {
+          res.write(`data: ${JSON.stringify({ chunk: result.chunk })}\n\n`);
+        }
       }
 
       // Send done signal with function call info
-      res.write(`data: ${JSON.stringify({ done: true, hadFunctionCalls })}\n\n`);
+      res.write(`data: ${JSON.stringify({ done: true, hadFunctionCalls, toolsUsed })}\n\n`);
       res.end();
 
       // Save messages to DB after streaming is complete

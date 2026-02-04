@@ -248,7 +248,7 @@ export class OpenAIService {
   }
 
   // Streaming version of chat with Function Calling support
-  async *chatStream(message: string, tenantId: string, history: any[] = [], uploadedFiles: string[] = [], userId?: string): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean }> {
+  async *chatStream(message: string, tenantId: string, history: any[] = [], uploadedFiles: string[] = [], userId?: string): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean; toolsUsed?: string[] }> {
     // Store uploaded files and userId for tool access
     this.uploadedFiles = uploadedFiles;
     this.currentUserId = userId;
@@ -316,7 +316,11 @@ export class OpenAIService {
 
     // Handle tool calls if any
     if (toolCalls.length > 0) {
-      yield { chunk: '', hadFunctionCalls: true };
+      // Extract tool names for frontend display
+      const toolNames = toolCalls
+        .filter(tc => tc.type === 'function' && 'function' in tc)
+        .map(tc => (tc as any).function.name as string);
+      yield { chunk: '', hadFunctionCalls: true, toolsUsed: toolNames };
       
       const toolResults = await this.executeToolCalls(toolCalls, tenantId);
       
