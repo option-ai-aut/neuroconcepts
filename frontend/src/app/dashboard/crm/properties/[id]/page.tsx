@@ -8,6 +8,18 @@ import Link from 'next/link';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 
+// Helper to get full image URL (handles relative /uploads/ paths)
+const getImageUrl = (url: string): string => {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  if (url.startsWith('/uploads/')) {
+    const config = getRuntimeConfig();
+    const apiUrl = config.apiUrl || '';
+    return `${apiUrl}${url}`;
+  }
+  return url;
+};
+
 export default function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [property, setProperty] = useState<Property | null>(null);
@@ -719,7 +731,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   {property.images.map((img, idx) => (
                     <div key={idx} className="relative group aspect-square">
                       <img 
-                        src={img} 
+                        src={getImageUrl(img)} 
                         alt={`Bild ${idx + 1}`}
                         className="w-full h-full object-cover rounded-lg"
                       />
@@ -784,7 +796,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   {property.floorplans.map((fp, idx) => (
                     <div key={idx} className="relative group aspect-square">
                       <img 
-                        src={fp} 
+                        src={getImageUrl(fp)} 
                         alt={`Grundriss ${idx + 1}`}
                         className="w-full h-full object-cover rounded-lg"
                       />
