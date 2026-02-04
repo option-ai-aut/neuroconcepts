@@ -38,10 +38,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
 
   const router = useRouter();
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { openDrawer, updateExposeEditor } = useGlobalState();
-  
-  const tenantId = 'default-tenant';
-  const userId = 'default-user';
+  const { openDrawer, updateExposeEditor, setPageContext, aiActionPerformed } = useGlobalState();
 
   useEffect(() => {
     loadProperty();
@@ -53,10 +50,20 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
+    
+    // Cleanup: clear page context when leaving
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      setPageContext(null);
     };
-  }, [id]);
+  }, [id, setPageContext]);
+
+  // Reload property when AI performs an action
+  useEffect(() => {
+    if (aiActionPerformed) {
+      loadProperty();
+    }
+  }, [aiActionPerformed]);
 
   const handleDeleteProperty = async () => {
     if (!confirm('Möchtest du dieses Objekt wirklich unwiderruflich löschen?')) return;
@@ -76,6 +83,15 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
     setProperty(propertyData);
     setFormData(propertyData || {});
     setExposes(exposesData);
+    
+    // Set page context for AI
+    if (propertyData) {
+      setPageContext({
+        page: 'crm/properties/detail',
+        propertyId: id,
+        propertyData: propertyData,
+      });
+    }
     
     // Load published portals
     if (propertyData?.publishedPortals) {

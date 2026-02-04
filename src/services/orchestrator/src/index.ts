@@ -1549,7 +1549,7 @@ app.post('/chat/stream',
   AiSafetyMiddleware.auditLog,
   async (req, res) => {
     try {
-      const { message } = req.body;
+      const { message, pageContext } = req.body;
       
       // Get user from auth - CRITICAL: tenantId comes from authenticated user, not request!
       const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
@@ -1571,12 +1571,31 @@ app.post('/chat/stream',
       const { recentMessages, summary } = await ConversationMemory.getOptimizedHistory(userId);
       const optimizedHistory = ConversationMemory.formatForOpenAI(recentMessages, summary);
 
+      // Build context message for AI if page context is available
+      let contextMessage = message;
+      if (pageContext) {
+        const contextParts: string[] = [];
+        contextParts.push(`[KONTEXT: User ist auf Seite "${pageContext.page}"]`);
+        
+        if (pageContext.propertyId && pageContext.propertyData) {
+          const p = pageContext.propertyData;
+          contextParts.push(`[AKTUELLES OBJEKT: ID=${pageContext.propertyId}, Titel="${p.title || 'Unbenannt'}", Adresse="${p.address || ''}", Preis=${p.salePrice || p.rentCold || 'k.A.'}€, Zimmer=${p.rooms || 'k.A.'}, Fläche=${p.livingArea || 'k.A.'}m²]`);
+        }
+        
+        if (pageContext.leadId && pageContext.leadData) {
+          const l = pageContext.leadData;
+          contextParts.push(`[AKTUELLER LEAD: ID=${pageContext.leadId}, Name="${l.firstName || ''} ${l.lastName || ''}", Email="${l.email || ''}"]`);
+        }
+        
+        contextMessage = contextParts.join('\n') + '\n\nUser-Nachricht: ' + message;
+      }
+
       const openai = new OpenAIService();
       let fullResponse = '';
       let hadFunctionCalls = false;
 
       // Stream the response with optimized history
-      for await (const result of openai.chatStream(message, tenantId, optimizedHistory)) {
+      for await (const result of openai.chatStream(contextMessage, tenantId, optimizedHistory)) {
         fullResponse += result.chunk;
         if (result.hadFunctionCalls) hadFunctionCalls = true;
         // Send chunk as SSE

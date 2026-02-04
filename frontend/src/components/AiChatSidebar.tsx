@@ -48,7 +48,7 @@ const CONTEXT_TIPS: ContextTip[] = [
 
 export default function AiChatSidebar() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const { aiChatDraft, setAiChatDraft, activeExposeContext, triggerExposeRefresh, notifyAiAction } = useGlobalState();
+  const { aiChatDraft, setAiChatDraft, activeExposeContext, triggerExposeRefresh, notifyAiAction, pageContext } = useGlobalState();
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [activeTip, setActiveTip] = useState<ContextTip | null>(null);
@@ -241,12 +241,14 @@ export default function AiChatSidebar() {
       } else {
         // Regular chat endpoint with STREAMING
         // Note: userId and tenantId come from auth token on backend
+        // Send page context so Jarvis knows where the user is
         const authHeaders = await getAuthHeaders();
         const res = await fetch(`${apiUrl}/chat/stream`, {
           method: 'POST',
           headers: authHeaders,
           body: JSON.stringify({
             message: userMsg.content,
+            pageContext: pageContext || undefined,
           })
         });
 
