@@ -240,6 +240,56 @@ export const CRM_TOOLS = {
       required: ["propertyId"]
     }
   },
+  get_property_images: {
+    name: "get_property_images",
+    description: "Gets all images and floorplans of a property. Returns URLs and counts.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        propertyId: { type: SchemaType.STRING, description: "ID of the property" } as FunctionDeclarationSchema,
+      },
+      required: ["propertyId"]
+    }
+  },
+  delete_property_image: {
+    name: "delete_property_image",
+    description: "Deletes a specific image or floorplan from a property.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        propertyId: { type: SchemaType.STRING, description: "ID of the property" } as FunctionDeclarationSchema,
+        imageUrl: { type: SchemaType.STRING, description: "URL of the image to delete" } as FunctionDeclarationSchema,
+        isFloorplan: { type: SchemaType.BOOLEAN, description: "If true, deletes from floorplans. Default: false" } as FunctionDeclarationSchema,
+      },
+      required: ["propertyId", "imageUrl"]
+    }
+  },
+  delete_all_property_images: {
+    name: "delete_all_property_images",
+    description: "Deletes all images or all floorplans from a property. Ask for confirmation first!",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        propertyId: { type: SchemaType.STRING, description: "ID of the property" } as FunctionDeclarationSchema,
+        isFloorplan: { type: SchemaType.BOOLEAN, description: "If true, deletes all floorplans. If false, deletes all images." } as FunctionDeclarationSchema,
+        confirmed: { type: SchemaType.BOOLEAN, description: "Must be true to confirm deletion" } as FunctionDeclarationSchema,
+      },
+      required: ["propertyId", "confirmed"]
+    }
+  },
+  move_image_to_floorplan: {
+    name: "move_image_to_floorplan",
+    description: "Moves an image to floorplans or vice versa.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        propertyId: { type: SchemaType.STRING, description: "ID of the property" } as FunctionDeclarationSchema,
+        imageUrl: { type: SchemaType.STRING, description: "URL of the image to move" } as FunctionDeclarationSchema,
+        toFloorplan: { type: SchemaType.BOOLEAN, description: "If true, moves image to floorplans. If false, moves floorplan to images." } as FunctionDeclarationSchema,
+      },
+      required: ["propertyId", "imageUrl", "toFloorplan"]
+    }
+  },
   // === EMAIL TOOLS ===
   get_emails: {
     name: "get_emails",
@@ -960,6 +1010,117 @@ export class AiToolExecutor {
         
         const typeLabel = isFloorplan ? 'Grundriss(e)' : 'Bild(er)';
         return `${_uploadedFiles.length} ${typeLabel} wurden zum Objekt "${property.title}" hinzugefügt.`;
+      }
+
+      case 'get_property_images': {
+        const { propertyId } = args;
+        
+        const property = await getPrisma().property.findFirst({ 
+          where: { id: propertyId, tenantId },
+          select: { id: true, title: true, images: true, floorplans: true }
+        });
+        
+        if (!property) {
+          return `Objekt mit ID ${propertyId} nicht gefunden.`;
+        }
+        
+        return {
+          propertyId: property.id,
+          title: property.title,
+          images: property.images,
+          imageCount: property.images.length,
+          floorplans: property.floorplans,
+          floorplanCount: property.floorplans.length,
+        };
+      }
+
+      case 'delete_property_image': {
+        const { propertyId, imageUrl, isFloorplan = false } = args;
+        
+        const property = await getPrisma().property.findFirst({ 
+          where: { id: propertyId, tenantId } 
+        });
+        
+        if (!property) {
+          return `Objekt mit ID ${propertyId} nicht gefunden.`;
+        }
+        
+        const arrayField = isFloorplan ? 'floorplans' : 'images';
+        const currentArray = isFloorplan ? property.floorplans : property.images;
+        
+        if (!currentArray.includes(imageUrl)) {
+          return `Bild "${imageUrl}" nicht im Objekt gefunden.`;
+        }
+        
+        const updatedArray = currentArray.filter(url => url !== imageUrl);
+        
+        await getPrisma().property.update({
+          where: { id: propertyId },
+          data: { [arrayField]: updatedArray }
+        });
+        
+        const typeLabel = isFloorplan ? 'Grundriss' : 'Bild';
+        return `${typeLabel} wurde aus "${property.title}" gelöscht.`;
+      }
+
+      case 'delete_all_property_images': {
+        const { propertyId, isFloorplan = false, confirmed } = args;
+        
+        if (!confirmed) {
+          return 'Löschung abgebrochen. Bitte bestätige mit confirmed: true.';
+        }
+        
+        const property = await getPrisma().property.findFirst({ 
+          where: { id: propertyId, tenantId } 
+        });
+        
+        if (!property) {
+          return `Objekt mit ID ${propertyId} nicht gefunden.`;
+        }
+        
+        const arrayField = isFloorplan ? 'floorplans' : 'images';
+        const count = isFloorplan ? property.floorplans.length : property.images.length;
+        
+        await getPrisma().property.update({
+          where: { id: propertyId },
+          data: { [arrayField]: [] }
+        });
+        
+        const typeLabel = isFloorplan ? 'Grundrisse' : 'Bilder';
+        return `${count} ${typeLabel} wurden aus "${property.title}" gelöscht.`;
+      }
+
+      case 'move_image_to_floorplan': {
+        const { propertyId, imageUrl, toFloorplan } = args;
+        
+        const property = await getPrisma().property.findFirst({ 
+          where: { id: propertyId, tenantId } 
+        });
+        
+        if (!property) {
+          return `Objekt mit ID ${propertyId} nicht gefunden.`;
+        }
+        
+        const sourceArray = toFloorplan ? property.images : property.floorplans;
+        const targetArray = toFloorplan ? property.floorplans : property.images;
+        
+        if (!sourceArray.includes(imageUrl)) {
+          const sourceLabel = toFloorplan ? 'Bildern' : 'Grundrissen';
+          return `Bild "${imageUrl}" nicht in ${sourceLabel} gefunden.`;
+        }
+        
+        const updatedSource = sourceArray.filter(url => url !== imageUrl);
+        const updatedTarget = [...targetArray, imageUrl];
+        
+        await getPrisma().property.update({
+          where: { id: propertyId },
+          data: toFloorplan 
+            ? { images: updatedSource, floorplans: updatedTarget }
+            : { floorplans: updatedSource, images: updatedTarget }
+        });
+        
+        const targetLabel = toFloorplan ? 'Grundrisse' : 'Bilder';
+        return `Bild wurde zu ${targetLabel} verschoben.`;
       }
 
       case 'search_properties': {

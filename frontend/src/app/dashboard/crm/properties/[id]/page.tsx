@@ -259,9 +259,10 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const removeImage = async (imageUrl: string, isFloorplan: boolean = false) => {
     try {
       const config = getRuntimeConfig();
+      const authHeaders = await getAuthHeaders();
       await fetch(`${config.apiUrl}/properties/${id}/images`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageUrl, isFloorplan })
       });
       await loadProperty();
