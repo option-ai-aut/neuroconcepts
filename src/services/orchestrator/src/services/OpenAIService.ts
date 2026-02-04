@@ -28,7 +28,7 @@ function convertToolsToOpenAI(tools: Record<string, any>): OpenAI.Chat.ChatCompl
 // Model to use - GPT-4o-mini is fast and capable
 const MODEL = 'gpt-4o-mini';
 
-const SYSTEM_PROMPT = `Du bist Jarvis, der KI-Assistent für NeuroConcepts - eine Immobilien-CRM-Plattform.
+const SYSTEM_PROMPT = `Du bist Jarvis, der KI-Assistent für Immivo - eine Immobilien-CRM-Plattform.
 
 DEINE PERSÖNLICHKEIT:
 - Prägnant und direkt wie TARS aus Interstellar
@@ -39,6 +39,17 @@ DEINE PERSÖNLICHKEIT:
 - Proaktiv, aber nicht aufdringlich
 
 DEINE FÄHIGKEITEN:
+
+🧠 GEDÄCHTNIS & KONTEXT:
+Du hast Zugriff auf vergangene Gespräche - auch archivierte!
+- search_chat_history: Suche in der Chat-Historie nach Begriffen oder Themen
+- get_conversation_context: Hole detaillierten Kontext zu einem Thema
+- get_memory_summary: Rufe dein Langzeit-Gedächtnis ab (Zusammenfassung aller Gespräche)
+
+Nutze diese Tools wenn:
+- Der User auf etwas Vergangenes verweist ("wie besprochen", "das Objekt von neulich")
+- Du dich an Präferenzen oder frühere Anfragen erinnern sollst
+- Der Kontext unklar ist
 
 📋 LEADS & CRM:
 - Leads erstellen, abrufen, aktualisieren, löschen
@@ -180,6 +191,7 @@ Antworte immer auf Deutsch. Sei freundlich und hilfsbereit. Erkläre kurz was du
 export class OpenAIService {
   private client: OpenAI;
   private uploadedFiles: string[] = []; // Files uploaded in current chat session
+  private currentUserId?: string; // Current user ID for memory tools
 
   constructor() {
     this.client = new OpenAI({
@@ -232,9 +244,10 @@ export class OpenAIService {
   }
 
   // Streaming version of chat with Function Calling support
-  async *chatStream(message: string, tenantId: string, history: any[] = [], uploadedFiles: string[] = []): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean }> {
-    // Store uploaded files for tool access
+  async *chatStream(message: string, tenantId: string, history: any[] = [], uploadedFiles: string[] = [], userId?: string): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean }> {
+    // Store uploaded files and userId for tool access
     this.uploadedFiles = uploadedFiles;
+    this.currentUserId = userId;
     // Filter out messages with null/empty content
     const validHistory = history.filter(h => h.content != null && h.content !== '');
     
@@ -441,7 +454,7 @@ WICHTIG: Nutze IMMER exposeId="${targetId}" bei allen Tool-Aufrufen!`;
           args._uploadedFiles = this.uploadedFiles;
         }
         
-        const output = await AiToolExecutor.execute(call.function.name, args, tenantId);
+        const output = await AiToolExecutor.execute(call.function.name, args, tenantId, this.currentUserId);
         results.push({
           role: 'tool',
           tool_call_id: call.id,

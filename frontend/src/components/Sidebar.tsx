@@ -76,7 +76,7 @@ export default function Sidebar() {
         <span className={`text-white font-bold text-lg tracking-tight ml-3 whitespace-nowrap transition-opacity duration-300 ${
           isHovered ? 'opacity-100' : 'opacity-0'
         }`}>
-          NeuroConcepts
+          Immivo
         </span>
       </div>
       

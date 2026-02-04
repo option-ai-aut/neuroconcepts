@@ -15,9 +15,17 @@ interface Message {
   createdAt?: Date;
 }
 
+interface ChatSearchResult {
+  content: string;
+  role: string;
+  date: string;
+  isArchived: boolean;
+}
+
 export class ConversationMemory {
-  private static RECENT_MESSAGES_COUNT = 10; // Last 10 messages in full detail
-  private static SUMMARY_THRESHOLD = 20; // Summarize after 20 messages
+  private static RECENT_MESSAGES_COUNT = 20; // Last 20 messages in full detail
+  private static SUMMARY_THRESHOLD = 50; // Summarize after 50 messages
+  private static AUTO_SUMMARY_INTERVAL = 30; // Auto-summarize every 30 new messages
   
   /**
    * Get optimized conversation history for AI
@@ -163,6 +171,221 @@ Zusammenfassung:`;
           id: { in: summaries.map(s => s.id) }
         }
       });
+    }
+  }
+
+  /**
+   * Search through chat history (including archived chats)
+   * Used by AI to find relevant context from past conversations
+   */
+  static async searchChatHistory(
+    userId: string, 
+    query: string, 
+    options?: { includeArchived?: boolean; limit?: number }
+  ): Promise<ChatSearchResult[]> {
+    const { includeArchived = true, limit = 20 } = options || {};
+
+    // Get all messages (optionally including archived)
+    const messages = await prisma.userChat.findMany({
+      where: {
+        userId,
+        ...(includeArchived ? {} : { archived: false }),
+        content: {
+          contains: query,
+          mode: 'insensitive'
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        content: true,
+        role: true,
+        createdAt: true,
+        archived: true
+      }
+    });
+
+    return messages.map(m => ({
+      content: m.content,
+      role: m.role,
+      date: m.createdAt.toISOString(),
+      isArchived: m.archived
+    }));
+  }
+
+  /**
+   * Get conversation context around a specific topic
+   * Returns messages before and after matches for better context
+   */
+  static async getContextAroundTopic(
+    userId: string,
+    topic: string,
+    contextWindow: number = 3
+  ): Promise<{ topic: string; context: ChatSearchResult[] }[]> {
+    // Find messages matching the topic
+    const matches = await prisma.userChat.findMany({
+      where: {
+        userId,
+        content: {
+          contains: topic,
+          mode: 'insensitive'
+        }
+      },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        createdAt: true
+      }
+    });
+
+    if (matches.length === 0) {
+      return [];
+    }
+
+    const results: { topic: string; context: ChatSearchResult[] }[] = [];
+
+    for (const match of matches.slice(0, 5)) { // Max 5 contexts
+      // Get messages around this match
+      const contextMessages = await prisma.userChat.findMany({
+        where: {
+          userId,
+          createdAt: {
+            gte: new Date(match.createdAt.getTime() - contextWindow * 60000), // contextWindow minutes before
+            lte: new Date(match.createdAt.getTime() + contextWindow * 60000)  // contextWindow minutes after
+          }
+        },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          content: true,
+          role: true,
+          createdAt: true,
+          archived: true
+        }
+      });
+
+      results.push({
+        topic,
+        context: contextMessages.map(m => ({
+          content: m.content,
+          role: m.role,
+          date: m.createdAt.toISOString(),
+          isArchived: m.archived
+        }))
+      });
+    }
+
+    return results;
+  }
+
+  /**
+   * Get long-term memory summary (persists across chat sessions)
+   * This is different from the per-session summary
+   */
+  static async getLongTermMemory(userId: string): Promise<string | null> {
+    const summary = await prisma.conversationSummary.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return summary?.summary || null;
+  }
+
+  /**
+   * Update long-term memory with new information
+   * Called periodically to keep the summary up-to-date
+   */
+  static async updateLongTermMemory(userId: string): Promise<string> {
+    // Get current summary
+    const currentSummary = await this.getLongTermMemory(userId);
+
+    // Get recent messages (last 50 non-archived)
+    const recentMessages = await prisma.userChat.findMany({
+      where: { 
+        userId,
+        archived: false
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+        role: true,
+        content: true,
+        createdAt: true
+      }
+    });
+
+    if (recentMessages.length < 10) {
+      return currentSummary || 'Noch keine ausreichende Gesprächshistorie.';
+    }
+
+    // Generate updated summary
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    
+    const conversationText = recentMessages
+      .reverse()
+      .map(m => `${m.role}: ${m.content}`)
+      .join('\n');
+
+    const prompt = `Du bist ein Gedächtnis-Assistent. Aktualisiere die Langzeit-Zusammenfassung basierend auf neuen Gesprächen.
+
+${currentSummary ? `BISHERIGE ZUSAMMENFASSUNG:\n${currentSummary}\n\n` : ''}NEUE GESPRÄCHE:
+${conversationText}
+
+Erstelle eine aktualisierte Zusammenfassung die enthält:
+- Wichtige Fakten über den User (Präferenzen, häufige Anfragen)
+- Wiederkehrende Themen und Muster
+- Wichtige Objekte, Leads oder Kontakte die erwähnt wurden
+- Offene Aufgaben oder Wünsche
+
+Sei präzise und strukturiert (max. 300 Wörter). Behalte wichtige Informationen aus der bisherigen Zusammenfassung bei.
+
+AKTUALISIERTE ZUSAMMENFASSUNG:`;
+
+    const result = await model.generateContent(prompt);
+    const newSummary = result.response.text();
+
+    // Save the new summary
+    await prisma.conversationSummary.create({
+      data: {
+        userId,
+        summary: newSummary,
+        messageCount: recentMessages.length
+      }
+    });
+
+    // Clean up old summaries
+    await this.cleanupOldSummaries(userId);
+
+    return newSummary;
+  }
+
+  /**
+   * Check if we should auto-summarize based on message count
+   */
+  static async shouldAutoSummarize(userId: string): Promise<boolean> {
+    const messageCount = await prisma.userChat.count({
+      where: { 
+        userId,
+        archived: false
+      }
+    });
+
+    const lastSummary = await prisma.conversationSummary.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Summarize if we have enough new messages since last summary
+    const messagesSinceLastSummary = messageCount - (lastSummary?.messageCount || 0);
+    return messagesSinceLastSummary >= this.AUTO_SUMMARY_INTERVAL;
+  }
+
+  /**
+   * Auto-summarize if needed (call this after each message)
+   */
+  static async autoSummarizeIfNeeded(userId: string): Promise<void> {
+    if (await this.shouldAutoSummarize(userId)) {
+      console.log(`📝 Auto-summarizing conversation for user ${userId}`);
+      await this.updateLongTermMemory(userId);
     }
   }
 }

@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NeuroConcepts AI",
+  title: "Immivo AI",
   description: "Real Estate AI Platform",
   icons: {
     icon: '/icon.svg',

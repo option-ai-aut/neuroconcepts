@@ -37,7 +37,7 @@ export default function BlogPage() {
     },
     {
       title: 'DSGVO-konformes CRM für Makler',
-      excerpt: 'Was du bei der Datenspeicherung beachten musst und wie NeuroConcepts dir dabei hilft.',
+      excerpt: 'Was du bei der Datenspeicherung beachten musst und wie Immivo dir dabei hilft.',
       date: '10. Januar 2026',
       readTime: '7 Min',
       category: 'Rechtliches'

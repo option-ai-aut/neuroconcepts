@@ -1,4 +1,4 @@
-# NeuroConcepts AI - B2B Real Estate Automation Platform
+# Immivo AI - B2B Real Estate Automation Platform
 
 **Status:** Phase 1 (MVP) - Live on AWS Lambda (Dev)  
 **Target Launch:** Q2 2026  
@@ -6,7 +6,7 @@
 
 ## 📖 Projektübersicht
 
-NeuroConcepts AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. € Umsatz), die den Vertriebsprozess automatisiert. Das System führt eingehende Leads (von Portalen oder der Website) vollautomatisch bis zum gebuchten Besichtigungstermin.
+Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. € Umsatz), die den Vertriebsprozess automatisiert. Das System führt eingehende Leads (von Portalen oder der Website) vollautomatisch bis zum gebuchten Besichtigungstermin.
 
 **Kernversprechen:** Der Makler greift erst ein, wenn der Termin im Kalender steht oder eine Eskalation notwendig ist.
 
@@ -86,4 +86,4 @@ NeuroConcepts AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 M
 **Support:** AI-Assisted Support Desk
 
 ---
-*NeuroConcepts.ai Internal Documentation*
+*Immivo.ai Internal Documentation*

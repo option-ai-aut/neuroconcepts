@@ -18,7 +18,7 @@ export default function ImpressumPage() {
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-6 sm:mt-8 mb-3 sm:mb-4">Angaben gemäß § 5 ECG</h2>
             
             <p className="text-sm sm:text-base">
-              <strong>NeuroConcepts AI GmbH</strong><br />
+              <strong>Immivo AI GmbH</strong><br />
               Musterstraße 123<br />
               1010 Wien<br />
               Österreich
@@ -27,7 +27,7 @@ export default function ImpressumPage() {
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-6 sm:mt-8 mb-3 sm:mb-4">Kontakt</h2>
             <p className="text-sm sm:text-base">
               Telefon: +43 1 234 56 78<br />
-              E-Mail: hello@neuroconcepts.ai
+              E-Mail: hello@immivo.ai
             </p>
 
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-6 sm:mt-8 mb-3 sm:mb-4">Handelsregister</h2>

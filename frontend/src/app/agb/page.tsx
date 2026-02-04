@@ -20,12 +20,12 @@ export default function AGBPage() {
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-6 sm:mt-8 mb-3 sm:mb-4">§ 1 Geltungsbereich</h2>
             <p className="text-sm sm:text-base">
               Diese Allgemeinen Geschäftsbedingungen gelten für alle Verträge zwischen der 
-              NeuroConcepts AI GmbH und ihren Kunden über die Nutzung der NeuroConcepts-Plattform.
+              Immivo AI GmbH und ihren Kunden über die Nutzung der Immivo-Plattform.
             </p>
 
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-6 sm:mt-8 mb-3 sm:mb-4">§ 2 Vertragsgegenstand</h2>
             <p className="text-sm sm:text-base">
-              NeuroConcepts stellt eine KI-gestützte Software-as-a-Service (SaaS) Plattform 
+              Immivo stellt eine KI-gestützte Software-as-a-Service (SaaS) Plattform 
               für Immobilienmakler zur Verfügung. Der Funktionsumfang richtet sich nach dem 
               gewählten Tarif.
             </p>
@@ -33,7 +33,7 @@ export default function AGBPage() {
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-6 sm:mt-8 mb-3 sm:mb-4">§ 3 Vertragsschluss</h2>
             <p className="text-sm sm:text-base">
               Der Vertrag kommt durch die Registrierung auf der Plattform und die Bestätigung 
-              der Registrierung durch NeuroConcepts zustande.
+              der Registrierung durch Immivo zustande.
             </p>
 
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-6 sm:mt-8 mb-3 sm:mb-4">§ 4 Testphase</h2>
@@ -58,13 +58,13 @@ export default function AGBPage() {
 
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-6 sm:mt-8 mb-3 sm:mb-4">§ 7 Verfügbarkeit</h2>
             <p className="text-sm sm:text-base">
-              NeuroConcepts bemüht sich um eine Verfügbarkeit von 99,9% pro Monat. 
+              Immivo bemüht sich um eine Verfügbarkeit von 99,9% pro Monat. 
               Geplante Wartungsarbeiten werden vorab angekündigt.
             </p>
 
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-6 sm:mt-8 mb-3 sm:mb-4">§ 8 Haftung</h2>
             <p className="text-sm sm:text-base">
-              NeuroConcepts haftet nur für Schäden, die durch vorsätzliches oder grob 
+              Immivo haftet nur für Schäden, die durch vorsätzliches oder grob 
               fahrlässiges Verhalten verursacht wurden. Die Haftung ist auf den 
               vorhersehbaren, vertragstypischen Schaden begrenzt.
             </p>

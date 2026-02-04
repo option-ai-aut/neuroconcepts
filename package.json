@@ -1,5 +1,5 @@
 {
-  "name": "neuroconcepts-ai",
+  "name": "immivo",
   "version": "0.1.0",
   "description": "B2B Real Estate Automation Platform",
   "main": "dist/index.js",
@@ -15,7 +15,7 @@
     "gemini",
     "aws"
   ],
-  "author": "NeuroConcepts AI",
+  "author": "Immivo AI",
   "license": "ISC",
   "devDependencies": {
     "typescript": "^5.3.3",

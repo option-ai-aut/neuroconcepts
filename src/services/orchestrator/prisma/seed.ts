@@ -8,7 +8,7 @@ async function main() {
   // 1. Create Tenant
   const tenant = await prisma.tenant.create({
     data: {
-      name: 'NeuroConcepts Demo Real Estate',
+      name: 'Immivo Demo Real Estate',
       settings: {
         create: {
           aiPersonality: { tone: 'professional', language: 'de' }

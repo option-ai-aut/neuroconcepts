@@ -10,7 +10,7 @@ async function main() {
     update: {},
     create: {
       id: tenantId,
-      name: 'NeuroConcepts HQ'
+      name: 'Immivo HQ'
     }
   });
   

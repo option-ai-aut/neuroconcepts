@@ -1,9 +1,9 @@
 {
-  "NeuroConcepts-Dev": {
+  "Immivo-Dev": {
     "OrchestratorApiUrl": "https://1rnmc2z8eg.execute-api.eu-central-1.amazonaws.com/dev/",
     "VpcId": "vpc-0e5a498b83385114d",
-    "EmailBucketName": "neuroconcepts-dev-emailingestbucketd823e4fb-bs3xvnw7dsh6",
+    "EmailBucketName": "immivo-dev-emailingestbucket",
     "OrchestratorApiEndpoint8D207D42": "https://1rnmc2z8eg.execute-api.eu-central-1.amazonaws.com/dev/",
-    "DBEndpoint": "neuroconcepts-dev-postgresinstance19cdd68a-v15towxvxdfx.c30ww240mnr2.eu-central-1.rds.amazonaws.com"
+    "DBEndpoint": "immivo-dev-postgres.eu-central-1.rds.amazonaws.com"
   }
 }

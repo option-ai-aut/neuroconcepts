@@ -205,7 +205,7 @@ export default function LandingPage() {
               </h1>
               
               <p className="text-xl text-gray-600 mb-10 leading-relaxed max-w-xl">
-                NeuroConcepts ist das erste <strong>vollständig KI-gesteuerte</strong> Betriebssystem für Immobilienmakler. 
+                Immivo ist das erste <strong>vollständig KI-gesteuerte</strong> Betriebssystem für Immobilienmakler. 
                 Jarvis übernimmt dein Tagesgeschäft — du konzentrierst dich auf Abschlüsse.
               </p>
               
@@ -257,7 +257,7 @@ export default function LandingPage() {
                     </div>
                     <div className="flex-1 mx-4">
                       <div className="bg-gray-700/50 rounded-lg px-4 py-1.5 text-xs text-gray-400 text-center">
-                        app.neuroconcepts.ai
+                        app.immivo.ai
                       </div>
                     </div>
                   </div>
@@ -574,7 +574,7 @@ export default function LandingPage() {
               <div>
                 <Quote className="w-10 h-10 text-indigo-300 mb-4" />
                 <p className="text-xl text-gray-700 mb-4 leading-relaxed">
-                  "Seit wir NeuroConcepts nutzen, habe ich endlich wieder Zeit für das, was ich liebe: 
+                  "Seit wir Immivo nutzen, habe ich endlich wieder Zeit für das, was ich liebe: 
                   Kunden beraten und Deals abschließen. Jarvis erledigt den ganzen Papierkram. 
                   <strong> Mein Umsatz ist um 30% gestiegen</strong>, während ich weniger arbeite."
                 </p>
@@ -600,7 +600,7 @@ export default function LandingPage() {
               Ein System. Unendliche Möglichkeiten.
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              NeuroConcepts ersetzt dein CRM, deine E-Mail-Tools und deine Exposé-Software — in einer einzigen, KI-gesteuerten Plattform.
+              Immivo ersetzt dein CRM, deine E-Mail-Tools und deine Exposé-Software — in einer einzigen, KI-gesteuerten Plattform.
             </p>
           </div>
 
@@ -850,7 +850,7 @@ export default function LandingPage() {
               </div>
               
               <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
-                Erlebe NeuroConcepts
+                Erlebe Immivo
                 <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">
                   live in Aktion
@@ -890,7 +890,7 @@ export default function LandingPage() {
                   Unser Kalender wird in Kürze hier eingebunden.
                 </p>
                 <a 
-                  href="mailto:hello@neuroconcepts.ai?subject=Demo-Anfrage"
+                  href="mailto:hello@immivo.ai?subject=Demo-Anfrage"
                   className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-indigo-500/30 transition-all"
                 >
                   Per E-Mail anfragen
@@ -923,7 +923,7 @@ export default function LandingPage() {
             Bereit, dein Business zu transformieren?
           </h2>
           <p className="text-xl text-white/80 mb-10 max-w-2xl mx-auto">
-            Schließe dich hunderten Maklern an, die mit NeuroConcepts mehr verdienen und weniger arbeiten. 
+            Schließe dich hunderten Maklern an, die mit Immivo mehr verdienen und weniger arbeiten. 
             Starte heute — in 5 Minuten bist du live.
           </p>
           
@@ -936,7 +936,7 @@ export default function LandingPage() {
               <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <a 
-              href="mailto:hello@neuroconcepts.ai" 
+              href="mailto:hello@immivo.ai" 
               className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white border-2 border-white/30 rounded-full hover:bg-white/10 transition-all"
             >
               Persönliche Demo buchen

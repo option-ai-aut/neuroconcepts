@@ -1,6 +1,6 @@
-# NeuroConcepts AI - Design System
+# Immivo AI - Design System
 
-Dieses Dokument definiert die visuellen Richtlinien für die NeuroConcepts AI Plattform. Ziel ist ein modernes, cleanes und konsistentes "Borderless" Design.
+Dieses Dokument definiert die visuellen Richtlinien für die Immivo AI Plattform. Ziel ist ein modernes, cleanes und konsistentes "Borderless" Design.
 
 ## 1. Grundprinzipien
 

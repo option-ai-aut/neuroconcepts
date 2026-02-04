@@ -15,17 +15,17 @@ Der Admin-Bereich ist über `/admin` erreichbar und durch eine Middleware gesch�
 Da wir noch keine Admin-Registrierungsseite haben, musst du den ersten Super-Admin direkt in der Datenbank anlegen.
 
 1.  **Verbinde dich mit der Datenbank:**
-    *   Hole dir das Passwort aus dem AWS Secrets Manager (`NeuroConcepts-DB-Secret-dev`).
+    *   Hole dir das Passwort aus dem AWS Secrets Manager (`Immivo-DB-Secret-dev`).
     *   Nutze ein Tool wie **TablePlus** oder **DBeaver**.
     *   Host: Siehe CloudFormation Output `DBEndpoint` (in der AWS Konsole).
 
 2.  **SQL-Befehl ausführen:**
     ```sql
     INSERT INTO "Tenant" (id, name, "updatedAt") 
-    VALUES ('default-tenant', 'NeuroConcepts HQ', NOW());
+    VALUES ('default-tenant', 'Immivo HQ', NOW());
 
     INSERT INTO "User" (id, email, name, "tenantId", role) 
-    VALUES (gen_random_uuid(), 'deine.email@neuroconcepts.ai', 'Dennis (Founder)', 'default-tenant', 'SUPER_ADMIN');
+    VALUES (gen_random_uuid(), 'deine.email@immivo.ai', 'Dennis (Founder)', 'default-tenant', 'SUPER_ADMIN');
     ```
 
 ### Sicherheits-Konzept
@@ -43,7 +43,7 @@ Da wir noch keine Admin-Registrierungsseite haben, musst du den ersten Super-Adm
 
 ### Aurora Serverless (Free Tier / Limits)
 
-Falls das Deployment von `NeuroConcepts-Prod` fehlschlägt mit Kapazitätsfehlern:
+Falls das Deployment von `Immivo-Prod` fehlschlägt mit Kapazitätsfehlern:
 Wir haben die Konfiguration angepasst (`serverlessV2MaxCapacity: 4`).
 
 ### Frontend "Cold Starts"
@@ -59,7 +59,7 @@ Falls GitHub Actions Deployments in "queued" hängen bleiben:
 ### CORS Fehler auf Dev Stage
 
 Falls 502 Fehler mit CORS auftreten:
-- Lambda Logs prüfen (`aws logs tail /aws/lambda/NeuroConcepts-Dev-OrchestratorLambda...`)
+- Lambda Logs prüfen (`aws logs tail /aws/lambda/Immivo-Dev-OrchestratorLambda...`)
 - Häufige Ursache: Dateisystem-Zugriff außerhalb von `/tmp` in Lambda
 - Lösung: Uploads müssen in `/tmp/uploads` statt `./uploads` gespeichert werden
 

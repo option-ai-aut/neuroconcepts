@@ -19,10 +19,10 @@ export default function DatenschutzPage() {
 
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-6 sm:mt-8 mb-3 sm:mb-4">1. Verantwortlicher</h2>
             <p className="text-sm sm:text-base">
-              NeuroConcepts AI GmbH<br />
+              Immivo AI GmbH<br />
               Musterstraße 123<br />
               1010 Wien, Österreich<br />
-              E-Mail: datenschutz@neuroconcepts.ai
+              E-Mail: datenschutz@immivo.ai
             </p>
 
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-6 sm:mt-8 mb-3 sm:mb-4">2. Erhebung und Verarbeitung personenbezogener Daten</h2>
@@ -67,8 +67,8 @@ export default function DatenschutzPage() {
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-6 sm:mt-8 mb-3 sm:mb-4">7. Kontakt</h2>
             <p className="text-sm sm:text-base">
               Bei Fragen zum Datenschutz kontaktieren Sie uns bitte unter: 
-              <a href="mailto:datenschutz@neuroconcepts.ai" className="text-indigo-600 hover:underline">
-                datenschutz@neuroconcepts.ai
+              <a href="mailto:datenschutz@immivo.ai" className="text-indigo-600 hover:underline">
+                datenschutz@immivo.ai
               </a>
             </p>
           </div>

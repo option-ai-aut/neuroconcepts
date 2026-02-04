@@ -47,7 +47,7 @@ export default function IntegrationenPage() {
             Nahtlose Integrationen
           </h1>
           <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto px-4">
-            NeuroConcepts verbindet sich mit allen Tools, die du bereits nutzt. 
+            Immivo verbindet sich mit allen Tools, die du bereits nutzt. 
             Automatischer Datenaustausch, keine manuelle Arbeit.
           </p>
         </div>

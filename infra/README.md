@@ -1,6 +1,6 @@
-# NeuroConcepts Infrastructure
+# Immivo Infrastructure
 
-This directory contains the **AWS CDK (Cloud Development Kit)** code that defines the entire cloud infrastructure for NeuroConcepts AI.
+This directory contains the **AWS CDK (Cloud Development Kit)** code that defines the entire cloud infrastructure for Immivo AI.
 
 ## 🏗 Stack Overview
 
@@ -22,7 +22,7 @@ The stack (`lib/infra-stack.ts`) provisions the following resources:
 We use **GitHub Actions** for CI/CD (`.github/workflows/deploy.yml`).
 
 ### Automatic Deployment
-- Pushing to the `main` branch automatically deploys to the **Dev** environment (`NeuroConcepts-Dev`).
+- Pushing to the `main` branch automatically deploys to the **Dev** environment (`Immivo-Dev`).
 
 ### Manual Deployment
 - You can manually trigger a deployment to **Stage** or **Prod** via the GitHub Actions "Run workflow" button.

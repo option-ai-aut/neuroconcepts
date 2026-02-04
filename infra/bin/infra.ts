@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
-import { NeuroConceptsStack } from '../lib/infra-stack';
+import { ImmivoStack } from '../lib/infra-stack';
 
 const app = new cdk.App();
 
@@ -11,22 +11,22 @@ const defaultEnv = {
 };
 
 // 1. Dev Environment (For developers)
-new NeuroConceptsStack(app, 'NeuroConcepts-Dev', {
+new ImmivoStack(app, 'Immivo-Dev', {
   env: defaultEnv,
   stageName: 'dev',
-  description: 'Development environment for NeuroConcepts AI',
+  description: 'Development environment for Immivo AI',
 });
 
 // 2. Stage Environment (Pre-production mirror)
-new NeuroConceptsStack(app, 'NeuroConcepts-Stage', {
+new ImmivoStack(app, 'Immivo-Stage', {
   env: defaultEnv,
   stageName: 'stage',
   description: 'Staging environment for final testing',
 });
 
 // 3. Prod Environment (Live)
-new NeuroConceptsStack(app, 'NeuroConcepts-Prod', {
+new ImmivoStack(app, 'Immivo-Prod', {
   env: defaultEnv,
   stageName: 'prod',
-  description: 'Production environment for NeuroConcepts AI',
+  description: 'Production environment for Immivo AI',
 });

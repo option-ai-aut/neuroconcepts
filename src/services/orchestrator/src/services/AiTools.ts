@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { SchemaType, FunctionDeclarationSchema } from '@google/generative-ai';
 import { randomUUID } from 'crypto';
+import { ConversationMemory } from './ConversationMemory';
 
 // Prisma client will be injected from index.ts
 let prisma: PrismaClient;
@@ -18,6 +19,43 @@ function getPrisma(): PrismaClient {
 }
 
 export const CRM_TOOLS = {
+  // === MEMORY & CONTEXT TOOLS ===
+  search_chat_history: {
+    name: "search_chat_history",
+    description: "Search through past conversations (including archived chats) to find relevant context. Use this when the user refers to something discussed earlier or you need to recall past information.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        query: { type: SchemaType.STRING, description: "Search term or topic to look for in chat history" } as FunctionDeclarationSchema,
+        includeArchived: { type: SchemaType.BOOLEAN, description: "Include archived/old chats in search. Default: true" } as FunctionDeclarationSchema,
+      },
+      required: ["query"]
+    }
+  },
+
+  get_conversation_context: {
+    name: "get_conversation_context",
+    description: "Get detailed context around a specific topic from past conversations. Returns messages before and after mentions of the topic.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        topic: { type: SchemaType.STRING, description: "Topic or keyword to find context for" } as FunctionDeclarationSchema,
+      },
+      required: ["topic"]
+    }
+  },
+
+  get_memory_summary: {
+    name: "get_memory_summary",
+    description: "Get the long-term memory summary of all past conversations with this user. Use this to recall user preferences, past requests, and important context.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {},
+      required: []
+    }
+  },
+
+  // === LEAD TOOLS ===
   create_lead: {
     name: "create_lead",
     description: "Creates a new lead in the CRM with contact info and buyer preferences.",
@@ -860,11 +898,73 @@ Date: {{date.today}}, {{date.year}}`,
 };
 
 export class AiToolExecutor {
-  static async execute(toolName: string, args: any, tenantId: string) {
+  static async execute(toolName: string, args: any, tenantId: string, userId?: string) {
     console.log(`Executing tool ${toolName} for tenant ${tenantId} with args:`, args);
 
     switch (toolName) {
-      // CRM Tools
+      // === MEMORY & CONTEXT TOOLS ===
+      case 'search_chat_history': {
+        if (!userId) return { error: 'User ID required for chat history search' };
+        const { query, includeArchived = true } = args;
+        
+        const results = await ConversationMemory.searchChatHistory(userId, query, {
+          includeArchived,
+          limit: 15
+        });
+
+        if (results.length === 0) {
+          return { message: `Keine Ergebnisse für "${query}" in der Chat-Historie gefunden.` };
+        }
+
+        return {
+          message: `${results.length} relevante Nachrichten gefunden:`,
+          results: results.map(r => ({
+            role: r.role,
+            content: r.content.substring(0, 300) + (r.content.length > 300 ? '...' : ''),
+            date: new Date(r.date).toLocaleDateString('de-DE'),
+            archived: r.isArchived ? 'Archiviert' : 'Aktuell'
+          }))
+        };
+      }
+
+      case 'get_conversation_context': {
+        if (!userId) return { error: 'User ID required for context search' };
+        const { topic } = args;
+        
+        const contexts = await ConversationMemory.getContextAroundTopic(userId, topic, 5);
+
+        if (contexts.length === 0) {
+          return { message: `Kein Kontext zu "${topic}" gefunden.` };
+        }
+
+        return {
+          message: `${contexts.length} Konversationen zu "${topic}" gefunden:`,
+          contexts: contexts.map(c => ({
+            messages: c.context.map(m => ({
+              role: m.role,
+              content: m.content.substring(0, 200) + (m.content.length > 200 ? '...' : ''),
+              date: new Date(m.date).toLocaleDateString('de-DE')
+            }))
+          }))
+        };
+      }
+
+      case 'get_memory_summary': {
+        if (!userId) return { error: 'User ID required for memory summary' };
+        
+        const summary = await ConversationMemory.getLongTermMemory(userId);
+
+        if (!summary) {
+          return { message: 'Noch keine Langzeit-Erinnerungen vorhanden. Diese werden automatisch erstellt, je mehr wir miteinander sprechen.' };
+        }
+
+        return {
+          message: 'Langzeit-Gedächtnis:',
+          summary
+        };
+      }
+
+      // === CRM TOOLS ===
       case 'create_lead': {
         const { 
           salutation, formalAddress, firstName, lastName, email, phone, message,

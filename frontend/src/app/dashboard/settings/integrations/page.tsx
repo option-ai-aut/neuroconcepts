@@ -28,7 +28,7 @@ const getAuthHeaders = async (): Promise<HeadersInit> => {
 export default function IntegrationsSettingsPage() {
   const searchParams = useSearchParams();
   const tenantId = 'default-tenant'; 
-  const inboundEmail = `${tenantId}@inbound.neuroconcepts.ai`;
+  const inboundEmail = `${tenantId}@inbound.immivo.ai`;
 
   const [smtpConfig, setSmtpConfig] = useState({
     host: '',

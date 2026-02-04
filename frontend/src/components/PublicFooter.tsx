@@ -14,7 +14,7 @@ export default function PublicFooter() {
               <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-xl flex items-center justify-center mr-3">
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
-              <span className="font-bold text-xl">NeuroConcepts</span>
+              <span className="font-bold text-xl">Immivo</span>
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed">
               Das KI-gesteuerte Betriebssystem für moderne Immobilienmakler. 
@@ -56,7 +56,7 @@ export default function PublicFooter() {
         </div>
 
         <div className="pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-gray-500 text-center md:text-left">© 2026 NeuroConcepts AI GmbH. Alle Rechte vorbehalten.</p>
+          <p className="text-sm text-gray-500 text-center md:text-left">© 2026 Immivo AI GmbH. Alle Rechte vorbehalten.</p>
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <span className="flex w-2 h-2 bg-green-500 rounded-full"></span>
             Alle Systeme operational

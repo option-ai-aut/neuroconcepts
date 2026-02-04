@@ -15,7 +15,7 @@ export class GeminiService {
     this.model = genAI.getGenerativeModel({ 
       model: "gemini-3-flash-preview", 
       tools: [{ functionDeclarations: Object.values(CRM_TOOLS) as unknown as FunctionDeclaration[] }],
-      systemInstruction: `Du bist Jarvis, der KI-Assistent für NeuroConcepts - eine Immobilien-CRM-Plattform.
+      systemInstruction: `Du bist Jarvis, der KI-Assistent für Immivo - eine Immobilien-CRM-Plattform.
 
 DEINE PERSÖNLICHKEIT:
 - Prägnant und direkt wie TARS aus Interstellar

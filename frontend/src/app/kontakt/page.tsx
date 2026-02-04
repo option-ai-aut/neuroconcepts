@@ -46,8 +46,8 @@ export default function KontaktPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1 text-sm sm:text-base">E-Mail</h3>
-                    <a href="mailto:hello@neuroconcepts.ai" className="text-indigo-600 hover:underline text-sm sm:text-base">
-                      hello@neuroconcepts.ai
+                    <a href="mailto:hello@immivo.ai" className="text-indigo-600 hover:underline text-sm sm:text-base">
+                      hello@immivo.ai
                     </a>
                   </div>
                 </div>
@@ -72,7 +72,7 @@ export default function KontaktPage() {
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1 text-sm sm:text-base">Adresse</h3>
                     <p className="text-gray-600 text-sm sm:text-base">
-                      NeuroConcepts AI GmbH<br />
+                      Immivo AI GmbH<br />
                       Musterstraße 123<br />
                       1010 Wien, Österreich
                     </p>
@@ -83,7 +83,7 @@ export default function KontaktPage() {
               <div className="mt-8 sm:mt-12 p-4 sm:p-6 bg-gray-50 rounded-xl">
                 <h3 className="font-semibold text-gray-900 mb-2 text-sm sm:text-base">Demo buchen</h3>
                 <p className="text-gray-600 text-xs sm:text-sm mb-3 sm:mb-4">
-                  Möchtest du NeuroConcepts in Aktion sehen? 
+                  Möchtest du Immivo in Aktion sehen? 
                   Buche eine persönliche Demo mit unserem Team.
                 </p>
                 <Link 

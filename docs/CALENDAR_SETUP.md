@@ -19,7 +19,7 @@ Diese Anleitung erklärt, wie Sie Google Calendar und Outlook Calendar OAuth-Int
 2. Klicken Sie auf "+ CREATE CREDENTIALS" > "OAuth client ID"
 3. Wählen Sie "Web application"
 4. Konfigurieren Sie:
-   - **Name**: NeuroConcepts Calendar Integration
+   - **Name**: Immivo Calendar Integration
    - **Authorized JavaScript origins**: 
      - `http://localhost:3001` (Development)
      - `https://your-production-domain.com` (Production)
@@ -58,7 +58,7 @@ GOOGLE_CALENDAR_REDIRECT_URI=https://1rnmc2z8eg.execute-api.eu-central-1.amazona
 ### 2. App Registration
 
 1. Konfigurieren Sie:
-   - **Name**: NeuroConcepts Calendar Integration
+   - **Name**: Immivo Calendar Integration
    - **Supported account types**: Accounts in any organizational directory (Any Azure AD directory - Multitenant) and personal Microsoft accounts
    - **Redirect URI**: 
      - Platform: Web

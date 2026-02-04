@@ -14,28 +14,28 @@ import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as path from 'path';
 
-export interface NeuroConceptsStackProps extends cdk.StackProps {
+export interface ImmivoStackProps extends cdk.StackProps {
   stageName: 'dev' | 'stage' | 'prod';
 }
 
-export class NeuroConceptsStack extends cdk.Stack {
+export class ImmivoStack extends cdk.Stack {
   public readonly vpc: ec2.Vpc;
   public readonly dbSecret: secretsmanager.Secret;
   public readonly dbEndpoint: string;
   public readonly userPool: cognito.UserPool;
   public readonly userPoolClient: cognito.UserPoolClient;
 
-  constructor(scope: Construct, id: string, props: NeuroConceptsStackProps) {
+  constructor(scope: Construct, id: string, props: ImmivoStackProps) {
     super(scope, id, props);
 
     // Tagging strategy: All resources get a 'Stage' tag
     cdk.Tags.of(this).add('Stage', props.stageName);
-    cdk.Tags.of(this).add('Project', 'NeuroConcepts');
+    cdk.Tags.of(this).add('Project', 'Immivo');
 
     // --- 1. Network Stack (VPC) ---
     const natGateways = props.stageName === 'dev' ? 0 : 1;
 
-    this.vpc = new ec2.Vpc(this, 'NeuroConceptsVPC', {
+    this.vpc = new ec2.Vpc(this, 'ImmivoVPC', {
       maxAzs: 2,
       natGateways: natGateways,
       subnetConfiguration: [
@@ -54,7 +54,7 @@ export class NeuroConceptsStack extends cdk.Stack {
 
     // --- 2. Database Stack (PostgreSQL) ---
     this.dbSecret = new secretsmanager.Secret(this, 'DBSecret', {
-      secretName: `NeuroConcepts-DB-Secret-${props.stageName}`,
+      secretName: `Immivo-DB-Secret-${props.stageName}`,
       generateSecretString: {
         secretStringTemplate: JSON.stringify({ username: 'postgres' }),
         excludePunctuation: true,
@@ -98,15 +98,15 @@ export class NeuroConceptsStack extends cdk.Stack {
         serverlessV2MaxCapacity: 4,
         credentials: rds.Credentials.fromSecret(this.dbSecret),
         securityGroups: [dbSg],
-        defaultDatabaseName: 'neuroconcepts',
+        defaultDatabaseName: 'immivo',
         removalPolicy: cdk.RemovalPolicy.RETAIN,
       });
       this.dbEndpoint = cluster.clusterEndpoint.hostname;
     }
 
     // --- 3. Authentication (Cognito) ---
-    this.userPool = new cognito.UserPool(this, 'NeuroConceptsUserPool', {
-      userPoolName: `NeuroConcepts-Users-${props.stageName}`,
+    this.userPool = new cognito.UserPool(this, 'ImmivoUserPool', {
+      userPoolName: `Immivo-Users-${props.stageName}`,
       selfSignUpEnabled: true, // Allow users to register themselves
       signInAliases: { email: true },
       autoVerify: { email: true },
@@ -132,8 +132,8 @@ export class NeuroConceptsStack extends cdk.Stack {
       removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
     });
 
-    this.userPoolClient = this.userPool.addClient('NeuroConceptsClient', {
-      userPoolClientName: `NeuroConcepts-Client-${props.stageName}`,
+    this.userPoolClient = this.userPool.addClient('ImmivoClient', {
+      userPoolClientName: `Immivo-Client-${props.stageName}`,
       generateSecret: false, // Web apps cannot keep secrets
       authFlows: {
         userSrp: true,
@@ -151,7 +151,7 @@ export class NeuroConceptsStack extends cdk.Stack {
     const appSecret = secretsmanager.Secret.fromSecretNameV2(
       this, 
       'AppSecret', 
-      `NeuroConcepts-App-Secret-${props.stageName}`
+      `Immivo-App-Secret-${props.stageName}`
     );
 
     // Pre-calculate absolute path to prisma folder (resolved at CDK synth time)

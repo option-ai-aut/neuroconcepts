@@ -2,7 +2,7 @@
 
 ## Übersicht
 
-Jarvis ist der zentrale KI-Assistent für NeuroConcepts mit Zugriff auf das **gesamte System**.
+Jarvis ist der zentrale KI-Assistent für Immivo mit Zugriff auf das **gesamte System**.
 
 ## Vollständige Tool-Liste
 

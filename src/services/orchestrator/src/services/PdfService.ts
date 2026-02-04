@@ -351,7 +351,7 @@ export class PdfService {
     ${blocks.map(block => this.renderBlock(block, expose, qrCodes, theme)).join('')}
     
     <div class="footer">
-      Exposé erstellt mit NeuroConcepts.ai • ${new Date().toLocaleDateString('de-DE')}
+      Exposé erstellt mit Immivo.ai • ${new Date().toLocaleDateString('de-DE')}
     </div>
   </div>
 </body>

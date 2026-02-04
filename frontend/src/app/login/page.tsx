@@ -205,7 +205,7 @@ export default function LoginPage() {
             <div className="w-8 h-8 bg-white/10 backdrop-blur-md rounded-lg flex items-center justify-center mr-3 border border-white/20">
               <span className="font-bold text-lg">N</span>
             </div>
-            <span className="font-bold text-xl tracking-tight">NeuroConcepts</span>
+            <span className="font-bold text-xl tracking-tight">Immivo</span>
           </div>
           
           <div className="max-w-md">
@@ -215,7 +215,7 @@ export default function LoginPage() {
           </div>
           
           <div className="text-sm text-gray-400">
-            © 2026 NeuroConcepts AI
+            © 2026 Immivo AI
           </div>
         </div>
       </div>
@@ -240,7 +240,7 @@ export default function LoginPage() {
                 <span className="text-white font-bold text-2xl">N</span>
               </div>
             </div>
-            <h2 className="mt-4 text-2xl font-extrabold text-gray-900">NeuroConcepts</h2>
+            <h2 className="mt-4 text-2xl font-extrabold text-gray-900">Immivo</h2>
           </div>
 
           <div className="mx-auto w-full max-w-md">

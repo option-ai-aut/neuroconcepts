@@ -1,8 +1,8 @@
-# AI Security & Safety - NeuroConcepts
+# AI Security & Safety - Immivo
 
 ## Übersicht
 
-Dieses Dokument beschreibt die Sicherheitsmaßnahmen für Jarvis (unseren KI-Assistenten) in der NeuroConcepts-Plattform.
+Dieses Dokument beschreibt die Sicherheitsmaßnahmen für Jarvis (unseren KI-Assistenten) in der Immivo-Plattform.
 
 ## Sicherheitsebenen
 
@@ -238,4 +238,4 @@ Bei Sicherheitsvorfällen:
 
 ## Kontakt
 
-Bei Sicherheitsfragen: security@neuroconcepts.ai
+Bei Sicherheitsfragen: security@immivo.ai

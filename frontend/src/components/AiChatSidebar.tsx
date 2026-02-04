@@ -185,7 +185,7 @@ export default function AiChatSidebar() {
   }, [messages]);
 
   const handleNewChat = async () => {
-    if (!confirm('Neuen Chat starten? Der aktuelle Chat wird archiviert und nach 7 Tagen gelöscht.')) return;
+    if (!confirm('Chat-Verlauf archivieren?\n\nJarvis behält sein Gedächtnis und kann bei Bedarf auf archivierte Gespräche zugreifen. Archivierte Chats werden nach 30 Tagen gelöscht.')) return;
     
     try {
       const apiUrl = getApiUrl();
@@ -199,7 +199,7 @@ export default function AiChatSidebar() {
       
       if (res.ok) {
         setMessages([]);
-        console.log('🆕 Neuer Chat gestartet');
+        console.log('🆕 Chat archiviert, neuer Chat gestartet');
       }
     } catch (error) {
       console.error('Error starting new chat:', error);
@@ -435,7 +435,7 @@ export default function AiChatSidebar() {
         <button
           onClick={handleNewChat}
           className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-          title="Neuen Chat starten"
+          title="Chat archivieren"
         >
           <RotateCcw className="w-4 h-4" />
         </button>

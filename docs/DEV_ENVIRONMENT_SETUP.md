@@ -1,6 +1,6 @@
 # Dev Environment Setup & Stack Updates
 
-Wenn du einen neuen CloudFormation Stack deployst (z.B. weil du den alten gelöscht hast oder eine neue Stage wie `NeuroConcepts-Stage` aufsetzt), ändern sich die **IDs und URLs** der AWS-Ressourcen (Datenbank, Cognito User Pool, API Gateway).
+Wenn du einen neuen CloudFormation Stack deployst (z.B. weil du den alten gelöscht hast oder eine neue Stage wie `Immivo-Stage` aufsetzt), ändern sich die **IDs und URLs** der AWS-Ressourcen (Datenbank, Cognito User Pool, API Gateway).
 
 Damit deine lokale Entwicklungsumgebung (`localhost`) weiterhin funktioniert, musst du diese neuen Werte in die lokalen Konfigurationsdateien übertragen.
 
@@ -10,7 +10,7 @@ Führe den Deploy-Befehl aus:
 
 ```bash
 cd infra
-cdk deploy NeuroConcepts-Dev --outputs-file outputs.json
+cdk deploy Immivo-Dev --outputs-file outputs.json
 ```
 
 Nach dem Deployment werden die "Outputs" im Terminal angezeigt. Du findest sie auch in der Datei `infra/outputs.json`.
@@ -109,7 +109,7 @@ Falls GitHub Actions nicht funktioniert, kannst du direkt deployen:
 # CDK Stack synthetisieren
 cd infra
 rm -rf cdk.out
-npx cdk synth NeuroConcepts-Dev
+npx cdk synth Immivo-Dev
 
 # Orchestrator Lambda manuell updaten
 cd cdk.out
@@ -117,6 +117,6 @@ ASSET_DIR=$(ls -d asset.* | while read d; do if [ -f "$d/index.js" ] && [ $(stat
 cd "$ASSET_DIR"
 zip -r /tmp/orchestrator.zip index.js
 aws lambda update-function-code \
-  --function-name NeuroConcepts-Dev-OrchestratorLambdaXXXXX \
+  --function-name Immivo-Dev-OrchestratorLambdaXXXXX \
   --zip-file fileb:///tmp/orchestrator.zip
 ```

@@ -14,7 +14,7 @@ export default function UeberUnsPage() {
       <section className="pt-24 sm:pt-32 pb-12 sm:pb-16 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-4 sm:mb-6">
-            Über NeuroConcepts
+            Über Immivo
           </h1>
           <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto px-4">
             Wir glauben, dass Immobilienmakler sich auf das konzentrieren sollten, 
@@ -30,7 +30,7 @@ export default function UeberUnsPage() {
             <div>
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">Unsere Mission</h2>
               <p className="text-base sm:text-lg text-gray-600 mb-4 sm:mb-6 leading-relaxed">
-                NeuroConcepts wurde 2024 gegründet mit einer klaren Vision: 
+                Immivo wurde 2024 gegründet mit einer klaren Vision: 
                 Die Immobilienbranche durch künstliche Intelligenz zu revolutionieren.
               </p>
               <p className="text-base sm:text-lg text-gray-600 leading-relaxed">
@@ -85,7 +85,7 @@ export default function UeberUnsPage() {
             Bereit, uns kennenzulernen?
           </h2>
           <p className="text-lg sm:text-xl text-gray-600 mb-6 sm:mb-8 px-4">
-            Teste NeuroConcepts 14 Tage kostenlos und überzeuge dich selbst.
+            Teste Immivo 14 Tage kostenlos und überzeuge dich selbst.
           </p>
           <Link 
             href="/login"

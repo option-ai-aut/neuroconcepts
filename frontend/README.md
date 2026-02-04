@@ -1,6 +1,6 @@
-# NeuroConcepts Frontend
+# Immivo Frontend
 
-This is the frontend application for NeuroConcepts AI, built with **Next.js 15** and **Tailwind CSS**.
+This is the frontend application for Immivo AI, built with **Next.js 15** and **Tailwind CSS**.
 
 ## 🚀 Getting Started
 

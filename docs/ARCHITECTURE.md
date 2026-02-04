@@ -115,14 +115,14 @@ graph TD
 Wir nutzen **AWS CDK (Cloud Development Kit)**, um die gesamte Infrastruktur im Code zu definieren.
 
 ### Environment-Strategie
-1.  **Dev** (`NeuroConcepts-Dev`):
+1.  **Dev** (`Immivo-Dev`):
     *   Für die tägliche Entwicklung.
     *   **Deployment:** Automatisch bei Push auf `main` (GitHub Actions).
     *   Ressourcen: RDS Micro, Lambda Frontend (Scale to Zero).
-2.  **Stage** (`NeuroConcepts-Stage`):
+2.  **Stage** (`Immivo-Stage`):
     *   Spiegelbild der Produktion.
     *   **Deployment:** Manuell via GitHub Actions (Workflow Dispatch).
-3.  **Prod** (`NeuroConcepts-Prod`):
+3.  **Prod** (`Immivo-Prod`):
     *   Das Live-System.
     *   **Deployment:** Manuell via GitHub Actions (Workflow Dispatch).
     *   Backups und High-Availability aktiviert.

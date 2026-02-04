@@ -143,9 +143,9 @@ const allowedOrigins = [
   'http://localhost:3000',  // Local frontend dev
   'http://localhost:3001',  // Local backend dev
   process.env.FRONTEND_URL, // Production frontend
-  'https://dev.neuroconcepts.ai',
-  'https://neuroconcepts.ai',
-  'https://www.neuroconcepts.ai',
+  'https://dev.immivo.ai',
+  'https://immivo.ai',
+  'https://www.immivo.ai',
 ].filter(Boolean);
 
 app.use(cors({
@@ -807,7 +807,7 @@ app.post('/properties/:id/documents', authMiddleware, upload.array('documents', 
 
     await prisma.property.update({
       where: { id },
-      data: { documents: updatedDocs }
+      data: { documents: updatedDocs as unknown as Prisma.InputJsonValue }
     });
 
     res.json({ success: true, documents: newDocs });
@@ -840,7 +840,7 @@ app.delete('/properties/:id/documents', authMiddleware, async (req, res) => {
 
     await prisma.property.update({
       where: { id },
-      data: { documents: updatedDocs }
+      data: { documents: updatedDocs as unknown as Prisma.InputJsonValue }
     });
 
     // Delete file from disk
@@ -890,7 +890,7 @@ app.post('/leads/:id/documents', authMiddleware, upload.array('documents', 20), 
 
     await prisma.lead.update({
       where: { id },
-      data: { documents: updatedDocs }
+      data: { documents: updatedDocs as unknown as Prisma.InputJsonValue }
     });
 
     res.json({ success: true, documents: newDocs });
@@ -923,7 +923,7 @@ app.delete('/leads/:id/documents', authMiddleware, async (req, res) => {
 
     await prisma.lead.update({
       where: { id },
-      data: { documents: updatedDocs }
+      data: { documents: updatedDocs as unknown as Prisma.InputJsonValue }
     });
 
     // Delete file from disk
@@ -1787,8 +1787,8 @@ app.post('/chat/stream',
       // Combine message with file context
       const fullMessage = message + fileContext;
 
-      // Stream the response with optimized history, pass uploaded files for tools
-      for await (const result of openai.chatStream(fullMessage, tenantId, optimizedHistory, uploadedFileUrls)) {
+      // Stream the response with optimized history, pass uploaded files and userId for tools
+      for await (const result of openai.chatStream(fullMessage, tenantId, optimizedHistory, uploadedFileUrls, currentUser.id)) {
         fullResponse += result.chunk;
         if (result.hadFunctionCalls) hadFunctionCalls = true;
         // Send chunk as SSE
@@ -1808,8 +1808,8 @@ app.post('/chat/stream',
       });
       console.log(`💾 Chat gespeichert für User ${userId}`);
       
-      // Cleanup old summaries (async, don't await)
-      ConversationMemory.cleanupOldSummaries(userId).catch(console.error);
+      // Auto-summarize if needed (async, don't await)
+      ConversationMemory.autoSummarizeIfNeeded(userId).catch(console.error);
     } catch (error) {
       console.error('Chat stream error:', error);
       res.write(`data: ${JSON.stringify({ error: 'AI Error' })}\n\n`);
@@ -2064,20 +2064,20 @@ app.post('/channels/:channelId/messages', authMiddleware, async (req, res) => {
 });
 
 // Export for Lambda
-// Auto-delete archived chats older than 7 days (runs every 24 hours)
+// Auto-delete archived chats older than 30 days (runs every 24 hours)
 async function cleanupOldChats() {
   try {
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const result = await prisma.userChat.deleteMany({
       where: {
         archived: true,
-        createdAt: { lt: sevenDaysAgo }
+        createdAt: { lt: thirtyDaysAgo }
       }
     });
 
-    console.log(`🗑️ Gelöscht: ${result.count} archivierte Chats (älter als 7 Tage)`);
+    console.log(`🗑️ Gelöscht: ${result.count} archivierte Chats (älter als 30 Tage)`);
   } catch (error) {
     console.error('Error cleaning up old chats:', error);
   }
