@@ -1123,6 +1123,12 @@ export class AiToolExecutor {
 
       case 'delete_property': {
         const { propertyId } = args;
+        // Delete related data first
+        await getPrisma().expose.deleteMany({ where: { propertyId } });
+        await getPrisma().lead.updateMany({ 
+          where: { propertyId },
+          data: { propertyId: null }
+        });
         await getPrisma().property.delete({ where: { id: propertyId } });
         return `Objekt ${propertyId} wurde gelöscht.`;
       }
@@ -1132,8 +1138,27 @@ export class AiToolExecutor {
         if (!confirmed) {
           return 'Löschung abgebrochen. Bitte bestätige mit confirmed: true.';
         }
+        
+        // Delete related data first (cascade)
+        const properties = await getPrisma().property.findMany({ 
+          where: { tenantId },
+          select: { id: true }
+        });
+        const propertyIds = properties.map(p => p.id);
+        
+        if (propertyIds.length > 0) {
+          // Delete exposes linked to these properties
+          await getPrisma().expose.deleteMany({ 
+            where: { propertyId: { in: propertyIds } } 
+          });
+          // Delete leads linked to these properties
+          await getPrisma().lead.deleteMany({ 
+            where: { propertyId: { in: propertyIds } } 
+          });
+        }
+        
         const result = await getPrisma().property.deleteMany({ where: { tenantId } });
-        return `${result.count} Objekt(e) wurden gelöscht.`;
+        return `${result.count} Objekt(e) wurden gelöscht (inkl. verknüpfter Exposés und Leads).`;
       }
 
       case 'upload_images_to_property': {
