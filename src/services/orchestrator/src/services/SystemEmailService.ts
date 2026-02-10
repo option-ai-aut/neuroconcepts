@@ -1,0 +1,312 @@
+/**
+ * SystemEmailService - Sends system emails via AWS SES
+ * Used for: Registration confirmations, password resets, Jarvis notifications, escalations
+ * NOT for lead communication (that uses EmailService with user's connected provider)
+ */
+
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+
+// Initialize SES client
+const ses = new SESClient({ 
+  region: process.env.AWS_REGION || 'eu-central-1' 
+});
+
+// Configuration
+const FROM_EMAIL = process.env.SES_FROM_EMAIL || 'noreply@immivo.ai';
+const FROM_NAME = process.env.SES_FROM_NAME || 'Immivo';
+const SES_ENABLED = process.env.SES_ENABLED !== 'false'; // Default enabled in production
+
+interface SendEmailParams {
+  to: string | string[];
+  subject: string;
+  html: string;
+  text?: string;
+  replyTo?: string;
+}
+
+/**
+ * Send a system email via AWS SES
+ */
+export async function sendSystemEmail(params: SendEmailParams): Promise<boolean> {
+  const { to, subject, html, text, replyTo } = params;
+  const recipients = Array.isArray(to) ? to : [to];
+
+  // Log in development mode
+  if (!SES_ENABLED) {
+    console.log('📧 [SES DISABLED] Would send email:');
+    console.log('   To:', recipients.join(', '));
+    console.log('   Subject:', subject);
+    console.log('   Body preview:', html.substring(0, 200) + '...');
+    return true;
+  }
+
+  try {
+    const command = new SendEmailCommand({
+      Source: `${FROM_NAME} <${FROM_EMAIL}>`,
+      Destination: {
+        ToAddresses: recipients
+      },
+      Message: {
+        Subject: { Data: subject, Charset: 'UTF-8' },
+        Body: {
+          Html: { Data: html, Charset: 'UTF-8' },
+          ...(text && { Text: { Data: text, Charset: 'UTF-8' } })
+        }
+      },
+      ...(replyTo && { ReplyToAddresses: [replyTo] })
+    });
+
+    await ses.send(command);
+    console.log('📧 Email sent successfully to:', recipients.join(', '));
+    return true;
+  } catch (error: any) {
+    console.error('📧 Failed to send email:', error.message);
+    // Don't throw - email failures shouldn't break the app flow
+    return false;
+  }
+}
+
+// ============================================
+// Email Templates
+// ============================================
+
+/**
+ * Jarvis Question Email - When Jarvis needs user input
+ */
+export function renderJarvisQuestionEmail(params: {
+  userName: string;
+  question: string;
+  leadName?: string;
+  propertyTitle?: string;
+  actionUrl: string;
+}): string {
+  const { userName, question, leadName, propertyTitle, actionUrl } = params;
+  
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 30px; border-radius: 16px 16px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 24px;">Jarvis benötigt deine Hilfe</h1>
+  </div>
+  
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 16px 16px;">
+    <p style="margin-top: 0;">Hallo ${userName},</p>
+    
+    <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+      <p style="margin: 0; font-weight: 600; color: #92400e;">${question}</p>
+    </div>
+    
+    ${leadName ? `<p><strong>Lead:</strong> ${leadName}</p>` : ''}
+    ${propertyTitle ? `<p><strong>Objekt:</strong> ${propertyTitle}</p>` : ''}
+    
+    <a href="${actionUrl}" style="display: inline-block; background: #4f46e5; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 20px;">
+      Jetzt antworten
+    </a>
+    
+    <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+      Diese Nachricht wurde automatisch von Jarvis gesendet.
+    </p>
+  </div>
+</body>
+</html>
+  `.trim();
+}
+
+/**
+ * Reminder Email - 24h reminder for pending actions
+ */
+export function renderReminderEmail(params: {
+  userName: string;
+  question: string;
+  hoursWaiting: number;
+  actionUrl: string;
+}): string {
+  const { userName, question, hoursWaiting, actionUrl } = params;
+  
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: #f59e0b; padding: 30px; border-radius: 16px 16px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 24px;">⏰ Erinnerung: Jarvis wartet auf dich</h1>
+  </div>
+  
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 16px 16px;">
+    <p style="margin-top: 0;">Hallo ${userName},</p>
+    
+    <p>Jarvis wartet seit <strong>${hoursWaiting} Stunden</strong> auf deine Antwort:</p>
+    
+    <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+      <p style="margin: 0; font-weight: 600; color: #92400e;">${question}</p>
+    </div>
+    
+    <p style="color: #dc2626; font-weight: 600;">
+      Ohne deine Antwort kann Jarvis nicht fortfahren.
+    </p>
+    
+    <a href="${actionUrl}" style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 20px;">
+      Jetzt antworten
+    </a>
+  </div>
+</body>
+</html>
+  `.trim();
+}
+
+/**
+ * Escalation Email - When action is escalated to admin
+ */
+export function renderEscalationEmail(params: {
+  adminName: string;
+  agentName: string;
+  question: string;
+  hoursWaiting: number;
+  leadName?: string;
+  actionUrl: string;
+}): string {
+  const { adminName, agentName, question, hoursWaiting, leadName, actionUrl } = params;
+  
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: #dc2626; padding: 30px; border-radius: 16px 16px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 24px;">🚨 Eskalation: Keine Antwort von ${agentName}</h1>
+  </div>
+  
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 16px 16px;">
+    <p style="margin-top: 0;">Hallo ${adminName},</p>
+    
+    <p><strong>${agentName}</strong> hat seit <strong>${hoursWaiting} Stunden</strong> nicht auf folgende Jarvis-Anfrage reagiert:</p>
+    
+    <div style="background: #fee2e2; border-left: 4px solid #dc2626; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+      <p style="margin: 0; font-weight: 600; color: #991b1b;">${question}</p>
+    </div>
+    
+    ${leadName ? `<p><strong>Betroffener Lead:</strong> ${leadName}</p>` : ''}
+    
+    <p>Bitte übernimm diese Anfrage oder kontaktiere ${agentName}.</p>
+    
+    <a href="${actionUrl}" style="display: inline-block; background: #dc2626; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 20px;">
+      Anfrage übernehmen
+    </a>
+  </div>
+</body>
+</html>
+  `.trim();
+}
+
+/**
+ * New Lead Email - Notification when a new lead comes in
+ */
+export function renderNewLeadEmail(params: {
+  userName: string;
+  leadName: string;
+  leadEmail: string;
+  propertyTitle?: string;
+  message?: string;
+  actionUrl: string;
+}): string {
+  const { userName, leadName, leadEmail, propertyTitle, message, actionUrl } = params;
+  
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; border-radius: 16px 16px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 24px;">🎉 Neuer Lead eingegangen!</h1>
+  </div>
+  
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 16px 16px;">
+    <p style="margin-top: 0;">Hallo ${userName},</p>
+    
+    <p>Ein neuer Interessent hat sich gemeldet:</p>
+    
+    <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+      <p style="margin: 0 0 8px 0;"><strong>Name:</strong> ${leadName}</p>
+      <p style="margin: 0 0 8px 0;"><strong>E-Mail:</strong> ${leadEmail}</p>
+      ${propertyTitle ? `<p style="margin: 0 0 8px 0;"><strong>Objekt:</strong> ${propertyTitle}</p>` : ''}
+    </div>
+    
+    ${message ? `
+    <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+      <p style="margin: 0; font-style: italic; color: #1e40af;">"${message.substring(0, 300)}${message.length > 300 ? '...' : ''}"</p>
+    </div>
+    ` : ''}
+    
+    <a href="${actionUrl}" style="display: inline-block; background: #10b981; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 20px;">
+      Lead ansehen
+    </a>
+  </div>
+</body>
+</html>
+  `.trim();
+}
+
+/**
+ * Lead Response Email - When a lead replies
+ */
+export function renderLeadResponseEmail(params: {
+  userName: string;
+  leadName: string;
+  propertyTitle?: string;
+  message: string;
+  actionUrl: string;
+}): string {
+  const { userName, leadName, propertyTitle, message, actionUrl } = params;
+  
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); padding: 30px; border-radius: 16px 16px 0 0;">
+    <h1 style="color: white; margin: 0; font-size: 24px;">📬 ${leadName} hat geantwortet</h1>
+  </div>
+  
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 16px 16px;">
+    <p style="margin-top: 0;">Hallo ${userName},</p>
+    
+    <p><strong>${leadName}</strong> hat auf deine Nachricht geantwortet${propertyTitle ? ` (${propertyTitle})` : ''}:</p>
+    
+    <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+      <p style="margin: 0; white-space: pre-wrap;">${message.substring(0, 500)}${message.length > 500 ? '...' : ''}</p>
+    </div>
+    
+    <a href="${actionUrl}" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 20px;">
+      Konversation öffnen
+    </a>
+  </div>
+</body>
+</html>
+  `.trim();
+}
+
+export default {
+  sendSystemEmail,
+  renderJarvisQuestionEmail,
+  renderReminderEmail,
+  renderEscalationEmail,
+  renderNewLeadEmail,
+  renderLeadResponseEmail
+};

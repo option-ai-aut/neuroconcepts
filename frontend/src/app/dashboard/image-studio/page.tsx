@@ -199,18 +199,7 @@ export default function ImageStudioPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
-      <div className="px-8 pt-8 pb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 bg-gradient-to-br from-fuchsia-500 to-pink-500 rounded-xl flex items-center justify-center">
-            <Wand2 className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">KI-Bildstudio</h1>
-            <p className="text-gray-500 text-sm">Virtual Staging mit Gemini 3 Pro Image</p>
-          </div>
-        </div>
-      </div>
+      <div className="pt-2" />
 
       <div className="px-8 pb-8">
         <div className="grid lg:grid-cols-2 gap-8">

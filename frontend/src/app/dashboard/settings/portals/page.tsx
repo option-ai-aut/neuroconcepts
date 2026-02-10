@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Globe, Check, RefreshCw, Settings2, ExternalLink, Eye, EyeOff, TestTube, Building2, User, Lock } from 'lucide-react';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 import useSWR from 'swr';
-import { getMe } from '@/lib/api';
+import { getMe, getAuthHeaders } from '@/lib/api';
 
 interface Portal {
   id: string;
@@ -78,13 +78,12 @@ export default function PortalsSettingsPage() {
   const loadData = async () => {
     try {
       const config = getRuntimeConfig();
-      const token = localStorage.getItem('token');
-      const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const authHeaders = await getAuthHeaders();
       
       const [portalsRes, tenantConnectionsRes, userConnectionsRes] = await Promise.all([
-        fetch(`${config.apiUrl}/portals`),
-        fetch(`${config.apiUrl}/portal-connections?tenantId=${tenantId}`, { headers }),
-        fetch(`${config.apiUrl}/portal-connections?userId=${userId}`, { headers })
+        fetch(`${config.apiUrl}/portals`, { headers: authHeaders }),
+        fetch(`${config.apiUrl}/portal-connections?tenantId=${tenantId}`, { headers: authHeaders }),
+        fetch(`${config.apiUrl}/portal-connections?userId=${userId}`, { headers: authHeaders })
       ]);
       
       if (portalsRes.ok) {
@@ -171,7 +170,7 @@ export default function PortalsSettingsPage() {
     
     try {
       const config = getRuntimeConfig();
-      const token = localStorage.getItem('token');
+      const authHeaders = await getAuthHeaders();
       const payload = editMode === 'tenant' 
         ? { tenantId, portalId: editingPortal, ...formData }
         : { userId, portalId: editingPortal, ...formData };
@@ -179,8 +178,8 @@ export default function PortalsSettingsPage() {
       const res = await fetch(`${config.apiUrl}/portal-connections`, {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...authHeaders,
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
       });
@@ -205,12 +204,10 @@ export default function PortalsSettingsPage() {
     
     try {
       const config = getRuntimeConfig();
-      const token = localStorage.getItem('token');
+      const authHeaders = await getAuthHeaders();
       const res = await fetch(`${config.apiUrl}/portal-connections/${connectionId}/test`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: authHeaders
       });
       
       if (res.ok) {
@@ -230,14 +227,12 @@ export default function PortalsSettingsPage() {
   const handleRemoveUserConnection = async (portalId: string) => {
     try {
       const config = getRuntimeConfig();
-      const token = localStorage.getItem('token');
+      const authHeaders = await getAuthHeaders();
       const connection = getUserConnection(portalId);
       if (connection) {
         const res = await fetch(`${config.apiUrl}/portal-connections/${connection.id}`, {
           method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          headers: authHeaders
         });
         
         if (res.ok) {

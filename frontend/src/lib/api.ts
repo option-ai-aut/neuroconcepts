@@ -1,7 +1,7 @@
 import { getRuntimeConfig } from '@/components/EnvProvider';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
-const getApiUrl = () => {
+export const getApiUrl = () => {
   const config = getRuntimeConfig();
   const url = config.apiUrl || 'https://lcbsl3olre.execute-api.eu-central-1.amazonaws.com/dev';
   // Remove trailing slash to prevent double slashes
@@ -170,6 +170,7 @@ export interface ExposeTemplate {
   name: string;
   blocks: ExposeBlock[];
   theme: string;
+  customColors?: string[];
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
@@ -184,6 +185,7 @@ export interface Expose {
   createdFromTemplateAt?: string;
   blocks: ExposeBlock[];
   theme: string;
+  customColors?: string[];
   status: 'DRAFT' | 'PUBLISHED';
   pdfUrl?: string;
   createdAt: string;
@@ -205,6 +207,20 @@ export const API_ENDPOINTS = {
 export async function fetcher(url: string) {
   const headers = await getAuthHeaders();
   const res = await fetch(`${getApiUrl()}${url}`, { headers });
+  if (!res.ok) throw new Error('Failed to fetch data');
+  return res.json();
+}
+
+// Fetch with auth for full URLs (used when apiUrl is already included)
+export async function fetchWithAuth(url: string, options: RequestInit = {}) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      ...headers,
+      ...options.headers,
+    },
+  });
   if (!res.ok) throw new Error('Failed to fetch data');
   return res.json();
 }
@@ -366,7 +382,7 @@ export async function sendDraftMessage(messageId: string) {
 
 // --- Auth & Team ---
 
-export async function syncUser() {
+export async function syncUser(): Promise<{ user: any; tenantId: string; needsOnboarding?: boolean }> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${getApiUrl()}/auth/sync`, {
     method: 'POST',
@@ -402,6 +418,19 @@ export async function inviteSeat(email: string, role: string) {
     body: JSON.stringify({ email, role }),
   });
   if (!res.ok) throw new Error('Failed to invite user');
+  return res.json();
+}
+
+export async function deleteSeat(id: string) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/seats/${id}`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || 'Failed to delete user');
+  }
   return res.json();
 }
 

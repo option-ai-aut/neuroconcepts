@@ -17,6 +17,7 @@ export default function SettingsLayout({
   const tabs = [
     { name: 'Integrationen', href: '/dashboard/settings/integrations' },
     { name: 'Portale', href: '/dashboard/settings/portals' },
+    { name: 'E-Mail', href: '/dashboard/settings/email' },
     { name: 'Jarvis (KI)', href: '/dashboard/settings/jarvis' },
     { name: 'Profil', href: '/dashboard/settings/profile' },
     { name: 'Abrechnung', href: '/dashboard/settings/billing', adminOnly: true },
@@ -25,9 +26,8 @@ export default function SettingsLayout({
   const visibleTabs = tabs.filter(tab => !tab.adminOnly || isAdmin);
 
   return (
-    <div className="h-full flex flex-col relative bg-white">
-      <div className="pt-8 px-8 pb-0">
-        <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight mb-6">Einstellungen</h1>
+    <div className="h-full flex flex-col bg-white">
+      <div className="px-8 pt-2 pb-0 relative z-10 bg-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)]">
         <nav className="-mb-px flex space-x-8" aria-label="Tabs">
           {visibleTabs.map((tab) => (
             <Link

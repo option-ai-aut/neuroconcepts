@@ -7,7 +7,7 @@ import {
   Image, Type, LayoutGrid, MapPin, User, List, Zap,
   Home, DollarSign, Thermometer, Phone, Quote, MousePointer,
   Columns, Video, Eye, Upload, ImageIcon, FileImage, BarChart3,
-  SeparatorHorizontal, FileText as FilePlus
+  SeparatorHorizontal, FileText as FilePlus, Palette, Pipette
 } from 'lucide-react';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { 
@@ -182,11 +182,11 @@ interface StyleTheme {
 }
 
 const STYLE_THEMES: StyleTheme[] = [
-  { id: 'default', name: 'Standard', fontFamily: 'system-ui, sans-serif', headingStyle: 'font-semibold', bodyStyle: 'font-normal' },
-  { id: 'modern', name: 'Modern', fontFamily: '"Inter", system-ui, sans-serif', headingStyle: 'font-bold tracking-tight', bodyStyle: 'font-light' },
-  { id: 'elegant', name: 'Elegant', fontFamily: '"Playfair Display", Georgia, serif', headingStyle: 'font-normal italic', bodyStyle: 'font-light' },
-  { id: 'minimal', name: 'Minimal', fontFamily: '"Helvetica Neue", Arial, sans-serif', headingStyle: 'font-medium uppercase tracking-widest text-sm', bodyStyle: 'font-normal' },
-  { id: 'luxury', name: 'Luxus', fontFamily: '"Cormorant Garamond", Georgia, serif', headingStyle: 'font-semibold', bodyStyle: 'font-normal' },
+  { id: 'default', name: 'Standard', fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', headingStyle: 'font-semibold', bodyStyle: 'font-normal' },
+  { id: 'modern', name: 'Modern', fontFamily: 'var(--font-inter), system-ui, sans-serif', headingStyle: 'font-bold tracking-tight', bodyStyle: 'font-light' },
+  { id: 'elegant', name: 'Elegant', fontFamily: 'var(--font-playfair), Georgia, serif', headingStyle: 'font-normal italic', bodyStyle: 'font-light' },
+  { id: 'minimal', name: 'Minimal', fontFamily: 'var(--font-geist-sans), "Helvetica Neue", Arial, sans-serif', headingStyle: 'font-medium uppercase tracking-widest text-sm', bodyStyle: 'font-normal' },
+  { id: 'luxury', name: 'Luxus', fontFamily: 'var(--font-cormorant), Georgia, serif', headingStyle: 'font-semibold', bodyStyle: 'font-normal' },
 ];
 
 // Color Palettes (separate from style)
@@ -207,15 +207,41 @@ const COLOR_PALETTES: ColorPalette[] = [
   { id: 'sky', name: 'Himmelblau', colors: { primary: '#0369A1', secondary: '#075985', accent: '#0EA5E9', background: '#F0F9FF' } },
 ];
 
-// Block-specific color options
-const BLOCK_COLORS = [
-  { id: 'theme', name: 'Theme-Farbe', value: 'theme' },
+// Block-specific color palette - full range
+const BG_COLORS = [
+  { id: 'transparent', name: 'Transparent', value: 'transparent' },
   { id: 'white', name: 'Weiß', value: '#FFFFFF' },
   { id: 'gray-50', name: 'Hellgrau', value: '#F9FAFB' },
   { id: 'gray-100', name: 'Grau', value: '#F3F4F6' },
+  { id: 'gray-200', name: 'Mittelgrau', value: '#E5E7EB' },
   { id: 'gray-800', name: 'Dunkelgrau', value: '#1F2937' },
+  { id: 'gray-900', name: 'Fast Schwarz', value: '#111827' },
   { id: 'black', name: 'Schwarz', value: '#000000' },
-  { id: 'custom', name: 'Eigene...', value: 'custom' },
+  { id: 'indigo-50', name: 'Indigo Hell', value: '#EEF2FF' },
+  { id: 'indigo-900', name: 'Indigo Dunkel', value: '#312E81' },
+  { id: 'blue-50', name: 'Blau Hell', value: '#EFF6FF' },
+  { id: 'blue-900', name: 'Blau Dunkel', value: '#1E3A5F' },
+  { id: 'emerald-50', name: 'Grün Hell', value: '#ECFDF5' },
+  { id: 'emerald-900', name: 'Grün Dunkel', value: '#064E3B' },
+  { id: 'amber-50', name: 'Amber Hell', value: '#FFFBEB' },
+  { id: 'amber-900', name: 'Amber Dunkel', value: '#78350F' },
+  { id: 'rose-50', name: 'Rose Hell', value: '#FFF1F2' },
+  { id: 'rose-900', name: 'Rose Dunkel', value: '#881337' },
+];
+
+const TEXT_COLORS = [
+  { id: 'white', name: 'Weiß', value: '#FFFFFF' },
+  { id: 'gray-100', name: 'Hellgrau', value: '#F3F4F6' },
+  { id: 'gray-400', name: 'Grau', value: '#9CA3AF' },
+  { id: 'gray-600', name: 'Mittelgrau', value: '#4B5563' },
+  { id: 'gray-800', name: 'Dunkelgrau', value: '#1F2937' },
+  { id: 'gray-900', name: 'Fast Schwarz', value: '#111827' },
+  { id: 'black', name: 'Schwarz', value: '#000000' },
+  { id: 'indigo-600', name: 'Indigo', value: '#4F46E5' },
+  { id: 'blue-600', name: 'Blau', value: '#2563EB' },
+  { id: 'emerald-600', name: 'Grün', value: '#059669' },
+  { id: 'amber-600', name: 'Amber', value: '#D97706' },
+  { id: 'rose-600', name: 'Rose', value: '#E11D48' },
 ];
 
 // Legacy THEMES for backward compatibility
@@ -257,6 +283,9 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
   const [selectedBlockIndex, setSelectedBlockIndex] = useState<number | null>(null);
   const [showBlockLibrary, setShowBlockLibrary] = useState(true);
   const [showThemeSelector, setShowThemeSelector] = useState(false);
+  const [showColorManager, setShowColorManager] = useState(false);
+  const [colorPickerValue, setColorPickerValue] = useState('#4F46E5');
+  const colorManagerRef = useRef<HTMLDivElement>(null);
   const [dragState, setDragState] = useState<{
     isDragging: boolean;
     dragIndex: number | null;
@@ -360,7 +389,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         clearTimeout(autoSaveTimeoutRef.current);
       }
     };
-  }, [template?.blocks, template?.name, template?.theme, expose?.blocks, expose?.theme]);
+  }, [template?.blocks, template?.name, template?.theme, template?.customColors, expose?.blocks, expose?.theme, expose?.customColors]);
 
   // Close theme selector on click outside
   useEffect(() => {
@@ -375,6 +404,20 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showThemeSelector]);
+
+  // Close color manager on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (colorManagerRef.current && !colorManagerRef.current.contains(event.target as Node)) {
+        setShowColorManager(false);
+      }
+    };
+
+    if (showColorManager) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showColorManager]);
 
   // Close property selector on click outside
   useEffect(() => {
@@ -434,6 +477,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
   const currentBlocks = isTemplate ? (template?.blocks as ExposeBlock[] || []) : (expose?.blocks as ExposeBlock[] || []);
   const currentTheme = isTemplate ? (template?.theme || 'default') : (expose?.theme || 'default');
   const themeColors = THEMES.find(t => t.id === currentTheme)?.colors || THEMES[0].colors;
+  const styleTheme = STYLE_THEMES.find(t => t.id === currentTheme) || STYLE_THEMES[0];
 
   // Calculate pages from blocks
   const calculatePages = useCallback((blocks: ExposeBlock[]): ExposeBlock[][] => {
@@ -613,11 +657,13 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
           name: template.name,
           blocks: template.blocks,
           theme: template.theme,
+          customColors: template.customColors,
         });
       } else if (expose) {
         await updateExpose(expose.id, {
           blocks: expose.blocks,
           theme: expose.theme,
+          customColors: expose.customColors,
           status: expose.status,
         });
       }
@@ -728,6 +774,31 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     setShowThemeSelector(false);
   };
 
+  // Custom colors helpers
+  const customColors: string[] = isTemplate
+    ? (template?.customColors || [])
+    : (expose?.customColors || []);
+
+  const addCustomColor = (color: string) => {
+    const hex = color.toUpperCase();
+    if (customColors.includes(hex)) return;
+    const updated = [...customColors, hex];
+    if (isTemplate && template) {
+      setTemplate({ ...template, customColors: updated });
+    } else if (expose) {
+      setExpose({ ...expose, customColors: updated });
+    }
+  };
+
+  const removeCustomColor = (color: string) => {
+    const updated = customColors.filter(c => c !== color);
+    if (isTemplate && template) {
+      setTemplate({ ...template, customColors: updated });
+    } else if (expose) {
+      setExpose({ ...expose, customColors: updated });
+    }
+  };
+
   // ============================================
   // RENDER BLOCK PREVIEW
   // ============================================
@@ -762,7 +833,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     setDragState({ isDragging: false, dragIndex: null, hoverIndex: null });
   };
 
-  const renderBlockPreview = (block: ExposeBlock, index: number) => {
+  const renderBlockPreview = (block: ExposeBlock, index: number, isFirstOnPage: boolean = false, isLastOnPage: boolean = false) => {
     const isSelected = selectedBlockIndex === index;
     const isDragging = dragState.dragIndex === index;
     const isHoverTarget = dragState.hoverIndex === index && dragState.dragIndex !== index;
@@ -786,15 +857,16 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
       }
     }
 
+    // Determine border radius based on position on page
+    const roundedClasses = `${isFirstOnPage ? 'rounded-t-lg' : ''} ${isLastOnPage ? 'rounded-b-lg' : ''}`;
+
     return (
       <div
         key={block.id}
-        className={`relative transition-all duration-200 ease-out ${
+        className={`relative transition-all duration-200 ease-out overflow-hidden ${roundedClasses} ${
           isDragging 
             ? 'z-50 shadow-2xl scale-[1.02] opacity-90' 
             : 'z-0'
-        } ${
-          isSelected && !isDragging ? 'ring-1 ring-indigo-400 shadow-[0_0_12px_rgba(99,102,241,0.4)]' : ''
         }`}
         style={{
           cursor: isDragging ? 'grabbing' : 'default',
@@ -816,6 +888,14 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
           }
         }}
       >
+        {/* Selection indicator - inner border overlay */}
+        {isSelected && !isDragging && (
+          <div 
+            className={`absolute inset-0 pointer-events-none z-20 border-2 border-indigo-400 ${roundedClasses}`}
+            style={{ boxShadow: 'inset 0 0 12px rgba(99,102,241,0.3)' }}
+          />
+        )}
+
         {/* Drop indicator line */}
         {isHoverTarget && (
           <div className="absolute inset-x-0 -top-0.5 z-30 pointer-events-none">
@@ -879,10 +959,19 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
   };
 
   const renderBlockContent = (block: ExposeBlock) => {
+    // Per-block color overrides
+    const blockBg = block.backgroundColor || undefined;
+    const blockTextColor = block.textColor || undefined;
+    const blockTitleColor = block.titleColor || undefined;
+
+    // Style theme classes for headings and body text
+    const hCls = styleTheme.headingStyle; // e.g. 'font-bold tracking-tight'
+    const bCls = styleTheme.bodyStyle;    // e.g. 'font-light'
+
     switch (block.type) {
       case 'hero':
         return (
-          <div className="relative h-64 bg-indigo-900 overflow-hidden">
+          <div className="relative h-64 overflow-hidden" style={{ backgroundColor: blockBg || '#312E81' }}>
             {block.imageUrl ? (
               <img src={block.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
             ) : (
@@ -890,9 +979,9 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                 <ImageIcon className="w-16 h-16" />
               </div>
             )}
-            <div className="absolute bottom-0 left-0 right-0 p-6 text-white bg-gradient-to-t from-black/60 via-black/30 to-transparent pt-16">
-              <h1 className="text-3xl font-bold mb-2">{pv(block.title, 'Titel eingeben...')}</h1>
-              <p className="text-lg opacity-90">{pv(block.subtitle, 'Untertitel eingeben...')}</p>
+            <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/60 via-black/30 to-transparent pt-16">
+              <h1 className={`text-3xl mb-2 ${hCls}`} style={{ color: blockTitleColor || '#FFFFFF' }}>{pv(block.title, 'Titel eingeben...')}</h1>
+              <p className={`text-lg opacity-90 ${bCls}`} style={{ color: blockTextColor || '#FFFFFF' }}>{pv(block.subtitle, 'Untertitel eingeben...')}</p>
             </div>
           </div>
         );
@@ -900,15 +989,15 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
       case 'stats':
         const stats = block.items || [
           { label: 'Zimmer', value: '{{property.rooms}}' },
-          { label: 'Wohnfläche', value: '{{property.area}} m²' },
-          { label: 'Preis', value: '{{property.price}} €' },
+          { label: 'Wohnfläche', value: '{{property.area}}' },
+          { label: 'Preis', value: '{{property.price}}' },
         ];
         return (
-          <div className="py-6 px-4 bg-gray-50 flex justify-around">
+          <div className="py-6 px-4 flex justify-around" style={{ backgroundColor: blockBg || '#F9FAFB' }}>
             {stats.map((stat: any, i: number) => (
               <div key={i} className="text-center">
-                <div className="text-2xl font-bold" style={{ color: themeColors.primary }}>{pv(stat.value)}</div>
-                <div className="text-sm text-gray-500">{pv(stat.label)}</div>
+                <div className={`text-2xl ${hCls}`} style={{ color: blockTitleColor || themeColors.primary }}>{pv(stat.value)}</div>
+                <div className={`text-sm ${bCls}`} style={{ color: blockTextColor || '#6B7280' }}>{pv(stat.label)}</div>
               </div>
             ))}
           </div>
@@ -916,16 +1005,16 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
 
       case 'text':
         return (
-          <div className={`p-6 ${block.style === 'highlight' ? 'bg-gray-50 border-l-4' : ''}`} style={block.style === 'highlight' ? { borderColor: themeColors.primary } : {}}>
-            {block.title && <h3 className="text-lg font-semibold mb-3" style={{ color: themeColors.secondary }}>{pv(block.title)}</h3>}
-            <p className="text-gray-600 whitespace-pre-wrap">{pv(block.content, 'Text eingeben...')}</p>
+          <div className={`p-6 ${block.style === 'highlight' && !blockBg ? 'border-l-4' : ''}`} style={{ backgroundColor: blockBg || (block.style === 'highlight' ? '#F9FAFB' : undefined), borderColor: block.style === 'highlight' ? themeColors.primary : undefined }}>
+            {block.title && <h3 className={`text-lg mb-3 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{pv(block.title)}</h3>}
+            <p className={`whitespace-pre-wrap ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>{pv(block.content, 'Text eingeben...')}</p>
           </div>
         );
 
       case 'gallery':
         const images = block.images || [];
         return (
-          <div className="p-4">
+          <div className="p-4" style={{ backgroundColor: blockBg }}>
             <div className={`grid gap-2 ${block.columns === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
               {images.length > 0 ? images.slice(0, 4).map((img: string, i: number) => (
                 <div key={i} className="aspect-video bg-gray-200 rounded overflow-hidden">
@@ -949,13 +1038,13 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
       case 'highlights':
         const items = block.items || [];
         return (
-          <div className="p-6">
-            {block.title && <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>{pv(block.title)}</h3>}
+          <div className="p-6" style={{ backgroundColor: blockBg }}>
+            {block.title && <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{pv(block.title)}</h3>}
             <div className="grid grid-cols-2 gap-3">
               {items.length > 0 ? items.map((item: any, i: number) => (
                 <div key={i} className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: themeColors.primary }} />
-                  <span className="text-sm text-gray-600">{pv(typeof item === 'string' ? item : item.text)}</span>
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: blockTitleColor || themeColors.primary }} />
+                  <span className={`text-sm ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>{pv(typeof item === 'string' ? item : item.text)}</span>
                 </div>
               )) : (
                 <span className="text-gray-400 text-sm">Elemente hinzufügen...</span>
@@ -966,33 +1055,33 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
 
       case 'location':
         return (
-          <div className="p-6 bg-gray-50">
-            <h3 className="text-lg font-semibold mb-2" style={{ color: themeColors.secondary }}>{pv(block.title, 'Lage')}</h3>
-            <p className="text-gray-600 mb-2">{pv(block.address, '{{property.address}}')}</p>
-            {block.description && <p className="text-sm text-gray-500">{pv(block.description)}</p>}
+          <div className="p-6" style={{ backgroundColor: blockBg || '#F9FAFB' }}>
+            <h3 className={`text-lg mb-2 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{pv(block.title, 'Lage')}</h3>
+            <p className={`mb-2 ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>{pv(block.address, '{{property.address}}')}</p>
+            {block.description && <p className={`text-sm ${bCls}`} style={{ color: blockTextColor || '#6B7280' }}>{pv(block.description)}</p>}
           </div>
         );
 
       case 'contact':
         return (
-          <div className="p-6 text-white" style={{ backgroundColor: themeColors.primary }}>
-            <h3 className="text-lg font-semibold mb-3">{pv(block.title, 'Ihr Ansprechpartner')}</h3>
-            <p>{pv(block.name, '{{user.name}}')}</p>
-            <p className="opacity-80">{pv(block.email, '{{user.email}}')}</p>
-            {block.phone && <p className="opacity-80">{pv(block.phone)}</p>}
+          <div className="p-6" style={{ backgroundColor: blockBg || themeColors.primary }}>
+            <h3 className={`text-lg mb-3 ${hCls}`} style={{ color: blockTitleColor || '#FFFFFF' }}>{pv(block.title, 'Ihr Ansprechpartner')}</h3>
+            <p className={bCls} style={{ color: blockTextColor || '#FFFFFF' }}>{pv(block.name, '{{user.name}}')}</p>
+            <p className={bCls} style={{ color: blockTextColor || '#FFFFFF', opacity: 0.8 }}>{pv(block.email, '{{user.email}}')}</p>
+            {block.phone && <p className={bCls} style={{ color: blockTextColor || '#FFFFFF', opacity: 0.8 }}>{pv(block.phone)}</p>}
           </div>
         );
 
       case 'leadInfo':
         return (
-          <div className="p-6 bg-gradient-to-r from-indigo-50 to-purple-50 border-l-4" style={{ borderColor: themeColors.accent }}>
+          <div className="p-6 border-l-4" style={{ backgroundColor: blockBg || undefined, borderColor: themeColors.accent }}>
             {block.showGreeting !== false && (
-              <p className="text-sm text-gray-500 mb-2">Erstellt für</p>
+              <p className={`text-sm mb-2 ${bCls}`} style={{ color: blockTextColor || '#6B7280' }}>Erstellt für</p>
             )}
-            <h3 className="text-lg font-semibold mb-2" style={{ color: themeColors.secondary }}>
+            <h3 className={`text-lg mb-2 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>
               {pv(block.leadName, '{{lead.name}}')}
             </h3>
-            <div className="space-y-1 text-sm text-gray-600">
+            <div className={`space-y-1 text-sm ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>
               <p>{pv(block.leadEmail, '{{lead.email}}')}</p>
               {block.leadPhone && <p>{pv(block.leadPhone)}</p>}
             </div>
@@ -1001,18 +1090,18 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
 
       case 'priceTable':
         const priceItems = block.items || [
-          { label: 'Kaltmiete', value: '{{property.price}} €' },
+          { label: 'Kaltmiete', value: '{{property.price}}' },
           { label: 'Nebenkosten', value: 'ca. 200 €' },
           { label: 'Kaution', value: '3 Monatsmieten' },
         ];
         return (
-          <div className="p-6">
-            {block.title && <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>{pv(block.title)}</h3>}
+          <div className="p-6" style={{ backgroundColor: blockBg }}>
+            {block.title && <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{pv(block.title)}</h3>}
             <div className="space-y-2">
               {priceItems.map((item: any, i: number) => (
                 <div key={i} className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-gray-600">{pv(item.label)}</span>
-                  <span className="font-medium">{pv(item.value)}</span>
+                  <span className={bCls} style={{ color: blockTextColor || '#4B5563' }}>{pv(item.label)}</span>
+                  <span className={hCls} style={{ color: blockTitleColor || undefined }}>{pv(item.value)}</span>
                 </div>
               ))}
             </div>
@@ -1021,15 +1110,15 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
 
       case 'energyCertificate':
         return (
-          <div className="p-6 bg-gray-50">
-            <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>Energieausweis</h3>
+          <div className="p-6" style={{ backgroundColor: blockBg || '#F9FAFB' }}>
+            <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>Energieausweis</h3>
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold" style={{ backgroundColor: themeColors.primary }}>
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl ${hCls}`} style={{ backgroundColor: themeColors.primary }}>
                 {pv(block.energyClass, 'B')}
               </div>
               <div>
-                <p className="text-sm text-gray-500">Energieeffizienzklasse</p>
-                <p className="font-medium">{pv(block.consumption, '85 kWh/(m²·a)')}</p>
+                <p className={`text-sm ${bCls}`} style={{ color: blockTextColor || '#6B7280' }}>Energieeffizienzklasse</p>
+                <p className={hCls} style={{ color: blockTitleColor || undefined }}>{pv(block.consumption, '85 kWh/(m²·a)')}</p>
               </div>
             </div>
           </div>
@@ -1037,9 +1126,9 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
 
       case 'cta':
         return (
-          <div className="p-8 text-center bg-gray-50">
-            <h3 className="text-xl font-semibold mb-4" style={{ color: themeColors.secondary }}>{pv(block.title, 'Interesse geweckt?')}</h3>
-            <button className="px-6 py-3 text-white rounded-lg font-medium" style={{ backgroundColor: themeColors.primary }}>
+          <div className="p-8 text-center" style={{ backgroundColor: blockBg || '#F9FAFB' }}>
+            <h3 className={`text-xl mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{pv(block.title, 'Interesse geweckt?')}</h3>
+            <button className={`px-6 py-3 text-white rounded-lg ${hCls}`} style={{ backgroundColor: themeColors.primary }}>
               {pv(block.buttonText, 'Jetzt Termin vereinbaren')}
             </button>
           </div>
@@ -1047,16 +1136,16 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
 
       case 'quote':
         return (
-          <div className="p-6 border-l-4" style={{ borderColor: themeColors.accent }}>
-            <p className="text-lg italic text-gray-600 mb-2">"{pv(block.text, 'Zitat eingeben...')}"</p>
-            {block.author && <p className="text-sm text-gray-500">— {pv(block.author)}</p>}
+          <div className="p-6 border-l-4" style={{ borderColor: themeColors.accent, backgroundColor: blockBg }}>
+            <p className={`text-lg italic mb-2 ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>"{pv(block.text, 'Zitat eingeben...')}"</p>
+            {block.author && <p className={`text-sm ${bCls}`} style={{ color: blockTextColor || '#6B7280' }}>— {pv(block.author)}</p>}
           </div>
         );
 
       case 'floorplan':
         return (
-          <div className="p-6">
-            {block.title && <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>{pv(block.title)}</h3>}
+          <div className="p-6" style={{ backgroundColor: blockBg }}>
+            {block.title && <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{pv(block.title)}</h3>}
             {block.imageUrl ? (
               <img src={block.imageUrl} alt="Grundriss" className="w-full" />
             ) : (
@@ -1069,13 +1158,13 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
 
       case 'twoColumn':
         return (
-          <div className="p-6">
+          <div className="p-6" style={{ backgroundColor: blockBg }}>
             <div className="grid grid-cols-2 gap-6">
               <div className="prose prose-sm">
-                <p className="text-gray-600 whitespace-pre-wrap">{pv(block.leftContent, 'Linke Spalte...')}</p>
+                <p className={`whitespace-pre-wrap ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>{pv(block.leftContent, 'Linke Spalte...')}</p>
               </div>
               <div className="prose prose-sm">
-                <p className="text-gray-600 whitespace-pre-wrap">{pv(block.rightContent, 'Rechte Spalte...')}</p>
+                <p className={`whitespace-pre-wrap ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>{pv(block.rightContent, 'Rechte Spalte...')}</p>
               </div>
             </div>
           </div>
@@ -1083,8 +1172,8 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
 
       case 'video':
         return (
-          <div className="p-6">
-            {block.title && <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>{pv(block.title)}</h3>}
+          <div className="p-6" style={{ backgroundColor: blockBg }}>
+            {block.title && <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{pv(block.title)}</h3>}
             {block.videoUrl ? (
               <div className="aspect-video bg-black rounded overflow-hidden">
                 {block.videoUrl.includes('youtube') || block.videoUrl.includes('youtu.be') ? (
@@ -1116,7 +1205,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
       case 'virtualTour':
         return (
           <div className="p-6">
-            {block.title && <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>{pv(block.title)}</h3>}
+            {block.title && <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: themeColors.secondary }}>{pv(block.title)}</h3>}
             {block.tourUrl ? (
               <div className="aspect-video rounded overflow-hidden border border-gray-200">
                 <iframe
@@ -1168,17 +1257,20 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     
     if (atIndex !== -1 && (atIndex === 0 || textBeforeCursor[atIndex - 1] === ' ' || textBeforeCursor[atIndex - 1] === '\n')) {
       const searchTerm = textBeforeCursor.substring(atIndex + 1).toLowerCase();
-      const filtered = TEMPLATE_FIELDS.filter(f => 
-        f.label.toLowerCase().includes(searchTerm) ||
-        f.id.toLowerCase().includes(searchTerm)
-      );
+      const filtered = searchTerm 
+        ? TEMPLATE_FIELDS.filter(f => 
+            f.label.toLowerCase().includes(searchTerm) ||
+            f.id.toLowerCase().includes(searchTerm) ||
+            f.variable.toLowerCase().includes(searchTerm)
+          )
+        : TEMPLATE_FIELDS; // Show all fields when no search term
       
       setMentionState({
         isOpen: true,
         searchTerm,
         activeField: fieldId,
         cursorPosition: cursorPos,
-        filteredFields: filtered.slice(0, 8) // Max 8 suggestions
+        filteredFields: filtered // Show all matching fields
       });
     } else {
       setMentionState(prev => ({ ...prev, isOpen: false }));
@@ -1229,43 +1321,68 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
   const renderMentionDropdown = (fieldId: string) => {
     if (!mentionState.isOpen || mentionState.activeField !== fieldId) return null;
     
+    // Group fields by category
+    const groupedFields = mentionState.filteredFields.reduce((acc, field) => {
+      if (!acc[field.category]) acc[field.category] = [];
+      acc[field.category].push(field);
+      return acc;
+    }, {} as Record<string, TemplateField[]>);
+
+    const categoryOrder = ['property', 'user', 'lead', 'date'];
+    
     return (
       <div 
         ref={mentionRef}
-        className="absolute z-50 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+        className="absolute z-50 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
       >
         <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
           <span className="text-xs font-medium text-gray-500">Feld einfügen</span>
+          {mentionState.searchTerm && (
+            <span className="text-xs text-gray-400 ml-2">
+              ({mentionState.filteredFields.length} Treffer)
+            </span>
+          )}
         </div>
-        <div className="max-h-48 overflow-y-auto">
+        <div className="max-h-72 overflow-y-auto">
           {mentionState.filteredFields.length === 0 ? (
             <div className="px-3 py-2 text-sm text-gray-400">Keine Felder gefunden</div>
           ) : (
-            mentionState.filteredFields.map(field => (
-              <button
-                key={field.id}
-                type="button"
-                className="w-full px-3 py-2 text-left hover:bg-indigo-50 flex items-center gap-2 transition-colors"
-                onMouseDown={(e) => {
-                  e.preventDefault(); // Prevent blur
-                }}
-                onClick={() => {
-                  const input = document.querySelector(`[data-field-id="${fieldId}"]`) as HTMLInputElement | HTMLTextAreaElement;
-                  if (input) {
-                    insertFieldAtCursor(field, input.value, mentionState.cursorPosition, (v) => {
-                      // Trigger change event
-                      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set 
-                        || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
-                      nativeInputValueSetter?.call(input, v);
-                      input.dispatchEvent(new Event('input', { bubbles: true }));
-                    });
-                  }
-                }}
-              >
-                <span className="text-base">{field.icon}</span>
-                <span className="text-sm text-gray-700">{field.label}</span>
-              </button>
-            ))
+            categoryOrder.map(category => {
+              const fields = groupedFields[category];
+              if (!fields || fields.length === 0) return null;
+              return (
+                <div key={category}>
+                  <div className="px-3 py-1.5 bg-gray-50 text-xs font-medium text-gray-500 sticky top-0">
+                    {FIELD_CATEGORY_LABELS[category]}
+                  </div>
+                  {fields.map(field => (
+                    <button
+                      key={field.id}
+                      type="button"
+                      className="w-full px-3 py-1.5 text-left hover:bg-indigo-50 flex items-center gap-2 transition-colors"
+                      onMouseDown={(e) => {
+                        e.preventDefault(); // Prevent blur
+                      }}
+                      onClick={() => {
+                        const input = document.querySelector(`[data-field-id="${fieldId}"]`) as HTMLInputElement | HTMLTextAreaElement;
+                        if (input) {
+                          insertFieldAtCursor(field, input.value, mentionState.cursorPosition, (v) => {
+                            // Trigger change event
+                            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set 
+                              || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+                            nativeInputValueSetter?.call(input, v);
+                            input.dispatchEvent(new Event('input', { bubbles: true }));
+                          });
+                        }
+                      }}
+                    >
+                      <span className="text-sm">{field.icon}</span>
+                      <span className="text-sm text-gray-700">{field.label}</span>
+                    </button>
+                  ))}
+                </div>
+              );
+            })
           )}
         </div>
       </div>
@@ -1355,9 +1472,9 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     }, {} as Record<string, TemplateField[]>);
 
     return (
-      <div className={`${showFieldsSidebar ? 'w-44' : 'w-12'} border-l border-gray-100 bg-gray-50 flex flex-col transition-all duration-200 overflow-hidden`}>
+      <div className={`${showFieldsSidebar ? 'w-48' : 'w-12'} border-l border-gray-100 bg-gray-50 flex flex-col transition-all duration-200 shrink-0 overflow-hidden`}>
         {/* Header - Tip text or just toggle */}
-        <div className="px-2 py-2 border-b border-gray-100 flex items-center gap-2 shrink-0 h-10">
+        <div className={`py-2 border-b border-gray-100 flex items-center shrink-0 h-10 ${showFieldsSidebar ? 'px-2 justify-start gap-2' : 'justify-center'}`}>
           <button
             onClick={() => setShowFieldsSidebar(!showFieldsSidebar)}
             className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors shrink-0"
@@ -1369,18 +1486,22 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               <ChevronUp className="w-4 h-4 -rotate-90" />
             )}
           </button>
-          <span className={`text-xs text-gray-500 whitespace-nowrap transition-opacity duration-200 ${showFieldsSidebar ? 'opacity-100' : 'opacity-0'}`}>
-            Tippe <span className="font-mono bg-gray-200 px-0.5 rounded">@</span>
-          </span>
+          {showFieldsSidebar && (
+            <span className="text-xs text-gray-500 whitespace-nowrap">
+              Tippe <span className="font-mono bg-gray-200 px-0.5 rounded">@</span>
+            </span>
+          )}
         </div>
 
-        {/* Fields list - icons always visible, text fades */}
-        <div className="flex-1 overflow-y-auto py-2 px-2 space-y-2 scrollbar-thin">
+        {/* Fields list - icons always visible and centered when collapsed */}
+        <div className={`flex-1 overflow-y-auto py-2 space-y-2 scrollbar-thin ${showFieldsSidebar ? 'px-2' : 'px-1'}`}>
           {Object.entries(groupedFields).map(([category, fields]) => (
             <div key={category}>
-              <div className={`text-xs font-medium text-gray-400 mb-1 whitespace-nowrap overflow-hidden transition-opacity duration-200 ${showFieldsSidebar ? 'opacity-100 px-1' : 'opacity-0 h-0'}`}>
-                {FIELD_CATEGORY_LABELS[category]}
-              </div>
+              {showFieldsSidebar && (
+                <div className="text-xs font-medium text-gray-400 mb-1 px-1">
+                  {FIELD_CATEGORY_LABELS[category]}
+                </div>
+              )}
               <div className="space-y-0.5">
                 {fields.map(field => (
                   <div
@@ -1390,13 +1511,17 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                       e.dataTransfer.setData('text/plain', field.variable);
                       e.dataTransfer.effectAllowed = 'copy';
                     }}
-                    className="flex items-center gap-2 px-1.5 py-1.5 bg-white rounded border border-gray-200 cursor-grab hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
+                    className={`flex items-center py-1.5 bg-white rounded border border-gray-200 cursor-grab hover:border-indigo-300 hover:bg-indigo-50 transition-colors ${
+                      showFieldsSidebar ? 'px-2 gap-2' : 'justify-center w-9 mx-auto'
+                    }`}
                     title={field.label}
                   >
-                    <span className="shrink-0 text-sm w-5 text-center">{field.icon}</span>
-                    <span className={`text-xs text-gray-700 whitespace-nowrap overflow-hidden transition-opacity duration-200 ${showFieldsSidebar ? 'opacity-100' : 'opacity-0 w-0'}`}>
-                      {field.label}
-                    </span>
+                    <span className="text-sm flex-shrink-0 leading-none">{field.icon}</span>
+                    {showFieldsSidebar && (
+                      <span className="text-xs text-gray-700 truncate">
+                        {field.label}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1835,7 +1960,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                 className="w-full py-2 border-2 border-dashed border-gray-200 rounded text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
               >
                 <Plus className="w-4 h-4 inline mr-1" />
-                Eckdatum hinzufügen
+                Hinzufügen
               </button>
             </div>
             <p className="mt-2 text-xs text-gray-500">
@@ -1948,58 +2073,154 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         )}
 
         {/* Block Color Settings - available for most blocks */}
-        {block.type !== 'pageBreak' && block.type !== 'gallery' && (
+        {block.type !== 'pageBreak' && (
           <div className="pt-3 mt-3 border-t border-gray-100">
             <label className="block text-xs font-medium text-gray-700 mb-2">Block-Farben</label>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div>
                 <span className="text-xs text-gray-500">Hintergrund</span>
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {BLOCK_COLORS.filter(c => c.id !== 'custom').map((color) => (
+                  {BG_COLORS.map((color) => (
                     <button
                       key={color.id}
                       onClick={() => updateBlock(selectedBlockIndex, { 
-                        backgroundColor: color.value === 'theme' ? undefined : color.value 
+                        backgroundColor: color.value === 'transparent' ? undefined : color.value 
                       })}
-                      className={`w-6 h-6 rounded border-2 transition-all ${
-                        (block.backgroundColor === color.value || (!block.backgroundColor && color.value === 'theme'))
+                      className={`w-5 h-5 rounded border-2 transition-all ${
+                        (block.backgroundColor === color.value || (!block.backgroundColor && color.value === 'transparent'))
                           ? 'border-indigo-500 scale-110' 
                           : 'border-gray-200 hover:border-gray-400'
                       }`}
                       style={{ 
-                        backgroundColor: color.value === 'theme' ? themeColors.background : color.value 
+                        backgroundColor: color.value === 'transparent' ? '#FFFFFF' : color.value,
+                        backgroundImage: color.value === 'transparent' ? 'linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%), linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%)' : undefined,
+                        backgroundSize: color.value === 'transparent' ? '6px 6px' : undefined,
+                        backgroundPosition: color.value === 'transparent' ? '0 0, 3px 3px' : undefined,
                       }}
                       title={color.name}
                     />
                   ))}
+                  {/* Custom colors for background */}
+                  {customColors.length > 0 && (
+                    <>
+                      <div className="w-px h-5 bg-gray-200 mx-0.5" />
+                      {customColors.map((color) => (
+                        <button
+                          key={`bg-custom-${color}`}
+                          onClick={() => updateBlock(selectedBlockIndex, { backgroundColor: color })}
+                          className={`w-5 h-5 rounded border-2 transition-all relative ${
+                            block.backgroundColor === color
+                              ? 'border-indigo-500 scale-110' 
+                              : 'border-gray-200 hover:border-gray-400'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          title={`Eigene: ${color}`}
+                        >
+                          <Pipette className="w-2 h-2 absolute -top-0.5 -right-0.5 text-indigo-500 drop-shadow-sm" />
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500">Titel</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {TEXT_COLORS.map((color) => (
+                    <button
+                      key={color.id}
+                      onClick={() => updateBlock(selectedBlockIndex, { 
+                        titleColor: color.value 
+                      })}
+                      className={`w-5 h-5 rounded border-2 transition-all ${
+                        block.titleColor === color.value
+                          ? 'border-indigo-500 scale-110' 
+                          : 'border-gray-200 hover:border-gray-400'
+                      }`}
+                      style={{ backgroundColor: color.value }}
+                      title={color.name}
+                    />
+                  ))}
+                  {/* Custom colors for title */}
+                  {customColors.length > 0 && (
+                    <>
+                      <div className="w-px h-5 bg-gray-200 mx-0.5" />
+                      {customColors.map((color) => (
+                        <button
+                          key={`title-custom-${color}`}
+                          onClick={() => updateBlock(selectedBlockIndex, { titleColor: color })}
+                          className={`w-5 h-5 rounded border-2 transition-all relative ${
+                            block.titleColor === color
+                              ? 'border-indigo-500 scale-110' 
+                              : 'border-gray-200 hover:border-gray-400'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          title={`Eigene: ${color}`}
+                        >
+                          <Pipette className="w-2 h-2 absolute -top-0.5 -right-0.5 text-indigo-500 drop-shadow-sm" />
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  {block.titleColor && (
+                    <button
+                      onClick={() => updateBlock(selectedBlockIndex, { titleColor: undefined })}
+                      className="w-5 h-5 rounded border-2 border-gray-200 hover:border-red-400 transition-all flex items-center justify-center text-gray-400 hover:text-red-500"
+                      title="Zurücksetzen"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
               </div>
               <div>
                 <span className="text-xs text-gray-500">Text</span>
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {[
-                    { id: 'theme', name: 'Theme', value: 'theme' },
-                    { id: 'white', name: 'Weiß', value: '#FFFFFF' },
-                    { id: 'gray-600', name: 'Grau', value: '#4B5563' },
-                    { id: 'gray-900', name: 'Dunkel', value: '#111827' },
-                    { id: 'black', name: 'Schwarz', value: '#000000' },
-                  ].map((color) => (
+                  {TEXT_COLORS.map((color) => (
                     <button
                       key={color.id}
                       onClick={() => updateBlock(selectedBlockIndex, { 
-                        textColor: color.value === 'theme' ? undefined : color.value 
+                        textColor: color.value
                       })}
-                      className={`w-6 h-6 rounded border-2 transition-all ${
-                        (block.textColor === color.value || (!block.textColor && color.value === 'theme'))
+                      className={`w-5 h-5 rounded border-2 transition-all ${
+                        block.textColor === color.value
                           ? 'border-indigo-500 scale-110' 
                           : 'border-gray-200 hover:border-gray-400'
                       }`}
-                      style={{ 
-                        backgroundColor: color.value === 'theme' ? themeColors.secondary : color.value 
-                      }}
+                      style={{ backgroundColor: color.value }}
                       title={color.name}
                     />
                   ))}
+                  {/* Custom colors for text */}
+                  {customColors.length > 0 && (
+                    <>
+                      <div className="w-px h-5 bg-gray-200 mx-0.5" />
+                      {customColors.map((color) => (
+                        <button
+                          key={`text-custom-${color}`}
+                          onClick={() => updateBlock(selectedBlockIndex, { textColor: color })}
+                          className={`w-5 h-5 rounded border-2 transition-all relative ${
+                            block.textColor === color
+                              ? 'border-indigo-500 scale-110' 
+                              : 'border-gray-200 hover:border-gray-400'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          title={`Eigene: ${color}`}
+                        >
+                          <Pipette className="w-2 h-2 absolute -top-0.5 -right-0.5 text-indigo-500 drop-shadow-sm" />
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  {block.textColor && (
+                    <button
+                      onClick={() => updateBlock(selectedBlockIndex, { textColor: undefined })}
+                      className="w-5 h-5 rounded border-2 border-gray-200 hover:border-red-400 transition-all flex items-center justify-center text-gray-400 hover:text-red-500"
+                      title="Zurücksetzen"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -2250,46 +2471,117 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                 )}
               </div>
 
-              {/* Color Palette Selector */}
-              <div className="relative">
+              {/* Custom Colors Manager */}
+              <div className="relative" ref={colorManagerRef}>
                 <button
-                  onClick={(e) => { 
-                    e.stopPropagation(); 
-                    // Toggle color selector (reuse theme selector state with different content)
-                    const colorSelector = document.getElementById('color-palette-dropdown');
-                    if (colorSelector) colorSelector.classList.toggle('hidden');
-                  }}
+                  onClick={(e) => { e.stopPropagation(); setShowColorManager(!showColorManager); }}
                   className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md"
                 >
-                  <div className="flex -space-x-1">
-                    <div className="w-3 h-3 rounded-full border border-white" style={{ backgroundColor: themeColors.primary }} />
-                    <div className="w-3 h-3 rounded-full border border-white" style={{ backgroundColor: themeColors.accent }} />
-                  </div>
+                  <Palette className="w-4 h-4" />
                   <span className="hidden sm:inline">Farben</span>
+                  {customColors.length > 0 && (
+                    <span className="bg-indigo-100 text-indigo-600 text-[10px] font-medium rounded-full w-4 h-4 flex items-center justify-center">
+                      {customColors.length}
+                    </span>
+                  )}
                 </button>
-                <div id="color-palette-dropdown" className="hidden absolute top-full right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 min-w-[180px]">
-                  <div className="px-3 py-1.5 text-xs font-medium text-gray-500 border-b border-gray-100">Farbpalette</div>
-                  {COLOR_PALETTES.map((palette) => (
-                    <button
-                      key={palette.id}
-                      onClick={(e) => { 
-                        e.stopPropagation(); 
-                        // Update the theme colors (we'll store colorPalette separately in the future)
-                        // For now, find matching THEMES entry or use first one
-                        const matchingTheme = THEMES.find(t => t.colors.primary === palette.colors.primary);
-                        if (matchingTheme) setTheme(matchingTheme.id);
-                        document.getElementById('color-palette-dropdown')?.classList.add('hidden');
-                      }}
-                      className="flex items-center gap-3 w-full px-3 py-2 text-sm text-gray-900 hover:bg-gray-50"
-                    >
-                      <div className="flex -space-x-1">
-                        <div className="w-4 h-4 rounded-full border border-white shadow-sm" style={{ backgroundColor: palette.colors.primary }} />
-                        <div className="w-4 h-4 rounded-full border border-white shadow-sm" style={{ backgroundColor: palette.colors.accent }} />
+                {showColorManager && (
+                  <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 z-50 w-[280px]" onClick={e => e.stopPropagation()}>
+                    <div className="px-4 py-2.5 border-b border-gray-100">
+                      <span className="text-xs font-medium text-gray-500">Eigene Farben</span>
+                    </div>
+                    
+                    {/* Saved custom colors */}
+                    {customColors.length > 0 && (
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <div className="flex flex-wrap gap-1.5">
+                          {customColors.map((color) => (
+                            <div key={color} className="relative group">
+                              <div
+                                className="w-7 h-7 rounded-md border-2 border-gray-200 cursor-pointer transition-transform hover:scale-110"
+                                style={{ backgroundColor: color }}
+                                title={color}
+                              />
+                              <button
+                                onClick={() => removeCustomColor(color)}
+                                className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 text-white rounded-full hidden group-hover:flex items-center justify-center"
+                              >
+                                <X className="w-2 h-2" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <span>{palette.name}</span>
-                    </button>
-                  ))}
-                </div>
+                    )}
+
+                    {/* Color picker */}
+                    <div className="px-4 py-3 space-y-3">
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs text-gray-500">Farbe wählen</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={colorPickerValue}
+                            onChange={(e) => setColorPickerValue(e.target.value)}
+                            className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer bg-transparent p-0.5"
+                          />
+                          <input
+                            type="text"
+                            value={colorPickerValue}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) setColorPickerValue(v);
+                            }}
+                            className="flex-1 px-2 py-1.5 text-sm border border-gray-200 rounded-md font-mono uppercase"
+                            placeholder="#000000"
+                            maxLength={7}
+                          />
+                          <button
+                            onClick={() => {
+                              if (/^#[0-9A-Fa-f]{6}$/.test(colorPickerValue)) {
+                                addCustomColor(colorPickerValue);
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-md hover:bg-indigo-700 transition-colors whitespace-nowrap"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Quick palette presets */}
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1.5 block">Schnellauswahl</label>
+                        <div className="flex flex-wrap gap-1">
+                          {[
+                            '#EF4444', '#F97316', '#F59E0B', '#EAB308', '#84CC16',
+                            '#22C55E', '#14B8A6', '#06B6D4', '#0EA5E9', '#3B82F6',
+                            '#6366F1', '#8B5CF6', '#A855F7', '#D946EF', '#EC4899',
+                            '#F43F5E', '#1C1917', '#44403C', '#78716C', '#A8A29E',
+                            '#D6D3D1', '#FAFAF9', '#0F172A', '#1E293B', '#475569',
+                          ].map((c) => (
+                            <button
+                              key={c}
+                              onClick={() => setColorPickerValue(c)}
+                              onDoubleClick={() => addCustomColor(c)}
+                              className={`w-5 h-5 rounded border transition-all ${
+                                colorPickerValue === c ? 'border-indigo-500 scale-110' : 'border-gray-200 hover:border-gray-400'
+                              }`}
+                              style={{ backgroundColor: c }}
+                              title={`${c} — Doppelklick zum Hinzufügen`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {customColors.length > 0 && (
+                      <div className="px-4 py-2 border-t border-gray-100">
+                        <p className="text-[10px] text-gray-400">Farben erscheinen bei den Blockoptionen markiert mit <Pipette className="w-2.5 h-2.5 inline" /></p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Regenerate (only for exposes) */}
@@ -2467,6 +2759,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                       width: `${A4_WIDTH_PX}px`, 
                       minHeight: `${A4_HEIGHT_PX}px`,
                       padding: pageBlocks.length === 0 ? `${A4_PADDING_PX}px` : 0,
+                      fontFamily: styleTheme.fontFamily,
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -2496,17 +2789,19 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                         </button>
                       </div>
                     ) : (
-                      // Page with blocks - no padding needed, blocks go edge to edge
+                      // Page with blocks
                       <div 
                         className="relative" 
                         style={{ 
                           minHeight: `${A4_HEIGHT_PX}px`
                         }}
                       >
-                        {pageBlocks.map((block) => {
+                        {pageBlocks.map((block, blockIndexOnPage) => {
                           // Find the actual global index of this block
                           const globalIndex = currentBlocks.findIndex(b => b.id === block.id);
-                          return renderBlockPreview(block, globalIndex);
+                          const isFirstOnPage = blockIndexOnPage === 0;
+                          const isLastOnPage = blockIndexOnPage === pageBlocks.length - 1;
+                          return renderBlockPreview(block, globalIndex, isFirstOnPage, isLastOnPage);
                         })}
                         
                         {/* Add block button directly after last block on this page */}

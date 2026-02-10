@@ -12,10 +12,23 @@ export class GeminiService {
 
   constructor() {
     // General chat model with CRM tools
+    // Get current date for system prompt
+    const today = new Date();
+    const currentDateStr = today.toLocaleDateString('de-DE', { 
+      weekday: 'long', 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    });
+    const isoDate = today.toISOString().split('T')[0];
+    
     this.model = genAI.getGenerativeModel({ 
       model: "gemini-3-flash-preview", 
       tools: [{ functionDeclarations: Object.values(CRM_TOOLS) as unknown as FunctionDeclaration[] }],
       systemInstruction: `Du bist Jarvis, der KI-Assistent für Immivo - eine Immobilien-CRM-Plattform.
+
+AKTUELLES DATUM: ${currentDateStr} (${isoDate})
+Nutze dieses Datum für alle zeitbezogenen Anfragen wie "heute", "morgen", "diese Woche", etc.
 
 DEINE PERSÖNLICHKEIT:
 - Prägnant und direkt wie TARS aus Interstellar
@@ -37,11 +50,24 @@ DEINE FÄHIGKEITEN:
 - Nach Properties suchen (Preis, Ort, Typ)
 - Property-Statistiken anzeigen (verfügbar, verkauft, vermietet)
 
+👥 TEAM & KONTAKTE:
+- Team-Mitglieder (Seats/Agenten) abrufen mit get_team_members
+- Kontakte im CRM suchen mit search_contacts
+- WICHTIG bei get_team_members: 
+  - Das Ergebnis unterscheidet zwischen "currentUser" (der Nutzer, mit dem du sprichst) und "teamMembers" (die anderen)
+  - Der currentUser ist NICHT Teil des Teams, sondern DU sprichst mit ihm!
+  - Wenn der Nutzer fragt "welche Teammitglieder habe ich?", liste nur teamMembers auf, nicht currentUser
+- WICHTIG: Wenn der Nutzer eine E-Mail an jemanden senden will, suche ZUERST nach dem Namen:
+  1. Suche mit get_team_members nach Team-Mitgliedern
+  2. Suche mit search_contacts nach CRM-Kontakten (Leads)
+  3. Verwende dann die gefundene E-Mail-Adresse
+
 📧 E-MAILS:
 - E-Mails lesen und abrufen
 - E-Mail-Entwürfe erstellen
 - E-Mails senden und beantworten
 - E-Mail-Templates nutzen
+- WICHTIG: Bei "sende E-Mail an [Name]" immer erst den Kontakt suchen!
 
 📅 KALENDER:
 - Termine abrufen und anzeigen
@@ -142,7 +168,7 @@ Antworte immer auf Deutsch. Sei freundlich und hilfsbereit. Erkläre kurz was du
     });
   }
 
-  async chat(message: string, tenantId: string, history: any[] = []) {
+  async chat(message: string, tenantId: string, userId: string, history: any[] = []) {
     const chat = this.model.startChat({
       history: history.map(h => ({
         role: h.role === 'assistant' ? 'model' : 'user',
@@ -155,7 +181,7 @@ Antworte immer auf Deutsch. Sei freundlich und hilfsbereit. Erkläre kurz was du
     const functionCalls = response.functionCalls();
 
     if (functionCalls && functionCalls.length > 0) {
-      const toolOutputs = await this.executeToolCalls(functionCalls, tenantId);
+      const toolOutputs = await this.executeToolCalls(functionCalls, tenantId, userId);
       const finalResult = await chat.sendMessage(toolOutputs);
       return finalResult.response.text();
     }
@@ -164,7 +190,7 @@ Antworte immer auf Deutsch. Sei freundlich und hilfsbereit. Erkläre kurz was du
   }
 
   // Streaming version of chat with Function Calling support
-  async *chatStream(message: string, tenantId: string, history: any[] = []): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean }> {
+  async *chatStream(message: string, tenantId: string, userId: string, history: any[] = []): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean }> {
     const chat = this.model.startChat({
       history
     });
@@ -178,7 +204,7 @@ Antworte immer auf Deutsch. Sei freundlich und hilfsbereit. Erkläre kurz was du
       // Signal that action is being executed (frontend shows visual indicator)
       yield { chunk: '', hadFunctionCalls: true };
       
-      const toolOutputs = await this.executeToolCalls(functionCalls, tenantId);
+      const toolOutputs = await this.executeToolCalls(functionCalls, tenantId, userId);
       
       // Send tool results and stream the final response
       const finalResult = await chat.sendMessageStream(toolOutputs);
@@ -259,7 +285,7 @@ WICHTIG: Nutze IMMER exposeId="${targetId}" bei allen Tool-Aufrufen!`;
         actionsPerformed.push(call.name);
       }
       
-      const toolOutputs = await this.executeToolCalls(functionCalls, tenantId);
+      const toolOutputs = await this.executeToolCalls(functionCalls, tenantId, undefined);
       result = await chat.sendMessage(toolOutputs);
       response = result.response;
       functionCalls = response.functionCalls();
@@ -284,12 +310,12 @@ WICHTIG: Nutze IMMER exposeId="${targetId}" bei allen Tool-Aufrufen!`;
     return result;
   }
 
-  private async executeToolCalls(functionCalls: any[], tenantId: string) {
+  private async executeToolCalls(functionCalls: any[], tenantId: string, userId?: string) {
     const toolOutputs = [];
     
     for (const call of functionCalls) {
       try {
-        const output = await AiToolExecutor.execute(call.name, call.args, tenantId);
+        const output = await AiToolExecutor.execute(call.name, call.args, tenantId, userId);
         toolOutputs.push({
           functionResponse: {
             name: call.name,

@@ -7,6 +7,7 @@ import Sidebar from '@/components/Sidebar';
 import AiChatSidebar from '@/components/AiChatSidebar';
 import GlobalDrawer from '@/components/GlobalDrawer';
 import ExposeEditor from '@/components/ExposeEditor';
+import PageHeader from '@/components/PageHeader';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { Loader2 } from 'lucide-react';
 
@@ -20,6 +21,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       
       {/* Main Content Area (Center) */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Top Header Bar */}
+        <PageHeader />
         {/* Scrollable Content */}
         <main className="flex-1 overflow-y-auto bg-white overflow-x-visible">
           {children}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useRef } from 'react';
 
 type DrawerType = 'LEAD' | 'PROPERTY' | 'EMAIL' | 'EXPOSE_EDITOR' | null;
 
@@ -38,6 +38,10 @@ interface GlobalState {
   // AI Action Tracking (for triggering refreshes)
   aiActionPerformed: number; // Timestamp of last action
 
+  // Page Header Actions (slot for page-specific buttons)
+  headerActions: React.ReactNode;
+  setHeaderActions: (actions: React.ReactNode) => void;
+
   // Actions
   openDrawer: (type: DrawerType) => void;
   closeDrawer: () => void;
@@ -70,6 +74,7 @@ export function GlobalStateProvider({ children }: { children: ReactNode }) {
   const [activeExposeContext, setActiveExposeContext] = useState<ExposeEditorContext | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [aiActionPerformed, setAiActionPerformed] = useState(0);
+  const [headerActions, setHeaderActions] = useState<React.ReactNode>(null);
 
   const openDrawer = (type: DrawerType) => {
     setDrawerType(type);
@@ -133,6 +138,8 @@ export function GlobalStateProvider({ children }: { children: ReactNode }) {
         aiChatDraft,
         activeExposeContext,
         aiActionPerformed,
+        headerActions,
+        setHeaderActions,
         openDrawer,
         closeDrawer,
         minimizeDrawer,

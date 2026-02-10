@@ -15,7 +15,8 @@ import {
   Calendar,
   FileText,
   MessageSquare,
-  Wand2
+  Wand2,
+  Activity
 } from 'lucide-react';
 
 import { useRouter } from 'next/navigation';
@@ -34,6 +35,7 @@ export default function Sidebar() {
 
   const mainNavigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Aktivitäten', href: '/dashboard/activities', icon: Activity },
     { name: 'Posteingang', href: '/dashboard/inbox', icon: Inbox },
     { name: 'CRM', href: '/dashboard/crm/leads', icon: Users },
     { name: 'Kalender', href: '/dashboard/calendar', icon: Calendar },

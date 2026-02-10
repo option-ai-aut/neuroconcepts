@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Bot, Paperclip, FileText, RotateCcw, X, Image as ImageIcon } from 'lucide-react';
+import { Send, Bot, Paperclip, FileText, RotateCcw, X, Image as ImageIcon, AlertCircle, Loader2, Square } from 'lucide-react';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 import { fetchAuthSession } from 'aws-amplify/auth';
@@ -42,87 +42,108 @@ interface Message {
   toolsUsed?: string[]; // Tools that were used for this response
 }
 
-// Human-readable tool names
-const TOOL_LABELS: Record<string, string> = {
+interface JarvisAction {
+  id: string;
+  leadId?: string;
+  propertyId?: string;
+  type: string;
+  question: string;
+  options?: Array<{ id: string; label: string }>;
+  allowCustom: boolean;
+  status: string;
+  createdAt: string;
+}
+
+// Human-readable tool names with icons
+const TOOL_LABELS: Record<string, { label: string; icon: string }> = {
+  // Team & Contacts
+  get_team_members: { label: 'Team durchsucht', icon: '👥' },
+  search_contacts: { label: 'Kontakte durchsucht', icon: '🔍' },
+  
   // Leads
-  create_lead: 'Lead erstellt',
-  get_leads: 'Leads abgerufen',
-  get_lead: 'Lead abgerufen',
-  update_lead: 'Lead aktualisiert',
-  delete_lead: 'Lead gelöscht',
-  delete_all_leads: 'Alle Leads gelöscht',
-  get_lead_statistics: 'Lead-Statistiken',
+  create_lead: { label: 'Lead erstellt', icon: '✨' },
+  get_leads: { label: 'Leads geladen', icon: '📋' },
+  get_lead: { label: 'Lead geladen', icon: '👤' },
+  update_lead: { label: 'Lead aktualisiert', icon: '✏️' },
+  delete_lead: { label: 'Lead gelöscht', icon: '🗑️' },
+  delete_all_leads: { label: 'Alle Leads gelöscht', icon: '🗑️' },
+  get_lead_statistics: { label: 'Statistiken geladen', icon: '📊' },
   
   // Properties
-  create_property: 'Objekt erstellt',
-  get_properties: 'Objekte abgerufen',
-  get_property: 'Objekt abgerufen',
-  update_property: 'Objekt aktualisiert',
-  delete_property: 'Objekt gelöscht',
-  delete_all_properties: 'Alle Objekte gelöscht',
-  search_properties: 'Objekte durchsucht',
-  get_property_statistics: 'Objekt-Statistiken',
+  create_property: { label: 'Objekt erstellt', icon: '🏠' },
+  get_properties: { label: 'Objekte geladen', icon: '🏘️' },
+  get_property: { label: 'Objekt geladen', icon: '🏠' },
+  update_property: { label: 'Objekt aktualisiert', icon: '✏️' },
+  delete_property: { label: 'Objekt gelöscht', icon: '🗑️' },
+  delete_all_properties: { label: 'Alle Objekte gelöscht', icon: '🗑️' },
+  search_properties: { label: 'Objekte durchsucht', icon: '🔍' },
+  get_property_statistics: { label: 'Statistiken geladen', icon: '📊' },
   
   // Property Images
-  upload_images_to_property: 'Bilder hochgeladen',
-  get_property_images: 'Bilder abgerufen',
-  delete_property_image: 'Bild gelöscht',
-  delete_all_property_images: 'Alle Bilder gelöscht',
-  move_image_to_floorplan: 'Bild verschoben',
+  upload_images_to_property: { label: 'Bilder hochgeladen', icon: '📸' },
+  get_property_images: { label: 'Bilder geladen', icon: '🖼️' },
+  delete_property_image: { label: 'Bild gelöscht', icon: '🗑️' },
+  delete_all_property_images: { label: 'Alle Bilder gelöscht', icon: '🗑️' },
+  move_image_to_floorplan: { label: 'Als Grundriss markiert', icon: '📐' },
   
   // E-Mails
-  get_emails: 'E-Mails abgerufen',
-  get_email: 'E-Mail abgerufen',
-  send_email: 'E-Mail gesendet',
-  reply_to_email: 'E-Mail beantwortet',
-  draft_email: 'E-Mail-Entwurf erstellt',
-  get_email_templates: 'E-Mail-Vorlagen abgerufen',
+  get_emails: { label: 'E-Mails geladen', icon: '📬' },
+  get_email: { label: 'E-Mail geladen', icon: '📧' },
+  send_email: { label: 'E-Mail gesendet', icon: '📤' },
+  reply_to_email: { label: 'Antwort gesendet', icon: '↩️' },
+  draft_email: { label: 'Entwurf erstellt', icon: '📝' },
+  get_email_templates: { label: 'Vorlagen geladen', icon: '📋' },
   
   // Calendar
-  get_calendar_events: 'Termine abgerufen',
-  create_calendar_event: 'Termin erstellt',
-  update_calendar_event: 'Termin aktualisiert',
-  delete_calendar_event: 'Termin gelöscht',
-  get_calendar_availability: 'Verfügbarkeit geprüft',
+  get_calendar_events: { label: 'Termine geladen', icon: '📅' },
+  create_calendar_event: { label: 'Termin erstellt', icon: '📆' },
+  update_calendar_event: { label: 'Termin aktualisiert', icon: '✏️' },
+  delete_calendar_event: { label: 'Termin gelöscht', icon: '🗑️' },
+  get_calendar_availability: { label: 'Verfügbarkeit geprüft', icon: '⏰' },
   
   // Memory & Context
-  search_chat_history: 'Chat-Verlauf durchsucht',
-  get_conversation_context: 'Kontext abgerufen',
-  get_memory_summary: 'Gedächtnis abgerufen',
-  get_last_conversation: 'Letzte Unterhaltung',
+  search_chat_history: { label: 'Verlauf durchsucht', icon: '🔍' },
+  get_conversation_context: { label: 'Kontext geladen', icon: '💭' },
+  get_memory_summary: { label: 'Gedächtnis abgerufen', icon: '🧠' },
+  get_last_conversation: { label: 'Letzte Unterhaltung', icon: '💬' },
   
   // Exposés
-  get_exposes: 'Exposés abgerufen',
-  create_expose_from_template: 'Exposé erstellt',
-  create_full_expose: 'Exposé erstellt',
-  delete_expose: 'Exposé gelöscht',
-  delete_all_exposes: 'Alle Exposés gelöscht',
-  get_expose_status: 'Exposé-Status',
-  set_expose_status: 'Exposé-Status geändert',
-  set_expose_theme: 'Exposé-Design geändert',
-  generate_expose_pdf: 'PDF generiert',
-  generate_expose_text: 'Text generiert',
+  get_exposes: { label: 'Exposés geladen', icon: '📑' },
+  create_expose_from_template: { label: 'Exposé erstellt', icon: '✨' },
+  create_full_expose: { label: 'Exposé erstellt', icon: '✨' },
+  delete_expose: { label: 'Exposé gelöscht', icon: '🗑️' },
+  delete_all_exposes: { label: 'Alle Exposés gelöscht', icon: '🗑️' },
+  get_expose_status: { label: 'Status geladen', icon: '📊' },
+  set_expose_status: { label: 'Status geändert', icon: '✏️' },
+  set_expose_theme: { label: 'Design geändert', icon: '🎨' },
+  generate_expose_pdf: { label: 'PDF generiert', icon: '📄' },
+  generate_expose_text: { label: 'Text generiert', icon: '✍️' },
   
   // Exposé Blocks
-  create_expose_block: 'Block hinzugefügt',
-  update_expose_block: 'Block aktualisiert',
-  delete_expose_block: 'Block gelöscht',
-  clear_expose_blocks: 'Blöcke gelöscht',
-  reorder_expose_blocks: 'Blöcke sortiert',
+  create_expose_block: { label: 'Block hinzugefügt', icon: '➕' },
+  update_expose_block: { label: 'Block aktualisiert', icon: '✏️' },
+  delete_expose_block: { label: 'Block gelöscht', icon: '🗑️' },
+  clear_expose_blocks: { label: 'Blöcke gelöscht', icon: '🗑️' },
+  reorder_expose_blocks: { label: 'Blöcke sortiert', icon: '↕️' },
   
   // Templates
-  create_expose_template: 'Vorlage erstellt',
-  get_expose_templates: 'Vorlagen abgerufen',
-  get_template: 'Vorlage abgerufen',
-  update_template: 'Vorlage aktualisiert',
+  create_expose_template: { label: 'Vorlage erstellt', icon: '✨' },
+  get_expose_templates: { label: 'Vorlagen geladen', icon: '📋' },
+  get_template: { label: 'Vorlage geladen', icon: '📋' },
+  update_template: { label: 'Vorlage aktualisiert', icon: '✏️' },
   
   // Team Chat
-  get_channels: 'Kanäle abgerufen',
-  get_channel_messages: 'Nachrichten abgerufen',
-  send_channel_message: 'Nachricht gesendet',
+  get_channels: { label: 'Kanäle geladen', icon: '💬' },
+  get_channel_messages: { label: 'Nachrichten geladen', icon: '💬' },
+  send_channel_message: { label: 'Nachricht gesendet', icon: '📤' },
   
   // Dashboard
-  get_dashboard_stats: 'Dashboard-Statistiken',
+  get_dashboard_stats: { label: 'Dashboard geladen', icon: '📊' },
+};
+
+// Helper to get tool label
+const getToolLabel = (tool: string): { label: string; icon: string } => {
+  return TOOL_LABELS[tool] || { label: tool.replace(/_/g, ' '), icon: '⚡' };
 };
 
 // Contextual tips that show once per context
@@ -142,7 +163,7 @@ const CONTEXT_TIPS: ContextTip[] = [
 
 export default function AiChatSidebar() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const { aiChatDraft, setAiChatDraft, activeExposeContext, triggerExposeRefresh, notifyAiAction } = useGlobalState();
+  const { aiChatDraft, setAiChatDraft, activeExposeContext, triggerExposeRefresh, notifyAiAction, aiActionPerformed } = useGlobalState();
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [activeTip, setActiveTip] = useState<ContextTip | null>(null);
@@ -152,6 +173,13 @@ export default function AiChatSidebar() {
   // File upload state
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Jarvis pending actions
+  const [pendingActions, setPendingActions] = useState<JarvisAction[]>([]);
+  const [respondingTo, setRespondingTo] = useState<string | null>(null);
+  
+  // Abort controller for stopping stream
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Get shown tips from localStorage
   const getShownTips = useCallback((): string[] => {
@@ -196,6 +224,73 @@ export default function AiChatSidebar() {
     setTipVisible(false);
     setTimeout(() => setActiveTip(null), 300);
   }, []);
+
+  // Load pending Jarvis actions
+  const loadPendingActions = useCallback(async () => {
+    const apiUrl = getApiUrl();
+    if (!apiUrl) {
+      // Config not ready yet, will retry
+      return;
+    }
+    
+    try {
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`${apiUrl}/jarvis/actions?status=PENDING`, { headers: authHeaders });
+      if (res.ok) {
+        const data = await res.json();
+        setPendingActions(data.actions || []);
+      }
+    } catch (error) {
+      // Silently ignore fetch errors (e.g., when backend is not available)
+      console.warn('Could not load pending actions:', error);
+    }
+  }, []);
+
+  // Respond to a Jarvis action
+  const handleRespondToAction = async (actionId: string, response: string) => {
+    const apiUrl = getApiUrl();
+    if (!apiUrl) return;
+    
+    setRespondingTo(actionId);
+    try {
+      const authHeaders = await getAuthHeaders();
+
+      const res = await fetch(`${apiUrl}/jarvis/actions/${actionId}/respond`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ response }),
+      });
+
+      if (res.ok) {
+        // Remove from local state
+        setPendingActions(prev => prev.filter(a => a.id !== actionId));
+        // Notify that an action was performed
+        notifyAiAction();
+        // Add confirmation message to chat
+        const action = pendingActions.find(a => a.id === actionId);
+        const option = action?.options?.find(o => o.id === response);
+        setMessages(prev => [...prev, {
+          role: 'ASSISTANT',
+          content: `✅ Erledigt: ${option?.label || response}`
+        }]);
+      }
+    } catch (error) {
+      console.error('Error responding to action:', error);
+    } finally {
+      setRespondingTo(null);
+    }
+  };
+
+  // Load pending actions on mount and when AI performs actions
+  useEffect(() => {
+    loadPendingActions();
+  }, [loadPendingActions]);
+
+  useEffect(() => {
+    if (aiActionPerformed) {
+      loadPendingActions();
+    }
+  }, [aiActionPerformed, loadPendingActions]);
 
   // Determine current context and show relevant tip
   useEffect(() => {
@@ -324,6 +419,45 @@ export default function AiChatSidebar() {
     setUploadedFiles(prev => [...prev, ...newFiles]);
   };
 
+  // Drag & drop state
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounterRef = useRef(0);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    dragCounterRef.current = 0;
+    
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      processFiles(files);
+    }
+  }, []);
+
   const removeFile = (fileId: string) => {
     setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
   };
@@ -346,6 +480,10 @@ export default function AiChatSidebar() {
     setAiChatDraft('');
     setUploadedFiles([]);
     setIsLoading(true);
+    
+    // Create abort controller for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     try {
       const apiUrl = getApiUrl();
@@ -370,7 +508,8 @@ export default function AiChatSidebar() {
           body: JSON.stringify({
             message: userMsg.content,
             history: messages.filter(m => !m.isAction).slice(-10),
-          })
+          }),
+          signal: abortController.signal,
         });
         const data = await res.json();
         
@@ -403,7 +542,8 @@ export default function AiChatSidebar() {
             headers: {
               'Authorization': (authHeaders as Record<string, string>)['Authorization'] || '',
             },
-            body: formData
+            body: formData,
+            signal: abortController.signal,
           });
         } else {
           res = await fetch(`${apiUrl}/chat/stream`, {
@@ -411,7 +551,8 @@ export default function AiChatSidebar() {
             headers: authHeaders,
             body: JSON.stringify({
               message: userMsg.content,
-            })
+            }),
+            signal: abortController.signal,
           });
         }
 
@@ -518,33 +659,97 @@ export default function AiChatSidebar() {
           notifyAiAction();
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        // User stopped the generation — just clean up
+        setMessages(prev => prev.filter(m => !m.isAction));
+        setIsLoading(false);
+        return;
+      }
       console.error('Chat error:', error);
       setMessages(prev => [...prev, { role: 'ASSISTANT', content: 'Fehler bei der Verbindung zu Jarvis.' }]);
       setIsLoading(false);
     }
   };
 
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
+    // Remove any action indicator messages
+    setMessages(prev => prev.filter(m => !m.isAction));
+  };
+
   return (
-    <div className="flex flex-col h-full bg-white w-80 z-20 relative shadow-[-10px_0_20px_-5px_rgba(0,0,0,0.1)]">
+    <div 
+      className="flex flex-col h-full bg-white w-80 z-20 relative shadow-[-10px_0_20px_-5px_rgba(0,0,0,0.1)]"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drop overlay */}
+      {isDragging && (
+        <div className="absolute inset-0 z-50 bg-indigo-600/10 border-2 border-dashed border-indigo-400 rounded-lg flex items-center justify-center backdrop-blur-[1px]">
+          <div className="bg-white rounded-xl shadow-lg px-6 py-4 text-center">
+            <Paperclip className="w-8 h-8 text-indigo-500 mx-auto mb-2" />
+            <p className="text-sm font-medium text-gray-800">Dateien hier ablegen</p>
+            <p className="text-xs text-gray-500 mt-0.5">Bilder, PDFs, Dokumente</p>
+          </div>
+        </div>
+      )}
       <div className="h-16 px-4 flex items-center justify-between bg-white shrink-0">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-indigo-600 rounded-md flex items-center justify-center shadow-md shadow-indigo-900/50">
             <Bot className="w-5 h-5 text-white" />
           </div>
           <span className="font-bold text-gray-900">Jarvis</span>
+          <span className="text-[9px] font-medium text-indigo-500 bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5 leading-none">KI</span>
         </div>
-        <button
-          onClick={handleNewChat}
-          className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-          title="Chat archivieren"
-        >
-          <RotateCcw className="w-4 h-4" />
-        </button>
+        <div className="flex items-center space-x-1">
+          <button
+            onClick={handleNewChat}
+            className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Chat archivieren"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
-        {messages.length === 0 && (
+        {/* Pending Jarvis Actions */}
+        {pendingActions.length > 0 && (
+          <div className="space-y-3 mb-4">
+            {pendingActions.map((action) => (
+              <div key={action.id} className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <div className="flex items-start gap-2 mb-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-gray-800">{action.question}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {action.options?.map((option) => (
+                    <button
+                      key={option.id}
+                      onClick={() => handleRespondToAction(action.id, option.id)}
+                      disabled={respondingTo === action.id}
+                      className="px-3 py-1.5 text-xs font-medium bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-md transition-colors disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {respondingTo === action.id && (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      )}
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {messages.length === 0 && pendingActions.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 space-y-3">
             <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center animate-alive">
               <Bot className="w-6 h-6 text-gray-300" />
@@ -557,6 +762,14 @@ export default function AiChatSidebar() {
                   : 'Frag mich nach Leads, Objekten oder E-Mails.'
                 }
               </p>
+              <div className="mt-4 mx-2 p-3 bg-gray-50 rounded-lg border border-gray-100 text-left">
+                <p className="text-[10px] text-gray-400 leading-relaxed">
+                  Jarvis ist ein KI-Assistent (GPT-5 mini). Deine Nachrichten werden 
+                  zur Verarbeitung an OpenAI übermittelt. Es werden keine Daten für 
+                  KI-Training verwendet. Alle Interaktionen werden protokolliert. 
+                  Antworten können fehlerhaft sein — bitte prüfe wichtige Angaben.
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -583,15 +796,26 @@ export default function AiChatSidebar() {
                   ? 'bg-indigo-600 text-white rounded-br-none' 
                   : 'bg-white text-gray-800 rounded-bl-none'
               }`}>
-                {/* Show tools used as tags */}
+                {/* Show tools used as tags - grouped by tool type with count */}
                 {msg.toolsUsed && msg.toolsUsed.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {msg.toolsUsed.map((tool, i) => (
-                      <span key={i} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 rounded-full px-2 py-0.5 text-[10px] font-medium">
-                        <span className="w-1 h-1 bg-indigo-500 rounded-full"></span>
-                        {TOOL_LABELS[tool] || tool}
-                      </span>
-                    ))}
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {(() => {
+                      // Group tools by name and count occurrences
+                      const toolCounts = msg.toolsUsed.reduce((acc, tool) => {
+                        acc[tool] = (acc[tool] || 0) + 1;
+                        return acc;
+                      }, {} as Record<string, number>);
+                      
+                      return Object.entries(toolCounts).map(([tool, count], i) => {
+                        const { label, icon } = getToolLabel(tool);
+                        return (
+                          <span key={i} className="inline-flex items-center gap-1 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 border border-indigo-100 rounded-md px-2 py-0.5 text-[10px] font-medium shadow-sm">
+                            <span>{icon}</span>
+                            {count > 1 ? `${count}x ${label}` : label}
+                          </span>
+                        );
+                      });
+                    })()}
                   </div>
                 )}
                 {/* Show attachments if any */}
@@ -707,16 +931,30 @@ export default function AiChatSidebar() {
             >
               <Paperclip className="w-4 h-4" />
             </button>
-            <button
-              type="submit"
-              disabled={isLoading || (!aiChatDraft.trim() && uploadedFiles.length === 0)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 transition-colors"
-            >
-              Senden
-              <Send className="w-3.5 h-3.5" />
-            </button>
+            {isLoading ? (
+              <button
+                type="button"
+                onClick={handleStop}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 text-white text-xs font-medium rounded-md hover:bg-red-600 transition-colors"
+              >
+                Stopp
+                <Square className="w-3 h-3 fill-current" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!aiChatDraft.trim() && uploadedFiles.length === 0}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 transition-colors"
+              >
+                Senden
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </form>
+        <p className="text-[10px] text-gray-400 text-center mt-2 leading-tight">
+          KI-generierte Antworten. Jarvis kann Fehler machen — wichtige Angaben bitte prüfen.
+        </p>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { signIn, signUp, confirmSignUp, resetPassword, confirmResetPassword, fetchAuthSession } from 'aws-amplify/auth';
+import { signIn, signUp, confirmSignUp, resetPassword, confirmResetPassword, fetchAuthSession, confirmSignIn } from 'aws-amplify/auth';
 import { Amplify } from 'aws-amplify';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react';
@@ -17,7 +17,7 @@ const COUNTRIES = [
   { code: 'LI', name: 'Liechtenstein', dialCode: '+423' },
 ];
 
-type AuthView = 'signIn' | 'signUp' | 'confirmSignUp' | 'forgotPassword' | 'confirmReset';
+type AuthView = 'signIn' | 'signUp' | 'confirmSignUp' | 'forgotPassword' | 'confirmReset' | 'onboarding' | 'newPasswordRequired';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -57,6 +57,10 @@ export default function LoginPage() {
   const [country, setCountry] = useState('Österreich');
   const [confirmationCode, setConfirmationCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  
+  // Onboarding fields
+  const [onboardingFirstName, setOnboardingFirstName] = useState('');
+  const [onboardingLastName, setOnboardingLastName] = useState('');
 
   // Check if already authenticated
   useEffect(() => {
@@ -79,9 +83,23 @@ export default function LoginPage() {
     setIsLoading(true);
     
     try {
-      await signIn({ username: email, password });
-      await syncUser();
-      router.push('/dashboard');
+      const signInResult = await signIn({ username: email, password });
+      
+      // Check if new password is required (invited user first login)
+      if (signInResult.nextStep?.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
+        setView('newPasswordRequired');
+        setIsLoading(false);
+        return;
+      }
+      
+      const syncResult = await syncUser();
+      
+      // Check if user needs onboarding (invited user first login)
+      if (syncResult.needsOnboarding) {
+        setView('onboarding');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err: any) {
       if (err.name === 'UserNotConfirmedException') {
         setView('confirmSignUp');
@@ -89,6 +107,107 @@ export default function LoginPage() {
       } else {
         setError(err.message || 'Anmeldung fehlgeschlagen');
       }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    if (!onboardingFirstName.trim() || !onboardingLastName.trim()) {
+      setError('Bitte gib deinen Vor- und Nachnamen ein');
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      setError('Passwörter stimmen nicht überein');
+      return;
+    }
+    
+    if (newPassword.length < 8) {
+      setError('Passwort muss mindestens 8 Zeichen lang sein');
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      // Confirm sign in with new password and required attributes
+      await confirmSignIn({ 
+        challengeResponse: newPassword,
+        options: {
+          userAttributes: {
+            given_name: onboardingFirstName.trim(),
+            family_name: onboardingLastName.trim()
+          }
+        }
+      });
+      
+      // Sync user to backend (will update name in DB)
+      const syncResult = await syncUser();
+      
+      // Update user profile with name in backend
+      const { getAuthHeaders } = await import('@/lib/api');
+      const { getRuntimeConfig } = await import('@/components/EnvProvider');
+      const headers = await getAuthHeaders();
+      const apiConfig = getRuntimeConfig();
+      
+      await fetch(`${apiConfig.apiUrl}/me`, {
+        method: 'PATCH',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          firstName: onboardingFirstName.trim(),
+          lastName: onboardingLastName.trim()
+        })
+      });
+      
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Fehler beim Setzen des Passworts');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleOnboarding = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    if (!onboardingFirstName.trim() || !onboardingLastName.trim()) {
+      setError('Bitte gib deinen Vor- und Nachnamen ein.');
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      const { getAuthHeaders } = await import('@/lib/api');
+      const { getRuntimeConfig } = await import('@/components/EnvProvider');
+      const headers = await getAuthHeaders();
+      const apiConfig = getRuntimeConfig();
+      
+      // Update user profile with name
+      const res = await fetch(`${apiConfig.apiUrl}/me`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: onboardingFirstName.trim(),
+          lastName: onboardingLastName.trim(),
+        }),
+      });
+      
+      if (!res.ok) {
+        throw new Error('Profil konnte nicht aktualisiert werden');
+      }
+      
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Fehler beim Speichern');
     } finally {
       setIsLoading(false);
     }
@@ -626,6 +745,146 @@ export default function LoginPage() {
                     Zurück zur Anmeldung
                   </button>
                 </p>
+              </form>
+            )}
+
+            {/* New Password Required - Invited User First Login */}
+            {view === 'newPasswordRequired' && (
+              <form onSubmit={handleNewPassword} className="space-y-5">
+                <div className="text-center mb-8">
+                  <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                    <span className="text-3xl">👋</span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900">Willkommen bei Immivo!</h3>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Vervollständige dein Profil und setze ein neues Passwort.
+                  </p>
+                </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                    {error}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Vorname *</label>
+                    <input
+                      type="text"
+                      value={onboardingFirstName}
+                      onChange={(e) => setOnboardingFirstName(e.target.value)}
+                      placeholder="Max"
+                      className={inputClass}
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Nachname *</label>
+                    <input
+                      type="text"
+                      value={onboardingLastName}
+                      onChange={(e) => setOnboardingLastName(e.target.value)}
+                      placeholder="Mustermann"
+                      className={inputClass}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <label className={labelClass}>Neues Passwort *</label>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Mindestens 8 Zeichen"
+                    className={inputClass}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <label className={labelClass}>Passwort bestätigen *</label>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Passwort wiederholen"
+                    className={inputClass}
+                    required
+                  />
+                </div>
+
+                <button type="submit" disabled={isLoading} className={buttonClass}>
+                  {isLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                  ) : (
+                    'Konto aktivieren'
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* Onboarding - Complete Profile */}
+            {view === 'onboarding' && (
+              <form onSubmit={handleOnboarding} className="space-y-5">
+                <div className="text-center mb-8">
+                  <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                    <span className="text-3xl">👋</span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900">Willkommen bei Immivo!</h3>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Bitte vervollständige dein Profil, um loszulegen.
+                  </p>
+                </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                    {error}
+                  </div>
+                )}
+
+                <div>
+                  <label className={labelClass}>Vorname *</label>
+                  <input
+                    type="text"
+                    value={onboardingFirstName}
+                    onChange={(e) => setOnboardingFirstName(e.target.value)}
+                    placeholder="Max"
+                    className={inputClass}
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Nachname *</label>
+                  <input
+                    type="text"
+                    value={onboardingLastName}
+                    onChange={(e) => setOnboardingLastName(e.target.value)}
+                    placeholder="Mustermann"
+                    className={inputClass}
+                    required
+                  />
+                </div>
+
+                <button type="submit" disabled={isLoading} className={buttonClass}>
+                  {isLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                  ) : (
+                    'Profil speichern & loslegen'
+                  )}
+                </button>
               </form>
             )}
           </div>

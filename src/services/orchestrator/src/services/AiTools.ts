@@ -2,6 +2,16 @@ import { PrismaClient } from '@prisma/client';
 import { SchemaType, FunctionDeclarationSchema } from '@google/generative-ai';
 import { randomUUID } from 'crypto';
 import { ConversationMemory } from './ConversationMemory';
+import { CalendarService } from './CalendarService';
+import { encryptionService } from './EncryptionService';
+import { google } from 'googleapis';
+
+// Helper function to get Google Email config at runtime
+const getGoogleEmailConfig = () => ({
+  clientId: process.env.GOOGLE_CALENDAR_CLIENT_ID || '',
+  clientSecret: process.env.GOOGLE_CALENDAR_CLIENT_SECRET || '',
+  redirectUri: process.env.GOOGLE_EMAIL_REDIRECT_URI || 'http://localhost:3001/email/gmail/callback'
+});
 
 // Prisma client will be injected from index.ts
 let prisma: PrismaClient;
@@ -136,19 +146,19 @@ export const CRM_TOOLS = {
   },
   get_leads: {
     name: "get_leads",
-    description: "Retrieves leads from the CRM. Can filter by status or search by name/email.",
+    description: "Retrieves leads from the CRM. Use search to find leads by full name (e.g. 'Anna Schmidt'), first name, last name, email, or phone. Always use this first when the user asks about a specific lead.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        status: { type: SchemaType.STRING, description: "Filter by status: NEW, CONTACTED, QUALIFIED, LOST" } as FunctionDeclarationSchema,
-        search: { type: SchemaType.STRING, description: "Search by name or email (partial match)" } as FunctionDeclarationSchema,
+        status: { type: SchemaType.STRING, description: "Filter by status: NEW, CONTACTED, CONVERSATION, BOOKED, LOST" } as FunctionDeclarationSchema,
+        search: { type: SchemaType.STRING, description: "Search by full name, first name, last name, email, or phone. Supports multi-word search like 'Anna Schmidt'." } as FunctionDeclarationSchema,
         limit: { type: SchemaType.NUMBER, description: "Maximum number of leads to return (default: 50)" } as FunctionDeclarationSchema,
       }
     }
   },
   get_lead: {
     name: "get_lead",
-    description: "Retrieves a specific lead by ID.",
+    description: "Retrieves ALL details of a specific lead by ID, including documents, messages, property, activities. Use after get_leads to answer follow-up questions about a specific lead. If the user asks about a lead's documents, notes, messages etc. and you already have the ID from a previous get_leads call, use this tool.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -291,6 +301,17 @@ export const CRM_TOOLS = {
       required: ["propertyId"]
     }
   },
+  upload_documents_to_lead: {
+    name: "upload_documents_to_lead",
+    description: "Uploads files/documents/images that were attached to the chat message to a specific lead. Use this when the user sends files and asks to add them to a lead. The files are automatically taken from the chat attachments.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        leadId: { type: SchemaType.STRING, description: "ID of the lead to upload documents to. Get this from get_leads first." } as FunctionDeclarationSchema,
+      },
+      required: ["leadId"]
+    }
+  },
   get_property_images: {
     name: "get_property_images",
     description: "Gets all images and floorplans of a property. Returns URLs and counts.",
@@ -341,25 +362,50 @@ export const CRM_TOOLS = {
       required: ["propertyId", "imageUrl", "toFloorplan"]
     }
   },
-  // === EMAIL TOOLS ===
-  get_emails: {
-    name: "get_emails",
-    description: "Retrieves emails from the inbox. Can filter by status.",
+  // === TEAM & CONTACTS TOOLS ===
+  get_team_members: {
+    name: "get_team_members",
+    description: "Retrieves all team members (agents/seats) in the company. Use this to find colleagues' email addresses when the user wants to send an email to a team member by name.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        status: { type: SchemaType.STRING, description: "Filter by status: UNREAD, READ, ARCHIVED" } as FunctionDeclarationSchema,
-        limit: { type: SchemaType.NUMBER, description: "Maximum number of emails (default: 50)" } as FunctionDeclarationSchema,
+        search: { type: SchemaType.STRING, description: "Optional: Search by name" } as FunctionDeclarationSchema,
+      }
+    }
+  },
+  search_contacts: {
+    name: "search_contacts",
+    description: "Searches for contacts in the CRM (leads). Use this to find a contact's email address when the user wants to send an email to someone by name.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        query: { type: SchemaType.STRING, description: "Search term (name, email, phone)" } as FunctionDeclarationSchema,
+        limit: { type: SchemaType.NUMBER, description: "Maximum results (default: 10)" } as FunctionDeclarationSchema,
+      },
+      required: ["query"]
+    }
+  },
+  // === EMAIL TOOLS ===
+  get_emails: {
+    name: "get_emails",
+    description: "Retrieves emails from the user's mailbox. Can filter by folder, unread status, or search term. Returns a list with subject, sender, date, and preview.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        folder: { type: SchemaType.STRING, description: "Filter by folder: INBOX, SENT, DRAFTS, TRASH" } as FunctionDeclarationSchema,
+        unreadOnly: { type: SchemaType.BOOLEAN, description: "If true, only return unread emails" } as FunctionDeclarationSchema,
+        search: { type: SchemaType.STRING, description: "Search term to filter by subject, sender, or content" } as FunctionDeclarationSchema,
+        limit: { type: SchemaType.NUMBER, description: "Maximum number of emails (default: 50, max: 100)" } as FunctionDeclarationSchema,
       }
     }
   },
   get_email: {
     name: "get_email",
-    description: "Retrieves a specific email by ID.",
+    description: "Retrieves the full content of a specific email by ID, including the complete body text.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        emailId: { type: SchemaType.STRING, description: "ID of the email" } as FunctionDeclarationSchema,
+        emailId: { type: SchemaType.STRING, description: "ID of the email to retrieve" } as FunctionDeclarationSchema,
       },
       required: ["emailId"]
     }
@@ -408,60 +454,62 @@ export const CRM_TOOLS = {
   // === CALENDAR TOOLS ===
   get_calendar_events: {
     name: "get_calendar_events",
-    description: "Retrieves calendar events for a date range.",
+    description: "Retrieves all calendar events (appointments, meetings, viewings) for a date range from the user's connected Google or Outlook calendar. Use this to check what appointments exist, find free slots, or answer questions about the user's schedule.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        start: { type: SchemaType.STRING, description: "Start date (ISO string)" } as FunctionDeclarationSchema,
-        end: { type: SchemaType.STRING, description: "End date (ISO string)" } as FunctionDeclarationSchema,
+        start: { type: SchemaType.STRING, description: "Start date (ISO string, e.g. '2026-02-06T00:00:00.000Z')" } as FunctionDeclarationSchema,
+        end: { type: SchemaType.STRING, description: "End date (ISO string, e.g. '2026-02-13T23:59:59.000Z')" } as FunctionDeclarationSchema,
       },
       required: ["start", "end"]
     }
   },
   create_calendar_event: {
     name: "create_calendar_event",
-    description: "Creates a new calendar event/appointment.",
+    description: "Creates a new calendar event/appointment in the user's connected Google or Outlook calendar. Use this to schedule viewings, meetings, or any other appointments. The event will appear in the user's real calendar.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        title: { type: SchemaType.STRING, description: "Event title" } as FunctionDeclarationSchema,
-        description: { type: SchemaType.STRING, description: "Event description" } as FunctionDeclarationSchema,
-        start: { type: SchemaType.STRING, description: "Start date/time (ISO string)" } as FunctionDeclarationSchema,
-        end: { type: SchemaType.STRING, description: "End date/time (ISO string)" } as FunctionDeclarationSchema,
-        location: { type: SchemaType.STRING, description: "Event location" } as FunctionDeclarationSchema,
-        attendees: { type: SchemaType.STRING, description: "Comma-separated email addresses" } as FunctionDeclarationSchema,
+        title: { type: SchemaType.STRING, description: "Event title (e.g. 'Besichtigung: Musterstraße 1')" } as FunctionDeclarationSchema,
+        description: { type: SchemaType.STRING, description: "Event description with details" } as FunctionDeclarationSchema,
+        start: { type: SchemaType.STRING, description: "Start date/time (ISO string, e.g. '2026-02-10T14:00:00.000Z')" } as FunctionDeclarationSchema,
+        end: { type: SchemaType.STRING, description: "End date/time (ISO string, e.g. '2026-02-10T15:00:00.000Z')" } as FunctionDeclarationSchema,
+        location: { type: SchemaType.STRING, description: "Event location/address" } as FunctionDeclarationSchema,
+        attendees: { type: SchemaType.STRING, description: "Comma-separated email addresses of attendees" } as FunctionDeclarationSchema,
       },
       required: ["title", "start", "end"]
     }
   },
   update_calendar_event: {
     name: "update_calendar_event",
-    description: "Updates an existing calendar event.",
+    description: "Updates an existing calendar event. Use this to change the time, title, location, or description of an appointment. You need the eventId from get_calendar_events.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        eventId: { type: SchemaType.STRING, description: "ID of the event" } as FunctionDeclarationSchema,
-        title: { type: SchemaType.STRING, description: "New title" } as FunctionDeclarationSchema,
-        start: { type: SchemaType.STRING, description: "New start time" } as FunctionDeclarationSchema,
-        end: { type: SchemaType.STRING, description: "New end time" } as FunctionDeclarationSchema,
+        eventId: { type: SchemaType.STRING, description: "ID of the event (from get_calendar_events)" } as FunctionDeclarationSchema,
+        title: { type: SchemaType.STRING, description: "New title (optional)" } as FunctionDeclarationSchema,
+        start: { type: SchemaType.STRING, description: "New start time (ISO string, optional)" } as FunctionDeclarationSchema,
+        end: { type: SchemaType.STRING, description: "New end time (ISO string, optional)" } as FunctionDeclarationSchema,
+        location: { type: SchemaType.STRING, description: "New location (optional)" } as FunctionDeclarationSchema,
+        description: { type: SchemaType.STRING, description: "New description (optional)" } as FunctionDeclarationSchema,
       },
       required: ["eventId"]
     }
   },
   delete_calendar_event: {
     name: "delete_calendar_event",
-    description: "Deletes a calendar event.",
+    description: "Deletes/cancels a calendar event. Use this to remove appointments from the user's calendar. You need the eventId from get_calendar_events.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        eventId: { type: SchemaType.STRING, description: "ID of the event to delete" } as FunctionDeclarationSchema,
+        eventId: { type: SchemaType.STRING, description: "ID of the event to delete (from get_calendar_events)" } as FunctionDeclarationSchema,
       },
       required: ["eventId"]
     }
   },
   get_calendar_availability: {
     name: "get_calendar_availability",
-    description: "Checks calendar availability for a given date range.",
+    description: "Checks calendar availability for a given date range. Returns busy slots and a summary of how many appointments exist. Use this to find free time slots for scheduling new appointments.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -475,7 +523,7 @@ export const CRM_TOOLS = {
   // === EXPOSÉ TOOLS (non-editor) ===
   get_exposes: {
     name: "get_exposes",
-    description: "Retrieves all Exposés. Can filter by status.",
+    description: "Retrieves all existing Exposés for this tenant. Use this FIRST when the user asks about exposés, how many exist, or wants to work with them. Can filter by status or property.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -624,7 +672,7 @@ export const CRM_TOOLS = {
   },
   get_expose_templates: {
     name: "get_expose_templates",
-    description: "Retrieves all Exposé templates.",
+    description: "Retrieves all existing Exposé templates (Vorlagen) for this tenant. Use this when the user asks about templates/Vorlagen or wants to see which ones exist.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -835,11 +883,12 @@ Date: {{date.today}}, {{date.year}}`,
   },
   create_full_expose: {
     name: "create_full_expose",
-    description: "Creates a complete professional Exposé with all necessary blocks based on property data and user preferences. This is the main tool for generating a full Exposé.",
+    description: "Creates a complete professional Exposé or Template with all necessary blocks. Use templateId for templates (with placeholder variables like {{property.title}}) or exposeId for real exposes with property data. IMPORTANT: When working on a template, always use templateId, NOT exposeId.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        exposeId: { type: SchemaType.STRING, description: "ID of the Exposé to populate" } as FunctionDeclarationSchema,
+        exposeId: { type: SchemaType.STRING, description: "ID of the Exposé to populate (for real exposes, not templates)" } as FunctionDeclarationSchema,
+        templateId: { type: SchemaType.STRING, description: "ID of the Template to populate (for templates - uses placeholder variables)" } as FunctionDeclarationSchema,
         style: { 
           type: SchemaType.STRING, 
           description: "Visual style: luxurious (elegant, high-end), modern (clean, minimalist), warm (friendly, inviting), professional (business-like)" 
@@ -854,7 +903,7 @@ Date: {{date.today}}, {{date.year}}`,
         } as FunctionDeclarationSchema,
         customInstructions: { type: SchemaType.STRING, description: "Any additional instructions from the user" } as FunctionDeclarationSchema,
       },
-      required: ["exposeId"]
+      required: []
     }
   },
   set_expose_theme: {
@@ -911,7 +960,7 @@ Date: {{date.today}}, {{date.year}}`,
 };
 
 export class AiToolExecutor {
-  static async execute(toolName: string, args: any, tenantId: string, userId?: string) {
+  static async execute(toolName: string, args: any, tenantId: string, userId?: string): Promise<any> {
     console.log(`Executing tool ${toolName} for tenant ${tenantId} with args:`, args);
 
     switch (toolName) {
@@ -1025,7 +1074,14 @@ export class AiToolExecutor {
             source,
             messages: message ? {
               create: { role: 'USER', content: message }
-            } : undefined
+            } : undefined,
+            activities: {
+              create: {
+                type: 'LEAD_CREATED',
+                description: `Lead ${firstName} ${lastName} erstellt`,
+                createdBy: userId
+              }
+            }
           }
         });
       }
@@ -1033,14 +1089,47 @@ export class AiToolExecutor {
       case 'get_leads': {
         const { status, search, limit = 50 } = args;
         
-        // Build search conditions
-        const searchConditions = search ? {
-          OR: [
-            { firstName: { contains: search, mode: 'insensitive' as const } },
-            { lastName: { contains: search, mode: 'insensitive' as const } },
-            { email: { contains: search, mode: 'insensitive' as const } },
-          ]
-        } : {};
+        // Build search conditions - split search into parts to match "Anna Schmidt" against firstName + lastName
+        let searchConditions: any = {};
+        if (search) {
+          const searchParts = search.trim().split(/\s+/);
+          
+          if (searchParts.length >= 2) {
+            // Multi-word search: try matching firstName + lastName combination AND individual parts
+            searchConditions = {
+              OR: [
+                // Match first word as firstName AND second word as lastName
+                {
+                  AND: [
+                    { firstName: { contains: searchParts[0], mode: 'insensitive' as const } },
+                    { lastName: { contains: searchParts.slice(1).join(' '), mode: 'insensitive' as const } },
+                  ]
+                },
+                // Also try reversed (lastName first)
+                {
+                  AND: [
+                    { lastName: { contains: searchParts[0], mode: 'insensitive' as const } },
+                    { firstName: { contains: searchParts.slice(1).join(' '), mode: 'insensitive' as const } },
+                  ]
+                },
+                // Individual parts match any field
+                ...searchParts.map((part: string) => ({ firstName: { contains: part, mode: 'insensitive' as const } })),
+                ...searchParts.map((part: string) => ({ lastName: { contains: part, mode: 'insensitive' as const } })),
+                { email: { contains: search, mode: 'insensitive' as const } },
+              ]
+            };
+          } else {
+            // Single-word search
+            searchConditions = {
+              OR: [
+                { firstName: { contains: search, mode: 'insensitive' as const } },
+                { lastName: { contains: search, mode: 'insensitive' as const } },
+                { email: { contains: search, mode: 'insensitive' as const } },
+                { phone: { contains: search, mode: 'insensitive' as const } },
+              ]
+            };
+          }
+        }
         
         return await getPrisma().lead.findMany({
           where: { 
@@ -1057,8 +1146,27 @@ export class AiToolExecutor {
             email: true,
             phone: true,
             status: true,
+            notes: true,
+            source: true,
+            salutation: true,
+            formalAddress: true,
+            budgetMin: true,
+            budgetMax: true,
+            preferredType: true,
+            preferredLocation: true,
+            minRooms: true,
+            minArea: true,
+            timeFrame: true,
+            financingStatus: true,
+            documents: true,
+            alternateEmails: true,
             createdAt: true,
-            propertyId: true
+            updatedAt: true,
+            propertyId: true,
+            assignedToId: true,
+            property: {
+              select: { id: true, title: true, address: true }
+            }
           }
         });
       }
@@ -1067,16 +1175,49 @@ export class AiToolExecutor {
         const { leadId } = args;
         return await getPrisma().lead.findFirst({
           where: { id: leadId, tenantId },
-          include: { messages: true }
+          include: { 
+            messages: { orderBy: { createdAt: 'desc' }, take: 20 },
+            property: { select: { id: true, title: true, address: true, propertyType: true, salePrice: true, rentCold: true } },
+            activities: { orderBy: { createdAt: 'desc' }, take: 10, select: { type: true, description: true, createdAt: true } }
+          }
         });
       }
 
       case 'update_lead': {
         const { leadId, ...updateData } = args;
-        return await getPrisma().lead.update({
+        
+        // Get current lead to compare changes
+        const currentLead = await getPrisma().lead.findUnique({ where: { id: leadId } });
+        
+        const updatedLead = await getPrisma().lead.update({
           where: { id: leadId },
           data: updateData
         });
+        
+        // Create activities for important changes
+        if (currentLead && updateData.status && currentLead.status !== updateData.status) {
+          await getPrisma().leadActivity.create({
+            data: {
+              leadId,
+              type: 'STATUS_CHANGED',
+              description: `Status geändert: ${currentLead.status} → ${updateData.status}`,
+              createdBy: userId
+            }
+          });
+        }
+        
+        if (updateData.notes && currentLead?.notes !== updateData.notes) {
+          await getPrisma().leadActivity.create({
+            data: {
+              leadId,
+              type: 'NOTE_ADDED',
+              description: 'Notiz aktualisiert',
+              createdBy: userId
+            }
+          });
+        }
+        
+        return updatedLead;
       }
 
       case 'delete_lead': {
@@ -1189,6 +1330,45 @@ export class AiToolExecutor {
         
         const typeLabel = isFloorplan ? 'Grundriss(e)' : 'Bild(er)';
         return `${_uploadedFiles.length} ${typeLabel} wurden zum Objekt "${property.title}" hinzugefügt.`;
+      }
+
+      case 'upload_documents_to_lead': {
+        const { leadId, _uploadedFiles } = args;
+        
+        if (!_uploadedFiles || _uploadedFiles.length === 0) {
+          return 'Keine Dateien zum Hochladen gefunden. Bitte hänge zuerst Dateien an deine Nachricht an.';
+        }
+        
+        // Verify lead belongs to tenant
+        const lead = await getPrisma().lead.findFirst({ 
+          where: { id: leadId, tenantId } 
+        });
+        
+        if (!lead) {
+          return `Lead mit ID ${leadId} nicht gefunden.`;
+        }
+        
+        // Build document entries
+        const existingDocs = (lead.documents as any[]) || [];
+        const newDocs = _uploadedFiles.map((url: string) => ({
+          id: `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          name: url.split('/').pop() || 'Dokument',
+          url: url,
+          type: url.match(/\.(pdf)$/i) ? 'application/pdf' 
+              : url.match(/\.(doc|docx)$/i) ? 'application/msword'
+              : url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image/' + (url.match(/\.(\w+)$/)?.[1] || 'jpeg')
+              : 'application/octet-stream',
+          size: 0,
+          uploadedAt: new Date().toISOString(),
+        }));
+        
+        await getPrisma().lead.update({
+          where: { id: leadId },
+          data: { documents: [...existingDocs, ...newDocs] }
+        });
+        
+        const leadName = [lead.firstName, lead.lastName].filter(Boolean).join(' ') || lead.email;
+        return `${newDocs.length} Dokument(e) wurden zum Lead "${leadName}" hinzugefügt.`;
       }
 
       case 'get_property_images': {
@@ -1320,59 +1500,699 @@ export class AiToolExecutor {
         });
       }
 
+      // === TEAM & CONTACTS TOOLS ===
+      case 'get_team_members': {
+        const { search, includeMe } = args;
+        
+        const where: any = { tenantId };
+        if (search) {
+          where.OR = [
+            { name: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } },
+          ];
+        }
+        
+        const members = await getPrisma().user.findMany({
+          where,
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+          orderBy: { name: 'asc' }
+        });
+        
+        // Separate current user from other team members
+        const currentUser = members.find(m => m.id === userId);
+        const otherMembers = members.filter(m => m.id !== userId);
+        
+        return {
+          currentUser: currentUser ? {
+            id: currentUser.id,
+            name: currentUser.name || currentUser.email.split('@')[0],
+            email: currentUser.email,
+            role: currentUser.role,
+            isYou: true,
+          } : null,
+          teamMembers: otherMembers.map(m => ({
+            id: m.id,
+            name: m.name || m.email.split('@')[0],
+            email: m.email,
+            role: m.role,
+          })),
+          total: otherMembers.length,
+          note: `Du bist ${currentUser?.name || 'der aktuelle Benutzer'} (${currentUser?.role}). Die anderen ${otherMembers.length} Teammitglieder sind oben aufgelistet.`
+        };
+      }
+
+      case 'search_contacts': {
+        const { query, limit = 10 } = args;
+        
+        const leads = await getPrisma().lead.findMany({
+          where: {
+            tenantId,
+            OR: [
+              { firstName: { contains: query, mode: 'insensitive' } },
+              { lastName: { contains: query, mode: 'insensitive' } },
+              { email: { contains: query, mode: 'insensitive' } },
+              { phone: { contains: query, mode: 'insensitive' } },
+            ]
+          },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            status: true,
+          },
+          take: Math.min(limit, 50),
+          orderBy: { createdAt: 'desc' }
+        });
+        
+        return {
+          total: leads.length,
+          contacts: leads.map(l => ({
+            id: l.id,
+            name: `${l.firstName || ''} ${l.lastName || ''}`.trim() || 'Unbekannt',
+            email: l.email,
+            phone: l.phone,
+            status: l.status,
+            type: 'lead'
+          }))
+        };
+      }
+
       // === EMAIL TOOLS ===
       case 'get_emails': {
-        const { status, limit = 50 } = args;
-        // TODO: Implement actual email fetching when email system is ready
-        return { message: "Email-System noch nicht implementiert. Coming soon!" };
+        const { folder, limit = 50, unreadOnly, search } = args;
+        
+        const where: any = { tenantId };
+        if (folder) where.folder = folder;
+        if (unreadOnly) where.isRead = false;
+        if (search) {
+          where.OR = [
+            { subject: { contains: search, mode: 'insensitive' } },
+            { from: { contains: search, mode: 'insensitive' } },
+            { fromName: { contains: search, mode: 'insensitive' } },
+            { bodyText: { contains: search, mode: 'insensitive' } },
+          ];
+        }
+        
+        const emails = await getPrisma().email.findMany({
+          where,
+          orderBy: { receivedAt: 'desc' },
+          take: Math.min(limit, 100),
+          select: {
+            id: true,
+            from: true,
+            fromName: true,
+            to: true,
+            subject: true,
+            folder: true,
+            isRead: true,
+            hasAttachments: true,
+            receivedAt: true,
+            sentAt: true,
+            leadId: true,
+            bodyText: true,
+          }
+        });
+        
+        // Return summary for each email
+        return {
+          total: emails.length,
+          emails: emails.map(e => ({
+            id: e.id,
+            from: e.fromName || e.from,
+            to: e.to,
+            subject: e.subject,
+            folder: e.folder,
+            isRead: e.isRead,
+            hasAttachments: e.hasAttachments,
+            date: (e.receivedAt || e.sentAt)?.toISOString(),
+            preview: e.bodyText?.substring(0, 150) + (e.bodyText && e.bodyText.length > 150 ? '...' : ''),
+            leadId: e.leadId,
+          }))
+        };
       }
 
       case 'get_email': {
         const { emailId } = args;
-        return { message: "Email-System noch nicht implementiert. Coming soon!" };
+        const email = await getPrisma().email.findFirst({
+          where: { id: emailId, tenantId }
+        });
+        if (!email) {
+          return { error: "Email nicht gefunden" };
+        }
+        return {
+          id: email.id,
+          from: email.from,
+          fromName: email.fromName,
+          to: email.to,
+          cc: email.cc,
+          subject: email.subject,
+          body: email.bodyText || email.bodyHtml?.replace(/<[^>]*>/g, ''),
+          bodyHtml: email.bodyHtml,
+          folder: email.folder,
+          isRead: email.isRead,
+          receivedAt: email.receivedAt?.toISOString(),
+          sentAt: email.sentAt?.toISOString(),
+          leadId: email.leadId,
+        };
       }
 
       case 'draft_email': {
         const { to, subject, body, leadId } = args;
-        return { message: `Email-Entwurf erstellt an ${to} mit Betreff "${subject}". Noch nicht implementiert.` };
+        
+        // Get user's signature and full name
+        const user = userId 
+          ? await getPrisma().user.findUnique({
+              where: { id: userId },
+              include: { settings: true }
+            })
+          : await getPrisma().user.findFirst({
+              where: { tenantId },
+              include: { settings: true }
+            });
+        
+        // Build full sender name from firstName + lastName
+        const senderName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.name || '';
+        
+        let finalBody = body;
+        if (user?.settings?.emailSignature) {
+          finalBody = body + '\n\n' + user.settings.emailSignature;
+        }
+        
+        const draft = await getPrisma().email.create({
+          data: {
+            tenantId,
+            from: user?.email || 'noreply@immivo.ai',
+            fromName: senderName || undefined,
+            to: [to],
+            subject,
+            bodyText: finalBody,
+            bodyHtml: finalBody.replace(/\n/g, '<br>'),
+            folder: 'DRAFTS',
+            isRead: true,
+            leadId: leadId || undefined,
+            providerData: { aiGenerated: true, generatedBy: 'jarvis' },
+          }
+        });
+        
+        return { 
+          success: true, 
+          message: `Email-Entwurf erstellt an ${to} mit Betreff "${subject}".`,
+          draftId: draft.id 
+        };
       }
 
       case 'send_email': {
         const { to, subject, body, leadId } = args;
-        return { message: `Email würde gesendet an ${to}. Email-System noch nicht implementiert.` };
+        
+        // Get tenant settings for email provider
+        const settings = await getPrisma().tenantSettings.findUnique({
+          where: { tenantId }
+        });
+        
+        // Get user's signature and full name
+        const user = userId 
+          ? await getPrisma().user.findUnique({
+              where: { id: userId },
+              include: { settings: true }
+            })
+          : await getPrisma().user.findFirst({
+              where: { tenantId },
+              include: { settings: true }
+            });
+        
+        // Build full sender name from firstName + lastName
+        const senderName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.name || '';
+        const fromHeader = senderName 
+          ? `"${senderName}" <${user?.email || 'noreply@immivo.ai'}>`
+          : (user?.email || 'noreply@immivo.ai');
+        
+        let finalBody = body;
+        if (user?.settings?.emailSignature) {
+          finalBody = body + '\n\n' + user.settings.emailSignature;
+        }
+        
+        if (!settings?.gmailConfig && !settings?.smtpConfig) {
+          return { error: "Kein Email-Provider konfiguriert. Bitte Gmail oder SMTP in den Einstellungen verbinden." };
+        }
+        
+        // Try Gmail first
+        if (settings?.gmailConfig) {
+          try {
+            const config = settings.gmailConfig as any;
+            let accessToken = config.accessToken;
+            let refreshToken = config.refreshToken;
+            
+            try { accessToken = encryptionService.decrypt(accessToken); } catch {}
+            try { refreshToken = encryptionService.decrypt(refreshToken); } catch {}
+            
+            const googleConfig = getGoogleEmailConfig();
+            const oauth2Client = new google.auth.OAuth2(
+              googleConfig.clientId,
+              googleConfig.clientSecret,
+              googleConfig.redirectUri
+            );
+            oauth2Client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+            
+            const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+            
+            const emailLines = [
+              `From: ${fromHeader}`,
+              `To: ${to}`,
+              `Subject: ${subject}`,
+              'MIME-Version: 1.0',
+              'Content-Type: text/html; charset=utf-8',
+              '',
+              finalBody.replace(/\n/g, '<br>')
+            ];
+            
+            const rawMessage = Buffer.from(emailLines.join('\r\n'))
+              .toString('base64')
+              .replace(/\+/g, '-')
+              .replace(/\//g, '_')
+              .replace(/=+$/, '');
+            
+            await gmail.users.messages.send({
+              userId: 'me',
+              requestBody: { raw: rawMessage }
+            });
+            
+            // Save to sent folder
+            await getPrisma().email.create({
+              data: {
+                tenantId,
+                from: user?.email || 'noreply@immivo.ai',
+                fromName: senderName || undefined,
+                to: [to],
+                subject,
+                bodyText: finalBody,
+                bodyHtml: finalBody.replace(/\n/g, '<br>'),
+                folder: 'SENT',
+                isRead: true,
+                provider: 'GMAIL',
+                leadId: leadId || undefined,
+                sentAt: new Date(),
+                providerData: { aiGenerated: true, generatedBy: 'jarvis' },
+              }
+            });
+            
+            // If linked to a lead, create a message record and activity
+            if (leadId) {
+              await getPrisma().message.create({
+                data: {
+                  leadId,
+                  role: 'ASSISTANT',
+                  content: `Subject: ${subject}\n\n${finalBody}`,
+                  status: 'SENT'
+                }
+              });
+              
+              // Create activity for email sent
+              await getPrisma().leadActivity.create({
+                data: {
+                  leadId,
+                  type: 'EMAIL_SENT',
+                  description: `E-Mail gesendet: "${subject}"`,
+                  createdBy: userId
+                }
+              });
+            }
+            
+            return { 
+              success: true, 
+              message: `Email erfolgreich gesendet an ${to} mit Betreff "${subject}".`
+            };
+          } catch (gmailError: any) {
+            console.error('Gmail send error:', gmailError);
+            return { error: `Fehler beim Senden via Gmail: ${gmailError.message}` };
+          }
+        }
+        
+        return { error: "Email konnte nicht gesendet werden." };
       }
 
       case 'reply_to_email': {
         const { emailId, body } = args;
-        return { message: "Email-Antwort noch nicht implementiert. Coming soon!" };
+        
+        // Get original email
+        const originalEmail = await getPrisma().email.findFirst({
+          where: { id: emailId, tenantId }
+        });
+        
+        if (!originalEmail) {
+          return { error: "Original-Email nicht gefunden" };
+        }
+        
+        // Use send_email logic - call recursively
+        const replySubject = originalEmail.subject.startsWith('Re:') 
+          ? originalEmail.subject 
+          : `Re: ${originalEmail.subject}`;
+        
+        return AiToolExecutor.execute('send_email', {
+          to: originalEmail.from,
+          subject: replySubject,
+          body: body,
+          leadId: originalEmail.leadId,
+        }, tenantId, userId);
       }
 
       // === CALENDAR TOOLS ===
       case 'get_calendar_events': {
         const { start, end } = args;
-        // TODO: Implement Google/Outlook Calendar integration
-        return { message: "Kalender-Integration noch nicht implementiert. Coming soon!" };
+        
+        // Get user's tenant settings for calendar config
+        const user = await getPrisma().user.findFirst({
+          where: { tenantId },
+          select: { tenantId: true }
+        });
+        
+        if (!user) {
+          return { error: "Benutzer nicht gefunden" };
+        }
+        
+        const settings = await getPrisma().tenantSettings.findUnique({
+          where: { tenantId },
+          select: { googleCalendarConfig: true, outlookCalendarConfig: true }
+        });
+        
+        if (!settings?.googleCalendarConfig && !settings?.outlookCalendarConfig) {
+          return { error: "Kein Kalender verbunden. Bitte verbinde zuerst Google Calendar oder Outlook unter Einstellungen > Kalender." };
+        }
+        
+        const events: any[] = [];
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        
+        // Fetch from Google Calendar
+        if (settings?.googleCalendarConfig) {
+          try {
+            const encryptedConfig = settings.googleCalendarConfig as any;
+            const accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+            const refreshToken = encryptionService.decrypt(encryptedConfig.refreshToken);
+            
+            const googleEvents = await CalendarService.getGoogleEvents(
+              accessToken,
+              refreshToken,
+              startDate,
+              endDate
+            );
+            events.push(...googleEvents);
+          } catch (error: any) {
+            console.error('Error fetching Google Calendar events:', error);
+            return { error: "Fehler beim Abrufen der Google Calendar Events. Möglicherweise muss der Kalender neu verbunden werden." };
+          }
+        }
+        
+        // Fetch from Outlook Calendar
+        if (settings?.outlookCalendarConfig) {
+          try {
+            const encryptedConfig = settings.outlookCalendarConfig as any;
+            const accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+            
+            const outlookEvents = await CalendarService.getOutlookEvents(
+              accessToken,
+              startDate,
+              endDate
+            );
+            events.push(...outlookEvents);
+          } catch (error: any) {
+            console.error('Error fetching Outlook Calendar events:', error);
+            return { error: "Fehler beim Abrufen der Outlook Calendar Events. Möglicherweise muss der Kalender neu verbunden werden." };
+          }
+        }
+        
+        // Sort by start time
+        events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+        
+        return {
+          events,
+          count: events.length,
+          period: { start, end }
+        };
       }
 
       case 'create_calendar_event': {
         const { title, description, start, end, location, attendees } = args;
-        return { message: `Termin "${title}" würde erstellt für ${start}. Kalender-Integration noch nicht implementiert.` };
+        
+        const settings = await getPrisma().tenantSettings.findUnique({
+          where: { tenantId },
+          select: { googleCalendarConfig: true, outlookCalendarConfig: true }
+        });
+        
+        if (!settings?.googleCalendarConfig && !settings?.outlookCalendarConfig) {
+          return { error: "Kein Kalender verbunden. Bitte verbinde zuerst Google Calendar oder Outlook unter Einstellungen > Kalender." };
+        }
+        
+        let createdEvent = null;
+        
+        // Create in Google Calendar
+        if (settings?.googleCalendarConfig) {
+          try {
+            const encryptedConfig = settings.googleCalendarConfig as any;
+            const accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+            const refreshToken = encryptionService.decrypt(encryptedConfig.refreshToken);
+            
+            createdEvent = await CalendarService.createViewingEvent({
+              provider: 'google',
+              config: { accessToken, refreshToken },
+              start: new Date(start),
+              end: new Date(end),
+              title,
+              description,
+              location,
+              attendeeEmail: attendees?.split(',')[0]?.trim()
+            });
+          } catch (error: any) {
+            console.error('Error creating Google Calendar event:', error);
+            return { error: "Fehler beim Erstellen des Termins in Google Calendar." };
+          }
+        }
+        // Create in Outlook Calendar
+        else if (settings?.outlookCalendarConfig) {
+          try {
+            const encryptedConfig = settings.outlookCalendarConfig as any;
+            const accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+            
+            createdEvent = await CalendarService.createViewingEvent({
+              provider: 'outlook',
+              config: { accessToken },
+              start: new Date(start),
+              end: new Date(end),
+              title,
+              description,
+              location,
+              attendeeEmail: attendees?.split(',')[0]?.trim()
+            });
+          } catch (error: any) {
+            console.error('Error creating Outlook Calendar event:', error);
+            return { error: "Fehler beim Erstellen des Termins in Outlook Calendar." };
+          }
+        }
+        
+        return {
+          success: true,
+          message: `Termin "${title}" wurde erfolgreich erstellt.`,
+          eventId: createdEvent?.eventId,
+          link: createdEvent?.link
+        };
       }
 
       case 'update_calendar_event': {
-        const { eventId, title, start, end } = args;
-        return { message: "Termin-Aktualisierung noch nicht implementiert. Coming soon!" };
+        const { eventId, title, start, end, location, description } = args;
+        
+        if (!eventId) {
+          return { error: "Event-ID ist erforderlich." };
+        }
+        
+        const settings = await getPrisma().tenantSettings.findUnique({
+          where: { tenantId },
+          select: { googleCalendarConfig: true, outlookCalendarConfig: true }
+        });
+        
+        if (!settings?.googleCalendarConfig && !settings?.outlookCalendarConfig) {
+          return { error: "Kein Kalender verbunden." };
+        }
+        
+        // Update in Google Calendar
+        if (settings?.googleCalendarConfig) {
+          try {
+            const encryptedConfig = settings.googleCalendarConfig as any;
+            const accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+            const refreshToken = encryptionService.decrypt(encryptedConfig.refreshToken);
+            
+            await CalendarService.updateGoogleEvent({
+              accessToken,
+              refreshToken,
+              eventId,
+              title: title || '',
+              start: start ? new Date(start) : new Date(),
+              end: end ? new Date(end) : new Date(),
+              location,
+              description
+            });
+            
+            return { success: true, message: `Termin wurde erfolgreich aktualisiert.` };
+          } catch (error: any) {
+            console.error('Error updating Google Calendar event:', error);
+            return { error: "Fehler beim Aktualisieren des Termins in Google Calendar." };
+          }
+        }
+        // Update in Outlook Calendar
+        else if (settings?.outlookCalendarConfig) {
+          try {
+            const encryptedConfig = settings.outlookCalendarConfig as any;
+            const accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+            
+            await CalendarService.updateOutlookEvent({
+              accessToken,
+              eventId,
+              title: title || '',
+              start: start ? new Date(start) : new Date(),
+              end: end ? new Date(end) : new Date(),
+              location,
+              description
+            });
+            
+            return { success: true, message: `Termin wurde erfolgreich aktualisiert.` };
+          } catch (error: any) {
+            console.error('Error updating Outlook Calendar event:', error);
+            return { error: "Fehler beim Aktualisieren des Termins in Outlook Calendar." };
+          }
+        }
+        
+        return { error: "Kein Kalender verbunden." };
       }
 
       case 'delete_calendar_event': {
         const { eventId } = args;
-        return { message: "Termin-Löschung noch nicht implementiert. Coming soon!" };
+        
+        if (!eventId) {
+          return { error: "Event-ID ist erforderlich." };
+        }
+        
+        const settings = await getPrisma().tenantSettings.findUnique({
+          where: { tenantId },
+          select: { googleCalendarConfig: true, outlookCalendarConfig: true }
+        });
+        
+        if (!settings?.googleCalendarConfig && !settings?.outlookCalendarConfig) {
+          return { error: "Kein Kalender verbunden." };
+        }
+        
+        // Delete from Google Calendar
+        if (settings?.googleCalendarConfig) {
+          try {
+            const encryptedConfig = settings.googleCalendarConfig as any;
+            const accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+            const refreshToken = encryptionService.decrypt(encryptedConfig.refreshToken);
+            
+            await CalendarService.deleteGoogleEvent({
+              accessToken,
+              refreshToken,
+              eventId
+            });
+            
+            return { success: true, message: `Termin wurde erfolgreich gelöscht.` };
+          } catch (error: any) {
+            console.error('Error deleting Google Calendar event:', error);
+            return { error: "Fehler beim Löschen des Termins aus Google Calendar." };
+          }
+        }
+        // Delete from Outlook Calendar
+        else if (settings?.outlookCalendarConfig) {
+          try {
+            const encryptedConfig = settings.outlookCalendarConfig as any;
+            const accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+            
+            await CalendarService.deleteOutlookEvent({
+              accessToken,
+              eventId
+            });
+            
+            return { success: true, message: `Termin wurde erfolgreich gelöscht.` };
+          } catch (error: any) {
+            console.error('Error deleting Outlook Calendar event:', error);
+            return { error: "Fehler beim Löschen des Termins aus Outlook Calendar." };
+          }
+        }
+        
+        return { error: "Kein Kalender verbunden." };
       }
 
-      case 'get_calendar_availability':
-        return [
-          { start: args.start, end: args.end, status: 'available' }
-        ];
+      case 'get_calendar_availability': {
+        const { start, end } = args;
+        
+        const settings = await getPrisma().tenantSettings.findUnique({
+          where: { tenantId },
+          select: { googleCalendarConfig: true, outlookCalendarConfig: true }
+        });
+        
+        if (!settings?.googleCalendarConfig && !settings?.outlookCalendarConfig) {
+          return { error: "Kein Kalender verbunden. Bitte verbinde zuerst Google Calendar oder Outlook unter Einstellungen > Kalender." };
+        }
+        
+        const events: any[] = [];
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        
+        // Fetch from Google Calendar
+        if (settings?.googleCalendarConfig) {
+          try {
+            const encryptedConfig = settings.googleCalendarConfig as any;
+            const accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+            const refreshToken = encryptionService.decrypt(encryptedConfig.refreshToken);
+            
+            const googleEvents = await CalendarService.getGoogleEvents(
+              accessToken,
+              refreshToken,
+              startDate,
+              endDate
+            );
+            events.push(...googleEvents);
+          } catch (error: any) {
+            console.error('Error fetching Google Calendar events for availability:', error);
+          }
+        }
+        
+        // Fetch from Outlook Calendar
+        if (settings?.outlookCalendarConfig) {
+          try {
+            const encryptedConfig = settings.outlookCalendarConfig as any;
+            const accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+            
+            const outlookEvents = await CalendarService.getOutlookEvents(
+              accessToken,
+              startDate,
+              endDate
+            );
+            events.push(...outlookEvents);
+          } catch (error: any) {
+            console.error('Error fetching Outlook Calendar events for availability:', error);
+          }
+        }
+        
+        // Calculate busy and free slots
+        const busySlots = events.map(e => ({
+          start: e.start,
+          end: e.end,
+          title: e.title
+        }));
+        
+        return {
+          period: { start, end },
+          busySlots,
+          totalEvents: events.length,
+          summary: events.length === 0 
+            ? `Du bist im Zeitraum ${new Date(start).toLocaleDateString('de-DE')} bis ${new Date(end).toLocaleDateString('de-DE')} komplett frei.`
+            : `Du hast ${events.length} Termin(e) im angegebenen Zeitraum.`
+        };
+      }
 
       // === EXPOSÉ TOOLS (non-editor) ===
       case 'get_exposes': {
@@ -1924,15 +2744,29 @@ export class AiToolExecutor {
       }
 
       case 'create_full_expose': {
-        const { exposeId, style = 'professional', includeBlocks, theme = 'default', customInstructions } = args;
+        const { exposeId, templateId, style = 'professional', includeBlocks, theme = 'default', customInstructions } = args;
         
-        const expose = await getPrisma().expose.findFirst({
-          where: { id: exposeId, property: { tenantId } },
-          include: { property: true }
-        });
-        if (!expose) throw new Error('Exposé not found or access denied');
+        const isTemplateMode = !!templateId;
+        let property: any = null;
 
-        const property = expose.property;
+        if (templateId) {
+          // Template mode - verify template exists
+          const template = await getPrisma().exposeTemplate.findFirst({
+            where: { id: templateId, tenantId }
+          });
+          if (!template) throw new Error('Template not found or access denied');
+        } else if (exposeId) {
+          // Expose mode - get real property data
+          const expose = await getPrisma().expose.findFirst({
+            where: { id: exposeId, property: { tenantId } },
+            include: { property: true }
+          });
+          if (!expose) throw new Error('Exposé not found or access denied');
+          property = expose.property;
+        } else {
+          throw new Error('Either exposeId or templateId is required');
+        }
+
         const blocks: any[] = [];
         
         // Determine which blocks to include
@@ -1958,9 +2792,9 @@ export class AiToolExecutor {
               blocks.push({
                 id: blockId,
                 type: 'hero',
-                title: generateHeadline(property, tone),
-                subtitle: property.address || '',
-                imageUrl: (property as any).images?.[0] || '',
+                title: isTemplateMode ? '{{property.title}}' : generateHeadline(property, tone),
+                subtitle: isTemplateMode ? '{{property.address}}' : (property?.address || ''),
+                imageUrl: isTemplateMode ? '' : ((property as any)?.images?.[0] || ''),
               });
               break;
 
@@ -1968,11 +2802,17 @@ export class AiToolExecutor {
               blocks.push({
                 id: blockId,
                 type: 'stats',
-                items: [
-                  { label: 'Zimmer', value: property.rooms?.toString() || '-' },
-                  { label: 'Wohnfläche', value: property.area ? `${property.area} m²` : '-' },
-                  { label: 'Preis', value: property.price ? `${Number(property.price).toLocaleString('de-DE')} €` : '-' },
-                ],
+                items: isTemplateMode 
+                  ? [
+                      { label: 'Zimmer', value: '{{property.rooms}}' },
+                      { label: 'Wohnfläche', value: '{{property.area}}' },
+                      { label: 'Preis', value: '{{property.priceFormatted}}' },
+                    ]
+                  : [
+                      { label: 'Zimmer', value: property?.rooms?.toString() || '-' },
+                      { label: 'Wohnfläche', value: property?.area ? `${property.area} m²` : '-' },
+                      { label: 'Preis', value: property?.price ? `${Number(property.price).toLocaleString('de-DE')} €` : '-' },
+                    ],
               });
               break;
 
@@ -1981,24 +2821,24 @@ export class AiToolExecutor {
                 id: blockId,
                 type: 'text',
                 title: 'Objektbeschreibung',
-                content: generatePropertyDescription(property, tone, 800),
+                content: isTemplateMode ? '{{property.description}}' : generatePropertyDescription(property, tone, 800),
                 style: 'normal',
               });
               break;
 
             case 'highlights':
-              const highlightItems = generateHighlightsList(property);
               blocks.push({
                 id: blockId,
                 type: 'highlights',
                 title: 'Highlights',
-                items: highlightItems,
+                items: isTemplateMode 
+                  ? ['Highlight 1', 'Highlight 2', 'Highlight 3', 'Highlight 4']
+                  : generateHighlightsList(property),
               });
               break;
 
             case 'gallery':
-              const images = (property as any).images || [];
-              // Always add gallery block, even if empty (will be filled from property)
+              const images = isTemplateMode ? [] : ((property as any)?.images || []);
               blocks.push({
                 id: blockId,
                 type: 'gallery',
@@ -2008,12 +2848,12 @@ export class AiToolExecutor {
               break;
 
             case 'floorplan':
-              const floorplans = (property as any).floorplans || [];
+              const floorplans = isTemplateMode ? [] : ((property as any)?.floorplans || []);
               blocks.push({
                 id: blockId,
                 type: 'floorplan',
                 title: 'Grundriss',
-                imageUrl: floorplans[0] || '', // First floorplan
+                imageUrl: floorplans[0] || '',
               });
               break;
 
@@ -2022,8 +2862,8 @@ export class AiToolExecutor {
                 id: blockId,
                 type: 'location',
                 title: 'Lage & Umgebung',
-                address: property.address || '',
-                description: generateLocationText(property, tone),
+                address: isTemplateMode ? '{{property.address}}' : (property?.address || ''),
+                description: isTemplateMode ? 'Beschreibung der Lage und Umgebung des Objekts.' : generateLocationText(property, tone),
               });
               break;
 
@@ -2032,7 +2872,9 @@ export class AiToolExecutor {
                 id: blockId,
                 type: 'features',
                 title: 'Ausstattung',
-                items: generateFeaturesList(property),
+                items: isTemplateMode 
+                  ? ['Einbauküche', 'Balkon', 'Fußbodenheizung', 'Aufzug']
+                  : generateFeaturesList(property),
               });
               break;
 
@@ -2081,21 +2923,32 @@ export class AiToolExecutor {
           }
         }
 
-        // Update expose with new blocks and theme
-        await getPrisma().expose.update({
-          where: { id: exposeId },
-          data: { 
-            blocks,
-            theme,
-          }
-        });
+        // Update expose or template with new blocks and theme
+        if (isTemplateMode) {
+          await getPrisma().exposeTemplate.update({
+            where: { id: templateId },
+            data: { 
+              blocks,
+              theme,
+            }
+          });
+        } else {
+          await getPrisma().expose.update({
+            where: { id: exposeId },
+            data: { 
+              blocks,
+              theme,
+            }
+          });
+        }
 
         return { 
           success: true, 
           blocksCreated: blocks.length,
           blockTypes: blocks.map(b => b.type),
           theme,
-          message: `Exposé wurde mit ${blocks.length} Blöcken erstellt.`
+          isTemplate: isTemplateMode,
+          message: `${isTemplateMode ? 'Vorlage' : 'Exposé'} wurde mit ${blocks.length} Blöcken erstellt.`
         };
       }
 

@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useGlobalState } from '@/context/GlobalStateContext';
-import { X, Minus, Maximize2, Send, Paperclip, ChevronDown, ChevronUp } from 'lucide-react';
-import { createLead, createProperty, sendManualEmail, API_ENDPOINTS } from '@/lib/api';
+import { X, Minus, Maximize2, Send, Paperclip, ChevronDown, ChevronUp, Bold, Italic, Underline, List, ListOrdered, Link2, Image, Trash2, FileText, Plus, User } from 'lucide-react';
+import { createLead, createProperty, sendManualEmail, API_ENDPOINTS, fetchWithAuth } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { mutate } from 'swr';
+import { useEnv } from '@/components/EnvProvider';
 
 const SALUTATION_OPTIONS = [
   { value: 'NONE', label: 'Keine Anrede' },
@@ -91,6 +92,310 @@ const selectClass = "block w-full rounded-lg border border-gray-300 bg-white tex
 const labelClass = "block text-xs font-medium text-gray-600 mb-1.5";
 const textareaClass = "block w-full rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 sm:text-sm py-2.5 px-3 transition-all outline-none resize-none";
 const sectionTitleClass = "text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2";
+
+// Email Composer Component
+interface EmailComposerProps {
+  emailFormData: any;
+  updateEmailForm: (data: any) => void;
+  onSend: () => void;
+  onSaveDraft: () => void;
+  onDiscard: () => void;
+  loading: boolean;
+}
+
+function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, onDiscard, loading }: EmailComposerProps) {
+  const { apiUrl } = useEnv();
+  const [showCc, setShowCc] = useState(!!emailFormData.cc);
+  const [showBcc, setShowBcc] = useState(!!emailFormData.bcc);
+  const [signature, setSignature] = useState<string | null>(null);
+  const [signatureLoaded, setSignatureLoaded] = useState(false);
+
+  // Load user signature
+  useEffect(() => {
+    const loadSignature = async () => {
+      if (!apiUrl || signatureLoaded) return;
+      try {
+        const response = await fetchWithAuth(`${apiUrl}/me/settings`);
+        if (response?.emailSignature) {
+          setSignature(response.emailSignature);
+        }
+        setSignatureLoaded(true);
+      } catch (error) {
+        console.warn('Could not load signature:', error);
+        setSignatureLoaded(true);
+      }
+    };
+    loadSignature();
+  }, [apiUrl, signatureLoaded]);
+
+  // Apply formatting
+  const applyFormat = (format: string) => {
+    const textarea = document.getElementById('email-body') as HTMLTextAreaElement;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = emailFormData.body?.substring(start, end) || '';
+    
+    let formattedText = '';
+    switch (format) {
+      case 'bold':
+        formattedText = `**${selectedText}**`;
+        break;
+      case 'italic':
+        formattedText = `*${selectedText}*`;
+        break;
+      case 'underline':
+        formattedText = `<u>${selectedText}</u>`;
+        break;
+      case 'list':
+        formattedText = selectedText.split('\n').map(line => `• ${line}`).join('\n');
+        break;
+      case 'numbered':
+        formattedText = selectedText.split('\n').map((line, i) => `${i + 1}. ${line}`).join('\n');
+        break;
+      case 'link':
+        const url = prompt('URL eingeben:', 'https://');
+        if (url) {
+          formattedText = `[${selectedText || 'Link'}](${url})`;
+        } else {
+          return;
+        }
+        break;
+      default:
+        return;
+    }
+
+    const newBody = (emailFormData.body || '').substring(0, start) + formattedText + (emailFormData.body || '').substring(end);
+    updateEmailForm({ body: newBody });
+  };
+
+  // Insert signature
+  const insertSignature = () => {
+    if (signature) {
+      const currentBody = emailFormData.body || '';
+      const newBody = currentBody + '\n\n' + signature;
+      updateEmailForm({ body: newBody });
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Recipients */}
+      <div className="space-y-3 mb-4">
+        {/* To */}
+        <div className="flex items-center gap-2">
+          <label className="w-12 text-sm font-medium text-gray-500 shrink-0">An:</label>
+          <input
+            type="email"
+            value={emailFormData.to || ''}
+            onChange={(e) => updateEmailForm({ to: e.target.value })}
+            className="flex-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:bg-white text-sm py-2 px-3 transition-all outline-none"
+            placeholder="empfaenger@email.de"
+          />
+          <div className="flex gap-1 shrink-0">
+            {!showCc && (
+              <button
+                type="button"
+                onClick={() => setShowCc(true)}
+                className="px-2 py-1 text-xs text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+              >
+                CC
+              </button>
+            )}
+            {!showBcc && (
+              <button
+                type="button"
+                onClick={() => setShowBcc(true)}
+                className="px-2 py-1 text-xs text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+              >
+                BCC
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* CC */}
+        {showCc && (
+          <div className="flex items-center gap-2">
+            <label className="w-12 text-sm font-medium text-gray-500 shrink-0">CC:</label>
+            <input
+              type="email"
+              value={emailFormData.cc || ''}
+              onChange={(e) => updateEmailForm({ cc: e.target.value })}
+              className="flex-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:bg-white text-sm py-2 px-3 transition-all outline-none"
+              placeholder="cc@email.de"
+            />
+            <button
+              type="button"
+              onClick={() => { setShowCc(false); updateEmailForm({ cc: '' }); }}
+              className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* BCC */}
+        {showBcc && (
+          <div className="flex items-center gap-2">
+            <label className="w-12 text-sm font-medium text-gray-500 shrink-0">BCC:</label>
+            <input
+              type="email"
+              value={emailFormData.bcc || ''}
+              onChange={(e) => updateEmailForm({ bcc: e.target.value })}
+              className="flex-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:bg-white text-sm py-2 px-3 transition-all outline-none"
+              placeholder="bcc@email.de"
+            />
+            <button
+              type="button"
+              onClick={() => { setShowBcc(false); updateEmailForm({ bcc: '' }); }}
+              className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Subject */}
+        <div className="flex items-center gap-2">
+          <label className="w-12 text-sm font-medium text-gray-500 shrink-0">Betreff:</label>
+          <input
+            type="text"
+            value={emailFormData.subject || ''}
+            onChange={(e) => updateEmailForm({ subject: e.target.value })}
+            className="flex-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:bg-white text-sm py-2 px-3 transition-all outline-none font-medium"
+            placeholder="Betreff eingeben..."
+          />
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-gray-100 mb-3" />
+
+      {/* Formatting Toolbar */}
+      <div className="flex items-center gap-1 mb-3 pb-3 border-b border-gray-100">
+        <button
+          type="button"
+          onClick={() => applyFormat('bold')}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+          title="Fett"
+        >
+          <Bold className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyFormat('italic')}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+          title="Kursiv"
+        >
+          <Italic className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyFormat('underline')}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+          title="Unterstrichen"
+        >
+          <Underline className="w-4 h-4" />
+        </button>
+        <div className="w-px h-5 bg-gray-200 mx-1" />
+        <button
+          type="button"
+          onClick={() => applyFormat('list')}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+          title="Aufzählung"
+        >
+          <List className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyFormat('numbered')}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+          title="Nummerierte Liste"
+        >
+          <ListOrdered className="w-4 h-4" />
+        </button>
+        <div className="w-px h-5 bg-gray-200 mx-1" />
+        <button
+          type="button"
+          onClick={() => applyFormat('link')}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+          title="Link einfügen"
+        >
+          <Link2 className="w-4 h-4" />
+        </button>
+        
+        <div className="flex-1" />
+        
+        {signature && (
+          <button
+            type="button"
+            onClick={insertSignature}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            title="Signatur einfügen"
+          >
+            <User className="w-3.5 h-3.5" />
+            Signatur
+          </button>
+        )}
+      </div>
+
+      {/* Email Body */}
+      <div className="flex-1 min-h-0">
+        <textarea
+          id="email-body"
+          value={emailFormData.body || ''}
+          onChange={(e) => updateEmailForm({ body: e.target.value })}
+          className="w-full h-full rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm py-3 px-4 transition-all outline-none resize-none leading-relaxed"
+          placeholder="Schreiben Sie Ihre Nachricht..."
+          style={{ minHeight: '280px' }}
+        />
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center justify-between pt-4 mt-4 border-t border-gray-100">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Anhang hinzufügen"
+          >
+            <Paperclip className="w-5 h-5" />
+          </button>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onDiscard}
+            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            Verwerfen
+          </button>
+          <button
+            type="button"
+            onClick={onSaveDraft}
+            disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors flex items-center gap-2"
+          >
+            <FileText className="w-4 h-4" />
+            Entwurf
+          </button>
+          <button
+            type="button"
+            onClick={onSend}
+            disabled={loading || !emailFormData.to}
+            className="px-5 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          >
+            <Send className="w-4 h-4" />
+            {loading ? 'Senden...' : 'Senden'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function GlobalDrawer() {
   const router = useRouter();
@@ -201,14 +506,36 @@ export default function GlobalDrawer() {
     }
   };
 
-  const handleSendEmail = async () => {
-    if (!emailFormData.subject || !emailFormData.body || !emailFormData.leadId) return;
+  const handleSendEmail = async (asDraft: boolean = false) => {
+    if (!emailFormData.to || !emailFormData.subject) {
+      alert('Bitte Empfänger und Betreff eingeben');
+      return;
+    }
     setLoading(true);
     try {
-      await sendManualEmail(emailFormData.leadId, emailFormData.subject, emailFormData.body);
+      const response = await fetchWithAuth(`${API_ENDPOINTS.BASE}/emails/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: emailFormData.to,
+          cc: emailFormData.cc || undefined,
+          bcc: emailFormData.bcc || undefined,
+          subject: emailFormData.subject,
+          body: emailFormData.body || '',
+          bodyHtml: emailFormData.bodyHtml || undefined,
+          leadId: emailFormData.leadId || undefined,
+          replyToEmailId: emailFormData.replyTo || undefined,
+          draftId: emailFormData.draftId || undefined, // Delete draft after sending
+          asDraft,
+        }),
+      });
+      
       handleAnimatedClose();
       router.refresh();
-      updateEmailForm({ subject: '', body: '' });
+      updateEmailForm({ to: '', cc: '', bcc: '', subject: '', body: '', bodyHtml: '', leadId: '', replyTo: '', draftId: '' });
+      
+      // Refresh inbox
+      mutate((key: string) => typeof key === 'string' && key.includes('/emails'));
     } catch (error) {
       alert('Fehler beim Senden: ' + error);
     } finally {
@@ -289,47 +616,14 @@ export default function GlobalDrawer() {
       {!drawerMinimized && (
         <div className="p-6 overflow-y-auto h-[calc(720px-48px)]">
           {drawerType === 'EMAIL' && (
-            <div className="max-w-4xl mx-auto space-y-4">
-              <div>
-                <input
-                  type="text"
-                  value={emailFormData.subject || ''}
-                  onChange={(e) => updateEmailForm({ subject: e.target.value })}
-                  className={inputClass}
-                  placeholder="Betreff"
-                />
-              </div>
-              <div>
-                <textarea
-                  rows={10}
-                  value={emailFormData.body || ''}
-                  onChange={(e) => updateEmailForm({ body: e.target.value })}
-                  className={textareaClass}
-                  placeholder="Schreiben Sie Ihre Nachricht..."
-                />
-              </div>
-              <div className="flex justify-between items-center pt-4">
-                <button className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100">
-                  <Paperclip className="w-5 h-5" />
-                </button>
-                <div className="flex space-x-3">
-                  <button 
-                    onClick={handleAnimatedClose}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Verwerfen
-                  </button>
-                  <button 
-                    onClick={handleSendEmail}
-                    disabled={loading}
-                    className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center"
-                  >
-                    <Send className="w-4 h-4 mr-2" />
-                    {loading ? 'Senden...' : 'Senden'}
-                  </button>
-                </div>
-              </div>
-            </div>
+            <EmailComposer
+              emailFormData={emailFormData}
+              updateEmailForm={updateEmailForm}
+              onSend={() => handleSendEmail(false)}
+              onSaveDraft={() => handleSendEmail(true)}
+              onDiscard={handleAnimatedClose}
+              loading={loading}
+            />
           )}
 
           {drawerType === 'LEAD' && (

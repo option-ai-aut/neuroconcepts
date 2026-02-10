@@ -1,50 +1,48 @@
+/**
+ * Email Parser Lambda
+ * 
+ * Receives emails from AWS SES via S3 and forwards them to the Orchestrator
+ * for processing by Jarvis (AI-based parsing).
+ * 
+ * This Lambda no longer does any parsing itself - it just extracts the raw
+ * email data and sends it to /internal/ingest-lead.
+ */
+
 import { S3Event, Context } from 'aws-lambda';
 import { simpleParser } from 'mailparser';
 import * as AWS from 'aws-sdk';
 import axios from 'axios';
-import { EmailParser, ExtractedLead } from './parsers/types';
-import { ImmoScoutParser } from './parsers/ImmoScoutParser';
-import { WillhabenParser } from './parsers/WillhabenParser';
-import { ImmoweltParser } from './parsers/ImmoweltParser';
-
-import { ImmoScoutCHParser } from './parsers/ImmoScoutCHParser';
-import { HomegateParser } from './parsers/HomegateParser';
-import { KleinanzeigenParser } from './parsers/KleinanzeigenParser';
 
 const s3 = new AWS.S3();
 
-// Strategy Registry
-const parsers: EmailParser[] = [
-  new ImmoScoutParser(),
-  new WillhabenParser(),
-  new ImmoweltParser(),
-  new ImmoScoutCHParser(),
-  new HomegateParser(),
-  new KleinanzeigenParser()
-];
-
 export const handler = async (event: any, context: Context) => {
-  console.log('Received event:', JSON.stringify(event, null, 2));
+  console.log('📧 Email Parser Lambda triggered');
+  console.log('Event:', JSON.stringify(event, null, 2));
 
-  // Get Orchestrator API URL from env
   const ORCHESTRATOR_URL = process.env.ORCHESTRATOR_API_URL || 'http://localhost:3001';
 
   // LOCAL TEST MODE
   if (event.isLocal) {
-    console.log('Running in LOCAL mode');
-    const text = event.body;
-    const subject = event.subject;
-    const from = event.from;
-    
-    await processEmail(text, subject, from, ORCHESTRATOR_URL);
-    return;
+    console.log('Running in LOCAL test mode');
+    await processEmail({
+      to: event.to || 'test@leads.immivo.ai',
+      from: event.from || 'noreply@immobilienscout24.de',
+      subject: event.subject || 'Test Subject',
+      text: event.body || event.text || '',
+      html: event.html,
+      orchestratorUrl: ORCHESTRATOR_URL,
+    });
+    return { success: true };
   }
 
+  // Process S3 events (from SES)
   for (const record of event.Records) {
     const bucket = record.s3.bucket.name;
     const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, ' '));
 
     try {
+      console.log(`📥 Fetching email from S3: ${bucket}/${key}`);
+      
       // 1. Fetch email from S3
       const params = { Bucket: bucket, Key: key };
       const data = await s3.getObject(params).promise();
@@ -53,62 +51,106 @@ export const handler = async (event: any, context: Context) => {
         throw new Error('Email body is empty');
       }
 
-      // 2. Parse Email
+      // 2. Parse raw email with mailparser
       const parsed = await simpleParser(data.Body as Buffer);
+      
+      // 3. Extract all relevant fields including TO (recipient)
+      const to = extractRecipient(parsed);
+      const from = parsed.from?.text || parsed.from?.value?.[0]?.address || '';
       const subject = parsed.subject || '';
       const text = parsed.text || '';
-      const html = parsed.html || undefined; // Pass HTML if available
-      const from = parsed.from?.text || '';
+      const html = typeof parsed.html === 'string' ? parsed.html : undefined;
 
-      await processEmail(text, subject, from, ORCHESTRATOR_URL, html);
+      console.log(`📧 Email details:`);
+      console.log(`   To: ${to}`);
+      console.log(`   From: ${from}`);
+      console.log(`   Subject: ${subject}`);
+
+      // 4. Send to Orchestrator for Jarvis processing
+      await processEmail({
+        to,
+        from,
+        subject,
+        text,
+        html,
+        orchestratorUrl: ORCHESTRATOR_URL,
+        rawEmailKey: key, // Reference to original email in S3
+      });
 
     } catch (error) {
-      console.error('Error processing email:', error);
+      console.error('❌ Error processing email:', error);
     }
   }
+
+  return { success: true };
 };
 
-async function processEmail(text: string, subject: string, from: string, orchestratorUrl: string, html?: string) {
-  console.log('Processing email from:', from);
-  console.log('Subject:', subject);
-
-  // 3. Find Matching Parser
-  let lead: ExtractedLead | null = null;
-  const parser = parsers.find(p => p.canParse(from, subject));
-
-  if (parser) {
-    console.log(`Using parser: ${parser.constructor.name}`);
-    lead = parser.parse(text, subject, html);
-  } else {
-    console.log('No specific parser found. Using generic fallback.');
-    // Fallback: Try to extract from standard email
-    lead = {
-      email: extractEmail(text) || 'unknown@lead.com',
-      firstName: 'Unbekannt',
-      lastName: 'Lead',
-      message: text.substring(0, 500), // Truncate message
-      source: 'Other'
-    };
+/**
+ * Extract recipient email address from parsed email
+ */
+function extractRecipient(parsed: any): string {
+  // Try different fields where recipient might be
+  if (parsed.to?.value?.[0]?.address) {
+    return parsed.to.value[0].address;
   }
-
-  if (lead) {
-    console.log('Extracted Lead:', JSON.stringify(lead, null, 2));
-
-    // 4. Send to Orchestrator
-    try {
-      await axios.post(`${orchestratorUrl}/leads`, {
-        ...lead,
-        tenantId: 'default-tenant' 
-      });
-      console.log('Lead sent to Orchestrator');
-    } catch (error) {
-      console.error('Failed to send lead to orchestrator:', error);
-    }
+  if (parsed.to?.text) {
+    // Extract email from text like "Name <email@example.com>"
+    const match = parsed.to.text.match(/<([^>]+)>/) || parsed.to.text.match(/([^\s<]+@[^\s>]+)/);
+    if (match) return match[1];
+    return parsed.to.text;
   }
+  // Check envelope recipient (for SES)
+  if (parsed.headers?.get('x-original-to')) {
+    return parsed.headers.get('x-original-to');
+  }
+  if (parsed.headers?.get('delivered-to')) {
+    return parsed.headers.get('delivered-to');
+  }
+  return '';
 }
 
-// Helper for generic extraction
-function extractEmail(text: string): string | null {
-  const match = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/);
-  return match ? match[1] : null;
+interface ProcessEmailParams {
+  to: string;
+  from: string;
+  subject: string;
+  text: string;
+  html?: string;
+  orchestratorUrl: string;
+  rawEmailKey?: string;
+}
+
+/**
+ * Send email data to Orchestrator for processing
+ */
+async function processEmail(params: ProcessEmailParams) {
+  const { to, from, subject, text, html, orchestratorUrl, rawEmailKey } = params;
+
+  console.log(`📤 Sending email to Orchestrator: ${orchestratorUrl}/internal/ingest-lead`);
+
+  try {
+    const response = await axios.post(`${orchestratorUrl}/internal/ingest-lead`, {
+      recipientEmail: to,
+      from,
+      subject,
+      text,
+      html,
+      rawEmailKey, // For reference/debugging
+    }, {
+      timeout: 30000, // 30 second timeout
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+
+    console.log(`✅ Orchestrator response:`, JSON.stringify(response.data, null, 2));
+    
+    return response.data;
+  } catch (error: any) {
+    console.error('❌ Failed to send to Orchestrator:', error.message);
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    }
+    throw error;
+  }
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState, use, useRef } from 'react';
 import { getProperty, Property, updateProperty, deleteProperty, getExposes, Expose, downloadExposePdf, getExposeTemplates, ExposeTemplate, getAuthHeaders, uploadPropertyDocuments, deletePropertyDocument, DocumentFile } from '@/lib/api';
 import { useRouter } from 'next/navigation';
-import { Building, MapPin, Euro, Maximize, Home, FileText, ArrowLeft, MoreVertical, Trash2, Save, FileImage, Plus, Upload, X, Image as ImageIcon, Globe, Check, Download, File, FileSpreadsheet, FileType } from 'lucide-react';
+import { Building, MapPin, Euro, Maximize, Home, FileText, ArrowLeft, MoreVertical, Trash2, Save, FileImage, Plus, Upload, X, Image as ImageIcon, Globe, Check, Download, File, FileSpreadsheet, FileType, Users, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { getRuntimeConfig } from '@/components/EnvProvider';
@@ -52,6 +52,11 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   // Document Upload State
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const documentInputRef = useRef<HTMLInputElement>(null);
+  
+  // Assigned Users State
+  const [teamMembers, setTeamMembers] = useState<Array<{ id: string; name: string; email: string }>>([]);
+  const [assignedUserIds, setAssignedUserIds] = useState<string[]>([]);
+  const [showUserSelector, setShowUserSelector] = useState(false);
 
   const router = useRouter();
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -59,6 +64,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
 
   useEffect(() => {
     loadProperty();
+    loadTeamMembers();
     
     // Close dropdowns when clicking outside
     function handleClickOutside(event: MouseEvent) {
@@ -72,6 +78,57 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [id]);
+  
+  const loadTeamMembers = async () => {
+    try {
+      const config = getRuntimeConfig();
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${config.apiUrl}/team`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setTeamMembers(data.members || []);
+      }
+    } catch (error) {
+      console.error('Error loading team members:', error);
+    }
+  };
+  
+  const loadAssignedUsers = async () => {
+    try {
+      const config = getRuntimeConfig();
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${config.apiUrl}/properties/${id}/assignments`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setAssignedUserIds(data.userIds || []);
+      }
+    } catch (error) {
+      console.error('Error loading assigned users:', error);
+    }
+  };
+  
+  const handleToggleUserAssignment = async (userId: string) => {
+    const isAssigned = assignedUserIds.includes(userId);
+    const newAssignedIds = isAssigned 
+      ? assignedUserIds.filter(id => id !== userId)
+      : [...assignedUserIds, userId];
+    
+    setAssignedUserIds(newAssignedIds);
+    
+    try {
+      const config = getRuntimeConfig();
+      const headers = await getAuthHeaders();
+      await fetch(`${config.apiUrl}/properties/${id}/assignments`, {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userIds: newAssignedIds }),
+      });
+    } catch (error) {
+      console.error('Error updating assignments:', error);
+      // Revert on error
+      setAssignedUserIds(assignedUserIds);
+    }
+  };
 
   // Reload property when AI performs an action
   useEffect(() => {
@@ -105,6 +162,9 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
     if (propertyData?.publishedPortals) {
       setSelectedPortals(propertyData.publishedPortals);
     }
+    
+    // Load assigned users
+    loadAssignedUsers();
     
     setLoading(false);
   };
@@ -452,6 +512,89 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   onChange={(e) => handleInputChange('title', e.target.value)}
                   className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
                 />
+              </div>
+
+              {/* Assigned Users */}
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-500 mb-2">Zuständige Mitarbeiter</label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowUserSelector(!showUserSelector)}
+                    className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-gray-400" />
+                      <span>
+                        {assignedUserIds.length === 0 
+                          ? 'Keine Mitarbeiter zugewiesen' 
+                          : `${assignedUserIds.length} Mitarbeiter zugewiesen`}
+                      </span>
+                    </div>
+                    <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${showUserSelector ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {showUserSelector && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
+                      {teamMembers.length === 0 ? (
+                        <div className="p-4 text-sm text-gray-500 text-center">
+                          Keine Team-Mitglieder gefunden
+                        </div>
+                      ) : (
+                        teamMembers.map((member) => (
+                          <button
+                            key={member.id}
+                            type="button"
+                            onClick={() => handleToggleUserAssignment(member.id)}
+                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                                <span className="text-sm font-medium text-indigo-600">
+                                  {member.name?.charAt(0) || member.email.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <div className="text-left">
+                                <p className="text-sm font-medium text-gray-900">{member.name || 'Unbekannt'}</p>
+                                <p className="text-xs text-gray-500">{member.email}</p>
+                              </div>
+                            </div>
+                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                              assignedUserIds.includes(member.id) 
+                                ? 'bg-indigo-600 border-indigo-600' 
+                                : 'border-gray-300'
+                            }`}>
+                              {assignedUserIds.includes(member.id) && (
+                                <Check className="w-3 h-3 text-white" />
+                              )}
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Show assigned users as tags */}
+                {assignedUserIds.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {assignedUserIds.map((userId) => {
+                      const member = teamMembers.find(m => m.id === userId);
+                      return member ? (
+                        <span key={userId} className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+                          {member.name || member.email}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleUserAssignment(userId)}
+                            className="hover:text-indigo-900"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="col-span-2">

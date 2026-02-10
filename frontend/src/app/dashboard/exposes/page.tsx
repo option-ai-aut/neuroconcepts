@@ -64,12 +64,8 @@ export default function ExposesPage() {
 
   const selectedTemplate = templates.find(t => t.id === selectedId);
 
-  // Auto-select first property for preview
-  useEffect(() => {
-    if (properties.length > 0 && !previewProperty) {
-      setPreviewProperty(properties[0]);
-    }
-  }, [properties, previewProperty]);
+  // Don't auto-select property - show raw fields by default
+  // User can manually select a property if they want to preview with real data
 
   // Focus input when editing name
   useEffect(() => {
@@ -147,28 +143,88 @@ export default function ExposesPage() {
     }
   };
 
-  // Replace template variables with preview data
+  // Variable labels for display (German names)
+  const VARIABLE_LABELS: Record<string, string> = {
+    '{{property.title}}': 'Objekttitel',
+    '{{property.address}}': 'Adresse',
+    '{{property.city}}': 'Stadt',
+    '{{property.zipCode}}': 'PLZ',
+    '{{property.price}}': 'Preis',
+    '{{property.priceFormatted}}': 'Preis (formatiert)',
+    '{{property.rooms}}': 'Zimmer',
+    '{{property.area}}': 'Wohnfläche',
+    '{{property.plotArea}}': 'Grundstück',
+    '{{property.bedrooms}}': 'Schlafzimmer',
+    '{{property.bathrooms}}': 'Badezimmer',
+    '{{property.floor}}': 'Etage',
+    '{{property.totalFloors}}': 'Gesamtetagen',
+    '{{property.yearBuilt}}': 'Baujahr',
+    '{{property.propertyType}}': 'Objektart',
+    '{{property.heatingType}}': 'Heizungsart',
+    '{{property.energyClass}}': 'Energieklasse',
+    '{{property.description}}': 'Beschreibung',
+    '{{user.name}}': 'Makler Name',
+    '{{user.email}}': 'Makler E-Mail',
+    '{{user.phone}}': 'Makler Telefon',
+    '{{company.name}}': 'Firmenname',
+    '{{lead.name}}': 'Lead Name',
+    '{{lead.firstName}}': 'Lead Vorname',
+    '{{lead.lastName}}': 'Lead Nachname',
+    '{{lead.email}}': 'Lead E-Mail',
+    '{{lead.phone}}': 'Lead Telefon',
+    '{{lead.greeting}}': 'Anrede',
+    '{{date.today}}': 'Heutiges Datum',
+    '{{date.year}}': 'Aktuelles Jahr',
+  };
+
+  // Replace template variables with preview data OR display as styled chips
   const replaceVariables = (text: string | undefined): string => {
-    if (!text || !previewProperty) return text || '';
+    if (!text) return '';
     
-    const replacements: Record<string, string> = {
-      '{{property.title}}': previewProperty.title || '',
-      '{{property.address}}': previewProperty.address || '',
-      '{{property.city}}': previewProperty.city || '',
-      '{{property.price}}': previewProperty.salePrice 
-        ? `${previewProperty.salePrice.toLocaleString('de-DE')} €`
-        : previewProperty.rentCold 
-          ? `${previewProperty.rentCold.toLocaleString('de-DE')} €/Monat`
-          : '',
-      '{{property.rooms}}': previewProperty.rooms?.toString() || '',
-      '{{property.area}}': previewProperty.livingArea ? `${previewProperty.livingArea} m²` : '',
-    };
-    
-    let result = text;
-    for (const [variable, value] of Object.entries(replacements)) {
-      result = result.replace(new RegExp(variable.replace(/[{}]/g, '\\$&'), 'g'), value);
+    // If we have a preview property, replace with actual values
+    if (previewProperty) {
+      const replacements: Record<string, string> = {
+        '{{property.title}}': previewProperty.title || '',
+        '{{property.address}}': previewProperty.address || '',
+        '{{property.city}}': previewProperty.city || '',
+        '{{property.price}}': previewProperty.salePrice 
+          ? `${previewProperty.salePrice.toLocaleString('de-DE')} €`
+          : previewProperty.rentCold 
+            ? `${previewProperty.rentCold.toLocaleString('de-DE')} €/Monat`
+            : '',
+        '{{property.rooms}}': previewProperty.rooms?.toString() || '',
+        '{{property.area}}': previewProperty.livingArea ? `${previewProperty.livingArea} m²` : '',
+      };
+      
+      let result = text;
+      for (const [variable, value] of Object.entries(replacements)) {
+        result = result.replace(new RegExp(variable.replace(/[{}]/g, '\\$&'), 'g'), value);
+      }
+      return result;
     }
-    return result;
+    
+    // No preview property - return text as-is (will be rendered with styled chips)
+    return text;
+  };
+
+  // Render text with variable chips (for display without preview property)
+  const renderTextWithVariables = (text: string | undefined): React.ReactNode => {
+    if (!text) return null;
+    if (previewProperty) return replaceVariables(text);
+    
+    // Split text by variables and render chips
+    const parts = text.split(/(\{\{[^}]+\}\})/g);
+    return parts.map((part, i) => {
+      if (part.match(/^\{\{[^}]+\}\}$/)) {
+        const label = VARIABLE_LABELS[part] || part.replace(/[{}]/g, '');
+        return (
+          <span key={i} className="inline-flex items-center px-1.5 py-0.5 mx-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">
+            {label}
+          </span>
+        );
+      }
+      return part;
+    });
   };
 
   const filteredTemplates = templates.filter(t =>
@@ -233,8 +289,13 @@ export default function ExposesPage() {
   const themeColors = getThemeColors();
 
   // Render block content - matches ExposeEditor.tsx exactly
+  // Use rv() for rendering with variable chips, pv() for plain text replacement
   const renderBlockContent = (block: any) => {
     const pv = (text: string | undefined, fallback: string = '') => replaceVariables(text) || fallback;
+    const rv = (text: string | undefined, fallback: string = '') => {
+      if (!text) return fallback;
+      return renderTextWithVariables(text) || fallback;
+    };
 
     switch (block.type) {
       case 'hero':
@@ -248,8 +309,8 @@ export default function ExposesPage() {
               </div>
             )}
             <div className="absolute bottom-0 left-0 right-0 p-6 text-white bg-gradient-to-t from-black/60 via-black/30 to-transparent pt-16">
-              <h1 className="text-3xl font-bold mb-2">{pv(block.title, 'Titel eingeben...')}</h1>
-              <p className="text-lg opacity-90">{pv(block.subtitle, 'Untertitel eingeben...')}</p>
+              <h1 className="text-3xl font-bold mb-2">{rv(block.title, 'Titel eingeben...')}</h1>
+              <p className="text-lg opacity-90">{rv(block.subtitle, 'Untertitel eingeben...')}</p>
             </div>
           </div>
         );
@@ -264,8 +325,8 @@ export default function ExposesPage() {
           <div className="py-6 px-4 bg-gray-50 flex justify-around">
             {stats.map((stat: any, i: number) => (
               <div key={i} className="text-center">
-                <div className="text-2xl font-bold" style={{ color: themeColors.primary }}>{pv(stat.value)}</div>
-                <div className="text-sm text-gray-500">{pv(stat.label)}</div>
+                <div className="text-2xl font-bold" style={{ color: themeColors.primary }}>{rv(stat.value)}</div>
+                <div className="text-sm text-gray-500">{rv(stat.label)}</div>
               </div>
             ))}
           </div>
@@ -274,8 +335,8 @@ export default function ExposesPage() {
       case 'text':
         return (
           <div className={`p-6 ${block.style === 'highlight' ? 'bg-gray-50 border-l-4' : ''}`} style={block.style === 'highlight' ? { borderColor: themeColors.primary } : {}}>
-            {block.title && <h3 className="text-lg font-semibold mb-3" style={{ color: themeColors.secondary }}>{pv(block.title)}</h3>}
-            <p className="text-gray-600 whitespace-pre-wrap">{pv(block.content, 'Text eingeben...')}</p>
+            {block.title && <h3 className="text-lg font-semibold mb-3" style={{ color: themeColors.secondary }}>{rv(block.title)}</h3>}
+            <p className="text-gray-600 whitespace-pre-wrap">{rv(block.content, 'Text eingeben...')}</p>
           </div>
         );
 
@@ -284,12 +345,12 @@ export default function ExposesPage() {
         const items = block.items || [];
         return (
           <div className="p-6">
-            {block.title && <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>{pv(block.title)}</h3>}
+            {block.title && <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>{rv(block.title)}</h3>}
             <div className="grid grid-cols-2 gap-3">
               {items.length > 0 ? items.map((item: any, i: number) => (
                 <div key={i} className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: themeColors.primary }} />
-                  <span className="text-sm text-gray-600">{pv(typeof item === 'string' ? item : item.text)}</span>
+                  <span className="text-sm text-gray-600">{rv(typeof item === 'string' ? item : item.text)}</span>
                 </div>
               )) : (
                 <span className="text-gray-400 text-sm">Elemente hinzufügen...</span>
@@ -301,19 +362,19 @@ export default function ExposesPage() {
       case 'location':
         return (
           <div className="p-6 bg-gray-50">
-            <h3 className="text-lg font-semibold mb-2" style={{ color: themeColors.secondary }}>{pv(block.title, 'Lage')}</h3>
-            <p className="text-gray-600 mb-2">{pv(block.address, '{{property.address}}')}</p>
-            {block.description && <p className="text-sm text-gray-500">{pv(block.description)}</p>}
+            <h3 className="text-lg font-semibold mb-2" style={{ color: themeColors.secondary }}>{rv(block.title, 'Lage')}</h3>
+            <p className="text-gray-600 mb-2">{rv(block.address, '{{property.address}}')}</p>
+            {block.description && <p className="text-sm text-gray-500">{rv(block.description)}</p>}
           </div>
         );
 
       case 'contact':
         return (
           <div className="p-6 text-white" style={{ backgroundColor: themeColors.primary }}>
-            <h3 className="text-lg font-semibold mb-3">{pv(block.title, 'Ihr Ansprechpartner')}</h3>
-            <p>{pv(block.name, '{{user.name}}')}</p>
-            <p className="opacity-80">{pv(block.email, '{{user.email}}')}</p>
-            {block.phone && <p className="opacity-80">{pv(block.phone)}</p>}
+            <h3 className="text-lg font-semibold mb-3">{rv(block.title, 'Ihr Ansprechpartner')}</h3>
+            <p>{rv(block.name, '{{user.name}}')}</p>
+            <p className="opacity-80">{rv(block.email, '{{user.email}}')}</p>
+            {block.phone && <p className="opacity-80">{rv(block.phone)}</p>}
           </div>
         );
 
@@ -324,11 +385,11 @@ export default function ExposesPage() {
               <p className="text-sm text-gray-500 mb-2">Erstellt für</p>
             )}
             <h3 className="text-lg font-semibold mb-2" style={{ color: themeColors.secondary }}>
-              {pv(block.leadName, '{{lead.name}}')}
+              {rv(block.leadName, '{{lead.name}}')}
             </h3>
             <div className="space-y-1 text-sm text-gray-600">
-              <p>{pv(block.leadEmail, '{{lead.email}}')}</p>
-              {block.leadPhone && <p>{pv(block.leadPhone)}</p>}
+              <p>{rv(block.leadEmail, '{{lead.email}}')}</p>
+              {block.leadPhone && <p>{rv(block.leadPhone)}</p>}
             </div>
           </div>
         );
@@ -341,12 +402,12 @@ export default function ExposesPage() {
         ];
         return (
           <div className="p-6">
-            {block.title && <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>{pv(block.title)}</h3>}
+            {block.title && <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>{rv(block.title)}</h3>}
             <div className="space-y-2">
               {priceItems.map((item: any, i: number) => (
                 <div key={i} className="flex justify-between py-2 border-b border-gray-100">
-                  <span className="text-gray-600">{pv(item.label)}</span>
-                  <span className="font-medium">{pv(item.value)}</span>
+                  <span className="text-gray-600">{rv(item.label)}</span>
+                  <span className="font-medium">{rv(item.value)}</span>
                 </div>
               ))}
             </div>
@@ -356,9 +417,9 @@ export default function ExposesPage() {
       case 'cta':
         return (
           <div className="p-8 text-center bg-gray-50">
-            <h3 className="text-xl font-semibold mb-4" style={{ color: themeColors.secondary }}>{pv(block.title, 'Interesse geweckt?')}</h3>
+            <h3 className="text-xl font-semibold mb-4" style={{ color: themeColors.secondary }}>{rv(block.title, 'Interesse geweckt?')}</h3>
             <button className="px-6 py-3 text-white rounded-lg font-medium" style={{ backgroundColor: themeColors.primary }}>
-              {pv(block.buttonText, 'Jetzt Termin vereinbaren')}
+              {rv(block.buttonText, 'Jetzt Termin vereinbaren')}
             </button>
           </div>
         );
@@ -366,8 +427,8 @@ export default function ExposesPage() {
       case 'quote':
         return (
           <div className="p-6 border-l-4" style={{ borderColor: themeColors.accent }}>
-            <p className="text-lg italic text-gray-600 mb-2">"{pv(block.text, 'Zitat eingeben...')}"</p>
-            {block.author && <p className="text-sm text-gray-500">— {pv(block.author)}</p>}
+            <p className="text-lg italic text-gray-600 mb-2">"{rv(block.text, 'Zitat eingeben...')}"</p>
+            {block.author && <p className="text-sm text-gray-500">— {rv(block.author)}</p>}
           </div>
         );
 
@@ -392,7 +453,7 @@ export default function ExposesPage() {
       case 'floorplan':
         return (
           <div className="p-6">
-            {block.title && <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>{pv(block.title)}</h3>}
+            {block.title && <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>{rv(block.title)}</h3>}
             {block.imageUrl ? (
               <img src={block.imageUrl} alt="Grundriss" className="w-full" />
             ) : (
@@ -408,10 +469,10 @@ export default function ExposesPage() {
           <div className="p-6">
             <div className="grid grid-cols-2 gap-6">
               <div className="prose prose-sm">
-                <p className="text-gray-600 whitespace-pre-wrap">{pv(block.leftContent, 'Linke Spalte...')}</p>
+                <p className="text-gray-600 whitespace-pre-wrap">{rv(block.leftContent, 'Linke Spalte...')}</p>
               </div>
               <div className="prose prose-sm">
-                <p className="text-gray-600 whitespace-pre-wrap">{pv(block.rightContent, 'Rechte Spalte...')}</p>
+                <p className="text-gray-600 whitespace-pre-wrap">{rv(block.rightContent, 'Rechte Spalte...')}</p>
               </div>
             </div>
           </div>
@@ -423,11 +484,11 @@ export default function ExposesPage() {
             <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>Energieausweis</h3>
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold" style={{ backgroundColor: themeColors.primary }}>
-                {pv(block.energyClass, 'B')}
+                {rv(block.energyClass, 'B')}
               </div>
               <div>
                 <p className="text-sm text-gray-500">Energieeffizienzklasse</p>
-                <p className="font-medium">{pv(block.consumption, '85 kWh/(m²·a)')}</p>
+                <p className="font-medium">{rv(block.consumption, '85 kWh/(m²·a)')}</p>
               </div>
             </div>
           </div>
@@ -437,7 +498,7 @@ export default function ExposesPage() {
       case 'virtualTour':
         return (
           <div className="p-6">
-            {block.title && <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>{pv(block.title)}</h3>}
+            {block.title && <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>{rv(block.title)}</h3>}
             <div className="aspect-video bg-gradient-to-br from-indigo-100 to-purple-100 rounded flex flex-col items-center justify-center text-gray-500">
               <Eye className="w-12 h-12 mb-2" />
               <span className="text-sm">{block.type === 'video' ? 'Video' : '360° Tour'}</span>
@@ -459,10 +520,7 @@ export default function ExposesPage() {
 
   return (
     <div className="h-full flex flex-col relative">
-      {/* Header */}
-      <div className="pt-8 px-8 pb-4">
-        <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Exposés & Vorlagen</h1>
-      </div>
+      <div className="pt-2" />
 
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar List */}
@@ -594,12 +652,24 @@ export default function ExposesPage() {
                       <Calendar className="w-3 h-3" />
                       {formatDate(selectedTemplate.updatedAt)}
                     </div>
-                    {previewProperty && (
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <Eye className="w-3 h-3" />
-                        Vorschau: {previewProperty.title}
-                      </div>
-                    )}
+                    
+                    {/* Preview Property Selector */}
+                    <div className="flex items-center gap-2">
+                      <Eye className="w-3 h-3 text-gray-400" />
+                      <select
+                        value={previewProperty?.id || ''}
+                        onChange={(e) => {
+                          const prop = properties.find(p => p.id === e.target.value);
+                          setPreviewProperty(prop || null);
+                        }}
+                        className="text-xs border border-gray-200 rounded px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value="">Variablen anzeigen</option>
+                        {properties.map(p => (
+                          <option key={p.id} value={p.id}>{p.title}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
               )}

@@ -1,8 +1,13 @@
+// Load .env.local first (for local dev), then .env as fallback
+// IMPORTANT: Must be before any other imports that read env vars!
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+dotenv.config(); // This won't override existing values from .env.local
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import serverless from 'serverless-http';
 import { PrismaClient, Prisma, ActivityType } from '@prisma/client';
 import { TemplateService, setPrismaClient as setTemplatePrisma } from './services/TemplateService';
@@ -18,10 +23,6 @@ import * as AWS from 'aws-sdk';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-
-// Load .env.local first (for local dev), then .env as fallback
-dotenv.config({ path: '.env.local' });
-dotenv.config(); // This won't override existing values from .env.local
 
 const app = express();
 
@@ -47,14 +48,26 @@ async function loadAppSecrets() {
       const secret = await secretsManager.getSecretValue({ SecretId: process.env.APP_SECRET_ARN }).promise();
       if (secret.SecretString) {
         const secrets = JSON.parse(secret.SecretString);
-        // Set environment variables from secrets
-        if (secrets.OPENAI_API_KEY) process.env.OPENAI_API_KEY = secrets.OPENAI_API_KEY;
-        if (secrets.ENCRYPTION_KEY) process.env.ENCRYPTION_KEY = secrets.ENCRYPTION_KEY;
-        if (secrets.GOOGLE_CALENDAR_CLIENT_ID) process.env.GOOGLE_CALENDAR_CLIENT_ID = secrets.GOOGLE_CALENDAR_CLIENT_ID;
-        if (secrets.GOOGLE_CALENDAR_CLIENT_SECRET) process.env.GOOGLE_CALENDAR_CLIENT_SECRET = secrets.GOOGLE_CALENDAR_CLIENT_SECRET;
-        if (secrets.MICROSOFT_CLIENT_ID) process.env.MICROSOFT_CLIENT_ID = secrets.MICROSOFT_CLIENT_ID;
-        if (secrets.MICROSOFT_CLIENT_SECRET) process.env.MICROSOFT_CLIENT_SECRET = secrets.MICROSOFT_CLIENT_SECRET;
-        console.log('✅ App secrets loaded from Secrets Manager');
+        // Set environment variables from secrets — all keys stored in Secrets Manager
+        const keysToLoad = [
+          'DATABASE_URL',
+          'OPENAI_API_KEY',
+          'GEMINI_API_KEY',
+          'ENCRYPTION_KEY',
+          'FRONTEND_URL',
+          'GOOGLE_CALENDAR_CLIENT_ID',
+          'GOOGLE_CALENDAR_CLIENT_SECRET',
+          'GOOGLE_CALENDAR_REDIRECT_URI',
+          'GOOGLE_EMAIL_REDIRECT_URI',
+          'MICROSOFT_CLIENT_ID',
+          'MICROSOFT_CLIENT_SECRET',
+          'MICROSOFT_REDIRECT_URI',
+          'MICROSOFT_EMAIL_REDIRECT_URI',
+        ];
+        for (const key of keysToLoad) {
+          if (secrets[key]) process.env[key] = secrets[key];
+        }
+        console.log('✅ App secrets loaded from Secrets Manager:', keysToLoad.filter(k => !!secrets[k]).length, 'keys');
       }
     } catch (error) {
       console.error('Failed to load app secrets from Secrets Manager:', error);
@@ -123,12 +136,16 @@ if (!process.env.AWS_LAMBDA_FUNCTION_NAME && process.env.DATABASE_URL) {
   setAiToolsPrisma(prisma);
 }
 
-const cognito = new AWS.CognitoIdentityServiceProvider();
+const cognito = new AWS.CognitoIdentityServiceProvider({
+  region: process.env.AWS_REGION || 'eu-central-1'
+});
 
 // Middleware to ensure Prisma is initialized before handling requests
 app.use(async (req, res, next) => {
   try {
     await initializePrisma();
+    // Attach prisma to request for audit logging middleware
+    (req as any).prismaClient = prisma;
     next();
   } catch (error) {
     console.error('Failed to initialize Prisma:', error);
@@ -215,6 +232,8 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
     const city = req.user!['custom:city'];
     const country = req.user!['custom:country'];
     
+    console.log('Auth sync for:', email, 'sub:', sub);
+    
     // Handle address - Cognito may return it as object { formatted: "..." } or string
     let streetAddress: string | undefined;
     if (address) {
@@ -225,18 +244,14 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
       }
     }
 
-    // 1. Find or Create Tenant
-    // Strategy: If user has a tenantId in DB, use it. If not, create new Tenant (assuming first user is Admin/Owner)
-    // For simplicity in this MVP: We create a tenant based on company name if it doesn't exist for this user.
-    // Better: Check if user already exists.
-
+    // Check if user exists in DB (by email)
     let user = await prisma.user.findUnique({ where: { email } });
     let tenantId = user?.tenantId;
+    let needsOnboarding = false;
 
     if (!user) {
-      // New User
-      // Check if we should create a new tenant or if this is an invite?
-      // For self-signup, we create a new tenant.
+      // New User (self-signup) - create new tenant
+      console.log('Creating new user and tenant for:', email);
       
       const newTenant = await prisma.tenant.create({
         data: {
@@ -266,23 +281,41 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
         data: { tenantId: newTenant.id }
       });
     } else {
-      // Update existing user with new data from Cognito (only if values are provided)
-      user = await prisma.user.update({
-        where: { email },
-        data: {
-          firstName: given_name || user.firstName,
-          lastName: family_name || user.lastName,
-          phone: phone_number || user.phone,
-          street: streetAddress || user.street,
-          postalCode: postalCode || user.postalCode,
-          city: city || user.city,
-          country: country || user.country,
-          // Don't update tenantId or role here
-        }
-      });
+      // Existing user - check if this is an invited user (Pending)
+      const isPendingInvite = user.firstName === 'Pending' && user.lastName === 'Invite';
+      
+      if (isPendingInvite) {
+        console.log('Invited user first login:', email);
+        // Update the user ID to match Cognito sub (important!)
+        // and mark for onboarding
+        user = await prisma.user.update({
+          where: { email },
+          data: {
+            id: sub, // Update to Cognito sub
+            // Keep firstName/lastName as Pending until they complete onboarding
+          }
+        });
+        needsOnboarding = true;
+      } else {
+        // Regular existing user - update with Cognito data if provided
+        console.log('Existing user login:', email);
+        user = await prisma.user.update({
+          where: { email },
+          data: {
+            id: sub, // Ensure ID matches Cognito sub
+            firstName: given_name || user.firstName,
+            lastName: family_name || user.lastName,
+            phone: phone_number || user.phone,
+            street: streetAddress || user.street,
+            postalCode: postalCode || user.postalCode,
+            city: city || user.city,
+            country: country || user.country,
+          }
+        });
+      }
     }
 
-    res.json({ user, tenantId });
+    res.json({ user, tenantId, needsOnboarding });
   } catch (error) {
     console.error('Auth sync error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -300,6 +333,173 @@ app.get('/me', authMiddleware, async (req, res) => {
     res.json(user);
   } catch (error) {
     console.error('Get me error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Get Tenant Settings
+app.get('/settings/tenant', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const currentUser = await db.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    let settings = await db.tenantSettings.findUnique({
+      where: { tenantId: currentUser.tenantId }
+    });
+
+    // If no settings exist, create them with a generated inboundLeadEmail
+    if (!settings) {
+      const emailPrefix = Math.random().toString(36).substring(2, 10);
+      settings = await db.tenantSettings.create({
+        data: {
+          tenantId: currentUser.tenantId,
+          inboundLeadEmail: emailPrefix
+        }
+      });
+    }
+
+    // If settings exist but no inboundLeadEmail, generate one
+    if (settings && !settings.inboundLeadEmail) {
+      const emailPrefix = Math.random().toString(36).substring(2, 10);
+      settings = await db.tenantSettings.update({
+        where: { id: settings.id },
+        data: { inboundLeadEmail: emailPrefix }
+      });
+    }
+
+    res.json({
+      inboundLeadEmail: settings.inboundLeadEmail,
+      autoReplyEnabled: settings.autoReplyEnabled,
+      autoReplyDelay: settings.autoReplyDelay,
+      calendarShareTeam: settings.calendarShareTeam,
+    });
+  } catch (error) {
+    console.error('Error fetching tenant settings:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Dashboard Stats
+app.get('/dashboard/stats', authMiddleware, async (req, res) => {
+  try {
+    const currentUser = await prisma.user.findUnique({ 
+      where: { email: req.user!.email },
+      include: { tenant: true }
+    });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const tenantId = currentUser.tenantId;
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Get all leads for this tenant
+    const leads = await prisma.lead.findMany({
+      where: { tenantId },
+      include: { property: true },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Get all properties for this tenant
+    const properties = await prisma.property.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Get recent activities (last 10)
+    const recentActivities = await prisma.leadActivity.findMany({
+      where: {
+        lead: { tenantId }
+      },
+      include: {
+        lead: { select: { firstName: true, lastName: true, email: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+
+    // Calculate stats
+    const totalLeads = leads.length;
+    const newLeadsToday = leads.filter(l => l.createdAt >= startOfToday).length;
+    const newLeadsThisWeek = leads.filter(l => l.createdAt >= startOfWeek).length;
+    const newLeadsThisMonth = leads.filter(l => l.createdAt >= startOfMonth).length;
+
+    // Lead status breakdown (matches LeadStatus enum: NEW, CONTACTED, CONVERSATION, BOOKED, LOST)
+    const leadsByStatus = {
+      NEW: leads.filter(l => l.status === 'NEW').length,
+      CONTACTED: leads.filter(l => l.status === 'CONTACTED').length,
+      CONVERSATION: leads.filter(l => l.status === 'CONVERSATION').length,
+      BOOKED: leads.filter(l => l.status === 'BOOKED').length,
+      LOST: leads.filter(l => l.status === 'LOST').length,
+    };
+
+    // Property stats
+    const totalProperties = properties.length;
+    const activeProperties = properties.filter(p => p.status === 'ACTIVE').length;
+    const reservedProperties = properties.filter(p => p.status === 'RESERVED').length;
+    const soldProperties = properties.filter(p => p.status === 'SOLD').length;
+
+    // Recent leads (last 5)
+    const recentLeads = leads.slice(0, 5).map(l => ({
+      id: l.id,
+      name: `${l.firstName || ''} ${l.lastName || ''}`.trim() || l.email,
+      email: l.email,
+      status: l.status,
+      propertyTitle: l.property?.title || null,
+      createdAt: l.createdAt
+    }));
+
+    // Leads needing attention (NEW status, oldest first)
+    const leadsNeedingAttention = leads
+      .filter(l => l.status === 'NEW')
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .slice(0, 5)
+      .map(l => ({
+        id: l.id,
+        name: `${l.firstName || ''} ${l.lastName || ''}`.trim() || l.email,
+        email: l.email,
+        propertyTitle: l.property?.title || null,
+        createdAt: l.createdAt,
+        daysSinceCreated: Math.floor((now.getTime() - l.createdAt.getTime()) / (1000 * 60 * 60 * 24))
+      }));
+
+    res.json({
+      user: {
+        firstName: currentUser.firstName,
+        lastName: currentUser.lastName,
+        email: currentUser.email,
+        role: currentUser.role,
+        tenantName: currentUser.tenant?.name
+      },
+      leads: {
+        total: totalLeads,
+        newToday: newLeadsToday,
+        newThisWeek: newLeadsThisWeek,
+        newThisMonth: newLeadsThisMonth,
+        byStatus: leadsByStatus,
+        needingAttention: leadsNeedingAttention,
+        recent: recentLeads
+      },
+      properties: {
+        total: totalProperties,
+        active: activeProperties,
+        reserved: reservedProperties,
+        sold: soldProperties
+      },
+      activities: recentActivities.map(a => ({
+        id: a.id,
+        type: a.type,
+        description: a.description,
+        leadName: `${a.lead.firstName || ''} ${a.lead.lastName || ''}`.trim() || a.lead.email,
+        createdAt: a.createdAt
+      }))
+    });
+  } catch (error) {
+    console.error('Dashboard stats error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -330,6 +530,293 @@ app.patch('/me', authMiddleware, async (req, res) => {
   }
 });
 
+// Get User Settings
+app.get('/me/settings', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    
+    // Get user by email (more reliable than sub)
+    const user = await db.user.findUnique({ where: { email: req.user!.email } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    let settings = await db.userSettings.findUnique({
+      where: { userId: user.id }
+    });
+
+    // Create default settings if none exist
+    if (!settings) {
+      settings = await db.userSettings.create({
+        data: {
+          userId: user.id,
+          emailNotifications: true,
+          viewingHoursEnabled: true,
+          viewingHoursStart: '09:00',
+          viewingHoursEnd: '18:00',
+          viewingDays: [1, 2, 3, 4, 5],
+          viewingDuration: 30,
+          viewingBuffer: 15
+        }
+      });
+    }
+
+    // Return flat format for email settings page compatibility
+    const response = {
+      id: settings.id,
+      emailNotifications: settings.emailNotifications,
+      emailSignature: (settings as any).emailSignature,
+      emailSignatureName: (settings as any).emailSignatureName,
+      viewingPreferences: {
+        enabled: settings.viewingHoursEnabled,
+        weekdays: settings.viewingDays || [1, 2, 3, 4, 5],
+        startTime: settings.viewingHoursStart || '09:00',
+        endTime: settings.viewingHoursEnd || '18:00',
+        slotDuration: settings.viewingDuration,
+        bufferTime: settings.viewingBuffer
+      }
+    };
+
+    res.json(response);
+  } catch (error: any) {
+    console.error('Error fetching user settings:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update User Settings
+app.put('/me/settings', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    
+    // Get user by email (more reliable than sub)
+    const user = await db.user.findUnique({ where: { email: req.user!.email } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const { emailNotifications, viewingPreferences, emailSignature, emailSignatureName } = req.body;
+
+    // Transform from frontend format to DB format
+    const updateData: any = {};
+    if (emailNotifications !== undefined) {
+      updateData.emailNotifications = emailNotifications;
+    }
+    if (viewingPreferences) {
+      updateData.viewingHoursEnabled = viewingPreferences.enabled ?? true;
+      updateData.viewingHoursStart = viewingPreferences.startTime;
+      updateData.viewingHoursEnd = viewingPreferences.endTime;
+      updateData.viewingDays = viewingPreferences.weekdays;
+      updateData.viewingDuration = viewingPreferences.slotDuration;
+      updateData.viewingBuffer = viewingPreferences.bufferTime;
+    }
+    // Email signature fields
+    if (emailSignature !== undefined) {
+      updateData.emailSignature = emailSignature;
+    }
+    if (emailSignatureName !== undefined) {
+      updateData.emailSignatureName = emailSignatureName;
+    }
+
+    const settings = await db.userSettings.upsert({
+      where: { userId: user.id },
+      update: updateData,
+      create: {
+        userId: user.id,
+        emailNotifications: emailNotifications ?? true,
+        viewingHoursEnabled: viewingPreferences?.enabled ?? true,
+        viewingHoursStart: viewingPreferences?.startTime ?? '09:00',
+        viewingHoursEnd: viewingPreferences?.endTime ?? '18:00',
+        viewingDays: viewingPreferences?.weekdays ?? [1, 2, 3, 4, 5],
+        viewingDuration: viewingPreferences?.slotDuration ?? 30,
+        viewingBuffer: viewingPreferences?.bufferTime ?? 15,
+        emailSignature: emailSignature ?? null,
+        emailSignatureName: emailSignatureName ?? null,
+      }
+    });
+
+    // Transform response to frontend format
+    const response = {
+      id: settings.id,
+      emailNotifications: settings.emailNotifications,
+      emailSignature: (settings as any).emailSignature,
+      emailSignatureName: (settings as any).emailSignatureName,
+      viewingPreferences: {
+        enabled: settings.viewingHoursEnabled,
+        weekdays: settings.viewingDays || [1, 2, 3, 4, 5],
+        startTime: settings.viewingHoursStart || '09:00',
+        endTime: settings.viewingHoursEnd || '18:00',
+        slotDuration: settings.viewingDuration,
+        bufferTime: settings.viewingBuffer
+      }
+    };
+
+    res.json(response);
+  } catch (error: any) {
+    console.error('Error updating user settings:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =====================================================
+// DSGVO: Data Export (Art. 20 - Datenübertragbarkeit)
+// =====================================================
+app.get('/account/export', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const user = await db.user.findUnique({ where: { email: req.user!.email } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Collect all user data
+    const [leads, emails, chats, activities, exposes, properties, notifications, auditLogs] = await Promise.all([
+      db.lead.findMany({
+        where: { tenantId: user.tenantId, assignedToId: user.id },
+        select: { id: true, email: true, firstName: true, lastName: true, phone: true, status: true, source: true, notes: true, createdAt: true }
+      }),
+      db.email.findMany({
+        where: { tenantId: user.tenantId },
+        select: { id: true, from: true, to: true, subject: true, folder: true, sentAt: true, receivedAt: true, createdAt: true },
+        take: 1000,
+        orderBy: { createdAt: 'desc' }
+      }),
+      db.userChat.findMany({
+        where: { userId: user.id },
+        select: { id: true, role: true, content: true, createdAt: true },
+        orderBy: { createdAt: 'desc' }
+      }),
+      db.leadActivity.findMany({
+        where: { createdBy: user.id },
+        select: { id: true, type: true, description: true, createdAt: true },
+        take: 500,
+        orderBy: { createdAt: 'desc' }
+      }),
+      db.expose.findMany({
+        where: { tenantId: user.tenantId },
+        select: { id: true, status: true, theme: true, createdAt: true, updatedAt: true }
+      }),
+      db.property.findMany({
+        where: { tenantId: user.tenantId },
+        select: { id: true, title: true, address: true, propertyType: true, status: true, createdAt: true }
+      }),
+      db.notification.findMany({
+        where: { userId: user.id },
+        select: { id: true, type: true, title: true, message: true, read: true, createdAt: true },
+        take: 500,
+        orderBy: { createdAt: 'desc' }
+      }),
+      db.aiAuditLog.findMany({
+        where: { userId: user.id },
+        select: { id: true, endpoint: true, message: true, flagged: true, createdAt: true },
+        take: 200,
+        orderBy: { createdAt: 'desc' }
+      })
+    ]);
+
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      format: 'DSGVO Art. 20 - Datenübertragbarkeit',
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        role: user.role,
+        street: user.street,
+        postalCode: user.postalCode,
+        city: user.city,
+        country: user.country,
+      },
+      leads,
+      emails,
+      chatHistory: chats,
+      activities,
+      exposes,
+      properties,
+      notifications,
+      aiInteractions: auditLogs,
+    };
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="immivo-datenexport-${new Date().toISOString().split('T')[0]}.json"`);
+    res.json(exportData);
+  } catch (error: any) {
+    console.error('Error exporting user data:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =====================================================
+// DSGVO: Account & Data Deletion (Art. 17 - Recht auf Löschung)
+// =====================================================
+app.delete('/account', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const user = await db.user.findUnique({ where: { email: req.user!.email } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Prevent SUPER_ADMIN self-deletion
+    if (user.role === 'SUPER_ADMIN') {
+      return res.status(403).json({ error: 'Super-Admin-Konten können nicht über die API gelöscht werden.' });
+    }
+
+    // If the user is the only ADMIN in their tenant, prevent deletion
+    if (user.role === 'ADMIN') {
+      const otherAdmins = await db.user.count({
+        where: { tenantId: user.tenantId, role: 'ADMIN', id: { not: user.id } }
+      });
+      if (otherAdmins === 0) {
+        return res.status(403).json({ error: 'Sie sind der einzige Admin. Bitte übertragen Sie die Admin-Rolle bevor Sie Ihr Konto löschen.' });
+      }
+    }
+
+    // Delete user data in correct order (respecting foreign keys)
+    await db.$transaction(async (tx) => {
+      // 1. Delete user's chat history
+      await tx.userChat.deleteMany({ where: { userId: user.id } });
+      
+      // 2. Delete conversation summaries
+      await tx.conversationSummary.deleteMany({ where: { userId: user.id } });
+      
+      // 3. Delete notifications
+      await tx.notification.deleteMany({ where: { userId: user.id } });
+      
+      // 4. Delete AI audit logs
+      await tx.aiAuditLog.deleteMany({ where: { userId: user.id } });
+      
+      // 5. Delete channel memberships and messages
+      await tx.channelMessage.deleteMany({ where: { userId: user.id } });
+      await tx.channelMember.deleteMany({ where: { userId: user.id } });
+      
+      // 6. Delete property assignments
+      await tx.propertyAssignment.deleteMany({ where: { userId: user.id } });
+      
+      // 7. Resolve/cancel pending actions
+      await tx.jarvisPendingAction.updateMany({
+        where: { userId: user.id, status: 'PENDING' },
+        data: { status: 'CANCELLED', resolvedAt: new Date(), resolution: 'Account gelöscht' }
+      });
+      
+      // 8. Unassign leads (don't delete - they belong to the tenant)
+      await tx.lead.updateMany({
+        where: { assignedToId: user.id },
+        data: { assignedToId: null }
+      });
+      
+      // 9. Delete user settings
+      await tx.userSettings.deleteMany({ where: { userId: user.id } });
+      
+      // 10. Delete portal connections
+      await tx.portalConnection.deleteMany({ where: { userId: user.id } });
+      
+      // 11. Finally delete the user
+      await tx.user.delete({ where: { id: user.id } });
+    });
+
+    console.log(`🗑️ Account deleted: ${user.email} (${user.id})`);
+    res.json({ success: true, message: 'Konto und alle persönlichen Daten wurden gelöscht.' });
+  } catch (error: any) {
+    console.error('Error deleting account:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get Seats (Team Members)
 app.get('/seats', authMiddleware, async (req, res) => {
   try {
@@ -353,73 +840,71 @@ app.post('/seats/invite', authMiddleware, async (req, res) => {
     const { email, role } = req.body;
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     
-    if (!currentUser || currentUser.role !== 'ADMIN' && currentUser.role !== 'SUPER_ADMIN') {
+    if (!currentUser || (currentUser.role !== 'ADMIN' && currentUser.role !== 'SUPER_ADMIN')) {
       return res.status(403).json({ error: 'Only Admins can invite users' });
     }
 
-    // 1. Create User in Cognito
+    // Check if user already exists in our DB
+    const existingDbUser = await prisma.user.findFirst({ where: { email } });
+    if (existingDbUser) {
+      return res.status(400).json({ error: 'Ein Benutzer mit dieser E-Mail existiert bereits' });
+    }
+
+    // Generate temp password
     const tempPassword = Math.random().toString(36).slice(-8) + 'Aa1!';
-    await cognito.adminCreateUser({
-      UserPoolId: process.env.USER_POOL_ID!,
-      Username: email,
-      UserAttributes: [
-        { Name: 'email', Value: email },
-        { Name: 'email_verified', Value: 'true' },
-        { Name: 'custom:company_name', Value: currentUser.tenantId } // Store TenantID in company name for now or use a custom attribute 'tenant_id'
-        // Ideally we use a custom attribute 'custom:tenant_id' in Cognito
-      ],
-      TemporaryPassword: tempPassword,
-      MessageAction: 'SUPPRESS', // We send our own email? Or let Cognito send it? Let's use Cognito default for now.
-      // Actually, if we use SUPPRESS, we must send the email. If we remove it, Cognito sends it.
-      // Let's remove MessageAction to let Cognito send the invite.
-    }).promise();
     
-    // Note: adminCreateUser sends an email with temp password by default if MessageAction is not SUPPRESS.
+    let sub: string | undefined;
+    
+    // Try to create user in Cognito
+    try {
+      const cognitoResponse = await cognito.adminCreateUser({
+        UserPoolId: process.env.USER_POOL_ID!,
+        Username: email,
+        UserAttributes: [
+          { Name: 'email', Value: email },
+          { Name: 'email_verified', Value: 'true' },
+        ],
+        DesiredDeliveryMediums: ['EMAIL'],
+        TemporaryPassword: tempPassword,
+      }).promise();
+      
+      sub = cognitoResponse.User?.Username;
+      console.log('Cognito user created with sub:', sub);
+    } catch (cognitoError: any) {
+      if (cognitoError.code === 'UsernameExistsException') {
+        // User exists in Cognito but not in DB - resend invite email and add to DB
+        console.log('User exists in Cognito, resending invite...');
+        try {
+          // Resend the invite email
+          const resendResponse = await cognito.adminCreateUser({
+            UserPoolId: process.env.USER_POOL_ID!,
+            Username: email,
+            MessageAction: 'RESEND',
+            DesiredDeliveryMediums: ['EMAIL'],
+          }).promise();
+          sub = resendResponse.User?.Username;
+          console.log('Resent invite to existing Cognito user with sub:', sub);
+        } catch (resendError: any) {
+          // If resend fails, just get the user
+          console.log('Resend failed, getting user:', resendError.code);
+          try {
+            const existingUser = await cognito.adminGetUser({
+              UserPoolId: process.env.USER_POOL_ID!,
+              Username: email
+            }).promise();
+            sub = existingUser.Username;
+            console.log('Found existing Cognito user with sub:', sub);
+          } catch (getError) {
+            console.error('Failed to get existing Cognito user:', getError);
+            return res.status(400).json({ error: 'Benutzer existiert bereits in Cognito' });
+          }
+        }
+      } else {
+        throw cognitoError;
+      }
+    }
 
-    // 2. Create User in DB (Pending state?)
-    // Actually, we can pre-create the user in DB so they are linked to the tenant.
-    // But their 'sub' will be different until they login? No, adminCreateUser returns the sub.
-    // Let's wait for them to login and hit /auth/sync? 
-    // Better: Create them now so they appear in the list.
-    
-    // We don't have the 'sub' yet easily available without parsing the response.
-    // Let's just return success and let /auth/sync handle the DB creation on first login.
-    // BUT: /auth/sync needs to know which tenant to put them in!
-    // The invite flow is tricky without a 'custom:tenant_id' attribute in Cognito.
-    
-    // Workaround: We create a "PendingInvite" record in DB? 
-    // Or we just rely on the fact that we can't easily map them yet.
-    
-    // Simplest solution for MVP: 
-    // When the invited user logs in, /auth/sync is called.
-    // We need to know their tenant.
-    // We can store the invite in a separate table 'UserInvite' { email, tenantId, role }.
-    // In /auth/sync, we check if there is an invite for this email. If yes, use that tenantId.
-    
-    // Since I don't want to change Prisma schema again right now:
-    // I will assume the user enters the company name correctly? No.
-    
-    // Okay, I will create the user in DB now. I need the 'sub' from Cognito response.
-    // const cognitoUser = await cognito.adminCreateUser(...).promise();
-    // const sub = cognitoUser.User.Username;
-    
-    // Let's do that.
-    
-    const params = {
-      UserPoolId: process.env.USER_POOL_ID!,
-      Username: email,
-      UserAttributes: [
-        { Name: 'email', Value: email },
-        { Name: 'email_verified', Value: 'true' },
-      ],
-      DesiredDeliveryMediums: ['EMAIL'],
-      TemporaryPassword: tempPassword,
-    };
-    
-    // @ts-ignore
-    const cognitoResponse = await cognito.adminCreateUser(params).promise();
-    const sub = cognitoResponse.User?.Username;
-
+    // Create user in DB
     if (sub) {
       await prisma.user.create({
         data: {
@@ -431,11 +916,70 @@ app.post('/seats/invite', authMiddleware, async (req, res) => {
           lastName: 'Invite'
         }
       });
+      console.log('DB user created successfully');
     }
 
     res.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Invite error:', error);
+    
+    if (error.code === 'InvalidParameterException') {
+      return res.status(400).json({ error: 'Ungültige E-Mail-Adresse' });
+    }
+    
+    res.status(500).json({ error: 'Fehler beim Einladen des Benutzers' });
+  }
+});
+
+// Delete Seat
+app.delete('/seats/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    
+    if (!currentUser || (currentUser.role !== 'ADMIN' && currentUser.role !== 'SUPER_ADMIN')) {
+      return res.status(403).json({ error: 'Only Admins can remove users' });
+    }
+
+    // Find the user to delete
+    const userToDelete = await prisma.user.findFirst({
+      where: { id, tenantId: currentUser.tenantId }
+    });
+
+    if (!userToDelete) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Prevent self-deletion
+    if (userToDelete.id === currentUser.id) {
+      return res.status(400).json({ error: 'Cannot delete yourself' });
+    }
+
+    // Delete from Cognito
+    console.log('Deleting user from Cognito:', userToDelete.email);
+    try {
+      await cognito.adminDeleteUser({
+        UserPoolId: process.env.USER_POOL_ID!,
+        Username: userToDelete.email
+      }).promise();
+      console.log('Successfully deleted from Cognito:', userToDelete.email);
+    } catch (cognitoError: any) {
+      console.error('Cognito delete error:', cognitoError.code, cognitoError.message);
+      // If user doesn't exist in Cognito, that's fine - continue
+      if (cognitoError.code !== 'UserNotFoundException') {
+        // For other errors, still continue but log it
+        console.error('Cognito delete failed but continuing with DB delete');
+      }
+    }
+
+    // Delete from database
+    console.log('Deleting user from DB:', id);
+    await prisma.user.delete({ where: { id } });
+    console.log('Successfully deleted from DB');
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete seat error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -527,6 +1071,124 @@ app.get('/properties/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /properties/:id/assignments - Get assigned users for a property
+app.get('/properties/:id/assignments', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const currentUser = await db.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    
+    // Verify property belongs to tenant
+    const property = await db.property.findFirst({
+      where: { id, tenantId: currentUser.tenantId }
+    });
+    if (!property) return res.status(404).json({ error: 'Property not found' });
+
+    const assignments = await db.propertyAssignment.findMany({
+      where: { propertyId: id },
+      include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } }
+    });
+
+    res.json({
+      userIds: assignments.map(a => a.userId),
+      users: assignments.map(a => ({
+        id: a.user.id,
+        name: [a.user.firstName, a.user.lastName].filter(Boolean).join(' ') || a.user.email,
+        email: a.user.email
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching property assignments:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// PUT /properties/:id/assignments - Update assigned users for a property
+app.put('/properties/:id/assignments', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const currentUser = await db.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    const { userIds } = req.body;
+
+    if (!Array.isArray(userIds)) {
+      return res.status(400).json({ error: 'userIds must be an array' });
+    }
+
+    // Verify property belongs to tenant
+    const property = await db.property.findFirst({
+      where: { id, tenantId: currentUser.tenantId }
+    });
+    if (!property) return res.status(404).json({ error: 'Property not found' });
+
+    // Verify all users belong to the same tenant
+    const users = await db.user.findMany({
+      where: { id: { in: userIds }, tenantId: currentUser.tenantId }
+    });
+    
+    if (users.length !== userIds.length) {
+      return res.status(400).json({ error: 'Some users not found or not in your team' });
+    }
+
+    // Delete existing assignments
+    await db.propertyAssignment.deleteMany({
+      where: { propertyId: id }
+    });
+
+    // Create new assignments
+    if (userIds.length > 0) {
+      await db.propertyAssignment.createMany({
+        data: userIds.map((userId: string) => ({
+          propertyId: id,
+          userId
+        }))
+      });
+    }
+
+    res.json({ success: true, assignedUserIds: userIds });
+  } catch (error) {
+    console.error('Error updating property assignments:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// GET /team - Get all team members for current tenant
+app.get('/team', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const currentUser = await db.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const members = await db.user.findMany({
+      where: { tenantId: currentUser.tenantId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true
+      },
+      orderBy: { firstName: 'asc' }
+    });
+
+    res.json({
+      members: members.map(m => ({
+        id: m.id,
+        email: m.email,
+        name: [m.firstName, m.lastName].filter(Boolean).join(' ') || null,
+        role: m.role
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching team members:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 // PUT /leads/:id - Update lead details (tenant-isolated)
 app.put('/leads/:id', authMiddleware, async (req, res) => {
   try {
@@ -534,11 +1196,27 @@ app.put('/leads/:id', authMiddleware, async (req, res) => {
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
 
     const { id } = req.params;
-    const updateData = req.body;
+    const rawData = req.body;
     
     // Get old lead data for comparison - tenant-isolated
     const oldLead = await prisma.lead.findFirst({ where: { id, tenantId: currentUser.tenantId } });
     if (!oldLead) return res.status(404).json({ error: 'Lead not found' });
+    
+    // Filter only allowed fields for update (exclude relations and immutable fields)
+    const allowedFields = [
+      'salutation', 'formalAddress', 'email', 'firstName', 'lastName', 'phone',
+      'budgetMin', 'budgetMax', 'preferredType', 'preferredLocation',
+      'minRooms', 'minArea', 'timeFrame', 'financingStatus', 'hasDownPayment',
+      'source', 'sourceDetails', 'notes', 'status', 'assignedToId', 'propertyId',
+      'documents', 'alternateEmails'
+    ];
+    
+    const updateData: any = {};
+    for (const field of allowedFields) {
+      if (field in rawData) {
+        updateData[field] = rawData[field];
+      }
+    }
     
     // Update lead
     const lead = await prisma.lead.update({
@@ -546,12 +1224,13 @@ app.put('/leads/:id', authMiddleware, async (req, res) => {
       data: updateData
     });
     
-    // Track activities
+    // Track activities - include createdBy for filtering
     const activities: Array<{
       leadId: string;
       type: ActivityType;
       description: string;
       metadata?: any;
+      createdBy?: string;
     }> = [];
     
     // Status changed
@@ -560,7 +1239,8 @@ app.put('/leads/:id', authMiddleware, async (req, res) => {
         leadId: id,
         type: ActivityType.STATUS_CHANGED,
         description: `Status geändert: ${oldLead.status} → ${updateData.status}`,
-        metadata: { old: oldLead.status, new: updateData.status }
+        metadata: { old: oldLead.status, new: updateData.status },
+        createdBy: currentUser.id
       });
     }
     
@@ -571,7 +1251,8 @@ app.put('/leads/:id', authMiddleware, async (req, res) => {
           leadId: id,
           type: ActivityType.FIELD_UPDATED,
           description: `Budget aktualisiert: ${updateData.budgetMin || 0}€ - ${updateData.budgetMax || 0}€`,
-          metadata: { field: 'budget' }
+          metadata: { field: 'budget' },
+          createdBy: currentUser.id
         });
       }
     }
@@ -582,7 +1263,8 @@ app.put('/leads/:id', authMiddleware, async (req, res) => {
         leadId: id,
         type: ActivityType.NOTE_ADDED,
         description: 'Notiz hinzugefügt',
-        metadata: { field: 'notes' }
+        metadata: { field: 'notes' },
+        createdBy: currentUser.id
       });
     }
     
@@ -1106,20 +1788,25 @@ app.post('/properties', authMiddleware, async (req, res) => {
 
 app.post('/leads', authMiddleware, async (req, res) => {
   try {
-    const { email, firstName, lastName, propertyId, message, salutation, formalAddress, phone, source, notes } = req.body;
+    const { email, firstName, lastName, propertyId, message, salutation, formalAddress, phone, source, notes, assignedToId } = req.body;
     
-    // Get tenantId from authenticated user
+    // Get tenantId and user from authenticated user
     const userEmail = req.user!.email;
-    const user = await prisma.user.findUnique({
+    const currentUser = await prisma.user.findUnique({
       where: { email: userEmail },
-      select: { tenantId: true }
+      select: { id: true, tenantId: true, firstName: true, lastName: true }
     });
     
-    if (!user) {
+    if (!currentUser) {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    const tenantId = user.tenantId;
+    const tenantId = currentUser.tenantId;
+    
+    // Get tenant settings for auto-reply configuration
+    const tenantSettings = await prisma.tenantSettings.findUnique({
+      where: { tenantId }
+    });
     
     // 1. Save Lead
     const lead = await prisma.lead.create({
@@ -1128,12 +1815,13 @@ app.post('/leads', authMiddleware, async (req, res) => {
         firstName,
         lastName,
         salutation: salutation || 'NONE',
-        formalAddress: formalAddress !== undefined ? formalAddress : true, // Default: "Sie"
+        formalAddress: formalAddress !== undefined ? formalAddress : true,
         phone,
         source: source || 'WEBSITE',
         notes,
         tenantId,
         propertyId,
+        assignedToId: assignedToId || currentUser.id,
         messages: message ? {
           create: {
             role: 'USER',
@@ -1149,41 +1837,115 @@ app.post('/leads', authMiddleware, async (req, res) => {
       }
     });
 
-    // 2. Fetch Context
+    console.log(`📥 New lead created: ${lead.id} (${lead.email})`);
+
+    // 2. Fetch Property and Template
     let property = null;
     let template = null;
+    let expose = null;
 
     if (propertyId) {
-      property = await prisma.property.findUnique({ where: { id: propertyId } });
+      property = await prisma.property.findUnique({ 
+        where: { id: propertyId },
+        include: { defaultExposeTemplate: true }
+      });
       template = await TemplateService.getTemplateForProperty(tenantId, propertyId);
-    } else {
-      // Fallback: Try to find a default template for the tenant
-      // For now, just skip AI draft if no property is selected
-      console.log('No propertyId provided, skipping AI draft generation');
+      
+      // Check if property has an expose
+      expose = await prisma.expose.findFirst({
+        where: { propertyId, status: 'PUBLISHED' }
+      });
     }
 
-    if (template && property) {
-      // 3. Render Email
-      const context = { lead, property, user: { name: 'Ihr Makler Team' } }; // Mock user for now
-      const emailBody = TemplateService.render(template.body, context);
-      const emailSubject = TemplateService.render(template.subject, context);
+    let emailDraft = null;
+    let emailSubject = '';
 
-      // 4. Create Draft Message (AI Response)
+    if (template && property) {
+      // 3. Render Email with Expose link if available
+      const agentName = [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ') || 'Ihr Makler Team';
+      const context = { 
+        lead, 
+        property, 
+        user: { name: agentName },
+        expose: expose ? { url: `${process.env.APP_URL || 'http://localhost:3000'}/leads/${lead.id}/expose` } : null
+      };
+      
+      emailDraft = TemplateService.render(template.body, context);
+      emailSubject = TemplateService.render(template.subject, context);
+
+      // 4. Create Draft Message
       await prisma.message.create({
         data: {
           leadId: lead.id,
           role: 'ASSISTANT',
-          content: emailBody,
+          content: emailDraft,
           status: 'DRAFT'
         }
       });
       
-      console.log('Draft message created for lead:', lead.id);
+      console.log(`📝 Draft message created for lead: ${lead.id}`);
     }
 
-    res.status(201).json({ id: lead.id, message: 'Lead processed' });
+    // 5. Handle Auto-Reply or Jarvis Question
+    const assignedUserId = assignedToId || currentUser.id;
+    
+    if (tenantSettings?.autoReplyEnabled && emailDraft && property) {
+      // Auto-Reply is enabled - schedule the email
+      const delayMinutes = tenantSettings.autoReplyDelay || 5;
+      
+      console.log(`⏰ Scheduling auto-reply for lead ${lead.id} in ${delayMinutes} minutes`);
+      
+      await SchedulerService.scheduleAutoReply({
+        leadId: lead.id,
+        tenantId,
+        delayMinutes
+      });
+      
+      // Create activity log
+      await prisma.leadActivity.create({
+        data: {
+          leadId: lead.id,
+          type: 'NOTE_ADDED',
+          description: `Auto-Reply geplant in ${delayMinutes} Minuten`
+        }
+      });
+    } else if (emailDraft && property) {
+      // Auto-Reply is disabled - ask Jarvis to confirm
+      const leadName = [firstName, lastName].filter(Boolean).join(' ') || email;
+      
+      await JarvisActionService.createPendingAction({
+        tenantId,
+        userId: assignedUserId,
+        leadId: lead.id,
+        type: 'SEND_EXPOSE',
+        question: `Neuer Lead: ${leadName} interessiert sich für "${property.title}". Soll ich das Exposé senden?`,
+        context: {
+          emailSubject,
+          emailPreview: emailDraft.substring(0, 200) + '...',
+          hasExpose: !!expose
+        }
+      });
+      
+      console.log(`❓ Jarvis question created for lead ${lead.id}`);
+    }
+
+    // 6. Notify assigned agent about new lead
+    await NotificationService.notifyNewLead({
+      tenantId,
+      userId: assignedUserId,
+      leadId: lead.id,
+      leadName: [firstName, lastName].filter(Boolean).join(' ') || email,
+      propertyTitle: property?.title
+    });
+
+    res.status(201).json({ 
+      id: lead.id, 
+      message: 'Lead processed',
+      autoReplyScheduled: tenantSettings?.autoReplyEnabled && !!emailDraft,
+      jarvisQuestionCreated: !tenantSettings?.autoReplyEnabled && !!emailDraft
+    });
   } catch (error) {
-    console.error(error);
+    console.error('Error creating lead:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -1296,11 +2058,11 @@ app.post('/expose-templates', authMiddleware, async (req, res) => {
 app.put('/expose-templates/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, blocks, theme, isDefault } = req.body;
+    const { name, blocks, theme, customColors, isDefault } = req.body;
 
     const template = await prisma.exposeTemplate.update({
       where: { id },
-      data: { name, blocks, theme, isDefault }
+      data: { name, blocks, theme, customColors, isDefault }
     });
     res.json(template);
   } catch (error) {
@@ -1352,8 +2114,11 @@ app.get('/exposes', authMiddleware, async (req, res) => {
 app.get('/exposes/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const expose = await prisma.expose.findUnique({
-      where: { id },
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const expose = await prisma.expose.findFirst({
+      where: { id, tenantId: currentUser.tenantId },
       include: {
         property: true,
         template: { select: { id: true, name: true, updatedAt: true } }
@@ -1417,11 +2182,11 @@ app.post('/exposes', authMiddleware, async (req, res) => {
 app.put('/exposes/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const { blocks, theme, status } = req.body;
+    const { blocks, theme, customColors, status } = req.body;
 
     const expose = await prisma.expose.update({
       where: { id },
-      data: { blocks, theme, status }
+      data: { blocks, theme, customColors, status }
     });
     res.json(expose);
   } catch (error) {
@@ -1682,6 +2447,45 @@ app.post('/chat/new', authMiddleware, async (req, res) => {
   }
 });
 
+// Generate email signature with AI
+app.post('/jarvis/generate-signature', authMiddleware, async (req, res) => {
+  try {
+    const { name, email, phone, company, website } = req.body;
+    
+    const prompt = `Erstelle eine professionelle HTML-E-Mail-Signatur für einen Immobilienmakler mit folgenden Daten:
+- Name: ${name || 'Nicht angegeben'}
+- E-Mail: ${email || 'Nicht angegeben'}
+- Telefon: ${phone || 'Nicht angegeben'}
+- Firma: ${company || 'Nicht angegeben'}
+- Website: ${website || 'Nicht angegeben'}
+
+Die Signatur sollte:
+- Professionell und modern aussehen
+- Inline-CSS verwenden (kein externes Stylesheet)
+- Maximal 5-6 Zeilen haben
+- Die Firmenfarbe Indigo (#4f46e5) als Akzentfarbe verwenden
+- Nur die angegebenen Daten enthalten (keine Platzhalter für fehlende Daten)
+
+Antworte NUR mit dem HTML-Code, ohne Erklärungen.`;
+
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    let signature = response.text();
+    
+    // Clean up response
+    signature = signature.replace(/```html\n?/g, '').replace(/```\n?/g, '').trim();
+    
+    res.json({ signature });
+  } catch (error: any) {
+    console.error('Error generating signature:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/chat',
   authMiddleware,
   AiSafetyMiddleware.rateLimit(50, 60000), // 50 requests per minute
@@ -1703,7 +2507,11 @@ app.post('/chat',
       });
 
       const openai = new OpenAIService();
-      const responseText = await openai.chat(message, tenantId, history);
+      const responseText = await openai.chat(message, tenantId, history, {
+        name: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email,
+        email: currentUser.email,
+        role: currentUser.role,
+      });
       
       // Sanitize response before sending
       const sanitizedResponse = wrapAiResponse(responseText);
@@ -1789,7 +2597,12 @@ app.post('/chat/stream',
 
       // Stream the response with optimized history, pass uploaded files and userId for tools
       let toolsUsed: string[] = [];
-      for await (const result of openai.chatStream(fullMessage, tenantId, optimizedHistory, uploadedFileUrls, currentUser.id)) {
+      const userContext = {
+        name: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email,
+        email: currentUser.email,
+        role: currentUser.role,
+      };
+      for await (const result of openai.chatStream(fullMessage, tenantId, optimizedHistory, uploadedFileUrls, currentUser.id, userContext)) {
         fullResponse += result.chunk;
         if (result.hadFunctionCalls) hadFunctionCalls = true;
         if (result.toolsUsed) toolsUsed = result.toolsUsed;
@@ -2070,27 +2883,67 @@ app.post('/channels/:channelId/messages', authMiddleware, async (req, res) => {
 });
 
 // Export for Lambda
-// Auto-delete archived chats older than 30 days (runs every 24 hours)
-async function cleanupOldChats() {
+// Auto-cleanup: archived chats, old audit logs, old notifications (runs every 24 hours)
+async function cleanupOldData() {
   try {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const result = await prisma.userChat.deleteMany({
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+    // 1. Delete archived chats older than 30 days
+    const chatsResult = await prisma.userChat.deleteMany({
       where: {
         archived: true,
         createdAt: { lt: thirtyDaysAgo }
       }
     });
 
-    console.log(`🗑️ Gelöscht: ${result.count} archivierte Chats (älter als 30 Tage)`);
+    // 2. Delete AI audit logs older than 12 months (DSGVO retention policy)
+    const auditResult = await prisma.aiAuditLog.deleteMany({
+      where: {
+        createdAt: { lt: twelveMonthsAgo }
+      }
+    });
+
+    // 3. Delete read notifications older than 90 days
+    const notifResult = await prisma.notification.deleteMany({
+      where: {
+        read: true,
+        createdAt: { lt: ninetyDaysAgo }
+      }
+    });
+
+    // 4. Delete resolved/cancelled pending actions older than 90 days
+    const actionsResult = await prisma.jarvisPendingAction.deleteMany({
+      where: {
+        status: { in: ['RESOLVED', 'CANCELLED'] },
+        createdAt: { lt: ninetyDaysAgo }
+      }
+    });
+
+    // 5. Delete old conversation summaries older than 12 months
+    const summaryResult = await prisma.conversationSummary.deleteMany({
+      where: {
+        createdAt: { lt: twelveMonthsAgo }
+      }
+    });
+
+    console.log(`🗑️ Retention Cleanup: ${chatsResult.count} Chats, ${auditResult.count} Audit-Logs, ${notifResult.count} Notifications, ${actionsResult.count} Actions, ${summaryResult.count} Summaries gelöscht`);
   } catch (error) {
-    console.error('Error cleaning up old chats:', error);
+    console.error('Error in data cleanup:', error);
   }
 }
 
+// Backward-compatible alias
+const cleanupOldChats = cleanupOldData;
+
 // Run cleanup every 24 hours
-setInterval(cleanupOldChats, 24 * 60 * 60 * 1000);
+setInterval(cleanupOldData, 24 * 60 * 60 * 1000);
 
 // --- Portal Integration ---
 
@@ -2433,6 +3286,7 @@ app.post('/portal-connections/:id/test', authMiddleware, async (req, res) => {
 app.get('/calendar/google/auth-url', authMiddleware, async (req, res) => {
   try {
     const authUrl = CalendarService.getGoogleAuthUrl();
+    console.log('🔗 Generated Google Auth URL:', authUrl);
     res.json({ authUrl });
   } catch (error) {
     console.error('Error generating Google auth URL:', error);
@@ -2442,24 +3296,32 @@ app.get('/calendar/google/auth-url', authMiddleware, async (req, res) => {
 
 // Google Calendar: OAuth Callback
 app.get('/calendar/google/callback', async (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  
   try {
-    const { code, state } = req.query;
+    const { code } = req.query;
     
     if (!code) {
-      return res.status(400).send('Missing authorization code');
+      return res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=google-calendar&error=true`);
     }
 
     // Exchange code for tokens
     const tokens = await CalendarService.exchangeGoogleCode(code as string);
 
-    // Store tokens in session or redirect with token
-    // For now, redirect to frontend with success
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=google&success=true&email=${encodeURIComponent(tokens.email)}`);
+    // Redirect with tokens in URL (frontend will save them)
+    const params = new URLSearchParams({
+      provider: 'google-calendar',
+      success: 'true',
+      email: tokens.email,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiryDate: tokens.expiryDate.toString()
+    });
+    
+    res.redirect(`${frontendUrl}/dashboard/settings/integrations?${params.toString()}`);
   } catch (error) {
     console.error('Error in Google OAuth callback:', error);
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=google&error=true`);
+    res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=google-calendar&error=true`);
   }
 });
 
@@ -2513,6 +3375,54 @@ app.post('/calendar/google/connect', authMiddleware, async (req, res) => {
   }
 });
 
+// Google Calendar: Save tokens directly (from OAuth callback)
+app.post('/calendar/google/save', authMiddleware, async (req, res) => {
+  try {
+    const { accessToken, refreshToken, expiryDate, email } = req.body;
+    const userEmail = req.user!.email;
+
+    if (!accessToken || !refreshToken) {
+      return res.status(400).json({ error: 'Missing tokens' });
+    }
+
+    // Get user's tenantId from database
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Encrypt tokens before storing
+    const encryptedConfig = {
+      accessToken: encryptionService.encrypt(accessToken),
+      refreshToken: encryptionService.encrypt(refreshToken),
+      expiryDate: expiryDate || Date.now() + 3600000,
+      email: email || ''
+    };
+
+    // Update tenant settings
+    await prisma.tenantSettings.upsert({
+      where: { tenantId: user.tenantId },
+      create: {
+        tenantId: user.tenantId,
+        googleCalendarConfig: encryptedConfig as any
+      },
+      update: {
+        googleCalendarConfig: encryptedConfig as any
+      }
+    });
+
+    console.log(`✅ Google Calendar connected for tenant ${user.tenantId}`);
+    res.json({ success: true, email });
+  } catch (error) {
+    console.error('Error saving Google Calendar config:', error);
+    res.status(500).json({ error: 'Failed to save Google Calendar config' });
+  }
+});
+
 // Google Calendar: Disconnect
 app.post('/calendar/google/disconnect', authMiddleware, async (req, res) => {
   try {
@@ -2555,23 +3465,32 @@ app.get('/calendar/outlook/auth-url', authMiddleware, async (req, res) => {
 
 // Outlook Calendar: OAuth Callback
 app.get('/calendar/outlook/callback', async (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  
   try {
     const { code } = req.query;
     
     if (!code) {
-      return res.status(400).send('Missing authorization code');
+      return res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=outlook-calendar&error=true`);
     }
 
     // Exchange code for tokens
     const tokens = await CalendarService.exchangeOutlookCode(code as string);
 
-    // Redirect to frontend with success
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=outlook&success=true&email=${encodeURIComponent(tokens.email)}`);
+    // Redirect with tokens in URL (frontend will save them)
+    const params = new URLSearchParams({
+      provider: 'outlook-calendar',
+      success: 'true',
+      email: tokens.email,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiryDate: tokens.expiryDate.toString()
+    });
+    
+    res.redirect(`${frontendUrl}/dashboard/settings/integrations?${params.toString()}`);
   } catch (error) {
     console.error('Error in Outlook OAuth callback:', error);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=outlook&error=true`);
+    res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=outlook-calendar&error=true`);
   }
 });
 
@@ -2622,6 +3541,54 @@ app.post('/calendar/outlook/connect', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error connecting Outlook Calendar:', error);
     res.status(500).json({ error: 'Failed to connect Outlook Calendar' });
+  }
+});
+
+// Outlook Calendar: Save tokens directly (from OAuth callback)
+app.post('/calendar/outlook/save', authMiddleware, async (req, res) => {
+  try {
+    const { accessToken, refreshToken, expiryDate, email } = req.body;
+    const userEmail = req.user!.email;
+
+    if (!accessToken || !refreshToken) {
+      return res.status(400).json({ error: 'Missing tokens' });
+    }
+
+    // Get user's tenantId from database
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Encrypt tokens before storing
+    const encryptedConfig = {
+      accessToken: encryptionService.encrypt(accessToken),
+      refreshToken: encryptionService.encrypt(refreshToken),
+      expiryDate: expiryDate || Date.now() + 3600000,
+      email: email || ''
+    };
+
+    // Update tenant settings
+    await prisma.tenantSettings.upsert({
+      where: { tenantId: user.tenantId },
+      create: {
+        tenantId: user.tenantId,
+        outlookCalendarConfig: encryptedConfig as any
+      },
+      update: {
+        outlookCalendarConfig: encryptedConfig as any
+      }
+    });
+
+    console.log(`✅ Outlook Calendar connected for tenant ${user.tenantId}`);
+    res.json({ success: true, email });
+  } catch (error) {
+    console.error('Error saving Outlook Calendar config:', error);
+    res.status(500).json({ error: 'Failed to save Outlook Calendar config' });
   }
 });
 
@@ -2711,6 +3678,393 @@ app.get('/calendar/status', authMiddleware, async (req, res) => {
   }
 });
 
+// Get Calendar Events
+app.get('/calendar/events', authMiddleware, async (req, res) => {
+  try {
+    const userEmail = req.user!.email;
+    const { start, end } = req.query;
+
+    if (!start || !end) {
+      return res.status(400).json({ error: 'start and end query parameters are required' });
+    }
+
+    // Get user's tenantId from database
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const settings = await prisma.tenantSettings.findUnique({
+      where: { tenantId: user.tenantId },
+      select: {
+        googleCalendarConfig: true,
+        outlookCalendarConfig: true,
+      }
+    });
+
+    const events: any[] = [];
+
+    // Fetch from Google Calendar
+    if (settings?.googleCalendarConfig) {
+      try {
+        const encryptedConfig = settings.googleCalendarConfig as any;
+        
+        // Decrypt tokens
+        let accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+        const refreshToken = encryptionService.decrypt(encryptedConfig.refreshToken);
+        let expiryDate = encryptedConfig.expiryDate;
+        
+        // Check if token is expired and refresh if needed
+        const now = Date.now();
+        if (expiryDate && expiryDate < now && refreshToken) {
+          console.log('🔄 Google Calendar token expired, refreshing...');
+          try {
+            const newTokens = await CalendarService.refreshGoogleToken(refreshToken);
+            accessToken = newTokens.accessToken;
+            expiryDate = newTokens.expiryDate;
+            
+            // Save updated tokens (encrypted)
+            const updatedConfig = {
+              ...encryptedConfig,
+              accessToken: encryptionService.encrypt(accessToken),
+              expiryDate: expiryDate
+            };
+            
+            await prisma.tenantSettings.update({
+              where: { tenantId: user.tenantId },
+              data: { googleCalendarConfig: updatedConfig }
+            });
+            console.log('✅ Google Calendar token refreshed');
+          } catch (refreshError) {
+            console.error('❌ Failed to refresh Google token:', refreshError);
+            // Token refresh failed - user needs to reconnect
+            return res.json({ events: [], needsReconnect: 'google' });
+          }
+        }
+        
+        const googleEvents = await CalendarService.getGoogleEvents(
+          accessToken,
+          refreshToken,
+          new Date(start as string),
+          new Date(end as string)
+        );
+        events.push(...googleEvents);
+      } catch (error: any) {
+        console.error('Error fetching Google Calendar events:', error);
+        // If it's an auth error, indicate reconnection needed
+        if (error?.code === 401 || error?.code === 400 || error?.message?.includes('invalid_grant')) {
+          return res.json({ events: [], needsReconnect: 'google' });
+        }
+      }
+    }
+
+    // Fetch from Outlook Calendar
+    if (settings?.outlookCalendarConfig) {
+      try {
+        const encryptedConfig = settings.outlookCalendarConfig as any;
+        
+        // Decrypt tokens
+        let accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+        const refreshToken = encryptionService.decrypt(encryptedConfig.refreshToken);
+        let expiryDate = encryptedConfig.expiryDate;
+        
+        // Check if token is expired and refresh if needed
+        const now = Date.now();
+        if (expiryDate && expiryDate < now && refreshToken) {
+          console.log('🔄 Outlook Calendar token expired, refreshing...');
+          try {
+            const newTokens = await CalendarService.refreshOutlookToken(refreshToken);
+            accessToken = newTokens.accessToken;
+            expiryDate = newTokens.expiryDate;
+            
+            // Save updated tokens (encrypted)
+            const updatedConfig = {
+              ...encryptedConfig,
+              accessToken: encryptionService.encrypt(accessToken),
+              expiryDate: expiryDate
+            };
+            
+            await prisma.tenantSettings.update({
+              where: { tenantId: user.tenantId },
+              data: { outlookCalendarConfig: updatedConfig }
+            });
+            console.log('✅ Outlook Calendar token refreshed');
+          } catch (refreshError) {
+            console.error('❌ Failed to refresh Outlook token:', refreshError);
+            return res.json({ events: [], needsReconnect: 'outlook' });
+          }
+        }
+        
+        const outlookEvents = await CalendarService.getOutlookEvents(
+          accessToken,
+          new Date(start as string),
+          new Date(end as string)
+        );
+        events.push(...outlookEvents);
+      } catch (error: any) {
+        console.error('Error fetching Outlook Calendar events:', error);
+        if (error?.code === 401 || error?.message?.includes('InvalidAuthenticationToken')) {
+          return res.json({ events: [], needsReconnect: 'outlook' });
+        }
+      }
+    }
+
+    // Sort events by start time
+    events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
+    res.json({ events });
+  } catch (error) {
+    console.error('Error getting calendar events:', error);
+    res.status(500).json({ error: 'Failed to get calendar events' });
+  }
+});
+
+// Create Calendar Event
+app.post('/calendar/events', authMiddleware, async (req, res) => {
+  try {
+    const userEmail = req.user!.email;
+    const { title, start, end, location, description } = req.body;
+
+    if (!title || !start || !end) {
+      return res.status(400).json({ error: 'title, start, and end are required' });
+    }
+
+    // Get user's tenantId from database
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const settings = await prisma.tenantSettings.findUnique({
+      where: { tenantId: user.tenantId },
+      select: {
+        googleCalendarConfig: true,
+        outlookCalendarConfig: true,
+      }
+    });
+
+    let createdEvent = null;
+
+    // Create event in Google Calendar
+    if (settings?.googleCalendarConfig) {
+      try {
+        const encryptedConfig = settings.googleCalendarConfig as any;
+        const accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+        const refreshToken = encryptionService.decrypt(encryptedConfig.refreshToken);
+
+        createdEvent = await CalendarService.createViewingEvent({
+          provider: 'google',
+          config: { accessToken, refreshToken },
+          start: new Date(start),
+          end: new Date(end),
+          title,
+          description,
+          location
+        });
+        
+        console.log('✅ Event created in Google Calendar:', createdEvent.eventId);
+      } catch (error) {
+        console.error('Error creating Google Calendar event:', error);
+        return res.status(500).json({ error: 'Failed to create event in Google Calendar' });
+      }
+    }
+    // Create event in Outlook Calendar
+    else if (settings?.outlookCalendarConfig) {
+      try {
+        const encryptedConfig = settings.outlookCalendarConfig as any;
+        const accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+
+        createdEvent = await CalendarService.createViewingEvent({
+          provider: 'outlook',
+          config: { accessToken },
+          start: new Date(start),
+          end: new Date(end),
+          title,
+          description,
+          location
+        });
+        
+        console.log('✅ Event created in Outlook Calendar:', createdEvent.eventId);
+      } catch (error) {
+        console.error('Error creating Outlook Calendar event:', error);
+        return res.status(500).json({ error: 'Failed to create event in Outlook Calendar' });
+      }
+    } else {
+      return res.status(400).json({ error: 'No calendar connected' });
+    }
+
+    res.json({ 
+      success: true, 
+      eventId: createdEvent?.eventId,
+      link: createdEvent?.link
+    });
+  } catch (error) {
+    console.error('Error creating calendar event:', error);
+    res.status(500).json({ error: 'Failed to create calendar event' });
+  }
+});
+
+// Update Calendar Event
+app.put('/calendar/events/:eventId', authMiddleware, async (req, res) => {
+  try {
+    const userEmail = req.user!.email;
+    const { eventId } = req.params;
+    const { title, start, end, location, description } = req.body;
+
+    if (!title || !start || !end) {
+      return res.status(400).json({ error: 'title, start, and end are required' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const settings = await prisma.tenantSettings.findUnique({
+      where: { tenantId: user.tenantId },
+      select: {
+        googleCalendarConfig: true,
+        outlookCalendarConfig: true,
+      }
+    });
+
+    // Update event in Google Calendar
+    if (settings?.googleCalendarConfig) {
+      try {
+        const encryptedConfig = settings.googleCalendarConfig as any;
+        const accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+        const refreshToken = encryptionService.decrypt(encryptedConfig.refreshToken);
+
+        await CalendarService.updateGoogleEvent({
+          accessToken,
+          refreshToken,
+          eventId,
+          title,
+          start: new Date(start),
+          end: new Date(end),
+          location,
+          description
+        });
+        
+        console.log('✅ Event updated in Google Calendar:', eventId);
+        return res.json({ success: true });
+      } catch (error) {
+        console.error('Error updating Google Calendar event:', error);
+        return res.status(500).json({ error: 'Failed to update event in Google Calendar' });
+      }
+    }
+    // Update event in Outlook Calendar
+    else if (settings?.outlookCalendarConfig) {
+      try {
+        const encryptedConfig = settings.outlookCalendarConfig as any;
+        const accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+
+        await CalendarService.updateOutlookEvent({
+          accessToken,
+          eventId,
+          title,
+          start: new Date(start),
+          end: new Date(end),
+          location,
+          description
+        });
+        
+        console.log('✅ Event updated in Outlook Calendar:', eventId);
+        return res.json({ success: true });
+      } catch (error) {
+        console.error('Error updating Outlook Calendar event:', error);
+        return res.status(500).json({ error: 'Failed to update event in Outlook Calendar' });
+      }
+    } else {
+      return res.status(400).json({ error: 'No calendar connected' });
+    }
+  } catch (error) {
+    console.error('Error updating calendar event:', error);
+    res.status(500).json({ error: 'Failed to update calendar event' });
+  }
+});
+
+// Delete Calendar Event
+app.delete('/calendar/events/:eventId', authMiddleware, async (req, res) => {
+  try {
+    const userEmail = req.user!.email;
+    const { eventId } = req.params;
+
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: { tenantId: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const settings = await prisma.tenantSettings.findUnique({
+      where: { tenantId: user.tenantId },
+      select: {
+        googleCalendarConfig: true,
+        outlookCalendarConfig: true,
+      }
+    });
+
+    // Delete event from Google Calendar
+    if (settings?.googleCalendarConfig) {
+      try {
+        const encryptedConfig = settings.googleCalendarConfig as any;
+        const accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+        const refreshToken = encryptionService.decrypt(encryptedConfig.refreshToken);
+
+        await CalendarService.deleteGoogleEvent({
+          accessToken,
+          refreshToken,
+          eventId
+        });
+        
+        console.log('✅ Event deleted from Google Calendar:', eventId);
+        return res.json({ success: true });
+      } catch (error) {
+        console.error('Error deleting Google Calendar event:', error);
+        return res.status(500).json({ error: 'Failed to delete event from Google Calendar' });
+      }
+    }
+    // Delete event from Outlook Calendar
+    else if (settings?.outlookCalendarConfig) {
+      try {
+        const encryptedConfig = settings.outlookCalendarConfig as any;
+        const accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
+
+        await CalendarService.deleteOutlookEvent({
+          accessToken,
+          eventId
+        });
+        
+        console.log('✅ Event deleted from Outlook Calendar:', eventId);
+        return res.json({ success: true });
+      } catch (error) {
+        console.error('Error deleting Outlook Calendar event:', error);
+        return res.status(500).json({ error: 'Failed to delete event from Outlook Calendar' });
+      }
+    } else {
+      return res.status(400).json({ error: 'No calendar connected' });
+    }
+  } catch (error) {
+    console.error('Error deleting calendar event:', error);
+    res.status(500).json({ error: 'Failed to delete calendar event' });
+  }
+});
+
 // --- Email Integration (Gmail & Outlook) ---
 
 import { EmailService } from './services/EmailService';
@@ -2728,10 +4082,12 @@ app.get('/email/gmail/auth-url', authMiddleware, async (req, res) => {
 
 // Gmail: OAuth Callback
 app.get('/email/gmail/callback', async (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  
   try {
     const { code } = req.query;
     if (!code) {
-      return res.redirect('/dashboard/settings/integrations?provider=gmail&error=true');
+      return res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=gmail&error=true`);
     }
 
     const tokens = await EmailService.exchangeGmailCode(code as string);
@@ -2746,10 +4102,10 @@ app.get('/email/gmail/callback', async (req, res) => {
       expiryDate: tokens.expiryDate.toString()
     });
     
-    res.redirect(`/dashboard/settings/integrations?${params.toString()}`);
+    res.redirect(`${frontendUrl}/dashboard/settings/integrations?${params.toString()}`);
   } catch (error) {
     console.error('Error in Gmail OAuth callback:', error);
-    res.redirect('/dashboard/settings/integrations?provider=gmail&error=true');
+    res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=gmail&error=true`);
   }
 });
 
@@ -2837,10 +4193,12 @@ app.get('/email/outlook/auth-url', authMiddleware, async (req, res) => {
 
 // Outlook Mail: OAuth Callback
 app.get('/email/outlook/callback', async (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  
   try {
     const { code } = req.query;
     if (!code) {
-      return res.redirect('/dashboard/settings/integrations?provider=outlook-mail&error=true');
+      return res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=outlook-mail&error=true`);
     }
 
     const tokens = await EmailService.exchangeOutlookMailCode(code as string);
@@ -2855,10 +4213,10 @@ app.get('/email/outlook/callback', async (req, res) => {
       expiryDate: tokens.expiryDate.toString()
     });
     
-    res.redirect(`/dashboard/settings/integrations?${params.toString()}`);
+    res.redirect(`${frontendUrl}/dashboard/settings/integrations?${params.toString()}`);
   } catch (error) {
     console.error('Error in Outlook Mail OAuth callback:', error);
-    res.redirect('/dashboard/settings/integrations?provider=outlook-mail&error=true');
+    res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=outlook-mail&error=true`);
   }
 });
 
@@ -3247,6 +4605,1340 @@ app.post('/admin/setup-db', async (req, res) => {
   } catch (error: any) {
     console.error('Setup error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// Email System API
+// ============================================
+
+import EmailSyncService from './services/EmailSyncService';
+import EmailResponseHandler from './services/EmailResponseHandler';
+
+// Get emails with folder filter
+app.get('/emails', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const userId = req.user.sub;
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { folder = 'INBOX', page = '1', limit = '50', leadId, search } = req.query;
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+
+    const where: any = { tenantId: user.tenantId };
+    
+    if (folder && folder !== 'ALL') {
+      where.folder = folder;
+    }
+    if (leadId) {
+      where.leadId = leadId;
+    }
+    if (search) {
+      where.OR = [
+        { subject: { contains: search, mode: 'insensitive' } },
+        { from: { contains: search, mode: 'insensitive' } },
+        { fromName: { contains: search, mode: 'insensitive' } },
+        { bodyText: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    const [emails, total] = await Promise.all([
+      db.email.findMany({
+        where,
+        orderBy: { receivedAt: 'desc' },
+        skip,
+        take: parseInt(limit as string)
+      }),
+      db.email.count({ where })
+    ]);
+
+    // Get unread counts per folder
+    const unreadCounts = await db.email.groupBy({
+      by: ['folder'],
+      where: { tenantId: user.tenantId, isRead: false },
+      _count: true
+    });
+
+    res.json({ 
+      emails, 
+      total,
+      page: parseInt(page as string),
+      totalPages: Math.ceil(total / parseInt(limit as string)),
+      unreadCounts: unreadCounts.reduce((acc: any, item: any) => {
+        acc[item.folder] = item._count;
+        return acc;
+      }, {})
+    });
+  } catch (error: any) {
+    console.error('Error fetching emails:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get single email
+app.get('/emails/:id', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const userId = req.user.sub;
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const email = await db.email.findFirst({
+      where: { id: req.params.id, tenantId: user.tenantId }
+    });
+
+    if (!email) {
+      return res.status(404).json({ error: 'Email not found' });
+    }
+
+    // Mark as read
+    if (!email.isRead) {
+      await db.email.update({
+        where: { id: email.id },
+        data: { isRead: true }
+      });
+    }
+
+    res.json({ email });
+  } catch (error: any) {
+    console.error('Error fetching email:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Mark email as read/unread
+app.patch('/emails/:id/read', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const userId = req.user.sub;
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { isRead } = req.body;
+
+    const email = await db.email.updateMany({
+      where: { id: req.params.id, tenantId: user.tenantId },
+      data: { isRead: isRead ?? true }
+    });
+
+    res.json({ success: email.count > 0 });
+  } catch (error: any) {
+    console.error('Error updating email:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Move email to folder
+app.patch('/emails/:id/move', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const userId = req.user.sub;
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { folder } = req.body;
+    if (!['INBOX', 'SENT', 'DRAFTS', 'TRASH', 'SPAM'].includes(folder)) {
+      return res.status(400).json({ error: 'Invalid folder' });
+    }
+
+    const email = await db.email.updateMany({
+      where: { id: req.params.id, tenantId: user.tenantId },
+      data: { folder }
+    });
+
+    res.json({ success: email.count > 0 });
+  } catch (error: any) {
+    console.error('Error moving email:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Toggle star on email
+app.patch('/emails/:id/star', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const userId = req.user.sub;
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { isStarred } = req.body;
+
+    const email = await db.email.updateMany({
+      where: { id: req.params.id, tenantId: user.tenantId },
+      data: { isStarred: Boolean(isStarred) }
+    });
+
+    res.json({ success: email.count > 0 });
+  } catch (error: any) {
+    console.error('Error toggling star:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete email (move to trash or permanent delete)
+app.delete('/emails/:id', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const userId = req.user.sub;
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { permanent } = req.query;
+
+    const email = await db.email.findFirst({
+      where: { id: req.params.id, tenantId: user.tenantId }
+    });
+
+    if (!email) {
+      return res.status(404).json({ error: 'Email not found' });
+    }
+
+    if (permanent === 'true' || email.folder === 'TRASH') {
+      // Permanent delete
+      await db.email.delete({ where: { id: email.id } });
+    } else {
+      // Move to trash
+      await db.email.update({
+        where: { id: email.id },
+        data: { folder: 'TRASH' }
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting email:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Send email (new general endpoint)
+app.post('/emails/send', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const user = await db.user.findUnique({ 
+      where: { email: req.user!.email },
+      include: { settings: true }
+    });
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { to, cc, bcc, subject, body, bodyHtml, leadId, replyToEmailId, asDraft, draftId } = req.body;
+
+    if (!to || !subject) {
+      return res.status(400).json({ error: 'Missing required fields: to, subject' });
+    }
+
+    // Get email configuration
+    const settings = await db.tenantSettings.findUnique({
+      where: { tenantId: user.tenantId }
+    });
+
+    // Prepare email body with signature if available
+    let finalBody = body || '';
+    let finalHtml = bodyHtml;
+    
+    const userSettings = user.settings as any;
+    if (userSettings?.emailSignature && !finalBody.includes(userSettings.emailSignature)) {
+      finalBody = finalBody + '\n\n' + userSettings.emailSignature;
+      if (finalHtml) {
+        finalHtml = finalHtml + '<br><br>' + userSettings.emailSignature;
+      }
+    }
+
+    // Build full sender name for drafts and sent emails
+    const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.name || undefined;
+
+    // If saving as draft
+    if (asDraft) {
+      const draft = await db.email.create({
+        data: {
+          tenantId: user.tenantId,
+          from: user.email,
+          fromName: fullName,
+          to: Array.isArray(to) ? to : [to],
+          cc: cc ? (Array.isArray(cc) ? cc : [cc]) : [],
+          bcc: bcc ? (Array.isArray(bcc) ? bcc : [bcc]) : [],
+          subject,
+          bodyText: finalBody,
+          bodyHtml: finalHtml,
+          folder: 'DRAFTS',
+          isRead: true,
+          leadId: leadId || undefined,
+        }
+      });
+      return res.json({ success: true, draft: true, emailId: draft.id });
+    }
+
+    // Determine which email provider to use
+    let sendResult: { success: boolean; provider?: string; error?: string } = { success: false };
+
+    if (settings?.gmailConfig) {
+      // Send via Gmail
+      const config = settings.gmailConfig as any;
+      let accessToken = config.accessToken;
+      let refreshToken = config.refreshToken;
+      
+      try { accessToken = encryptionService.decrypt(accessToken); } catch {}
+      try { refreshToken = encryptionService.decrypt(refreshToken); } catch {}
+
+      const { google } = require('googleapis');
+      const googleConfig = {
+        clientId: process.env.GOOGLE_CALENDAR_CLIENT_ID || '',
+        clientSecret: process.env.GOOGLE_CALENDAR_CLIENT_SECRET || '',
+        redirectUri: process.env.GOOGLE_EMAIL_REDIRECT_URI || 'http://localhost:3001/email/gmail/callback'
+      };
+      
+      const oauth2Client = new google.auth.OAuth2(
+        googleConfig.clientId,
+        googleConfig.clientSecret,
+        googleConfig.redirectUri
+      );
+      oauth2Client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+
+      const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+      // Build sender name from user profile
+      const senderName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.name || '';
+      const fromHeader = senderName 
+        ? `"${senderName}" <${user.email}>`
+        : user.email;
+
+      // Build email message
+      const emailLines = [
+        `From: ${fromHeader}`,
+        `To: ${to}`,
+        cc ? `Cc: ${cc}` : '',
+        bcc ? `Bcc: ${bcc}` : '',
+        `Subject: ${subject}`,
+        'MIME-Version: 1.0',
+        'Content-Type: text/html; charset=utf-8',
+        '',
+        finalHtml || finalBody.replace(/\n/g, '<br>')
+      ].filter(Boolean);
+
+      const rawMessage = Buffer.from(emailLines.join('\r\n'))
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+      try {
+        await gmail.users.messages.send({
+          userId: 'me',
+          requestBody: { raw: rawMessage }
+        });
+        sendResult = { success: true, provider: 'gmail' };
+      } catch (gmailError: any) {
+        console.error('Gmail send error:', gmailError);
+        sendResult = { success: false, error: gmailError.message };
+      }
+    } else if (settings?.smtpConfig) {
+      // Send via SMTP (fallback)
+      const smtpConfig = settings.smtpConfig as any;
+      const nodemailer = require('nodemailer');
+      
+      const transporter = nodemailer.createTransport({
+        host: smtpConfig.host,
+        port: smtpConfig.port,
+        secure: smtpConfig.port === 465,
+        auth: {
+          user: smtpConfig.user,
+          pass: smtpConfig.pass,
+        },
+      });
+
+      // Build sender name for SMTP
+      const smtpSenderName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.name || '';
+      const smtpFrom = smtpSenderName 
+        ? `"${smtpSenderName}" <${smtpConfig.from || user.email}>`
+        : (smtpConfig.from || user.email);
+
+      try {
+        await transporter.sendMail({
+          from: smtpFrom,
+          to,
+          cc,
+          bcc,
+          subject,
+          text: finalBody,
+          html: finalHtml,
+        });
+        sendResult = { success: true, provider: 'smtp' };
+      } catch (smtpError: any) {
+        console.error('SMTP send error:', smtpError);
+        sendResult = { success: false, error: smtpError.message };
+      }
+    } else {
+      return res.status(400).json({ error: 'No email provider configured. Please connect Gmail or configure SMTP in settings.' });
+    }
+
+    if (sendResult.success) {
+      // Build full sender name
+      const fullSenderName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.name || undefined;
+      
+      // Save to sent folder
+      await db.email.create({
+        data: {
+          tenantId: user.tenantId,
+          from: user.email,
+          fromName: fullSenderName,
+          to: Array.isArray(to) ? to : [to],
+          cc: cc ? (Array.isArray(cc) ? cc : [cc]) : [],
+          subject,
+          bodyText: finalBody,
+          bodyHtml: finalHtml,
+          folder: 'SENT',
+          isRead: true,
+          provider: sendResult.provider === 'gmail' ? 'GMAIL' : 'SMTP',
+          leadId: leadId || undefined,
+          sentAt: new Date(),
+        }
+      });
+
+      // Delete the draft if this was sent from a draft
+      if (draftId) {
+        await db.email.deleteMany({
+          where: { 
+            id: draftId, 
+            tenantId: user.tenantId,
+            folder: 'DRAFTS'
+          }
+        });
+      }
+
+      // If linked to a lead, create a message record and activity
+      if (leadId) {
+        await db.message.create({
+          data: {
+            leadId,
+            role: 'ASSISTANT',
+            content: `Subject: ${subject}\n\n${finalBody}`,
+            status: 'SENT'
+          }
+        });
+        
+        // Create activity for email sent
+        await db.leadActivity.create({
+          data: {
+            leadId,
+            type: 'EMAIL_SENT',
+            description: `E-Mail gesendet: "${subject}"`,
+            createdBy: user.id
+          }
+        });
+      }
+
+      res.json({ success: true, provider: sendResult.provider });
+    } else {
+      res.status(500).json({ success: false, error: sendResult.error });
+    }
+  } catch (error: any) {
+    console.error('Error sending email:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Sync emails from providers
+app.post('/emails/sync', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const userEmail = req.user!.email;
+    const user = await db.user.findUnique({ where: { email: userEmail } });
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    console.log(`📧 Starting email sync for tenant ${user.tenantId}...`);
+    const result = await EmailSyncService.syncAll(user.tenantId);
+    console.log(`📧 Email sync complete:`, result);
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error syncing emails:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get sync status
+app.get('/emails/sync/status', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const userEmail = req.user!.email;
+    const user = await db.user.findUnique({ where: { email: userEmail } });
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const status = await EmailSyncService.getSyncStatus(user.tenantId);
+    res.json(status);
+  } catch (error: any) {
+    console.error('Error getting sync status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Process incoming email (webhook endpoint)
+app.post('/emails/incoming', async (req, res) => {
+  try {
+    const { tenantId, from, fromName, subject, body, receivedAt } = req.body;
+
+    if (!tenantId || !from || !subject || !body) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const result = await EmailResponseHandler.processEmailResponse(tenantId, {
+      from,
+      fromName,
+      subject,
+      body,
+      receivedAt: receivedAt ? new Date(receivedAt) : new Date()
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error processing incoming email:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// Notifications API
+// ============================================
+
+import NotificationService from './services/NotificationService';
+import JarvisActionService from './services/JarvisActionService';
+import SchedulerService from './services/SchedulerService';
+
+// Get notifications for current user
+app.get('/notifications', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const userId = req.user.sub;
+    const { unreadOnly, limit, offset } = req.query;
+
+    const notifications = await NotificationService.getNotificationsForUser(userId, {
+      unreadOnly: unreadOnly === 'true',
+      limit: limit ? parseInt(limit as string) : 50,
+      offset: offset ? parseInt(offset as string) : 0
+    });
+
+    const unreadCount = await NotificationService.getUnreadCount(userId);
+
+    res.json({ notifications, unreadCount });
+  } catch (error: any) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Mark notification as read
+app.patch('/notifications/:id/read', authMiddleware, async (req: any, res) => {
+  try {
+    const userId = req.user.sub;
+    const { id } = req.params;
+
+    const success = await NotificationService.markAsRead(id, userId);
+    
+    if (!success) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error marking notification as read:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Mark all notifications as read
+app.post('/notifications/mark-all-read', authMiddleware, async (req: any, res) => {
+  try {
+    const userId = req.user.sub;
+    const count = await NotificationService.markAllAsRead(userId);
+    res.json({ success: true, count });
+  } catch (error: any) {
+    console.error('Error marking all notifications as read:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// Activities API
+// ============================================
+
+// Get all activities for tenant
+app.get('/activities', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const userEmail = req.user!.email;
+    const { limit = 100, leadId, type } = req.query;
+
+    console.log('📋 Loading activities for user:', userEmail);
+
+    const user = await db.user.findUnique({
+      where: { email: userEmail },
+      select: { id: true, tenantId: true }
+    });
+
+    if (!user) {
+      console.log('❌ User not found:', userEmail);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    console.log('📋 User found:', user.id, 'tenantId:', user.tenantId);
+
+    // First check total count
+    const totalCount = await db.leadActivity.count({
+      where: {
+        lead: { tenantId: user.tenantId }
+      }
+    });
+    console.log('📋 Total activities in DB for tenant:', totalCount);
+
+    const activities = await db.leadActivity.findMany({
+      where: {
+        lead: { tenantId: user.tenantId },
+        ...(leadId && { leadId: leadId as string }),
+        ...(type && { type: type as string }),
+      },
+      select: {
+        id: true,
+        leadId: true,
+        type: true,
+        description: true,
+        metadata: true,
+        propertyId: true,
+        jarvisActionId: true,
+        createdBy: true,
+        createdAt: true,
+        lead: {
+          select: { id: true, firstName: true, lastName: true, email: true }
+        },
+        property: {
+          select: { id: true, title: true, address: true }
+        },
+        jarvisAction: {
+          select: { id: true, status: true, question: true, options: true, allowCustom: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: parseInt(limit as string),
+    });
+
+    // Fetch user names for createdBy IDs
+    const createdByIds = [...new Set(activities.map(a => a.createdBy).filter(Boolean))] as string[];
+    const users = createdByIds.length > 0 
+      ? await db.user.findMany({
+          where: { id: { in: createdByIds } },
+          select: { id: true, firstName: true, lastName: true, name: true, email: true }
+        })
+      : [];
+    // Build full name from firstName + lastName, fallback to name, then email
+    const userMap = new Map(users.map(u => {
+      const fullName = [u.firstName, u.lastName].filter(Boolean).join(' ');
+      return [u.id, fullName || u.name || u.email.split('@')[0]];
+    }));
+
+    // Add createdByName to activities
+    const activitiesWithNames = activities.map(a => ({
+      ...a,
+      createdByName: a.createdBy ? userMap.get(a.createdBy) || null : null
+    }));
+
+    console.log('📋 Returning', activitiesWithNames.length, 'activities');
+    res.json({ activities: activitiesWithNames, currentUserId: user.id });
+  } catch (error: any) {
+    console.error('Error fetching activities:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// Admin: Backfill activities for existing leads
+// ============================================
+app.post('/admin/backfill-activities', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const userEmail = req.user!.email;
+    
+    const user = await db.user.findUnique({
+      where: { email: userEmail },
+      select: { id: true, tenantId: true, role: true }
+    });
+    
+    if (!user || !['ADMIN', 'SUPER_ADMIN'].includes(user.role)) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    
+    // Get all leads for this tenant that don't have a LEAD_CREATED activity
+    const leads = await db.lead.findMany({
+      where: { tenantId: user.tenantId },
+      include: {
+        activities: {
+          where: { type: 'LEAD_CREATED' }
+        }
+      }
+    });
+    
+    const leadsWithoutActivity = leads.filter(l => l.activities.length === 0);
+    console.log(`📋 Found ${leadsWithoutActivity.length} leads without LEAD_CREATED activity`);
+    
+    // Create activities for these leads
+    let created = 0;
+    for (const lead of leadsWithoutActivity) {
+      await db.leadActivity.create({
+        data: {
+          leadId: lead.id,
+          type: 'LEAD_CREATED',
+          description: `Lead ${lead.firstName || ''} ${lead.lastName || ''} erstellt`.trim(),
+          createdBy: user.id,
+          createdAt: lead.createdAt // Use the lead's creation date
+        }
+      });
+      created++;
+    }
+    
+    console.log(`📋 Created ${created} LEAD_CREATED activities`);
+    res.json({ success: true, created, total: leads.length });
+  } catch (error: any) {
+    console.error('Error backfilling activities:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// Jarvis Pending Actions API
+// ============================================
+
+// Get pending actions for current user
+app.get('/jarvis/actions', authMiddleware, async (req: any, res) => {
+  try {
+    const userId = req.user.sub;
+    const actions = await JarvisActionService.getPendingActionsForUser(userId);
+    res.json({ actions });
+  } catch (error: any) {
+    console.error('Error fetching pending actions:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all pending actions for tenant (admin only)
+app.get('/jarvis/actions/all', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const userId = req.user.sub;
+    
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (!user || !['ADMIN', 'SUPER_ADMIN'].includes(user.role)) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const actions = await JarvisActionService.getPendingActionsForTenant(user.tenantId);
+    res.json({ actions });
+  } catch (error: any) {
+    console.error('Error fetching all pending actions:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Resolve a pending action
+app.post('/jarvis/actions/:id/resolve', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const userId = req.user.sub;
+    const { id } = req.params;
+    const { resolution } = req.body;
+
+    if (!resolution) {
+      return res.status(400).json({ error: 'Resolution is required' });
+    }
+
+    // Verify user owns this action or is admin
+    const action = await db.jarvisPendingAction.findUnique({ where: { id } });
+    if (!action) {
+      return res.status(404).json({ error: 'Action not found' });
+    }
+
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (action.userId !== userId && !['ADMIN', 'SUPER_ADMIN'].includes(user?.role || '')) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    // Cancel any pending schedules
+    await SchedulerService.cancelActionSchedules(id);
+
+    const resolved = await JarvisActionService.resolveAction(id, resolution, userId);
+    res.json({ success: true, action: resolved });
+  } catch (error: any) {
+    console.error('Error resolving action:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Respond to a pending action (simplified version of resolve)
+app.post('/jarvis/actions/:id/respond', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const userEmail = req.user!.email;
+    const { id } = req.params;
+    const { response } = req.body;
+
+    if (!response) {
+      return res.status(400).json({ error: 'Response is required' });
+    }
+
+    const user = await db.user.findUnique({ where: { email: userEmail } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get the action
+    const action = await db.jarvisPendingAction.findUnique({ 
+      where: { id },
+      include: { activity: true }
+    });
+    
+    if (!action) {
+      return res.status(404).json({ error: 'Action not found' });
+    }
+
+    if (action.status !== 'PENDING') {
+      return res.status(400).json({ error: 'Action already resolved' });
+    }
+
+    // Handle different action types
+    if (action.type === 'ASSIGN_PROPERTY' && response !== 'none') {
+      // Assign property to lead
+      if (action.leadId) {
+        await db.lead.update({
+          where: { id: action.leadId },
+          data: { propertyId: response }
+        });
+
+        // Create activity for assignment
+        await db.leadActivity.create({
+          data: {
+            leadId: action.leadId,
+            type: 'PROPERTY_ASSIGNED',
+            description: 'Objekt manuell zugewiesen',
+            propertyId: response,
+            createdBy: user.id,
+          }
+        });
+      }
+    }
+
+    // Resolve the action
+    const resolved = await db.jarvisPendingAction.update({
+      where: { id },
+      data: {
+        status: 'RESOLVED',
+        resolution: response,
+        resolvedAt: new Date(),
+      }
+    });
+
+    // Update linked activity if exists
+    if (action.activity) {
+      await db.leadActivity.update({
+        where: { id: action.activity.id },
+        data: {
+          type: 'PROPERTY_ASSIGNED',
+          description: response === 'none' 
+            ? 'Keinem Objekt zugeordnet' 
+            : 'Objekt zugewiesen',
+        }
+      });
+    }
+
+    res.json({ success: true, action: resolved });
+  } catch (error: any) {
+    console.error('Error responding to action:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Cancel a pending action
+app.post('/jarvis/actions/:id/cancel', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const userId = req.user.sub;
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    // Verify user owns this action or is admin
+    const action = await db.jarvisPendingAction.findUnique({ where: { id } });
+    if (!action) {
+      return res.status(404).json({ error: 'Action not found' });
+    }
+
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (action.userId !== userId && !['ADMIN', 'SUPER_ADMIN'].includes(user?.role || '')) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    // Cancel any pending schedules
+    await SchedulerService.cancelActionSchedules(id);
+
+    const cancelled = await JarvisActionService.cancelAction(id, reason);
+    res.json({ success: true, action: cancelled });
+  } catch (error: any) {
+    console.error('Error cancelling action:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// Internal Scheduler Endpoints (called by EventBridge)
+// ============================================
+
+// Internal endpoint for auto-reply
+app.post('/internal/scheduler/auto-reply', async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { leadId, tenantId } = req.body;
+    
+    console.log(`📧 Auto-reply triggered for lead ${leadId}`);
+    
+    // 1. Get lead with property and messages
+    const lead = await db.lead.findUnique({
+      where: { id: leadId },
+      include: { 
+        property: true,
+        messages: { where: { status: 'DRAFT', role: 'ASSISTANT' }, take: 1 }
+      }
+    });
+    
+    if (!lead) {
+      console.log(`⚠️ Lead ${leadId} not found`);
+      return res.json({ success: false, error: 'Lead not found' });
+    }
+    
+    if (lead.status !== 'NEW') {
+      console.log(`⚠️ Lead ${leadId} status is ${lead.status}, skipping auto-reply`);
+      return res.json({ success: false, error: 'Lead already processed' });
+    }
+    
+    // 2. Get tenant settings for email config
+    const tenantSettings = await db.tenantSettings.findUnique({
+      where: { tenantId }
+    });
+    
+    if (!tenantSettings) {
+      console.log(`⚠️ Tenant settings not found for ${tenantId}`);
+      return res.json({ success: false, error: 'Tenant settings not found' });
+    }
+    
+    // 3. Get the draft message
+    const draftMessage = lead.messages[0];
+    if (!draftMessage) {
+      console.log(`⚠️ No draft message found for lead ${leadId}`);
+      return res.json({ success: false, error: 'No draft message' });
+    }
+    
+    // 4. Prepare email config
+    const emailConfig: any = {};
+    if (tenantSettings.gmailConfig) {
+      const config = tenantSettings.gmailConfig as any;
+      emailConfig.gmailConfig = {
+        accessToken: encryptionService.decrypt(config.accessToken),
+        refreshToken: encryptionService.decrypt(config.refreshToken),
+        expiryDate: config.expiryDate,
+        email: config.email
+      };
+    }
+    if (tenantSettings.outlookMailConfig) {
+      const config = tenantSettings.outlookMailConfig as any;
+      emailConfig.outlookMailConfig = {
+        accessToken: encryptionService.decrypt(config.accessToken),
+        refreshToken: config.refreshToken,
+        expiryDate: config.expiryDate,
+        email: config.email
+      };
+    }
+    if (tenantSettings.smtpConfig) {
+      emailConfig.smtpConfig = tenantSettings.smtpConfig;
+    }
+    
+    // 5. Check if we have an email provider
+    if (!EmailService.hasEmailProvider(emailConfig)) {
+      console.log(`⚠️ No email provider configured for tenant ${tenantId}`);
+      
+      // Create Jarvis action to notify admin
+      const admin = await db.user.findFirst({
+        where: { tenantId, role: { in: ['ADMIN', 'SUPER_ADMIN'] } }
+      });
+      
+      if (admin) {
+        await JarvisActionService.createPendingAction({
+          tenantId,
+          userId: admin.id,
+          leadId,
+          type: 'ESCALATION',
+          question: 'Auto-Reply konnte nicht gesendet werden: Kein E-Mail-Provider konfiguriert. Bitte Gmail, Outlook oder SMTP in den Einstellungen verbinden.',
+          context: { leadEmail: lead.email }
+        });
+      }
+      
+      return res.json({ success: false, error: 'No email provider configured' });
+    }
+    
+    // 6. Generate email subject
+    const emailSubject = lead.property 
+      ? `Ihr Exposé für ${lead.property.title}`
+      : 'Ihre Anfrage';
+    
+    // 7. Send the email
+    const result = await EmailService.sendEmail(emailConfig, {
+      to: lead.email,
+      subject: emailSubject,
+      body: draftMessage.content,
+      html: draftMessage.content.includes('<') ? draftMessage.content : undefined
+    });
+    
+    if (result.success) {
+      // 8. Update lead status and message
+      await db.lead.update({
+        where: { id: leadId },
+        data: { status: 'CONTACTED' }
+      });
+      
+      await db.message.update({
+        where: { id: draftMessage.id },
+        data: { status: 'SENT' }
+      });
+      
+      // 9. Create activity log
+      await db.leadActivity.create({
+        data: {
+          leadId,
+          type: 'EMAIL_SENT',
+          description: `Exposé automatisch gesendet via ${result.provider}`
+        }
+      });
+      
+      // 10. Store email in local database
+      await db.email.create({
+        data: {
+          tenantId,
+          from: EmailService.getSenderEmail(emailConfig) || 'noreply@immivo.ai',
+          to: [lead.email],
+          cc: [],
+          bcc: [],
+          subject: emailSubject,
+          bodyHtml: draftMessage.content.includes('<') ? draftMessage.content : undefined,
+          bodyText: draftMessage.content,
+          folder: 'SENT',
+          isRead: true,
+          hasAttachments: false,
+          leadId,
+          provider: result.provider === 'gmail' ? 'GMAIL' : result.provider === 'outlook' ? 'OUTLOOK' : 'SMTP',
+          sentAt: new Date()
+        }
+      });
+      
+      console.log(`✅ Auto-reply sent successfully for lead ${leadId} via ${result.provider}`);
+      res.json({ success: true, provider: result.provider });
+    } else {
+      console.log(`❌ Auto-reply failed for lead ${leadId}: ${result.error}`);
+      
+      // Notify assigned agent about the failure
+      if (lead.assignedToId) {
+        await JarvisActionService.createPendingAction({
+          tenantId,
+          userId: lead.assignedToId,
+          leadId,
+          type: 'ESCALATION',
+          question: `Auto-Reply an ${lead.email} fehlgeschlagen: ${result.error}. Bitte manuell senden.`,
+          context: { error: result.error }
+        });
+      }
+      
+      res.json({ success: false, error: result.error });
+    }
+  } catch (error: any) {
+    console.error('Auto-reply error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Internal endpoint for reminder
+app.post('/internal/scheduler/reminder', async (req, res) => {
+  try {
+    const { actionId } = req.body;
+    await JarvisActionService.sendReminder(actionId);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Reminder error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Internal endpoint for escalation
+app.post('/internal/scheduler/escalation', async (req, res) => {
+  try {
+    const { actionId } = req.body;
+    await JarvisActionService.escalateAction(actionId);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Escalation error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// Internal Lead Ingestion Endpoint (called by Email Parser Lambda)
+// ============================================
+
+import { parsePortalEmail, isPortalEmail } from './services/EmailParserService';
+import { matchProperty, getPropertiesForSelection } from './services/PropertyMatchingService';
+
+app.post('/internal/ingest-lead', async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { recipientEmail, from, subject, text, html, rawEmail } = req.body;
+
+    console.log(`📧 Lead ingestion: Email to ${recipientEmail} from ${from}`);
+
+    // 1. Find tenant by inboundLeadEmail
+    const emailPrefix = recipientEmail?.split('@')[0];
+    if (!emailPrefix) {
+      console.log('⚠️ No recipient email prefix');
+      return res.status(400).json({ error: 'Invalid recipient email' });
+    }
+
+    const tenantSettings = await db.tenantSettings.findFirst({
+      where: { inboundLeadEmail: emailPrefix },
+      include: { tenant: true }
+    });
+
+    if (!tenantSettings) {
+      console.log(`⚠️ No tenant found for email prefix: ${emailPrefix}`);
+      return res.status(404).json({ error: 'Tenant not found for this email address' });
+    }
+
+    const tenantId = tenantSettings.tenantId;
+    console.log(`✅ Tenant identified: ${tenantSettings.tenant.name} (${tenantId})`);
+
+    // 2. Check if this is a portal email
+    if (!isPortalEmail(from, subject)) {
+      console.log('⚠️ Not a recognized portal email, skipping');
+      return res.json({ success: false, message: 'Not a portal email' });
+    }
+
+    // 3. Parse email with Jarvis
+    console.log('🤖 Parsing email with Jarvis...');
+    const parseResult = await parsePortalEmail({ from, subject, text, html });
+
+    if (!parseResult.success) {
+      console.log(`⚠️ Failed to parse email: ${parseResult.error}`);
+      // Still create a lead with minimal data
+    }
+
+    console.log(`📋 Parse result: portal=${parseResult.portal}, hasClickLink=${parseResult.hasClickLink}`);
+
+    // 4. Determine lead stage based on parse result
+    let leadStatus: 'NEW' | 'CONTACTED' | 'CONVERSATION' | 'BOOKED' | 'LOST' = 'NEW';
+    
+    // 5. Create the lead (always!)
+    const leadData = parseResult.leadData;
+    // Build notes with message and link info
+    let leadNotes = leadData.message || parseResult.rawMessage || '';
+    if (parseResult.hasClickLink) {
+      leadNotes = `⚠️ Portal-Email erfordert Link-Klick. URL: ${parseResult.clickLinkUrl || 'nicht erkannt'}\n\n${leadNotes}`;
+    }
+
+    const lead = await db.lead.create({
+      data: {
+        tenantId,
+        email: leadData.email || `unknown-${Date.now()}@portal.lead`,
+        firstName: leadData.firstName || undefined,
+        lastName: leadData.lastName || undefined,
+        phone: leadData.phone || undefined,
+        source: 'PORTAL',
+        sourceDetails: parseResult.portal,
+        status: leadStatus,
+        notes: leadNotes || undefined,
+      }
+    });
+
+    console.log(`✅ Lead created: ${lead.id}`);
+
+    // 6. Try to match property
+    let matchedProperty = null;
+    let assignedUserIds: string[] = [];
+
+    if (parseResult.propertyRef) {
+      console.log(`🔍 Matching property: ${parseResult.propertyRef.type} = ${parseResult.propertyRef.value}`);
+      const matchResult = await matchProperty(tenantId, parseResult.propertyRef);
+      
+      if (matchResult.property) {
+        matchedProperty = matchResult.property;
+        console.log(`✅ Property matched: ${matchedProperty.title} (${matchResult.matchType}, ${matchResult.confidence}%)`);
+
+        // Get assigned users for this property
+        const assignments = await db.propertyAssignment.findMany({
+          where: { propertyId: matchedProperty.id },
+          select: { userId: true }
+        });
+        assignedUserIds = assignments.map(a => a.userId);
+      }
+    }
+
+    // 7. Create activity
+    const activityType = parseResult.hasClickLink ? 'LINK_CLICK_REQUIRED' : 'PORTAL_INQUIRY';
+    const activityDescription = parseResult.hasClickLink
+      ? `Neue Anfrage via ${parseResult.portal} - Link-Klick erforderlich`
+      : `Neue Anfrage via ${parseResult.portal}`;
+
+    const activity = await db.leadActivity.create({
+      data: {
+        leadId: lead.id,
+        type: activityType,
+        description: activityDescription,
+        propertyId: matchedProperty?.id,
+        metadata: {
+          portal: parseResult.portal,
+          hasClickLink: parseResult.hasClickLink,
+          clickLinkUrl: parseResult.clickLinkUrl,
+          propertyRef: parseResult.propertyRef ? JSON.parse(JSON.stringify(parseResult.propertyRef)) : null,
+          originalEmail: { from, subject },
+        } as any
+      }
+    });
+
+    // 8. Determine who to notify
+    let usersToNotify: string[] = [];
+
+    if (assignedUserIds.length > 0) {
+      // Notify assigned users of the property
+      usersToNotify = assignedUserIds;
+      console.log(`📢 Notifying ${usersToNotify.length} assigned user(s)`);
+    } else {
+      // No property match or no assigned users -> notify ALL users in tenant
+      const allUsers = await db.user.findMany({
+        where: { tenantId },
+        select: { id: true }
+      });
+      usersToNotify = allUsers.map(u => u.id);
+      console.log(`📢 No property match - notifying ALL ${usersToNotify.length} user(s)`);
+    }
+
+    // 9. Create notifications
+    const notificationType = parseResult.hasClickLink ? 'JARVIS_QUESTION' : 'NEW_LEAD';
+    const notificationTitle = parseResult.hasClickLink
+      ? `Neue Portal-Anfrage - Link-Klick erforderlich`
+      : `Neuer Lead: ${[leadData.firstName, leadData.lastName].filter(Boolean).join(' ') || leadData.email || 'Unbekannt'}`;
+    const notificationMessage = matchedProperty
+      ? `Anfrage für "${matchedProperty.title}" via ${parseResult.portal}`
+      : `Anfrage via ${parseResult.portal} - kein Objekt zugeordnet`;
+
+    for (const userId of usersToNotify) {
+      await db.notification.create({
+        data: {
+          tenantId,
+          userId,
+          type: notificationType,
+          title: notificationTitle,
+          message: notificationMessage,
+          metadata: {
+            leadId: lead.id,
+            propertyId: matchedProperty?.id,
+            activityId: activity.id,
+          }
+        }
+      });
+    }
+
+    // 10. If no property matched, create JarvisQuery for assignment
+    let jarvisAction = null;
+    if (!matchedProperty && !parseResult.hasClickLink) {
+      // Get properties for selection
+      const propertyOptions = await getPropertiesForSelection(tenantId);
+      const options = [
+        ...propertyOptions.map(p => ({ id: p.id, label: `${p.label} (${p.address})` })),
+        { id: 'none', label: 'Keinem Objekt zuordnen' }
+      ];
+
+      // Create JarvisQuery for the first user (or admin)
+      const targetUser = usersToNotify[0];
+      if (targetUser) {
+        jarvisAction = await db.jarvisPendingAction.create({
+          data: {
+            tenantId,
+            userId: targetUser,
+            leadId: lead.id,
+            type: 'ASSIGN_PROPERTY',
+            question: `Neuer Lead "${[leadData.firstName, leadData.lastName].filter(Boolean).join(' ') || leadData.email}" via ${parseResult.portal}. Welchem Objekt soll ich die Anfrage zuordnen?`,
+            options,
+            allowCustom: false,
+            context: {
+              leadId: lead.id,
+              portal: parseResult.portal,
+              leadEmail: leadData.email,
+            }
+          }
+        });
+
+        // Link activity to JarvisAction
+        await db.leadActivity.update({
+          where: { id: activity.id },
+          data: {
+            type: 'JARVIS_QUERY',
+            jarvisActionId: jarvisAction.id,
+          }
+        });
+
+        console.log(`❓ JarvisQuery created for property assignment: ${jarvisAction.id}`);
+      }
+    }
+
+    // 11. If hasClickLink, create JarvisQuery for link click
+    if (parseResult.hasClickLink) {
+      const targetUser = usersToNotify[0];
+      if (targetUser) {
+        jarvisAction = await db.jarvisPendingAction.create({
+          data: {
+            tenantId,
+            userId: targetUser,
+            leadId: lead.id,
+            type: 'LINK_CLICK_REQUIRED',
+            question: `Neue Anfrage via ${parseResult.portal}. Die Email enthält einen Link, der geklickt werden muss, um die Lead-Daten zu sehen.`,
+            options: [
+              { id: 'done', label: 'Link geklickt - Daten eingegeben' },
+              { id: 'skip', label: 'Überspringen' }
+            ],
+            allowCustom: true,
+            context: {
+              leadId: lead.id,
+              portal: parseResult.portal,
+              clickLinkUrl: parseResult.clickLinkUrl,
+              originalEmail: { from, subject },
+            }
+          }
+        });
+
+        // Link activity to JarvisAction
+        await db.leadActivity.update({
+          where: { id: activity.id },
+          data: { jarvisActionId: jarvisAction.id }
+        });
+
+        console.log(`❓ JarvisQuery created for link click: ${jarvisAction.id}`);
+      }
+    }
+
+    res.json({
+      success: true,
+      leadId: lead.id,
+      propertyId: matchedProperty?.id,
+      jarvisActionId: jarvisAction?.id,
+      notifiedUsers: usersToNotify.length,
+      parseResult: {
+        portal: parseResult.portal,
+        hasClickLink: parseResult.hasClickLink,
+        propertyMatched: !!matchedProperty,
+      }
+    });
+
+  } catch (error: any) {
+    console.error('❌ Error in lead ingestion:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
 

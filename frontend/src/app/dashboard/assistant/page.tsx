@@ -41,10 +41,7 @@ export default function TeamChatPage() {
 
   return (
     <div className="h-full flex flex-col relative bg-white">
-      {/* Header */}
-      <div className="pt-8 px-8 pb-4 shrink-0">
-        <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Team Chat</h1>
-      </div>
+      <div className="pt-2 shrink-0" />
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar: Channels & DMs */}

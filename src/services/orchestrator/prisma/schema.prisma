@@ -38,7 +38,7 @@ model TenantSettings {
   tenant   Tenant @relation(fields: [tenantId], references: [id])
 
   // Configuration
-  smtpConfig    Json? // { host, port, user, pass }
+  smtpConfig    Json? // { host, port, user, pass, from }
   stripeConfig  Json? // { customerId, subscriptionId }
   aiPersonality Json? // { tone: "professional", language: "de" }
   
@@ -53,6 +53,11 @@ model TenantSettings {
   
   // Auto-Reply Settings
   autoReplyEnabled Boolean @default(false) // If true, Jarvis sends emails automatically
+  autoReplyDelay   Int     @default(5)     // Minutes to wait before auto-sending
+  
+  // Lead Ingestion - Email address for receiving portal leads
+  // e.g. "f7k2m9" -> f7k2m9@leads.immivo.ai
+  inboundLeadEmail String? @unique
 }
 
 model User {
@@ -80,6 +85,36 @@ model User {
   aiAuditLogs AiAuditLog[]
   conversationSummaries ConversationSummary[]
   portalConnections PortalConnection[]
+  settings  UserSettings?
+  notifications Notification[]
+  pendingActions JarvisPendingAction[]
+  assignedProperties PropertyAssignment[]
+}
+
+// --- User Settings (per-agent preferences) ---
+
+model UserSettings {
+  id       String @id @default(uuid())
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id])
+  
+  // Viewing Preferences (for calendar/appointment scheduling)
+  viewingHoursEnabled Boolean @default(false)
+  viewingHoursStart   String? // "09:00"
+  viewingHoursEnd     String? // "12:00"
+  viewingDays         Json?   // ["MO", "TU", "WE", "TH", "FR"]
+  viewingDuration     Int     @default(30) // Minutes per viewing
+  viewingBuffer       Int     @default(15) // Buffer between appointments
+  
+  // Notification Preferences
+  emailNotifications  Boolean @default(true)
+  
+  // Email Signature (HTML)
+  emailSignature      String? @db.Text // Full HTML signature
+  emailSignatureName  String? // Display name for signature selection
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum Role {
@@ -141,6 +176,9 @@ model Lead {
   // Documents (Führerschein, Pass, Mietverträge, etc.) - stored as JSON array
   documents   Json?    // Array of { name: string, url: string, type: string, uploadedAt: string }
   
+  // Alternate emails (for matching responses from different email addresses)
+  alternateEmails Json? // ["other@email.com"] - for responses from different addresses
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -156,10 +194,19 @@ model LeadActivity {
   description String // "Status geändert: Neu → Kontaktiert"
   metadata  Json? // Zusätzliche Daten (z.B. alte/neue Werte)
   
+  // Optional: Which property does this activity relate to?
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id])
+  
+  // Link to JarvisAction (for displaying buttons in activities)
+  jarvisActionId String? @unique
+  jarvisAction   JarvisPendingAction? @relation(fields: [jarvisActionId], references: [id])
+  
   createdBy String? // User ID
   createdAt DateTime @default(now())
   
   @@index([leadId, createdAt])
+  @@index([propertyId])
 }
 
 enum ActivityType {
@@ -170,6 +217,12 @@ enum ActivityType {
   EMAIL_RECEIVED
   NOTE_ADDED
   PROPERTY_ASSIGNED
+  PORTAL_INQUIRY       // New inquiry from portal
+  EXPOSE_SENT          // Expose was sent
+  VIEWING_SCHEDULED    // Viewing appointment scheduled
+  VIEWING_DONE         // Viewing completed
+  JARVIS_QUERY         // Jarvis is asking a question
+  LINK_CLICK_REQUIRED  // Portal email requires link click
 }
 
 enum LeadTimeFrame {
@@ -305,9 +358,28 @@ model Property {
   // Relations
   leads       Lead[]
   exposes     Expose[]
+  activities  LeadActivity[]
+  
+  // Assigned users (multiple agents can be assigned to one property)
+  assignedUsers PropertyAssignment[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// Many-to-Many: Property <-> User (multiple agents per property)
+model PropertyAssignment {
+  id         String   @id @default(uuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt  DateTime @default(now())
+  
+  @@unique([propertyId, userId])
+  @@index([propertyId])
+  @@index([userId])
 }
 
 enum PropertyType {
@@ -488,7 +560,8 @@ model ExposeTemplate {
   blocks    Json     // Array of ExposeBlock with placeholders
   
   // Styling
-  theme     String   @default("default") // "default", "modern", "classic", "luxury"
+  theme        String   @default("default") // "default", "modern", "classic", "luxury"
+  customColors Json?    // Array of custom hex color strings e.g. ["#FF5733", "#4F46E5"]
   
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -515,8 +588,9 @@ model Expose {
   createdFromTemplateAt DateTime? // When was this generated from template
   
   // Content (concrete data, no placeholders)
-  blocks      Json     // Array of ExposeBlock with real data
-  theme       String   @default("default")
+  blocks       Json     // Array of ExposeBlock with real data
+  theme        String   @default("default")
+  customColors Json?    // Array of custom hex color strings
   
   // Status
   status      ExposeStatus @default(DRAFT)
@@ -692,4 +766,153 @@ enum PortalSyncStatus {
   SUCCESS
   PARTIAL_SUCCESS
   FAILED
+}
+
+// --- Jarvis Automation System ---
+
+model JarvisPendingAction {
+  id          String   @id @default(uuid())
+  tenantId    String
+  
+  userId      String   // Assigned agent
+  user        User     @relation(fields: [userId], references: [id])
+  
+  leadId      String?
+  propertyId  String?  // Related property (if any)
+  
+  type        PendingActionType
+  question    String   // What Jarvis is asking
+  context     Json?    // Additional context data
+  
+  // Button options for user to choose from
+  // e.g. [{ id: "prop-1", label: "Musterstr. 1" }, { id: "none", label: "Keinem zuordnen" }]
+  options     Json?
+  allowCustom Boolean  @default(true)  // Allow free-text response?
+  
+  status      PendingActionStatus @default(PENDING)
+  
+  createdAt   DateTime @default(now())
+  reminderSentAt DateTime?
+  escalatedAt    DateTime?
+  resolvedAt     DateTime?
+  resolution     String?  // User's response
+  
+  // Scheduled Events (for EventBridge)
+  scheduledReminderId   String?
+  scheduledEscalationId String?
+  
+  // Link back to activity (for sync)
+  activity    LeadActivity?
+  
+  @@index([tenantId, userId, status])
+  @@index([status, createdAt])
+}
+
+enum PendingActionType {
+  SEND_EXPOSE
+  SCHEDULE_VIEWING
+  ANSWER_QUESTION
+  ESCALATION
+  ASSIGN_PROPERTY      // Ask user to assign lead to a property
+  LINK_CLICK_REQUIRED  // Portal email requires manual link click
+  CLARIFICATION        // General clarification needed
+}
+
+enum PendingActionStatus {
+  PENDING
+  REMINDED
+  ESCALATED
+  RESOLVED
+  CANCELLED
+}
+
+// --- Notification System ---
+
+model Notification {
+  id        String   @id @default(uuid())
+  tenantId  String
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  type      NotificationType
+  title     String
+  message   String   @db.Text
+  metadata  Json?    // { leadId, propertyId, actionId }
+  
+  read      Boolean  @default(false)
+  
+  createdAt DateTime @default(now())
+  
+  @@index([tenantId, userId, read])
+  @@index([userId, createdAt])
+}
+
+enum NotificationType {
+  JARVIS_QUESTION
+  NEW_LEAD
+  LEAD_RESPONSE
+  REMINDER
+  ESCALATION
+  SYSTEM
+}
+
+// --- Email System (local storage for inbox) ---
+
+model Email {
+  id          String   @id @default(uuid())
+  tenantId    String
+  
+  // Email Data
+  messageId   String?  // Provider Message-ID for sync
+  threadId    String?  // For thread grouping
+  inReplyTo   String?  // Message-ID this is replying to
+  
+  from        String
+  fromName    String?
+  to          String[] // Array of recipients
+  cc          String[]
+  bcc         String[]
+  subject     String
+  bodyHtml    String?  @db.Text
+  bodyText    String?  @db.Text
+  
+  // Metadata
+  folder      EmailFolder @default(INBOX)
+  isRead      Boolean  @default(false)
+  isStarred   Boolean  @default(false)
+  hasAttachments Boolean @default(false)
+  attachments Json?    // [{ name, url, size, type }]
+  
+  // Lead Association (auto-linked)
+  leadId      String?
+  
+  // Provider Info
+  provider    EmailProvider?
+  providerData Json?   // Provider-specific data
+  
+  // Timestamps
+  sentAt      DateTime?
+  receivedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([tenantId, folder, receivedAt])
+  @@index([tenantId, leadId])
+  @@index([tenantId, from])
+  @@index([threadId])
+}
+
+enum EmailFolder {
+  INBOX
+  SENT
+  DRAFTS
+  TRASH
+  SPAM
+}
+
+enum EmailProvider {
+  GMAIL
+  OUTLOOK
+  SMTP
 }

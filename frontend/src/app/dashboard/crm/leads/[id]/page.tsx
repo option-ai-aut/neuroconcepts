@@ -3,7 +3,7 @@
 import { useEffect, useState, use, useRef } from 'react';
 import { getLead, Lead, sendDraftMessage, updateLead, sendManualEmail, deleteLead, uploadLeadDocuments, deleteLeadDocument, DocumentFile, getAuthHeaders } from '@/lib/api';
 import { useRouter } from 'next/navigation';
-import { Mail, Phone, User, Send, MessageSquare, FileText, ArrowLeft, MoreVertical, Calendar, Clock, ChevronDown, Plus, Trash2, Euro, Home, MapPin, Building, Activity, CheckCircle2, Edit3, FileCheck, Upload, Download, File, FileSpreadsheet, FileType } from 'lucide-react';
+import { Mail, Phone, User, Send, MessageSquare, FileText, ArrowLeft, MoreVertical, Calendar, Clock, ChevronDown, Plus, Trash2, Euro, Home, MapPin, Building, Activity, CheckCircle2, Edit3, FileCheck, Upload, Download, File, FileSpreadsheet, FileType, X, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { getRuntimeConfig } from '@/components/EnvProvider';
@@ -39,6 +39,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   // Document Upload State
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const documentInputRef = useRef<HTMLInputElement>(null);
+  
+  // Assigned Property & Users State
+  const [assignedProperty, setAssignedProperty] = useState<any>(null);
+  const [assignedUsers, setAssignedUsers] = useState<Array<{ id: string; name: string; email: string }>>([]);
 
   const router = useRouter();
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -79,16 +83,48 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       
       // Load activities
       const config = getRuntimeConfig();
-      const res = await fetch(`${config.apiUrl}/leads/${id}/activities`);
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${config.apiUrl}/leads/${id}/activities`, { headers });
       if (res.ok) {
         const activitiesData = await res.json();
         setActivities(activitiesData);
+      }
+      
+      // Load assigned property and users if lead has a propertyId
+      if (data?.propertyId) {
+        await loadPropertyAndUsers(data.propertyId);
+      } else {
+        setAssignedProperty(null);
+        setAssignedUsers([]);
       }
       
       setLoading(false);
     } catch (error) {
       console.error('Error loading lead:', error);
       setLoading(false);
+    }
+  };
+  
+  const loadPropertyAndUsers = async (propertyId: string) => {
+    try {
+      const config = getRuntimeConfig();
+      const headers = await getAuthHeaders();
+      
+      // Load property details
+      const propRes = await fetch(`${config.apiUrl}/properties/${propertyId}`, { headers });
+      if (propRes.ok) {
+        const propData = await propRes.json();
+        setAssignedProperty(propData);
+      }
+      
+      // Load assigned users
+      const assignRes = await fetch(`${config.apiUrl}/properties/${propertyId}/assignments`, { headers });
+      if (assignRes.ok) {
+        const assignData = await assignRes.json();
+        setAssignedUsers(assignData.users || []);
+      }
+    } catch (error) {
+      console.error('Error loading property/users:', error);
     }
   };
 
@@ -187,6 +223,33 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
+  // Lead stages for pipeline
+  const LEAD_STAGES = [
+    { id: 'NEW', label: 'Neu', color: 'blue' },
+    { id: 'CONTACTED', label: 'Kontaktiert', color: 'yellow' },
+    { id: 'CONVERSATION', label: 'Im Gespräch', color: 'purple' },
+    { id: 'BOOKED', label: 'Termin', color: 'indigo' },
+    { id: 'WON', label: 'Abschluss', color: 'green' },
+  ];
+
+  const getCurrentStageIndex = () => {
+    if (formData.status === 'LOST') return -1;
+    if (formData.status === 'WON') return LEAD_STAGES.length - 1;
+    return LEAD_STAGES.findIndex(s => s.id === formData.status);
+  };
+
+  const handleStageClick = (stageId: string) => {
+    // If clicking on a previous stage, confirm
+    const currentIndex = getCurrentStageIndex();
+    const newIndex = LEAD_STAGES.findIndex(s => s.id === stageId);
+    
+    if (newIndex < currentIndex && currentIndex !== -1) {
+      if (!confirm('Möchtest du den Status wirklich zurücksetzen?')) return;
+    }
+    
+    handleInputChange('status', stageId);
+  };
+
   if (loading) return <div className="p-8 text-center text-gray-500">Laden...</div>;
   if (!lead) return <div className="p-8 text-center text-red-500">Lead nicht gefunden.</div>;
 
@@ -194,7 +257,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     <div className="h-full flex flex-col bg-white">
       {/* Header */}
       <div className="pt-8 px-8 pb-6 shadow-sm">
-        <div className="flex items-end justify-between">
+        <div className="flex items-start justify-between mb-6">
           <div>
             <Link href="/dashboard/crm/leads" className="inline-flex items-center text-sm text-gray-500 hover:text-gray-900 mb-3 transition-colors">
               <ArrowLeft className="w-4 h-4 mr-1" />
@@ -215,6 +278,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 formData.status === 'CONTACTED' ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' :
                 formData.status === 'CONVERSATION' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' :
                 formData.status === 'BOOKED' ? 'bg-green-100 text-green-700 hover:bg-green-200' :
+                formData.status === 'WON' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' :
                 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}>
               <span>
@@ -222,6 +286,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 {formData.status === 'CONTACTED' && 'Kontaktiert'}
                 {formData.status === 'CONVERSATION' && 'Im Gespräch'}
                 {formData.status === 'BOOKED' && 'Termin gebucht'}
+                {formData.status === 'WON' && 'Abgeschlossen'}
                 {formData.status === 'LOST' && 'Verloren'}
               </span>
               <ChevronDown className={`w-4 h-4 transition-transform ${statusDropdownOpen ? 'rotate-180' : ''}`} />
@@ -233,7 +298,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   { value: 'NEW', label: 'Neu', color: 'text-blue-700 hover:bg-blue-50' },
                   { value: 'CONTACTED', label: 'Kontaktiert', color: 'text-yellow-700 hover:bg-yellow-50' },
                   { value: 'CONVERSATION', label: 'Im Gespräch', color: 'text-purple-700 hover:bg-purple-50' },
-                  { value: 'BOOKED', label: 'Termin gebucht', color: 'text-green-700 hover:bg-green-50' },
+                  { value: 'BOOKED', label: 'Termin gebucht', color: 'text-indigo-700 hover:bg-indigo-50' },
+                  { value: 'WON', label: 'Abgeschlossen', color: 'text-emerald-700 hover:bg-emerald-50' },
                   { value: 'LOST', label: 'Verloren', color: 'text-gray-700 hover:bg-gray-50' },
                 ].map((option) => (
                   <button
@@ -274,6 +340,122 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
         </div>
+
+        {/* Lead Pipeline */}
+        {formData.status !== 'LOST' && (
+          <div className="mt-8 pt-6 border-t border-gray-100">
+            <div className="flex items-end gap-0">
+              {LEAD_STAGES.map((stage, index) => {
+                const currentIndex = getCurrentStageIndex();
+                const isActive = index === currentIndex;
+                const isCompleted = index < currentIndex;
+
+                // Get stage-specific colors
+                const getBarColor = () => {
+                  if (isCompleted) return 'bg-green-500';
+                  if (!isActive) return 'bg-gray-200';
+                  switch (stage.color) {
+                    case 'blue': return 'bg-blue-500';
+                    case 'yellow': return 'bg-yellow-500';
+                    case 'purple': return 'bg-purple-500';
+                    case 'indigo': return 'bg-indigo-500';
+                    case 'green': return 'bg-green-500';
+                    default: return 'bg-gray-400';
+                  }
+                };
+
+                const getDotColor = () => {
+                  if (isCompleted) return 'bg-green-500 border-green-500';
+                  if (!isActive) return 'bg-white border-gray-300 group-hover:border-gray-400';
+                  switch (stage.color) {
+                    case 'blue': return 'bg-blue-500 border-blue-500';
+                    case 'yellow': return 'bg-yellow-500 border-yellow-500';
+                    case 'purple': return 'bg-purple-500 border-purple-500';
+                    case 'indigo': return 'bg-indigo-500 border-indigo-500';
+                    case 'green': return 'bg-green-500 border-green-500';
+                    default: return 'bg-gray-400 border-gray-400';
+                  }
+                };
+
+                return (
+                  <button
+                    key={stage.id}
+                    onClick={() => handleStageClick(stage.id)}
+                    className="flex-1 relative group"
+                  >
+                    {/* Label above */}
+                    <div className={`text-xs font-medium mb-4 text-center transition-colors ${
+                      isActive ? 'text-gray-900 font-semibold' :
+                      isCompleted ? 'text-green-600' :
+                      'text-gray-400'
+                    }`}>
+                      {stage.label}
+                    </div>
+                    {/* Progress bar - full width, no gaps */}
+                    <div className={`h-1.5 transition-all ${getBarColor()} ${
+                      index === 0 ? 'rounded-l-full' : ''
+                    } ${
+                      index === LEAD_STAGES.length - 1 ? 'rounded-r-full' : ''
+                    }`} />
+                    {/* Dot indicator centered on bar */}
+                    <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-4 h-4 rounded-full border-2 transition-all flex items-center justify-center ${getDotColor()}`}>
+                      {isCompleted && (
+                        <CheckCircle2 className="w-3 h-3 text-white" />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {formData.status === 'LOST' && (
+          <div className="mt-6 pt-6 border-t border-gray-100">
+            <div className="flex items-center gap-2 text-gray-500">
+              <X className="w-4 h-4" />
+              <span className="text-sm">Lead wurde als verloren markiert</span>
+            </div>
+          </div>
+        )}
+        
+        {/* Assigned Property & Users */}
+        {assignedProperty && (
+          <div className="mt-6 pt-6 border-t border-gray-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Building className="w-4 h-4 text-gray-400" />
+                  <Link 
+                    href={`/dashboard/crm/properties/${assignedProperty.id}`}
+                    className="text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+                  >
+                    {assignedProperty.title}
+                  </Link>
+                  <span className="text-sm text-gray-400">•</span>
+                  <span className="text-sm text-gray-500">{assignedProperty.address}</span>
+                </div>
+              </div>
+              
+              {assignedUsers.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm text-gray-500">Zuständig:</span>
+                  <div className="flex items-center gap-1">
+                    {assignedUsers.map((user, index) => (
+                      <span key={user.id} className="inline-flex items-center gap-1">
+                        <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+                          {user.name || user.email}
+                        </span>
+                        {index < assignedUsers.length - 1 && <span className="text-gray-300">,</span>}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Content */}
