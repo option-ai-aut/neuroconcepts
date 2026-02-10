@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState, use, useRef } from 'react';
-import { getProperty, Property, updateProperty, deleteProperty, getExposes, Expose, downloadExposePdf, getExposeTemplates, ExposeTemplate, getAuthHeaders, uploadPropertyDocuments, deletePropertyDocument, DocumentFile } from '@/lib/api';
+import { getProperty, Property, updateProperty, deleteProperty, getExposes, Expose, downloadExposePdf, getExposeTemplates, ExposeTemplate, getAuthHeaders, uploadPropertyDocuments, deletePropertyDocument, DocumentFile, getMe } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { Building, MapPin, Euro, Maximize, Home, FileText, ArrowLeft, MoreVertical, Trash2, Save, FileImage, Plus, Upload, X, Image as ImageIcon, Globe, Check, Download, File, FileSpreadsheet, FileType, Users, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
+import useSWR from 'swr';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 
@@ -22,6 +23,9 @@ const getImageUrl = (url: string): string => {
 
 export default function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { data: currentUser } = useSWR('/me', getMe);
+  const userId = currentUser?.id || '';
+  const tenantId = currentUser?.tenantId || '';
   const [property, setProperty] = useState<Property | null>(null);
   const [exposes, setExposes] = useState<Expose[]>([]);
   const [exposeTemplates, setExposeTemplates] = useState<ExposeTemplate[]>([]);
@@ -172,7 +176,8 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const loadPortals = async () => {
     try {
       const config = getRuntimeConfig();
-      const res = await fetch(`${config.apiUrl}/portal-connections/effective?userId=${userId}&tenantId=${tenantId}`);
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${config.apiUrl}/portal-connections/effective?userId=${userId}&tenantId=${tenantId}`, { headers });
       if (res.ok) {
         const data = await res.json();
         // Only show connected portals
@@ -192,9 +197,10 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
     setSyncing(true);
     try {
       const config = getRuntimeConfig();
+      const headers = await getAuthHeaders();
       const res = await fetch(`${config.apiUrl}/properties/${id}/sync`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           portalIds: selectedPortals,
           userId,
@@ -836,7 +842,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               </p>
               <select
                 value={formData.defaultExposeTemplateId || ''}
-                onChange={(e) => handleInputChange('defaultExposeTemplateId', e.target.value || null)}
+                onChange={(e) => handleInputChange('defaultExposeTemplateId', e.target.value || '')}
                 className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
               >
                 <option value="">Keine automatische Erstellung</option>

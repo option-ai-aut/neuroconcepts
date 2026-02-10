@@ -39,6 +39,8 @@ interface Email {
   from: string;
   fromName?: string;
   to: string[];
+  cc?: string[];
+  bcc?: string[];
   subject: string;
   bodyHtml?: string;
   bodyText?: string;

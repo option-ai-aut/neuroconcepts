@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { X, Minus, Maximize2, Send, Paperclip, ChevronDown, ChevronUp, Bold, Italic, Underline, List, ListOrdered, Link2, Image, Trash2, FileText, Plus, User } from 'lucide-react';
-import { createLead, createProperty, sendManualEmail, API_ENDPOINTS, fetchWithAuth } from '@/lib/api';
+import { createLead, createProperty, sendManualEmail, API_ENDPOINTS, fetchWithAuth, getApiUrl } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { mutate } from 'swr';
 import { useEnv } from '@/components/EnvProvider';
@@ -149,10 +149,10 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
         formattedText = `<u>${selectedText}</u>`;
         break;
       case 'list':
-        formattedText = selectedText.split('\n').map(line => `• ${line}`).join('\n');
+        formattedText = selectedText.split('\n').map((line: string) => `• ${line}`).join('\n');
         break;
       case 'numbered':
-        formattedText = selectedText.split('\n').map((line, i) => `${i + 1}. ${line}`).join('\n');
+        formattedText = selectedText.split('\n').map((line: string, i: number) => `${i + 1}. ${line}`).join('\n');
         break;
       case 'link':
         const url = prompt('URL eingeben:', 'https://');
@@ -513,7 +513,7 @@ export default function GlobalDrawer() {
     }
     setLoading(true);
     try {
-      const response = await fetchWithAuth(`${API_ENDPOINTS.BASE}/emails/send`, {
+      const response = await fetchWithAuth(`${getApiUrl()}/emails/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
