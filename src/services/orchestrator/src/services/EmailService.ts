@@ -55,7 +55,7 @@ export interface TenantEmailConfig {
 export class EmailService {
   // ===== GMAIL =====
   
-  static getGmailAuthUrl(): string {
+  static getGmailAuthUrl(state?: string): string {
     const config = getGoogleEmailConfig();
     console.log('🔑 Gmail Redirect URI:', config.redirectUri);
     
@@ -75,7 +75,8 @@ export class EmailService {
     return oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: scopes,
-      prompt: 'consent' // Force consent to get refresh token
+      prompt: 'consent', // Force consent to get refresh token
+      state: state || undefined
     });
   }
 

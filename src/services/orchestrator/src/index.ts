@@ -4190,9 +4190,12 @@ app.delete('/calendar/events/:eventId', authMiddleware, async (req, res) => {
 import { EmailService } from './services/EmailService';
 
 // Gmail: Get Auth URL
-app.get('/email/gmail/auth-url', authMiddleware, async (req, res) => {
+app.get('/email/gmail/auth-url', authMiddleware, async (req: any, res) => {
   try {
-    const authUrl = EmailService.getGmailAuthUrl();
+    // Pass user email as state so callback can save tokens server-side
+    const userEmail = req.user!.email;
+    const state = Buffer.from(JSON.stringify({ email: userEmail })).toString('base64url');
+    const authUrl = EmailService.getGmailAuthUrl(state);
     res.json({ authUrl });
   } catch (error) {
     console.error('Error getting Gmail auth URL:', error);
@@ -4200,26 +4203,65 @@ app.get('/email/gmail/auth-url', authMiddleware, async (req, res) => {
   }
 });
 
-// Gmail: OAuth Callback
+// Gmail: OAuth Callback - saves tokens directly server-side
 app.get('/email/gmail/callback', async (req, res) => {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   
   try {
-    const { code } = req.query;
+    const { code, state } = req.query;
     if (!code) {
       return res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=gmail&error=true`);
     }
 
     const tokens = await EmailService.exchangeGmailCode(code as string);
+    console.log('✅ Gmail tokens exchanged for:', tokens.email);
     
-    // Redirect with tokens in URL (frontend will save them)
+    // Try to save tokens directly server-side using state parameter
+    let saved = false;
+    if (state) {
+      try {
+        const stateData = JSON.parse(Buffer.from(state as string, 'base64url').toString());
+        const userEmail = stateData.email;
+        console.log('📧 Saving Gmail config for user:', userEmail);
+        
+        const db = prisma || (await initializePrisma());
+        const user = await db.user.findUnique({
+          where: { email: userEmail },
+          select: { tenantId: true }
+        });
+        
+        if (user) {
+          const encryptedConfig = {
+            accessToken: encryptionService.encrypt(tokens.accessToken),
+            refreshToken: encryptionService.encrypt(tokens.refreshToken),
+            expiryDate: tokens.expiryDate,
+            email: tokens.email
+          };
+          
+          await db.tenantSettings.upsert({
+            where: { tenantId: user.tenantId },
+            update: { gmailConfig: encryptedConfig as any },
+            create: { tenantId: user.tenantId, gmailConfig: encryptedConfig as any }
+          });
+          
+          saved = true;
+          console.log('✅ Gmail config saved server-side for tenant:', user.tenantId);
+        }
+      } catch (stateError) {
+        console.error('Error saving Gmail config server-side:', stateError);
+      }
+    }
+    
+    // Redirect to frontend with success/tokens (as fallback)
     const params = new URLSearchParams({
       provider: 'gmail',
       success: 'true',
       email: tokens.email,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      expiryDate: tokens.expiryDate.toString()
+      ...(saved ? {} : {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiryDate: tokens.expiryDate.toString()
+      })
     });
     
     res.redirect(`${frontendUrl}/dashboard/settings/integrations?${params.toString()}`);
