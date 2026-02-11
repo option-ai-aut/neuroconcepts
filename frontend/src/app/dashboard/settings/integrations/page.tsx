@@ -503,28 +503,6 @@ export default function IntegrationsSettingsPage() {
           )}
         </div>
 
-        {/* Inbound */}
-        <div className="space-y-3 pt-4">
-          <div>
-            <div className="text-sm font-medium text-gray-900 mb-1">Empfangsadresse (Weiterleitung)</div>
-            <p className="text-xs text-gray-500">
-              Alternativ: Leiten Sie Portal-Anfragen an diese Adresse weiter.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 px-3 py-2 bg-gray-50 rounded-lg text-gray-800 font-mono text-sm select-all truncate">
-              {inboundLeadEmail || 'Wird geladen...'}
-            </code>
-            <button 
-              onClick={() => inboundLeadEmail && navigator.clipboard.writeText(inboundLeadEmail)}
-              disabled={!inboundLeadEmail}
-              className="px-3 py-2 rounded-lg text-sm font-medium text-indigo-600 hover:bg-indigo-50 transition-colors disabled:opacity-50"
-            >
-              Kopieren
-            </button>
-          </div>
-        </div>
-
         {/* SMTP (collapsed by default) */}
         <details className="pt-4">
           <summary className="cursor-pointer text-sm font-medium text-gray-600 hover:text-gray-900">
