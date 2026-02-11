@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Globe, Check, RefreshCw, Settings2, ExternalLink, Eye, EyeOff, TestTube, Building2, User, Lock } from 'lucide-react';
+import { Globe, Check, RefreshCw, ExternalLink, Eye, EyeOff, TestTube, Building2, User, Lock } from 'lucide-react';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 import useSWR from 'swr';
 import { getMe, getAuthHeaders } from '@/lib/api';
@@ -52,6 +52,229 @@ const COUNTRY_FLAGS: Record<string, string> = {
   AT: '🇦🇹',
   CH: '🇨🇭'
 };
+
+// Per-portal configuration: subtitle, hint, placeholders, labels, help
+interface PortalConfig {
+  subtitle: string;               // Shown under portal name
+  hint: string;                   // Help text inside edit form
+  ftpHostPlaceholder?: string;    // FTP host placeholder
+  providerLabel: string;          // Label for provider ID field
+  providerPlaceholder?: string;   // Placeholder for provider ID field
+  helpUrl?: string;               // Link to portal docs/help
+  apiKeyLabel?: string;           // Label for API key (REST_API only)
+  apiKeyPlaceholder?: string;     // Placeholder for API key
+  apiSecretLabel?: string;        // Label for API secret (REST_API only)
+}
+
+const PORTAL_CONFIG: Record<string, PortalConfig> = {
+  // ─── Deutschland (13) ────────────────────────────────────────
+  'immoscout24-de': {
+    subtitle: 'Deutschlands größtes Immobilienportal',
+    hint: 'Zugangsdaten findest du im ImmobilienScout24 Partner-Portal unter „Verwalten" → „Schnittstellen / API-Zugang". Es fallen ggf. Nutzungsgebühren seitens ImmoScout24 an.',
+    providerLabel: 'Anbieternummer',
+    providerPlaceholder: 'Deine IS24 Anbieternummer',
+    helpUrl: 'https://api.immobilienscout24.de',
+    apiKeyLabel: 'API Key (Consumer Key)',
+    apiKeyPlaceholder: 'z.B. IhrConsumerKey12345',
+    apiSecretLabel: 'API Secret (Consumer Secret)',
+  },
+  'immowelt': {
+    subtitle: 'Eines der größten Portale in DE/AT',
+    hint: 'Die FTP-Zugangsdaten erhältst du im Immowelt-Kundencenter unter „Schnittstellen". Der Standard-FTP-Host ist ftp2.immowelt.net.',
+    ftpHostPlaceholder: 'ftp2.immowelt.net',
+    providerLabel: 'Kundennummer',
+    providerPlaceholder: 'Deine Immowelt-Kundennummer',
+    helpUrl: 'https://support.immowelt.de',
+  },
+  'immonet': {
+    subtitle: 'Teil der Immowelt-Gruppe',
+    hint: 'Immonet gehört zur Immowelt-Gruppe. FTP-Host: ftp.immonet.de. Benutzername = deine AnbieterID (nicht die Immonet-Kundennummer).',
+    ftpHostPlaceholder: 'ftp.immonet.de',
+    providerLabel: 'AnbieterID',
+    providerPlaceholder: 'Deine Immonet AnbieterID',
+  },
+  'kleinanzeigen': {
+    subtitle: 'Ehem. eBay Kleinanzeigen — großes Publikum',
+    hint: 'FTP-Zugangsdaten werden dir nach Abschluss eines gewerblichen Immobilien-Pakets per E-Mail zugesandt. Bei Fragen: Support unter „Meins" → „Kundensupport" kontaktieren.',
+    ftpHostPlaceholder: 'Wird per E-Mail mitgeteilt',
+    providerLabel: 'Anbieternummer',
+    providerPlaceholder: 'Deine Kleinanzeigen-Anbieternummer',
+    helpUrl: 'https://themen.kleinanzeigen.de/hilfe-gewerblich/immobilien/',
+  },
+  'kalaydo': {
+    subtitle: 'Regionaler Marktplatz für Rheinland & Ruhrgebiet',
+    hint: 'Zugangsdaten erhältst du nach der gewerblichen Registrierung beim Kalaydo-Kundenservice. OpenImmo-Export aus deiner Maklersoftware einrichten.',
+    ftpHostPlaceholder: 'Vom Kalaydo-Kundenservice',
+    providerLabel: 'Kundennummer',
+    providerPlaceholder: 'Deine Kalaydo-Kundennummer',
+    helpUrl: 'https://www.kalaydo.de',
+  },
+  'immozentral': {
+    subtitle: 'Portal für den deutschsprachigen Raum',
+    hint: 'Nach der Registrierung als gewerblicher Anbieter erhältst du die FTP-Zugangsdaten per E-Mail.',
+    ftpHostPlaceholder: 'Wird nach Registrierung mitgeteilt',
+    providerLabel: 'Anbieternummer',
+    providerPlaceholder: 'Deine Immozentral-Anbieternummer',
+    helpUrl: 'https://www.immozentral.com',
+  },
+  'immopool': {
+    subtitle: 'Weitere Reichweite für deine Objekte',
+    hint: 'Die FTP-Zugangsdaten erhältst du nach der gewerblichen Registrierung direkt von Immopool.',
+    ftpHostPlaceholder: 'Wird nach Registrierung mitgeteilt',
+    providerLabel: 'Anbieternummer',
+    providerPlaceholder: 'Deine Immopool-Anbieternummer',
+    helpUrl: 'https://www.immopool.de',
+  },
+  '1a-immobilien': {
+    subtitle: 'Zusätzliche Sichtbarkeit im Netz',
+    hint: 'Zugangsdaten erhältst du nach der Registrierung als gewerblicher Inserent bei 1A-Immobilienmarkt.',
+    ftpHostPlaceholder: 'Wird nach Registrierung mitgeteilt',
+    providerLabel: 'Anbieternummer',
+    providerPlaceholder: 'Deine Anbieternummer',
+    helpUrl: 'https://www.1a-immobilienmarkt.de',
+  },
+  'ivd24': {
+    subtitle: 'Exklusiv für IVD-Mitglieder',
+    hint: 'Zugang nur für Mitglieder des Immobilienverband Deutschland (IVD). Zugangsdaten über die IVD-Mitgliederverwaltung.',
+    ftpHostPlaceholder: 'Über IVD-Mitgliederverwaltung',
+    providerLabel: 'IVD-Mitgliedsnummer',
+    providerPlaceholder: 'Deine IVD-Mitgliedsnummer',
+    helpUrl: 'https://www.ivd24immobilien.de',
+  },
+  'neubau-kompass': {
+    subtitle: 'Spezialist für Neubau-Projekte',
+    hint: 'Für Bauträger und Projektentwickler. Zugangsdaten nach Registrierung über den Neubau Kompass Kundenservice.',
+    ftpHostPlaceholder: 'Vom Neubau Kompass Support',
+    providerLabel: 'Kundennummer',
+    providerPlaceholder: 'Deine Neubau Kompass Kundennr.',
+    helpUrl: 'https://www.neubaukompass.de',
+  },
+  'sz-immo': {
+    subtitle: 'Immobilienmarkt der Süddeutschen Zeitung',
+    hint: 'Premium-Reichweite über die Süddeutsche Zeitung. Zugangsdaten über den SZ-Anzeigenservice oder deine Maklersoftware.',
+    ftpHostPlaceholder: 'Vom SZ-Anzeigenservice',
+    providerLabel: 'Kundennummer',
+    providerPlaceholder: 'Deine SZ-Kundennummer',
+    helpUrl: 'https://immobilienmarkt.sueddeutsche.de',
+  },
+  'faz-immo': {
+    subtitle: 'Immobilienmarkt der Frankfurter Allgemeinen',
+    hint: 'Premium-Reichweite über die FAZ. Zugangsdaten über den FAZ-Anzeigenservice oder deine Maklersoftware.',
+    ftpHostPlaceholder: 'Vom FAZ-Anzeigenservice',
+    providerLabel: 'Kundennummer',
+    providerPlaceholder: 'Deine FAZ-Kundennummer',
+    helpUrl: 'https://fazimmo.faz.net',
+  },
+  'welt-immo': {
+    subtitle: 'Immobilienmarkt von WELT (Axel Springer)',
+    hint: 'Premium-Reichweite über WELT/Axel Springer. Zugangsdaten über den WELT-Anzeigenservice oder deine Maklersoftware.',
+    ftpHostPlaceholder: 'Vom WELT-Anzeigenservice',
+    providerLabel: 'Kundennummer',
+    providerPlaceholder: 'Deine WELT-Kundennummer',
+  },
+
+  // ─── Österreich (5) ──────────────────────────────────────────
+  'willhaben': {
+    subtitle: 'Österreichs größte Anzeigenplattform',
+    hint: 'FTP-Zugangsdaten erhältst du über deinen Willhaben-Kundenbetreuer. OpenImmo-Export in deiner Maklersoftware einrichten.',
+    ftpHostPlaceholder: 'Vom Willhaben-Kundenbetreuer',
+    providerLabel: 'Kundennummer',
+    providerPlaceholder: 'Deine Willhaben-Kundennummer',
+    helpUrl: 'https://www.willhaben.at',
+  },
+  'immoscout24-at': {
+    subtitle: 'ImmobilienScout24 für Österreich',
+    hint: 'FTP-Zugangsdaten erhältst du nach der gewerblichen Registrierung bei ImmoScout24 AT. Achtung: Die REST-API ist nur für die DE-Version verfügbar.',
+    ftpHostPlaceholder: 'Wird nach Registrierung mitgeteilt',
+    providerLabel: 'Anbieternummer',
+    providerPlaceholder: 'Deine IS24-AT Anbieternummer',
+    helpUrl: 'https://www.immobilienscout24.at',
+  },
+  'immmo-at': {
+    subtitle: 'Österreichisches Immobilienportal',
+    hint: 'Zugangsdaten erhältst du nach der Registrierung als gewerblicher Anbieter bei immmo.at.',
+    ftpHostPlaceholder: 'Wird nach Registrierung mitgeteilt',
+    providerLabel: 'Anbieternummer',
+    providerPlaceholder: 'Deine immmo.at Anbieternummer',
+    helpUrl: 'https://www.immmo.at',
+  },
+  'findmyhome': {
+    subtitle: 'Premium-Immobilienportal Österreich',
+    hint: 'Zugangsdaten über den FindMyHome-Kundenservice. Als gewerblicher Anbieter registrieren.',
+    ftpHostPlaceholder: 'Vom FindMyHome-Kundenservice',
+    providerLabel: 'Anbieternummer',
+    providerPlaceholder: 'Deine FindMyHome-Anbieternummer',
+    helpUrl: 'https://www.findmyhome.at',
+  },
+  'derstandard-immo': {
+    subtitle: 'Immobilienmarkt von DerStandard.at',
+    hint: 'Premium-Reichweite über DerStandard.at. Zugangsdaten über den Standard-Anzeigenservice oder deine Maklersoftware.',
+    ftpHostPlaceholder: 'Vom Standard-Anzeigenservice',
+    providerLabel: 'Kundennummer',
+    providerPlaceholder: 'Deine Standard-Kundennummer',
+    helpUrl: 'https://immobilien.derstandard.at',
+  },
+
+  // ─── Schweiz (6) ─────────────────────────────────────────────
+  'homegate': {
+    subtitle: 'Grösstes Immobilienportal der Schweiz',
+    hint: 'Die IDX-Zugangsdaten erhältst du über deine Maklersoftware (z.B. CASAONE, Immomig, RealForce) oder direkt vom Homegate-Kundenservice.',
+    ftpHostPlaceholder: 'z.B. ftp.homegate.ch',
+    providerLabel: 'Kunden-ID',
+    providerPlaceholder: 'Deine Homegate Kunden-ID',
+    helpUrl: 'https://www.homegate.ch',
+  },
+  'immoscout24-ch': {
+    subtitle: 'ImmoScout24 für die Schweiz',
+    hint: 'Die IDX-Zugangsdaten erhältst du über deine Maklersoftware oder direkt vom ImmoScout24-CH-Kundenservice. Achtung: Die REST-API ist nur für DE verfügbar.',
+    ftpHostPlaceholder: 'z.B. ftp.immoscout24.ch',
+    providerLabel: 'Kunden-ID',
+    providerPlaceholder: 'Deine IS24-CH Kunden-ID',
+    helpUrl: 'https://www.immoscout24.ch',
+  },
+  'comparis': {
+    subtitle: 'Vergleichsportal mit Immobilienmarkt',
+    hint: 'Die IDX-Zugangsdaten erhältst du über deine Maklersoftware (z.B. CASAONE) oder direkt vom Comparis-Kundenservice.',
+    ftpHostPlaceholder: 'z.B. ftp.comparis.ch',
+    providerLabel: 'Kunden-ID',
+    providerPlaceholder: 'Deine Comparis Kunden-ID',
+    helpUrl: 'https://www.comparis.ch/immobilien',
+  },
+  'newhome': {
+    subtitle: 'Regionales Schweizer Immobilienportal',
+    hint: 'Die IDX-Zugangsdaten erhältst du über deine Maklersoftware oder direkt vom Newhome-Kundenservice.',
+    ftpHostPlaceholder: 'z.B. ftp.newhome.ch',
+    providerLabel: 'Kunden-ID',
+    providerPlaceholder: 'Deine Newhome Kunden-ID',
+    helpUrl: 'https://www.newhome.ch',
+  },
+  'immostreet': {
+    subtitle: 'Gehört zur Homegate-Gruppe',
+    hint: 'Die IDX-Zugangsdaten sind oft identisch mit deinen Homegate-Daten. Ansonsten über den ImmoStreet-Kundenservice.',
+    ftpHostPlaceholder: 'z.B. ftp.immostreet.ch',
+    providerLabel: 'Kunden-ID',
+    providerPlaceholder: 'Deine ImmoStreet Kunden-ID',
+    helpUrl: 'https://www.immostreet.ch',
+  },
+  'flatfox': {
+    subtitle: 'Digitaler Vermietungsprozess (Schweiz)',
+    hint: 'Flatfox bietet eine eigene REST-API. API-Zugangsdaten findest du in deinem Flatfox Business-Konto unter der API-Dokumentation.',
+    providerLabel: 'Kunden-ID',
+    providerPlaceholder: 'Deine Flatfox Kunden-ID',
+    helpUrl: 'https://flatfox.ch/en/docs/',
+    apiKeyLabel: 'API Key',
+    apiKeyPlaceholder: 'Dein Flatfox API Key',
+    apiSecretLabel: 'API Secret',
+  },
+};
+
+function getPortalConfig(slug: string): PortalConfig {
+  return PORTAL_CONFIG[slug] || {
+    subtitle: 'Immobilienportal',
+    hint: 'Die Zugangsdaten erhältst du nach der Registrierung beim jeweiligen Portal.',
+    providerLabel: 'Anbieternummer',
+  };
+}
 
 export default function PortalsSettingsPage() {
   const { data: user } = useSWR('/me', getMe);
@@ -394,9 +617,7 @@ export default function PortalsSettingsPage() {
                           )}
                         </div>
                         <div className="text-xs text-gray-500">
-                          {portal.connectionType === 'OPENIMMO_FTP' ? 'OpenImmo + FTP' : 
-                           portal.connectionType === 'REST_API' ? 'REST API' :
-                           portal.connectionType === 'IDX' ? 'IDX 3.01' : portal.connectionType}
+                          {getPortalConfig(portal.slug).subtitle}
                         </div>
                       </div>
                     </div>
@@ -468,315 +689,231 @@ export default function PortalsSettingsPage() {
                         </button>
                       </div>
                       
-                      {/* Connection Form */}
-                      <div className="space-y-4 pt-4 border-t border-gray-200">
-                        {portal.connectionType === 'REST_API' ? (
-                          // API Form (ImmoScout24 DE, Flatfox CH)
-                          <>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">API Key</label>
-                              <input
-                                type="text"
-                                value={formData.apiKey || ''}
-                                onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
-                                placeholder={portal.slug === 'flatfox' ? 'Dein API Key von Flatfox' : 'Dein API Key von ImmobilienScout24'}
-                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                              />
+                      {/* Connection Form — driven by PORTAL_CONFIG */}
+                      {(() => {
+                        const cfg = getPortalConfig(portal.slug);
+                        return (
+                          <div className="space-y-4 pt-4 border-t border-gray-200">
+                            {/* Portal-specific hint */}
+                            <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-800">
+                              {cfg.hint}
+                              {cfg.helpUrl && (
+                                <> <a href={cfg.helpUrl} target="_blank" rel="noopener noreferrer" className="underline font-medium">Mehr erfahren</a></>
+                              )}
+                            </div>
+
+                            {portal.connectionType === 'REST_API' ? (
+                              // API Form
+                              <>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">{cfg.apiKeyLabel || 'API Key'}</label>
+                                  <input
+                                    type="text"
+                                    value={formData.apiKey || ''}
+                                    onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
+                                    placeholder={cfg.apiKeyPlaceholder || 'Dein API Key'}
+                                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                  />
+                                </div>
+                                
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">{cfg.apiSecretLabel || 'API Secret'}</label>
+                                  <div className="relative">
+                                    <input
+                                      type={showPassword ? 'text' : 'password'}
+                                      value={formData.apiSecret || ''}
+                                      onChange={(e) => setFormData({ ...formData, apiSecret: e.target.value })}
+                                      placeholder="Dein API Secret"
+                                      className="w-full px-3 py-2 pr-10 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowPassword(!showPassword)}
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    >
+                                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    </button>
+                                  </div>
+                                </div>
+                                
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">{cfg.providerLabel}</label>
+                                  <input
+                                    type="text"
+                                    value={formData.providerId || ''}
+                                    onChange={(e) => setFormData({ ...formData, providerId: e.target.value })}
+                                    placeholder={cfg.providerPlaceholder || 'Deine Anbieternummer'}
+                                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                  />
+                                </div>
+                              </>
+                            ) : (
+                              // FTP/IDX Form (both use same fields with portal-specific labels)
+                              <>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">FTP Host</label>
+                                    <input
+                                      type="text"
+                                      value={formData.ftpHost || ''}
+                                      onChange={(e) => setFormData({ ...formData, ftpHost: e.target.value })}
+                                      placeholder={cfg.ftpHostPlaceholder || 'ftp.portal.de'}
+                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Port</label>
+                                    <input
+                                      type="number"
+                                      value={formData.ftpPort || 21}
+                                      onChange={(e) => setFormData({ ...formData, ftpPort: parseInt(e.target.value) })}
+                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                  </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Benutzername</label>
+                                    <input
+                                      type="text"
+                                      value={formData.ftpUsername || ''}
+                                      onChange={(e) => setFormData({ ...formData, ftpUsername: e.target.value })}
+                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Passwort</label>
+                                    <div className="relative">
+                                      <input
+                                        type={showPassword ? 'text' : 'password'}
+                                        value={formData.ftpPassword || ''}
+                                        onChange={(e) => setFormData({ ...formData, ftpPassword: e.target.value })}
+                                        className="w-full px-3 py-2 pr-10 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                      >
+                                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Verzeichnis</label>
+                                    <input
+                                      type="text"
+                                      value={formData.ftpPath || '/'}
+                                      onChange={(e) => setFormData({ ...formData, ftpPath: e.target.value })}
+                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">{cfg.providerLabel}</label>
+                                    <input
+                                      type="text"
+                                      value={formData.providerId || ''}
+                                      onChange={(e) => setFormData({ ...formData, providerId: e.target.value })}
+                                      placeholder={cfg.providerPlaceholder || 'Deine Anbieternummer'}
+                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                  </div>
+                                </div>
+                                
+                                <div className="flex items-center gap-6">
+                                  <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={formData.useSftp || false}
+                                      onChange={(e) => setFormData({ ...formData, useSftp: e.target.checked })}
+                                      className="w-4 h-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                    />
+                                    <span className="text-sm text-gray-700">SFTP verwenden</span>
+                                  </label>
+                                </div>
+                              </>
+                            )}
+                        
+                            {/* Common options */}
+                            <div className="flex items-center gap-6 pt-2 border-t border-gray-100">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={formData.isEnabled ?? true}
+                                  onChange={(e) => setFormData({ ...formData, isEnabled: e.target.checked })}
+                                  className="w-4 h-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <span className="text-sm text-gray-700">Aktiviert</span>
+                              </label>
+                              
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={formData.autoSyncEnabled || false}
+                                  onChange={(e) => setFormData({ ...formData, autoSyncEnabled: e.target.checked })}
+                                  className="w-4 h-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <span className="text-sm text-gray-700">Auto-Sync</span>
+                              </label>
                             </div>
                             
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">API Secret</label>
-                              <div className="relative">
-                                <input
-                                  type={showPassword ? 'text' : 'password'}
-                                  value={formData.apiSecret || ''}
-                                  onChange={(e) => setFormData({ ...formData, apiSecret: e.target.value })}
-                                  placeholder="Dein API Secret"
-                                  className="w-full px-3 py-2 pr-10 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
+                            {/* Test Result */}
+                            {testResult && (
+                              <div className={`p-3 rounded-lg text-sm ${
+                                testResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                              }`}>
+                                {testResult.message}
+                              </div>
+                            )}
+                            
+                            {/* Actions */}
+                            <div className="flex justify-between pt-2">
+                              <div className="flex gap-2">
                                 <button
-                                  type="button"
-                                  onClick={() => setShowPassword(!showPassword)}
-                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                  onClick={() => effectiveConn && handleTest(effectiveConn.id)}
+                                  disabled={!effectiveConn || testing === effectiveConn?.id}
+                                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-50 transition-colors"
                                 >
-                                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                  {testing === effectiveConn?.id ? (
+                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <TestTube className="w-4 h-4" />
+                                  )}
+                                  Testen
+                                </button>
+                                
+                                {editMode === 'user' && userConn && (
+                                  <button
+                                    onClick={() => handleRemoveUserConnection(portal.id)}
+                                    className="px-4 py-2 rounded-lg text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                                  >
+                                    Eigene Verbindung löschen
+                                  </button>
+                                )}
+                              </div>
+                              
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => setEditingPortal(null)}
+                                  className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
+                                >
+                                  Abbrechen
+                                </button>
+                                <button
+                                  onClick={handleSave}
+                                  className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                                >
+                                  Speichern
                                 </button>
                               </div>
                             </div>
-                            
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Anbieternummer</label>
-                              <input
-                                type="text"
-                                value={formData.providerId || ''}
-                                onChange={(e) => setFormData({ ...formData, providerId: e.target.value })}
-                                placeholder="Deine Anbieternummer"
-                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                              />
-                            </div>
-                            
-                            <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-800">
-                              {portal.slug === 'flatfox' ? (
-                                <><strong>Hinweis:</strong> Du findest deine API-Zugangsdaten unter <a href="https://flatfox.ch/en/docs/" target="_blank" rel="noopener noreferrer" className="underline">flatfox.ch/docs</a> im Business-Bereich.</>
-                              ) : (
-                                <><strong>Hinweis:</strong> Du findest deine API-Zugangsdaten im ImmobilienScout24 Partner-Portal unter &quot;Einstellungen&quot; → &quot;API-Zugang&quot;.</>
-                              )}
-                            </div>
-                          </>
-                        ) : portal.connectionType === 'IDX' ? (
-                          // IDX Form (Swiss portals: Homegate, ImmoScout24 CH, Comparis, Newhome, ImmoStreet)
-                          <>
-                            <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-800 mb-2">
-                              <strong>IDX 3.01</strong> — Schweizer Standard für den Immobilien-Datenaustausch. Die Zugangsdaten erhältst du direkt vom Portal oder über deine Maklersoftware (z.B. CASAONE, Immomig, RealForce).
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">FTP Host</label>
-                                <input
-                                  type="text"
-                                  value={formData.ftpHost || ''}
-                                  onChange={(e) => setFormData({ ...formData, ftpHost: e.target.value })}
-                                  placeholder="z.B. ftp.homegate.ch"
-                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Port</label>
-                                <input
-                                  type="number"
-                                  value={formData.ftpPort || 21}
-                                  onChange={(e) => setFormData({ ...formData, ftpPort: parseInt(e.target.value) })}
-                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
-                              </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Benutzername</label>
-                                <input
-                                  type="text"
-                                  value={formData.ftpUsername || ''}
-                                  onChange={(e) => setFormData({ ...formData, ftpUsername: e.target.value })}
-                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Passwort</label>
-                                <div className="relative">
-                                  <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={formData.ftpPassword || ''}
-                                    onChange={(e) => setFormData({ ...formData, ftpPassword: e.target.value })}
-                                    className="w-full px-3 py-2 pr-10 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                  >
-                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Verzeichnis</label>
-                                <input
-                                  type="text"
-                                  value={formData.ftpPath || '/'}
-                                  onChange={(e) => setFormData({ ...formData, ftpPath: e.target.value })}
-                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Anbieternummer / Kunden-ID</label>
-                                <input
-                                  type="text"
-                                  value={formData.providerId || ''}
-                                  onChange={(e) => setFormData({ ...formData, providerId: e.target.value })}
-                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center gap-6">
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={formData.useSftp || false}
-                                  onChange={(e) => setFormData({ ...formData, useSftp: e.target.checked })}
-                                  className="w-4 h-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                />
-                                <span className="text-sm text-gray-700">SFTP verwenden</span>
-                              </label>
-                            </div>
-                          </>
-                        ) : (
-                          // OpenImmo FTP Form (DE/AT standard)
-                          <>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">FTP Host</label>
-                                <input
-                                  type="text"
-                                  value={formData.ftpHost || ''}
-                                  onChange={(e) => setFormData({ ...formData, ftpHost: e.target.value })}
-                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Port</label>
-                                <input
-                                  type="number"
-                                  value={formData.ftpPort || 21}
-                                  onChange={(e) => setFormData({ ...formData, ftpPort: parseInt(e.target.value) })}
-                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
-                              </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Benutzername</label>
-                                <input
-                                  type="text"
-                                  value={formData.ftpUsername || ''}
-                                  onChange={(e) => setFormData({ ...formData, ftpUsername: e.target.value })}
-                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Passwort</label>
-                                <div className="relative">
-                                  <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={formData.ftpPassword || ''}
-                                    onChange={(e) => setFormData({ ...formData, ftpPassword: e.target.value })}
-                                    className="w-full px-3 py-2 pr-10 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                  >
-                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Verzeichnis</label>
-                                <input
-                                  type="text"
-                                  value={formData.ftpPath || '/'}
-                                  onChange={(e) => setFormData({ ...formData, ftpPath: e.target.value })}
-                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Anbieternummer</label>
-                                <input
-                                  type="text"
-                                  value={formData.providerId || ''}
-                                  onChange={(e) => setFormData({ ...formData, providerId: e.target.value })}
-                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center gap-6">
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={formData.useSftp || false}
-                                  onChange={(e) => setFormData({ ...formData, useSftp: e.target.checked })}
-                                  className="w-4 h-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                />
-                                <span className="text-sm text-gray-700">SFTP verwenden</span>
-                              </label>
-                            </div>
-                          </>
-                        )}
-                        
-                        {/* Common options for both API and FTP */}
-                        <div className="flex items-center gap-6 pt-2 border-t border-gray-100">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={formData.isEnabled ?? true}
-                              onChange={(e) => setFormData({ ...formData, isEnabled: e.target.checked })}
-                              className="w-4 h-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                            />
-                            <span className="text-sm text-gray-700">Aktiviert</span>
-                          </label>
-                          
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={formData.autoSyncEnabled || false}
-                              onChange={(e) => setFormData({ ...formData, autoSyncEnabled: e.target.checked })}
-                              className="w-4 h-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                            />
-                            <span className="text-sm text-gray-700">Auto-Sync</span>
-                          </label>
-                        </div>
-                        
-                        {/* Test Result */}
-                        {testResult && (
-                          <div className={`p-3 rounded-lg text-sm ${
-                            testResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-                          }`}>
-                            {testResult.message}
                           </div>
-                        )}
-                        
-                        {/* Actions */}
-                        <div className="flex justify-between pt-2">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => effectiveConn && handleTest(effectiveConn.id)}
-                              disabled={!effectiveConn || testing === effectiveConn?.id}
-                              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                            >
-                              {testing === effectiveConn?.id ? (
-                                <RefreshCw className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <TestTube className="w-4 h-4" />
-                              )}
-                              Testen
-                            </button>
-                            
-                            {editMode === 'user' && userConn && (
-                              <button
-                                onClick={() => handleRemoveUserConnection(portal.id)}
-                                className="px-4 py-2 rounded-lg text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
-                              >
-                                Eigene Verbindung löschen
-                              </button>
-                            )}
-                          </div>
-                          
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setEditingPortal(null)}
-                              className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
-                            >
-                              Abbrechen
-                            </button>
-                            <button
-                              onClick={handleSave}
-                              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
-                            >
-                              Speichern
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -786,21 +923,10 @@ export default function PortalsSettingsPage() {
         </div>
       ))}
       
-      {/* Info Box */}
-      {isAdmin ? (
-        <div className="bg-blue-50 rounded-xl p-4 text-sm text-blue-800 space-y-1">
-          <strong>Schnittstellen-Übersicht:</strong>
-          <ul className="list-disc list-inside ml-1 space-y-0.5">
-            <li><strong>Deutschland & Österreich:</strong> OpenImmo XML + FTP — Branchenstandard. Zugangsdaten vom Portal nach gewerblicher Registrierung.</li>
-            <li><strong>Schweiz:</strong> IDX 3.01 — Schweizer Standard. Zugangsdaten über Maklersoftware (CASAONE, Immomig, RealForce) oder direkt vom Portal.</li>
-            <li><strong>ImmobilienScout24 DE:</strong> REST API — API Key & Secret im Partner-Portal unter „Einstellungen".</li>
-            <li><strong>Flatfox CH:</strong> REST API — Eigene API-Dokumentation unter flatfox.ch/docs.</li>
-          </ul>
-        </div>
-      ) : (
+      {/* Info for non-admins */}
+      {!isAdmin && (
         <div className="bg-amber-50 rounded-xl p-4 text-sm text-amber-800">
-          <strong>Hinweis für Team-Mitglieder:</strong> Du kannst für jedes Portal deine eigenen Zugangsdaten (FTP oder API) hinterlegen, um die Firmen-Verbindung zu überschreiben. 
-          Die Firmen-Verbindungen können nur vom Admin verwaltet werden.
+          <strong>Hinweis:</strong> Du kannst für jedes Portal deine eigenen Zugangsdaten hinterlegen. Die Firmen-Verbindungen werden vom Admin verwaltet.
         </div>
       )}
     </div>
