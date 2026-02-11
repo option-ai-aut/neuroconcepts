@@ -37,9 +37,31 @@ export default function LoginPage() {
     }
   }, [config]);
 
+  const [checkingSession, setCheckingSession] = useState(true);
   const [view, setView] = useState<AuthView>('signIn');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Check if already authenticated - redirect to dashboard
+  useEffect(() => {
+    const checkExisting = async () => {
+      try {
+        const session = await fetchAuthSession();
+        if (session.tokens?.idToken) {
+          router.replace('/dashboard');
+          return;
+        }
+      } catch {
+        // Not authenticated - show login
+      }
+      setCheckingSession(false);
+    };
+    if (config.userPoolId && config.userPoolClientId) {
+      checkExisting();
+    } else {
+      setCheckingSession(false);
+    }
+  }, [config, router]);
   const [showPassword, setShowPassword] = useState(false);
   
   // Form fields
@@ -311,6 +333,15 @@ export default function LoginPage() {
   const inputClass = "w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all";
   const labelClass = "block text-sm font-medium text-gray-700 mb-1.5";
   const buttonClass = "w-full py-3 px-4 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed";
+
+  // Show nothing while checking existing session (prevents login page flash)
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-white">
