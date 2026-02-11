@@ -6,6 +6,7 @@ import { Amplify } from 'aws-amplify';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { syncUser } from '@/lib/api';
 import { useRuntimeConfig } from '@/components/RuntimeConfigProvider';
 
@@ -364,10 +365,8 @@ export default function LoginPage() {
         
         <div className="relative z-20 flex flex-col justify-between h-full p-12 text-white">
           <div className="flex items-center">
-            <div className="w-8 h-8 bg-white/10 backdrop-blur-md rounded-lg flex items-center justify-center mr-3 border border-white/20">
-              <span className="font-bold text-lg">N</span>
-            </div>
-            <span className="font-bold text-xl tracking-tight">Immivo</span>
+            <Image src="/logo-icon-only.png" alt="Immivo" width={32} height={32} className="mr-3" />
+            <Image src="/logo-white.png" alt="Immivo" width={110} height={30} className="h-7 w-auto" />
           </div>
           
           <div className="max-w-md">
@@ -396,13 +395,9 @@ export default function LoginPage() {
 
         <div className="flex-1 flex flex-col pt-2 sm:pt-4 lg:pt-8">
           {/* Mobile Logo */}
-          <div className="mb-4 sm:mb-6 lg:hidden text-center">
-            <div className="flex items-center justify-center">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-xl sm:text-2xl">N</span>
-              </div>
-            </div>
-            <h2 className="mt-2 sm:mt-4 text-xl sm:text-2xl font-extrabold text-gray-900">Immivo</h2>
+          <div className="mb-4 sm:mb-6 lg:hidden flex flex-col items-center">
+            <Image src="/logo-icon-only.png" alt="Immivo" width={44} height={44} />
+            <Image src="/logo-black.png" alt="Immivo" width={120} height={32} className="h-7 w-auto mt-3" />
           </div>
 
           <div className="mx-auto w-full max-w-md">

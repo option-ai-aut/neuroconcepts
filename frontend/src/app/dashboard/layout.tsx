@@ -11,7 +11,8 @@ import PageHeader from '@/components/PageHeader';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { useAuthConfigured } from '@/components/AuthProvider';
-import { Loader2, Bot, Monitor } from 'lucide-react';
+import { Loader2, Monitor } from 'lucide-react';
+import Image from 'next/image';
 
 // Routes allowed on mobile devices
 const MOBILE_ALLOWED_PREFIXES = [
@@ -32,7 +33,7 @@ function MobileRouteGuard({ children, pathname }: { children: React.ReactNode; p
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
+    const check = () => setIsMobile(window.innerWidth < 1024);
     check();
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
@@ -69,16 +70,19 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   }, [setMobileJarvisOpen]);
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans">
+    <div className="flex h-screen bg-white font-sans">
+      {/* Safe area top fill — ensures white behind iPhone notch/status bar */}
+      <div className="fixed top-0 left-0 right-0 bg-white z-[60] lg:hidden" style={{ height: 'env(safe-area-inset-top, 0px)' }} />
+      
       {/* Main Navigation Sidebar (Left) - Desktop only */}
       <Sidebar />
       
       {/* Main Content Area (Center) */}
-      <div className="flex-1 flex flex-col overflow-hidden relative">
+      <div className="flex-1 flex flex-col overflow-hidden relative" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         {/* Top Header Bar */}
         <PageHeader />
         {/* Scrollable Content - extra bottom padding on mobile for nav bar */}
-        <main className="flex-1 overflow-y-auto bg-white overflow-x-visible pb-16 md:pb-0">
+        <main className="flex-1 overflow-y-auto bg-white overflow-x-visible pb-16 lg:pb-0">
           <MobileRouteGuard pathname={pathname}>
             {children}
           </MobileRouteGuard>
@@ -86,7 +90,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* AI Chat Sidebar (Right) - Desktop only */}
-      <div className="hidden md:block">
+      <div className="hidden lg:block">
         <AiChatSidebar />
       </div>
 
@@ -94,17 +98,17 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       {!mobileJarvisOpen && !jarvisClosing && (
         <button
           onClick={() => setMobileJarvisOpen(true)}
-          className="md:hidden fixed bottom-[72px] right-4 z-40 w-14 h-14 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg animate-fab-pulse active:scale-95 transition-transform safe-bottom"
+          className="lg:hidden fixed bottom-[72px] right-4 z-40 w-14 h-14 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg animate-fab-pulse active:scale-95 transition-transform safe-bottom"
           style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
           aria-label="Jarvis KI-Chat öffnen"
         >
-          <Bot className="w-6 h-6 text-white" />
+          <Image src="/logo-icon-only.png" alt="Jarvis" width={28} height={28} />
         </button>
       )}
 
       {/* Mobile: Jarvis Full-Screen Chat Overlay */}
       {(mobileJarvisOpen || jarvisClosing) && (
-        <div className={`md:hidden fixed inset-0 z-50 bg-white ${jarvisClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
+        <div className={`lg:hidden fixed inset-0 z-50 bg-white ${jarvisClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
           <AiChatSidebar mobile onClose={handleCloseJarvis} />
         </div>
       )}

@@ -66,9 +66,14 @@ export const metadata: Metadata = {
   creator: 'Immivo AI',
   publisher: 'Immivo AI',
   icons: {
-    icon: '/icon.svg',
-    apple: '/icon.svg',
+    icon: [
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+    ],
+    apple: '/apple-touch-icon.png',
+    shortcut: '/favicon.ico',
   },
+  manifest: '/site.webmanifest',
   openGraph: {
     type: 'website',
     locale: 'de_AT',
@@ -113,12 +118,20 @@ export const metadata: Metadata = {
     // yandex: 'your-yandex-verification-code',
   },
   category: 'technology',
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-    viewportFit: 'cover',
+  other: {
+    'theme-color': '#ffffff',
+    'apple-mobile-web-app-status-bar-style': 'default',
   },
+};
+
+// Viewport exported separately (Next.js 14+ best practice)
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover' as const,
+  themeColor: '#ffffff',
 };
 
 export const dynamic = 'force-dynamic';
@@ -134,7 +147,7 @@ const jsonLd = {
       url: SITE_URL,
       logo: {
         '@type': 'ImageObject',
-        url: `${SITE_URL}/icon.svg`,
+        url: `${SITE_URL}/logo-black.png`,
       },
       description: DEFAULT_DESCRIPTION,
       sameAs: [
@@ -198,15 +211,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="de">
+    <html lang="de" className="bg-white">
       <head>
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${playfairDisplay.variable} ${cormorantGaramond.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${playfairDisplay.variable} ${cormorantGaramond.variable} antialiased bg-white`}
       >
         <RuntimeConfigProvider>
           <AuthProvider>

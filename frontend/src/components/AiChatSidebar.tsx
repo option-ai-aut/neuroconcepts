@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Bot, Paperclip, FileText, RotateCcw, X, Image as ImageIcon, AlertCircle, Loader2, Square } from 'lucide-react';
+import NextImage from 'next/image';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 import { fetchAuthSession } from 'aws-amplify/auth';
@@ -711,9 +712,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
       )}
       <div className={`px-4 flex items-center justify-between bg-white shrink-0 border-b border-gray-100 ${mobile ? 'h-14 pt-[env(safe-area-inset-top)]' : 'h-16'}`}>
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-indigo-600 rounded-md flex items-center justify-center shadow-md shadow-indigo-900/50">
-            <Bot className="w-5 h-5 text-white" />
-          </div>
+          <NextImage src="/logo-icon-only.png" alt="Jarvis" width={32} height={32} />
           <span className="font-bold text-gray-900">Jarvis</span>
           <span className="text-[9px] font-medium text-indigo-500 bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5 leading-none">KI</span>
         </div>
@@ -768,9 +767,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
 
         {messages.length === 0 && pendingActions.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 space-y-3">
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center animate-alive">
-              <Bot className="w-6 h-6 text-gray-300" />
-            </div>
+            <NextImage src="/logo-icon-only.png" alt="Jarvis" width={48} height={48} className="opacity-40" />
             <div>
               <p className="font-medium text-gray-600">Wie kann ich helfen?</p>
               <p className="text-xs mt-1">
@@ -942,7 +939,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
             }}
             placeholder="Nachricht an Jarvis..."
             rows={1}
-            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white transition-all placeholder-gray-400 resize-none overflow-y-auto"
+            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-[16px] lg:text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white transition-all placeholder-gray-400 resize-none overflow-y-auto"
             style={{ maxHeight: '5.5rem', minHeight: '2.25rem' }}
             onInput={(e) => {
               const target = e.target as HTMLTextAreaElement;

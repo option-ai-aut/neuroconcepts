@@ -89,21 +89,27 @@ function EmailBodyViewer({ email, onContentClick }: { email: Email; onContentCli
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
               font-size: 14px; line-height: 1.6; color: #374151; background: white;
               overflow-x: hidden;
+              max-width: 100vw;
+              word-wrap: break-word;
+              overflow-wrap: break-word;
             }
-            body { padding: 16px; }
-            img { max-width: 100%; height: auto; }
-            a { color: #4f46e5; text-decoration: none; }
+            body { padding: 16px; max-width: 100%; }
+            img { max-width: 100% !important; height: auto !important; }
+            a { color: #4f46e5; text-decoration: none; word-break: break-all; }
             a:hover { text-decoration: underline; }
-            table { max-width: 100%; border-collapse: collapse; }
-            td, th { padding: 8px; }
-            pre, code { font-family: 'SF Mono', Monaco, 'Courier New', monospace; font-size: 13px; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }
-            pre { padding: 12px; overflow-x: auto; }
+            table { max-width: 100% !important; width: 100% !important; border-collapse: collapse; table-layout: fixed; }
+            td, th { padding: 8px; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; }
+            div, span, p { max-width: 100%; }
+            pre, code { font-family: 'SF Mono', Monaco, 'Courier New', monospace; font-size: 13px; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
+            pre { padding: 12px; overflow-x: auto; max-width: 100%; }
             blockquote { margin: 16px 0; padding-left: 16px; border-left: 3px solid #e5e7eb; color: #6b7280; }
             h1, h2, h3 { color: #111827; margin-top: 24px; margin-bottom: 12px; font-weight: 600; }
             p { margin: 12px 0; }
             ul, ol { padding-left: 24px; margin: 12px 0; }
             hr { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
             * { -webkit-font-smoothing: antialiased; }
+            [width] { max-width: 100% !important; }
+            [style*="width"] { max-width: 100% !important; }
           </style>
         </head>
         <body>${content}</body>
@@ -347,7 +353,7 @@ export default function InboxPage() {
               {email.fromName || email.from.split('@')[0]}
             </span>
             <div className="flex items-center gap-1.5 ml-2 shrink-0">
-              {!email.isRead && <div className="w-2 h-2 bg-indigo-500 rounded-full md:hidden" />}
+              {!email.isRead && <div className="w-2 h-2 bg-indigo-500 rounded-full lg:hidden" />}
               <span className="text-xs text-gray-400 tabular-nums">
                 {formatDate(email.receivedAt || email.sentAt || '')}
               </span>
@@ -384,7 +390,7 @@ export default function InboxPage() {
     return (
       <>
         {/* MOBILE Detail View */}
-        <div className="h-full flex flex-col bg-white md:hidden">
+        <div className="h-full flex flex-col bg-white lg:hidden">
           {/* Mobile Detail Header */}
           <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100 shrink-0">
             <button
@@ -458,7 +464,7 @@ export default function InboxPage() {
         </div>
 
         {/* DESKTOP Detail View stays in the 3-col layout — rendered below */}
-        <div className="hidden md:flex h-full bg-gray-50">
+        <div className="hidden lg:flex h-full bg-gray-50">
           {renderDesktopLayout()}
         </div>
       </>
@@ -605,10 +611,10 @@ export default function InboxPage() {
 
   // ──────────── MAIN RENDER ────────────
   return (
-    <div className="h-full flex flex-col md:flex-row bg-gray-50">
+    <div className="h-full flex flex-col lg:flex-row bg-gray-50">
 
       {/* ═══ MOBILE: Header + List ═══ */}
-      <div className="md:hidden flex flex-col h-full bg-white">
+      <div className="lg:hidden flex flex-col h-full bg-white">
         {/* Mobile Header */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 shrink-0">
           <button
@@ -672,7 +678,7 @@ export default function InboxPage() {
 
       {/* ═══ MOBILE: Folder Drawer (overlay) ═══ */}
       {showMobileFolders && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
+        <div className="lg:hidden fixed inset-0 z-50 flex">
           {/* Backdrop */}
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowMobileFolders(false)} />
           
@@ -726,14 +732,14 @@ export default function InboxPage() {
       )}
 
       {/* ═══ DESKTOP: 3-Column Layout ═══ */}
-      <div className="hidden md:flex h-full w-full">
+      <div className="hidden lg:flex h-full w-full">
         {renderDesktopLayout()}
       </div>
 
       {/* ═══ Context Menu (Desktop) ═══ */}
       {contextMenu && (
         <div ref={contextMenuRef}
-          className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[200px] hidden md:block"
+          className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[200px] hidden lg:block"
           style={{ left: contextMenu.x, top: contextMenu.y, maxHeight: 'calc(100vh - 20px)', overflowY: 'auto' }}>
           {selectedFolder !== 'DRAFTS' && selectedFolder !== 'SENT' && (
             <>

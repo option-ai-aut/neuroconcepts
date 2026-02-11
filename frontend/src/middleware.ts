@@ -97,6 +97,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|icon.svg|.*\\.).*)',
+    '/((?!_next/static|_next/image|favicon.ico|favicon.png|apple-touch-icon.png|site.webmanifest|logo-.*|icon-.*|.*\\.).*)',
   ],
 };

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'aws-amplify/auth';
 import { useState } from 'react';
@@ -58,7 +59,7 @@ export default function Sidebar() {
 
   return (
     <div 
-      className={`hidden md:flex flex-col bg-slate-900 h-screen relative z-20 transition-all duration-300 ease-in-out ${
+      className={`hidden lg:flex flex-col bg-slate-900 h-screen relative z-20 transition-all duration-300 ease-in-out ${
         isHovered ? 'w-64' : 'w-20'
       }`}
       onMouseEnter={() => {
@@ -72,14 +73,16 @@ export default function Sidebar() {
     >
       {/* Logo */}
       <div className="flex items-center h-16 px-6 shrink-0 overflow-hidden">
-        <div className="w-8 h-8 bg-indigo-600 rounded-md flex items-center justify-center shrink-0 shadow-md shadow-indigo-900/50">
-          <span className="text-white font-bold text-lg">N</span>
-        </div>
-        <span className={`text-white font-bold text-lg tracking-tight ml-3 whitespace-nowrap transition-opacity duration-300 ${
-          isHovered ? 'opacity-100' : 'opacity-0'
-        }`}>
-          Immivo
-        </span>
+        <Image src="/logo-icon-only.png" alt="Immivo" width={32} height={32} className="shrink-0" />
+        <Image 
+          src="/logo-white.png" 
+          alt="Immivo" 
+          width={90} 
+          height={24} 
+          className={`h-6 w-auto ml-3 whitespace-nowrap transition-opacity duration-300 ${
+            isHovered ? 'opacity-100' : 'opacity-0'
+          }`}
+        />
       </div>
       
       {/* Main Navigation */}

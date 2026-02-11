@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { 
-  Bot, TrendingUp, Clock, ArrowRight, CheckCircle2, Sparkles,
+  Bot, TrendingUp, Clock, ArrowRight, CheckCircle2,
   Users, Building2, Mail, Calendar, FileText, Zap, Shield,
   ChevronRight, Star, Quote, BarChart3,
   MessageSquare, Brain, Rocket, Target, Award, Globe, Image,

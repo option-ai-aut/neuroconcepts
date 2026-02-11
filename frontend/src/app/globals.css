@@ -12,17 +12,24 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Force light mode on all devices — no dark mode */
+
+html {
+  background-color: #ffffff;
 }
 
 body {
-  background: var(--background);
+  background: #ffffff;
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Prevent Safari auto-zoom on input focus (requires font-size >= 16px) */
+/* Use 1023px to match Tailwind lg: breakpoint (1024px) — covers iPhone landscape */
+@media screen and (max-width: 1023px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
 }
 
 /* Global Border Radius - Override Tailwind defaults */
@@ -128,8 +135,18 @@ body {
 }
 
 /* Prevent overscroll bounce on mobile */
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
   body {
     overscroll-behavior: none;
   }
+}
+
+/* Image Studio staging animation */
+@keyframes staging-pop {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+@keyframes staging-sparkle {
+  0%, 100% { opacity: 0; transform: scale(0.5) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(180deg); }
 }

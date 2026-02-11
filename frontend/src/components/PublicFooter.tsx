@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Sparkles } from 'lucide-react';
+import Image from 'next/image';
 
 export default function PublicFooter() {
   return (
@@ -11,10 +11,8 @@ export default function PublicFooter() {
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="flex items-center mb-4 md:mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-xl flex items-center justify-center mr-3">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-bold text-xl">Immivo</span>
+              <Image src="/logo-icon-only.png" alt="Immivo" width={36} height={36} className="mr-2" />
+              <Image src="/logo-white.png" alt="Immivo" width={100} height={28} className="h-6 w-auto" />
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed">
               Das KI-gesteuerte Betriebssystem für moderne Immobilienmakler. 

@@ -361,6 +361,22 @@ export default function CalendarPage() {
     return `${i.toString().padStart(2, '0')}:00`;
   });
 
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 1024);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  // Default to day view on mobile
+  useEffect(() => {
+    if (isMobile && view === 'week') {
+      setView('day');
+    }
+  }, [isMobile]);
+
   const dayNames = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
   const today = new Date();
 
@@ -441,36 +457,36 @@ export default function CalendarPage() {
     <div className="h-full flex flex-col bg-white">
       {/* Reconnect Warning */}
       {needsReconnect && (
-        <div className="bg-amber-50 border-b border-amber-200 px-8 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
-                <CalendarIcon className="w-4 h-4 text-amber-600" />
+        <div className="bg-amber-50 border-b border-amber-200 px-4 lg:px-8 py-2 lg:py-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 lg:gap-3 min-w-0">
+              <div className="w-7 h-7 lg:w-8 lg:h-8 bg-amber-100 rounded-full flex items-center justify-center shrink-0">
+                <CalendarIcon className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-amber-600" />
               </div>
-              <div>
-                <p className="text-sm font-medium text-amber-800">Kalender-Verbindung abgelaufen</p>
-                <p className="text-xs text-amber-600">Bitte verbinde deinen Kalender erneut, um Termine zu sehen.</p>
+              <div className="min-w-0">
+                <p className="text-xs lg:text-sm font-medium text-amber-800">Verbindung abgelaufen</p>
+                <p className="text-[10px] lg:text-xs text-amber-600 truncate">Bitte verbinde deinen Kalender erneut.</p>
               </div>
             </div>
             <Link 
               href="/dashboard/settings/integrations"
-              className="px-4 py-2 text-sm font-medium rounded-lg text-amber-700 bg-amber-100 hover:bg-amber-200 transition-colors"
+              className="px-3 lg:px-4 py-1.5 lg:py-2 text-xs lg:text-sm font-medium rounded-lg text-amber-700 bg-amber-100 hover:bg-amber-200 transition-colors shrink-0"
             >
-              Neu verbinden
+              Verbinden
             </Link>
           </div>
         </div>
       )}
       
       {/* Header */}
-      <div className="px-8 py-3 border-b border-gray-100 flex justify-between items-center">
+      <div className="px-4 lg:px-8 py-3 border-b border-gray-100 flex justify-between items-center">
         <div>
           {connectedEmail && !needsReconnect && (
-            <p className="text-sm text-gray-500">Verbunden mit {connectedEmail}</p>
+            <p className="text-xs lg:text-sm text-gray-500 truncate max-w-[180px] lg:max-w-none">Verbunden mit {connectedEmail}</p>
           )}
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 lg:gap-3">
           <button 
             onClick={() => {
               setNewEvent(prev => ({
@@ -479,57 +495,58 @@ export default function CalendarPage() {
               }));
               setShowNewEventModal(true);
             }}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2"
+            className="bg-indigo-600 text-white px-3 lg:px-4 py-2 rounded-lg text-xs lg:text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-1.5 lg:gap-2"
           >
             <Plus className="w-4 h-4" />
-            Neuer Termin
+            <span className="hidden lg:inline">Neuer Termin</span>
+            <span className="lg:hidden">Neu</span>
           </button>
         </div>
       </div>
       
       {/* Calendar Navigation */}
-      <div className="px-8 py-4 flex items-center justify-between border-b border-gray-100">
-        <div className="flex items-center gap-2">
+      <div className="px-4 lg:px-8 py-3 lg:py-4 flex items-center justify-between border-b border-gray-100">
+        <div className="flex items-center gap-1 lg:gap-2">
           <button 
             onClick={() => navigate(-1)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-1.5 lg:p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <ChevronLeft className="w-5 h-5 text-gray-600" />
+            <ChevronLeft className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
           </button>
-          <span className="px-4 text-base font-semibold text-gray-900 min-w-[280px] text-center">
+          <span className="px-1 lg:px-4 text-xs lg:text-base font-semibold text-gray-900 min-w-0 lg:min-w-[280px] text-center truncate">
             {getHeaderTitle()}
           </span>
           <button 
             onClick={() => navigate(1)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-1.5 lg:p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <ChevronRight className="w-5 h-5 text-gray-600" />
+            <ChevronRight className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
           </button>
           <button 
             onClick={() => setCurrentDate(new Date())}
-            className="ml-2 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            className="ml-1 lg:ml-2 px-2 lg:px-3 py-1 lg:py-1.5 text-[10px] lg:text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
           >
             Heute
           </button>
         </div>
         
         {/* View Switcher */}
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+        <div className="flex gap-0.5 lg:gap-1 bg-gray-100 rounded-lg p-0.5 lg:p-1">
           <button 
             onClick={() => setView('day')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${view === 'day' ? 'text-gray-900 bg-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+            className={`px-2 lg:px-3 py-1 lg:py-1.5 text-[10px] lg:text-xs font-medium rounded-md transition-colors ${view === 'day' ? 'text-gray-900 bg-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
           >
             Tag
           </button>
           <button 
             onClick={() => setView('week')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${view === 'week' ? 'text-gray-900 bg-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+            className={`hidden lg:block px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${view === 'week' ? 'text-gray-900 bg-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
           >
             Woche
           </button>
           <button 
             onClick={() => setView('month')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${view === 'month' ? 'text-gray-900 bg-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+            className={`px-2 lg:px-3 py-1 lg:py-1.5 text-[10px] lg:text-xs font-medium rounded-md transition-colors ${view === 'month' ? 'text-gray-900 bg-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
           >
             Monat
           </button>
@@ -540,13 +557,13 @@ export default function CalendarPage() {
       <div ref={scrollContainerRef} className="flex-1 overflow-auto">
         {/* Day View */}
         {view === 'day' && (
-          <div className="min-h-full p-6">
-            <div className="grid grid-cols-[80px_1fr] gap-4">
+          <div className="min-h-full p-3 lg:p-6">
+            <div className="grid grid-cols-[50px_1fr] lg:grid-cols-[80px_1fr] gap-2 lg:gap-4">
               {/* Time Column */}
               <div className="space-y-0">
                 {timeSlots.map((time) => (
-                  <div key={time} className="h-16 text-xs text-gray-400 text-right pr-4 relative">
-                    <span className="absolute -top-2 right-4">{time}</span>
+                  <div key={time} className="h-12 lg:h-16 text-[10px] lg:text-xs text-gray-400 text-right pr-2 lg:pr-4 relative">
+                    <span className="absolute -top-2 right-2 lg:right-4">{time}</span>
                   </div>
                 ))}
               </div>
@@ -555,7 +572,7 @@ export default function CalendarPage() {
               <div className="relative border-l border-gray-100">
                 {/* Hour Grid Lines */}
                 {timeSlots.map((_, i) => (
-                  <div key={i} className="h-16 border-b border-gray-50"></div>
+                  <div key={i} className="h-12 lg:h-16 border-b border-gray-50"></div>
                 ))}
 
                 {/* Events */}
@@ -566,23 +583,25 @@ export default function CalendarPage() {
                   const endHour = endTime.getHours() + endTime.getMinutes() / 60;
                   const duration = endHour - startHour;
                   
-                  const top = startHour * 64;
-                  const height = Math.max(duration * 64, 40);
+                  const slotH = 48; // h-12 = 48px on mobile
+                  const top = startHour * slotH;
+                  const height = Math.max(duration * slotH, 32);
                   
                   return (
                     <div 
                       key={event.id}
                       onClick={() => setSelectedEvent(event)}
-                      className="absolute left-2 right-2 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg p-3 cursor-pointer hover:shadow-md transition-all"
+                      className="absolute left-1 right-1 lg:left-2 lg:right-2 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-md lg:rounded-lg p-1.5 lg:p-3 cursor-pointer hover:shadow-md transition-all"
                       style={{ top: `${top}px`, height: `${height}px` }}
                     >
-                      <div className="pl-3">
-                        <div className="text-sm font-semibold text-indigo-900">{event.title}</div>
-                        <div className="text-xs text-indigo-600 mt-1">
+                      <div className="pl-1.5 lg:pl-3 h-full overflow-hidden">
+                        <div className="text-xs lg:text-sm font-medium text-indigo-900 leading-tight truncate">{event.title}</div>
+                        <div className="hidden lg:block text-xs text-indigo-600 mt-1">
                           {formatTime(event.start)} - {formatTime(event.end)}
                         </div>
+                        <div className="lg:hidden text-[10px] text-indigo-500 mt-0.5">{formatTime(event.start)}</div>
                         {event.location && (
-                          <div className="text-xs text-indigo-500 mt-1 flex items-center gap-1">
+                          <div className="hidden lg:flex text-xs text-indigo-500 mt-1 items-center gap-1">
                             <MapPin className="w-3 h-3" />
                             {event.location}
                           </div>
@@ -672,21 +691,22 @@ export default function CalendarPage() {
 
         {/* Month View */}
         {view === 'month' && (
-          <div className="p-6">
+          <div className="p-2 lg:p-6">
             {/* Day Headers */}
-            <div className="grid grid-cols-7 gap-2 mb-2">
+            <div className="grid grid-cols-7 gap-0.5 lg:gap-2 mb-1 lg:mb-2">
               {dayNames.map((name) => (
-                <div key={name} className="text-center text-xs font-medium text-gray-500 py-2">
-                  {name}
+                <div key={name} className="text-center text-[10px] lg:text-xs font-medium text-gray-500 py-1 lg:py-2">
+                  <span className="lg:hidden">{name.charAt(0)}{name.charAt(1)}</span>
+                  <span className="hidden lg:inline">{name}</span>
                 </div>
               ))}
             </div>
             
             {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-0.5 lg:gap-2">
               {getMonthDays().map((day, i) => {
                 if (!day) {
-                  return <div key={`empty-${i}`} className="min-h-[120px]"></div>;
+                  return <div key={`empty-${i}`} className="min-h-[48px] lg:min-h-[120px]"></div>;
                 }
                 
                 const dayEvents = getEventsForDay(day);
@@ -696,16 +716,31 @@ export default function CalendarPage() {
                 return (
                   <div 
                     key={day.toISOString()} 
-                    className={`min-h-[120px] border border-gray-100 rounded-lg p-2 ${isCurrentMonth ? 'bg-white' : 'bg-gray-50'}`}
+                    className={`min-h-[48px] lg:min-h-[120px] border border-gray-100 rounded lg:rounded-lg p-1 lg:p-2 ${isCurrentMonth ? 'bg-white' : 'bg-gray-50'}`}
+                    onClick={() => {
+                      if (dayEvents.length > 0 && window.innerWidth < 1024) {
+                        setCurrentDate(day);
+                        setView('day');
+                      }
+                    }}
                   >
-                    <div className={`text-sm font-medium mb-2 ${isToday ? 'text-white bg-indigo-600 rounded-full w-7 h-7 flex items-center justify-center' : isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}`}>
+                    <div className={`text-[10px] lg:text-sm font-medium mb-0.5 lg:mb-2 ${isToday ? 'text-white bg-indigo-600 rounded-full w-5 h-5 lg:w-7 lg:h-7 flex items-center justify-center text-[10px] lg:text-sm' : isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}`}>
                       {day.getDate()}
                     </div>
-                    <div className="space-y-1">
+                    {/* Mobile: only show dot indicators */}
+                    {dayEvents.length > 0 && (
+                      <div className="lg:hidden flex gap-0.5 justify-center">
+                        {dayEvents.slice(0, 3).map((event) => (
+                          <div key={event.id} className="w-1 h-1 rounded-full bg-indigo-500"></div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Desktop: show event labels */}
+                    <div className="hidden lg:block space-y-1">
                       {dayEvents.slice(0, 3).map((event) => (
                         <div 
                           key={event.id}
-                          onClick={() => setSelectedEvent(event)}
+                          onClick={(e) => { e.stopPropagation(); setSelectedEvent(event); }}
                           className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded truncate cursor-pointer hover:bg-indigo-100"
                           title={event.title}
                         >
@@ -728,10 +763,10 @@ export default function CalendarPage() {
 
       {/* New Event Modal */}
       {showNewEventModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900">Neuer Termin</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-end lg:items-center justify-center z-50">
+          <div className="bg-white rounded-t-2xl lg:rounded-xl shadow-xl w-full lg:max-w-md lg:mx-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 lg:px-6 py-3 lg:py-4 border-b border-gray-100 shrink-0">
+              <h2 className="text-base lg:text-lg font-semibold text-gray-900">Neuer Termin</h2>
               <button 
                 onClick={() => setShowNewEventModal(false)}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -740,86 +775,86 @@ export default function CalendarPage() {
               </button>
             </div>
             
-            <div className="p-6 space-y-4">
+            <div className="overflow-y-auto flex-1 p-4 lg:p-6 space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Titel *</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Titel *</label>
                 <input
                   type="text"
                   value={newEvent.title}
                   onChange={(e) => setNewEvent(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   placeholder="z.B. Besichtigung Musterstraße 1"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Datum *</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Datum *</label>
                 <input
                   type="date"
                   value={newEvent.date}
                   onChange={(e) => setNewEvent(prev => ({ ...prev, date: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Von</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Von</label>
                   <input
                     type="time"
                     value={newEvent.startTime}
                     onChange={(e) => setNewEvent(prev => ({ ...prev, startTime: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Bis</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Bis</label>
                   <input
                     type="time"
                     value={newEvent.endTime}
                     onChange={(e) => setNewEvent(prev => ({ ...prev, endTime: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
                 </div>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Ort</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Ort</label>
                 <input
                   type="text"
                   value={newEvent.location}
                   onChange={(e) => setNewEvent(prev => ({ ...prev, location: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   placeholder="z.B. Musterstraße 1, 1010 Wien"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Beschreibung</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Beschreibung</label>
                 <textarea
                   value={newEvent.description}
                   onChange={(e) => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                  rows={3}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                  rows={2}
                   placeholder="Optionale Notizen..."
                 />
               </div>
             </div>
             
-            <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+            <div className="flex gap-3 px-4 lg:px-6 py-3 lg:py-4 border-t border-gray-100 shrink-0 safe-bottom">
               <button
                 onClick={() => setShowNewEventModal(false)}
-                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="flex-1 px-4 py-2.5 lg:py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 Abbrechen
               </button>
               <button
                 onClick={handleCreateEvent}
                 disabled={!newEvent.title || !newEvent.date || creatingEvent}
-                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2.5 lg:py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {creatingEvent && <Loader2 className="w-4 h-4 animate-spin" />}
-                Termin erstellen
+                Erstellen
               </button>
             </div>
           </div>
@@ -828,10 +863,10 @@ export default function CalendarPage() {
 
       {/* Event Detail/Edit Modal */}
       {selectedEvent && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => { setSelectedEvent(null); setIsEditing(false); }}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900">
+        <div className="fixed inset-0 bg-black/50 flex items-end lg:items-center justify-center z-50" onClick={() => { setSelectedEvent(null); setIsEditing(false); }}>
+          <div className="bg-white rounded-t-2xl lg:rounded-xl shadow-xl w-full lg:max-w-lg lg:mx-4 max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 lg:px-6 py-3 lg:py-4 border-b border-gray-100 shrink-0">
+              <h2 className="text-base lg:text-lg font-semibold text-gray-900">
                 {isEditing ? 'Termin bearbeiten' : 'Termindetails'}
               </h2>
               <button 
@@ -842,156 +877,158 @@ export default function CalendarPage() {
               </button>
             </div>
             
-            {isEditing ? (
-              /* Edit Mode */
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Titel *</label>
-                  <input
-                    type="text"
-                    value={editEvent.title}
-                    onChange={(e) => setEditEvent(prev => ({ ...prev, title: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Datum *</label>
-                  <input
-                    type="date"
-                    value={editEvent.date}
-                    onChange={(e) => setEditEvent(prev => ({ ...prev, date: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
+            <div className="overflow-y-auto flex-1">
+              {isEditing ? (
+                /* Edit Mode */
+                <div className="p-4 lg:p-6 space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Von</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Titel *</label>
                     <input
-                      type="time"
-                      value={editEvent.startTime}
-                      onChange={(e) => setEditEvent(prev => ({ ...prev, startTime: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      type="text"
+                      value={editEvent.title}
+                      onChange={(e) => setEditEvent(prev => ({ ...prev, title: e.target.value }))}
+                      className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     />
                   </div>
+                  
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Bis</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Datum *</label>
                     <input
-                      type="time"
-                      value={editEvent.endTime}
-                      onChange={(e) => setEditEvent(prev => ({ ...prev, endTime: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      type="date"
+                      value={editEvent.date}
+                      onChange={(e) => setEditEvent(prev => ({ ...prev, date: e.target.value }))}
+                      className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Von</label>
+                      <input
+                        type="time"
+                        value={editEvent.startTime}
+                        onChange={(e) => setEditEvent(prev => ({ ...prev, startTime: e.target.value }))}
+                        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Bis</label>
+                      <input
+                        type="time"
+                        value={editEvent.endTime}
+                        onChange={(e) => setEditEvent(prev => ({ ...prev, endTime: e.target.value }))}
+                        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Ort</label>
+                    <input
+                      type="text"
+                      value={editEvent.location}
+                      onChange={(e) => setEditEvent(prev => ({ ...prev, location: e.target.value }))}
+                      className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Beschreibung</label>
+                    <textarea
+                      value={editEvent.description}
+                      onChange={(e) => setEditEvent(prev => ({ ...prev, description: e.target.value }))}
+                      className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                      rows={2}
                     />
                   </div>
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Ort</label>
-                  <input
-                    type="text"
-                    value={editEvent.location}
-                    onChange={(e) => setEditEvent(prev => ({ ...prev, location: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Beschreibung</label>
-                  <textarea
-                    value={editEvent.description}
-                    onChange={(e) => setEditEvent(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                    rows={3}
-                  />
-                </div>
-              </div>
-            ) : (
-              /* View Mode */
-              <div className="p-6 space-y-5">
-                {/* Title */}
-                <div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <CalendarIcon className="w-5 h-5 text-indigo-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-900">{selectedEvent.title}</h3>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Date & Time */}
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Clock className="w-5 h-5 text-gray-600" />
-                  </div>
+              ) : (
+                /* View Mode */
+                <div className="p-4 lg:p-6 space-y-3 lg:space-y-5">
+                  {/* Title */}
                   <div>
-                    <div className="text-sm font-medium text-gray-900">
-                      {new Date(selectedEvent.start).toLocaleDateString('de-DE', { 
-                        weekday: 'long', 
-                        day: 'numeric', 
-                        month: 'long', 
-                        year: 'numeric' 
-                      })}
-                    </div>
-                    <div className="text-sm text-gray-500 mt-0.5">
-                      {formatTime(selectedEvent.start)} - {formatTime(selectedEvent.end)} Uhr
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Location */}
-                {selectedEvent.location && (
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <MapPin className="w-5 h-5 text-gray-600" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">Ort</div>
-                      <div className="text-sm text-gray-500 mt-0.5">{selectedEvent.location}</div>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Attendees */}
-                {selectedEvent.attendees && selectedEvent.attendees.length > 0 && (
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Users className="w-5 h-5 text-gray-600" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">Teilnehmer</div>
-                      <div className="text-sm text-gray-500 mt-0.5">
-                        {selectedEvent.attendees.join(', ')}
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-8 h-8 lg:w-10 lg:h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <CalendarIcon className="w-4 h-4 lg:w-5 lg:h-5 text-indigo-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm lg:text-xl font-semibold text-gray-900 leading-snug">{selectedEvent.title}</h3>
                       </div>
                     </div>
                   </div>
-                )}
-                
-                {/* Description */}
-                {selectedEvent.description && (
-                  <div className="pt-4 border-t border-gray-100">
-                    <div className="text-sm font-medium text-gray-900 mb-2">Beschreibung</div>
-                    <div className="text-sm text-gray-600 whitespace-pre-wrap">{selectedEvent.description}</div>
+                  
+                  {/* Date & Time */}
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Clock className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
+                    </div>
+                    <div>
+                      <div className="text-xs lg:text-sm font-medium text-gray-900">
+                        {new Date(selectedEvent.start).toLocaleDateString('de-DE', { 
+                          weekday: 'long', 
+                          day: 'numeric', 
+                          month: 'long', 
+                          year: 'numeric' 
+                        })}
+                      </div>
+                      <div className="text-xs lg:text-sm text-gray-500 mt-0.5">
+                        {formatTime(selectedEvent.start)} - {formatTime(selectedEvent.end)} Uhr
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
-            )}
+                  
+                  {/* Location */}
+                  {selectedEvent.location && (
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <MapPin className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
+                      </div>
+                      <div>
+                        <div className="text-xs lg:text-sm font-medium text-gray-900">Ort</div>
+                        <div className="text-xs lg:text-sm text-gray-500 mt-0.5">{selectedEvent.location}</div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Attendees */}
+                  {selectedEvent.attendees && selectedEvent.attendees.length > 0 && (
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Users className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
+                      </div>
+                      <div>
+                        <div className="text-xs lg:text-sm font-medium text-gray-900">Teilnehmer</div>
+                        <div className="text-xs lg:text-sm text-gray-500 mt-0.5">
+                          {selectedEvent.attendees.join(', ')}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Description */}
+                  {selectedEvent.description && (
+                    <div className="pt-3 lg:pt-4 border-t border-gray-100">
+                      <div className="text-xs lg:text-sm font-medium text-gray-900 mb-1 lg:mb-2">Beschreibung</div>
+                      <div className="text-xs lg:text-sm text-gray-600 whitespace-pre-wrap">{selectedEvent.description}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             
-            <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+            <div className="flex gap-3 px-4 lg:px-6 py-3 lg:py-4 border-t border-gray-100 shrink-0 safe-bottom">
               {isEditing ? (
                 <>
                   <button
                     onClick={() => setIsEditing(false)}
-                    className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    className="flex-1 px-4 py-2.5 lg:py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                   >
                     Abbrechen
                   </button>
                   <button
                     onClick={handleUpdateEvent}
                     disabled={!editEvent.title || !editEvent.date || savingEvent}
-                    className="flex-1 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="flex-1 px-4 py-2.5 lg:py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {savingEvent && <Loader2 className="w-4 h-4 animate-spin" />}
                     Speichern
@@ -1002,14 +1039,14 @@ export default function CalendarPage() {
                   <button
                     onClick={handleDeleteEvent}
                     disabled={deletingEvent}
-                    className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="px-4 py-2.5 lg:py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {deletingEvent && <Loader2 className="w-4 h-4 animate-spin" />}
                     Löschen
                   </button>
                   <button
                     onClick={startEditEvent}
-                    className="flex-1 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+                    className="flex-1 px-4 py-2.5 lg:py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
                   >
                     Bearbeiten
                   </button>

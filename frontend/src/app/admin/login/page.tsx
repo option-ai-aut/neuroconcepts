@@ -5,6 +5,7 @@ import { signIn, fetchAuthSession, confirmSignIn } from 'aws-amplify/auth';
 import { Amplify } from 'aws-amplify';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2, Shield } from 'lucide-react';
+import Image from 'next/image';
 import { useRuntimeConfig } from '@/components/RuntimeConfigProvider';
 
 export default function AdminLoginPage() {
@@ -110,9 +111,7 @@ export default function AdminLoginPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-red-600/20 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-500/30">
-            <Shield className="w-8 h-8 text-red-500" />
-          </div>
+          <Image src="/logo-icon-only.png" alt="Immivo" width={56} height={56} className="mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-white">Admin Konsole</h1>
           <p className="text-sm text-gray-400 mt-2">Immivo Plattform-Administration</p>
         </div>

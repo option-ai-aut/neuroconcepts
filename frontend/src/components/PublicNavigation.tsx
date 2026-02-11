@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState } from 'react';
-import { Sparkles, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 
 interface PublicNavigationProps {
   currentPage?: string;
@@ -29,10 +30,8 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center mr-3 shadow-lg shadow-indigo-500/30">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-bold text-xl tracking-tight text-gray-900">Immivo</span>
+            <Image src="/logo-icon-only.png" alt="Immivo" width={36} height={36} className="mr-2" />
+            <Image src="/logo-black.png" alt="Immivo" width={100} height={28} className="h-6 w-auto hidden sm:block" />
           </Link>
 
           {/* Desktop Navigation */}

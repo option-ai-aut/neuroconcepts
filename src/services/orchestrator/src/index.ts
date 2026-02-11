@@ -67,6 +67,7 @@ async function loadAppSecrets() {
           'MICROSOFT_CLIENT_SECRET',
           'MICROSOFT_REDIRECT_URI',
           'MICROSOFT_EMAIL_REDIRECT_URI',
+          'GEMINI_API_KEY',
         ];
         for (const key of keysToLoad) {
           if (secrets[key]) process.env[key] = secrets[key];
@@ -4702,7 +4703,7 @@ app.get('/email/status', authMiddleware, async (req, res) => {
 
 // --- AI Image Editing (Virtual Staging) ---
 
-// POST /ai/image-edit - Virtual Staging with OpenAI gpt-image-1
+// POST /ai/image-edit - Virtual Staging with Gemini 3 Pro Image Preview
 app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, async (req, res) => {
   try {
     const { image, prompt, style, roomType, aspectRatio } = req.body;
@@ -4716,7 +4717,7 @@ app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, asyn
 
     // Extract base64 data from data URL
     let imageData = image;
-    let mimeType = 'image/png';
+    let mimeType = 'image/jpeg';
     
     if (image.startsWith('data:')) {
       const matches = image.match(/^data:([^;]+);base64,(.+)$/);
@@ -4726,58 +4727,68 @@ app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, asyn
       }
     }
 
-    const imageBuffer = Buffer.from(imageData, 'base64');
-
     // Short, direct prompt — less is more for image editing
     let stagingPrompt: string;
     if (prompt && prompt.trim()) {
-      // User provided custom instructions
       stagingPrompt = `${prompt.trim()} Do not alter the room, walls, floor, ceiling, windows or perspective.`;
     } else {
-      stagingPrompt = `Add ${style || 'modern'} furniture to this ${roomType || 'room'}. Do not alter the room, walls, floor, ceiling, windows or perspective.`;
+      const parts: string[] = [];
+      if (style) parts.push(`${style} style`);
+      if (roomType) parts.push(roomType);
+      stagingPrompt = `Add ${parts.length > 0 ? parts.join(' ') + ' ' : ''}furniture to this room. Do not alter the room, walls, floor, ceiling, windows or perspective.`;
     }
 
-    // Pick output size matching the input aspect ratio
-    const ar = aspectRatio || 1.5; // default landscape
-    let size: '1536x1024' | '1024x1536' | '1024x1024' = '1536x1024';
-    if (ar < 0.85) size = '1024x1536';       // portrait
-    else if (ar <= 1.15) size = '1024x1024';  // square-ish
+    // Map numeric aspect ratio to Gemini-supported string
+    const ar = aspectRatio || 1.5;
+    let geminiAspectRatio = '3:2'; // default landscape
+    if (ar < 0.7) geminiAspectRatio = '9:16';
+    else if (ar < 0.85) geminiAspectRatio = '2:3';
+    else if (ar <= 1.15) geminiAspectRatio = '1:1';
+    else if (ar < 1.4) geminiAspectRatio = '4:3';
+    else geminiAspectRatio = '3:2';
 
-    const OpenAILib = require('openai');
-    const openaiClient = new OpenAILib.default({ apiKey: process.env.OPENAI_API_KEY });
-    const { toFile } = require('openai');
-    
-    const inputFile = await toFile(imageBuffer, 'input.png', { type: mimeType });
+    const { GoogleGenAI } = require('@google/genai');
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-    console.log(`🎨 Virtual staging: style=${style}, room=${roomType}, size=${size}, prompt="${stagingPrompt.substring(0, 80)}..."`);
+    console.log(`🎨 Virtual staging (Gemini 3): style=${style}, room=${roomType}, aspect=${geminiAspectRatio}, prompt="${stagingPrompt.substring(0, 80)}..."`);
 
-    const result = await openaiClient.images.edit({
-      model: 'gpt-image-1',
-      image: inputFile,
-      prompt: stagingPrompt,
-      size,
-      quality: 'high',
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-image-preview',
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { inlineData: { mimeType, data: imageData } },
+            { text: stagingPrompt },
+          ],
+        },
+      ],
+      config: {
+        responseModalities: ['IMAGE', 'TEXT'],
+        imageConfig: {
+          aspectRatio: geminiAspectRatio,
+        },
+      },
     });
 
-    // Get the result (prefer b64, fallback to URL)
-    const imageB64 = result.data?.[0]?.b64_json;
-    const imageUrl = result.data?.[0]?.url;
-    
+    // Extract generated image from response
     let generatedImage: string | null = null;
-    
-    if (imageB64) {
-      generatedImage = `data:image/png;base64,${imageB64}`;
-    } else if (imageUrl) {
-      const imgResponse = await fetch(imageUrl);
-      const imgArrayBuffer = await imgResponse.arrayBuffer();
-      generatedImage = `data:image/png;base64,${Buffer.from(imgArrayBuffer).toString('base64')}`;
+
+    if (response.candidates && response.candidates[0]?.content?.parts) {
+      for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData && part.inlineData.data) {
+          const outMime = part.inlineData.mimeType || 'image/png';
+          generatedImage = `data:${outMime};base64,${part.inlineData.data}`;
+          break;
+        }
+      }
     }
 
     if (!generatedImage) {
-      return res.status(500).json({ error: 'No image generated' });
+      return res.status(500).json({ error: 'No image generated — the model returned no image. Try a different prompt or image.' });
     }
 
-    console.log(`✅ Image staged for ${currentUser.email}`);
+    console.log(`✅ Image staged for ${currentUser.email} (Gemini 3 Pro Image)`);
 
     res.json({ 
       image: generatedImage,
@@ -4786,7 +4797,7 @@ app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, asyn
     });
   } catch (error: any) {
     console.error('Image staging error:', error?.message || error);
-    const msg = error?.message?.includes('content_policy') 
+    const msg = error?.message?.includes('SAFETY') || error?.message?.includes('safety')
       ? 'Das Bild wurde von der KI-Sicherheitsrichtlinie abgelehnt. Bitte versuche ein anderes Bild.'
       : 'Bildbearbeitung fehlgeschlagen. Bitte versuche es erneut.';
     res.status(500).json({ error: msg });
