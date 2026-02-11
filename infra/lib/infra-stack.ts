@@ -267,8 +267,8 @@ export class ImmivoStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_22_X,
       entry: path.join(__dirname, '../../src/services/email-parser/index.ts'),
       handler: 'handler',
-      timeout: cdk.Duration.seconds(30),
-      memorySize: 256,
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 512,
       environment: {
         STAGE: props.stageName,
         DB_SECRET_ARN: this.dbSecret.secretArn,
