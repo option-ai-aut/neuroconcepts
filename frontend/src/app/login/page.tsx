@@ -342,13 +342,13 @@ export default function LoginPage() {
       {/* Right Side - Form */}
       <div className="flex-1 flex flex-col py-6 lg:py-8 px-4 sm:px-6 lg:px-12 xl:px-20 bg-white overflow-y-auto">
         <div className="flex-shrink-0 mb-4 lg:mb-6">
-          <Link 
-            href="/" 
+          <a 
+            href="https://immivo.ai" 
             className="group inline-flex items-center px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-full transition-all"
           >
             <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
             Zurück zur Startseite
-          </Link>
+          </a>
         </div>
 
         <div className="flex-1 flex flex-col pt-4 lg:pt-8">
