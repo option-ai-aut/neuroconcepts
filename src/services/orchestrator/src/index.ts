@@ -4702,19 +4702,19 @@ app.get('/email/status', authMiddleware, async (req, res) => {
 
 // --- AI Image Editing (Virtual Staging) ---
 
-// POST /ai/image-edit - Edit image with OpenAI GPT-Image
+// POST /ai/image-edit - Virtual Staging with OpenAI gpt-image-1
 app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, async (req, res) => {
   try {
-    const { image, prompt, style, roomType } = req.body;
+    const { image, prompt, style, roomType, aspectRatio } = req.body;
     
-    if (!image || !prompt) {
-      return res.status(400).json({ error: 'image and prompt required' });
+    if (!image) {
+      return res.status(400).json({ error: 'image required' });
     }
 
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
 
-    // Extract base64 data from data URL if needed
+    // Extract base64 data from data URL
     let imageData = image;
     let mimeType = 'image/png';
     
@@ -4726,39 +4726,40 @@ app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, asyn
       }
     }
 
-    // Convert base64 to buffer for OpenAI
     const imageBuffer = Buffer.from(imageData, 'base64');
 
-    // Create the prompt for virtual staging
-    const stagingPrompt = `You are an expert interior designer and virtual staging specialist. 
-Edit this image to add furniture and decor in a ${style} style for a ${roomType}.
+    // Short, direct prompt — less is more for image editing
+    let stagingPrompt: string;
+    if (prompt && prompt.trim()) {
+      // User provided custom instructions
+      stagingPrompt = `${prompt.trim()} Do not alter the room, walls, floor, ceiling, windows or perspective.`;
+    } else {
+      stagingPrompt = `Add ${style || 'modern'} furniture to this ${roomType || 'room'}. Do not alter the room, walls, floor, ceiling, windows or perspective.`;
+    }
 
-Instructions:
-${prompt}
+    // Pick output size matching the input aspect ratio
+    const ar = aspectRatio || 1.5; // default landscape
+    let size: '1536x1024' | '1024x1536' | '1024x1024' = '1536x1024';
+    if (ar < 0.85) size = '1024x1536';       // portrait
+    else if (ar <= 1.15) size = '1024x1024';  // square-ish
 
-Important guidelines:
-- Keep the room structure, walls, floors, windows, and doors exactly as they are
-- Add realistic furniture that fits the space proportionally
-- Use appropriate lighting and shadows for photorealism
-- Make the result look like a professional real estate photo
-- The furniture should match the ${style} aesthetic perfectly
-- Ensure the final image looks natural and inviting`;
-
-    // Use OpenAI image editing API (gpt-image-1)
     const OpenAILib = require('openai');
     const openaiClient = new OpenAILib.default({ apiKey: process.env.OPENAI_API_KEY });
     const { toFile } = require('openai');
     
     const inputFile = await toFile(imageBuffer, 'input.png', { type: mimeType });
 
+    console.log(`🎨 Virtual staging: style=${style}, room=${roomType}, size=${size}, prompt="${stagingPrompt.substring(0, 80)}..."`);
+
     const result = await openaiClient.images.edit({
       model: 'gpt-image-1',
       image: inputFile,
       prompt: stagingPrompt,
-      size: '1024x1024',
+      size,
+      quality: 'high',
     });
 
-    // Get the generated image
+    // Get the result (prefer b64, fallback to URL)
     const imageB64 = result.data?.[0]?.b64_json;
     const imageUrl = result.data?.[0]?.url;
     
@@ -4767,28 +4768,28 @@ Important guidelines:
     if (imageB64) {
       generatedImage = `data:image/png;base64,${imageB64}`;
     } else if (imageUrl) {
-      // Fetch the image from URL and convert to base64 (native fetch in Node 18+)
       const imgResponse = await fetch(imageUrl);
       const imgArrayBuffer = await imgResponse.arrayBuffer();
-      const imgBase64 = Buffer.from(imgArrayBuffer).toString('base64');
-      generatedImage = `data:image/png;base64,${imgBase64}`;
+      generatedImage = `data:image/png;base64,${Buffer.from(imgArrayBuffer).toString('base64')}`;
     }
 
     if (!generatedImage) {
       return res.status(500).json({ error: 'No image generated' });
     }
 
-    // Log usage for billing (future)
-    console.log(`🎨 Image edited for user ${currentUser.email}, style: ${style}, room: ${roomType}`);
+    console.log(`✅ Image staged for ${currentUser.email}`);
 
     res.json({ 
       image: generatedImage,
       style,
       roomType
     });
-  } catch (error) {
-    console.error('Error editing image:', error);
-    res.status(500).json({ error: 'Image editing failed' });
+  } catch (error: any) {
+    console.error('Image staging error:', error?.message || error);
+    const msg = error?.message?.includes('content_policy') 
+      ? 'Das Bild wurde von der KI-Sicherheitsrichtlinie abgelehnt. Bitte versuche ein anderes Bild.'
+      : 'Bildbearbeitung fehlgeschlagen. Bitte versuche es erneut.';
+    res.status(500).json({ error: msg });
   }
 });
 
