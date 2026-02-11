@@ -172,6 +172,13 @@ app.post('/admin/seed-portals', express.json({ limit: '1mb' }), async (req, res)
   try {
     const db = prisma || (await initializePrisma());
 
+    // Ensure IDX enum value exists in the database
+    try {
+      await db.$executeRawUnsafe(`ALTER TYPE "PortalConnectionType" ADD VALUE IF NOT EXISTS 'IDX'`);
+    } catch (e: any) {
+      console.log('IDX enum may already exist:', e.message);
+    }
+
     const portals: { name: string; slug: string; country: string; websiteUrl: string; connectionType: PortalConnectionType; isPremium: boolean; defaultFtpHost: string | null }[] = [
       // Deutschland (13)
       { name: 'ImmobilienScout24', slug: 'immoscout24-de', country: 'DE', websiteUrl: 'https://www.immobilienscout24.de', connectionType: PortalConnectionType.REST_API, isPremium: true, defaultFtpHost: null },
