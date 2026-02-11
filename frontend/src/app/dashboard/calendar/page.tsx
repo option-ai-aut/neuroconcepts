@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, Users, Clock, MapPin, Loader2, X, RefreshCw } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, Users, Clock, MapPin, Loader2, X } from 'lucide-react';
 import Link from 'next/link';
 import { getAuthHeaders, getApiUrl } from '@/lib/api';
 
@@ -471,15 +471,6 @@ export default function CalendarPage() {
         </div>
         
         <div className="flex items-center gap-3">
-          <button 
-            onClick={() => loadEvents()}
-            disabled={loadingEvents}
-            className={`p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all ${loadingEvents ? 'animate-spin' : ''}`}
-            title="Aktualisieren"
-          >
-            <RefreshCw className="w-5 h-5" />
-          </button>
-          
           <button 
             onClick={() => {
               setNewEvent(prev => ({
