@@ -75,6 +75,9 @@ export class ImmivoStack extends cdk.Stack {
     if (props.stageName === 'dev') {
       dbSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(5432), 'Allow public access to DB in Dev');
     }
+    
+    // Allow Lambda (same SG) to reach Aurora in non-dev stages
+    dbSg.addIngressRule(dbSg, ec2.Port.tcp(5432), 'Allow Lambda to reach Aurora (self-referencing)');
 
     if (props.stageName === 'dev' || props.stageName === 'test') {
       const instance = new rds.DatabaseInstance(this, 'PostgresInstance', {

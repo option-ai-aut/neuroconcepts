@@ -160,6 +160,51 @@ app.use(async (req, res, next) => {
 
 app.use(helmet());
 
+// Protected database migration endpoint - creates tables if they don't exist
+// This is the only way to run migrations on Aurora in a private VPC
+app.post('/admin/db-migrate', async (req, res) => {
+  const secret = req.headers['x-admin-secret'];
+  if (!secret || secret !== process.env.ENCRYPTION_KEY) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  
+  try {
+    const db = prisma || (await initializePrisma());
+    
+    // Check if tables already exist
+    const tables = await db.$queryRaw<any[]>`SELECT tablename FROM pg_tables WHERE schemaname = 'public'`;
+    const tableNames = tables.map((t: any) => t.tablename);
+    
+    if (tableNames.includes('User')) {
+      return res.json({ message: 'Database already migrated', tables: tableNames });
+    }
+    
+    // Run migration SQL statements one by one
+    const migrationStatements = (req.body.sql as string).split(';').filter((s: string) => s.trim().length > 0);
+    
+    let executed = 0;
+    const errors: string[] = [];
+    
+    for (const statement of migrationStatements) {
+      try {
+        await db.$executeRawUnsafe(statement.trim());
+        executed++;
+      } catch (err: any) {
+        // Skip "already exists" errors
+        if (err.message?.includes('already exists')) {
+          continue;
+        }
+        errors.push(`Statement ${executed}: ${err.message}`);
+      }
+    }
+    
+    res.json({ success: true, executed, errors: errors.length > 0 ? errors : undefined });
+  } catch (error: any) {
+    console.error('Migration failed:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // CORS configuration - restrict to known origins in production
 const allowedOrigins = [
   'http://localhost:3000',  // Local frontend dev
