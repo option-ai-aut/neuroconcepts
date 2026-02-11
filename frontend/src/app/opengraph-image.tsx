@@ -19,33 +19,8 @@ export default async function OGImage() {
           justifyContent: 'center',
           fontFamily: 'system-ui, sans-serif',
           position: 'relative',
-          overflow: 'hidden',
         }}
       >
-        {/* Background decorations */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '-100px',
-            right: '-100px',
-            width: '400px',
-            height: '400px',
-            borderRadius: '50%',
-            background: 'rgba(255,255,255,0.05)',
-          }}
-        />
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '-150px',
-            left: '-150px',
-            width: '500px',
-            height: '500px',
-            borderRadius: '50%',
-            background: 'rgba(255,255,255,0.03)',
-          }}
-        />
-
         {/* Logo */}
         <div
           style={{
@@ -77,18 +52,34 @@ export default async function OGImage() {
         {/* Headline */}
         <div
           style={{
-            fontSize: '56px',
-            fontWeight: 800,
-            color: 'white',
-            textAlign: 'center',
-            lineHeight: 1.15,
-            maxWidth: '900px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
             marginBottom: '24px',
           }}
         >
-          Dein Büro arbeitet.
-          <br />
-          <span style={{ color: '#a5b4fc' }}>Du verdienst.</span>
+          <span
+            style={{
+              fontSize: '56px',
+              fontWeight: 800,
+              color: 'white',
+              textAlign: 'center',
+              lineHeight: 1.15,
+            }}
+          >
+            Dein Büro arbeitet.
+          </span>
+          <span
+            style={{
+              fontSize: '56px',
+              fontWeight: 800,
+              color: '#a5b4fc',
+              textAlign: 'center',
+              lineHeight: 1.15,
+            }}
+          >
+            Du verdienst.
+          </span>
         </div>
 
         {/* Subtitle */}
@@ -99,6 +90,7 @@ export default async function OGImage() {
             textAlign: 'center',
             maxWidth: '700px',
             lineHeight: 1.5,
+            display: 'flex',
           }}
         >
           Das erste KI-gesteuerte Betriebssystem für Immobilienmakler
@@ -116,28 +108,26 @@ export default async function OGImage() {
             border: '1px solid rgba(255,255,255,0.15)',
           }}
         >
-          {['KI-Assistent', 'CRM', 'Exposés', 'E-Mail', 'Kalender'].map((feature) => (
-            <div
-              key={feature}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                color: 'rgba(255,255,255,0.8)',
-                fontSize: '18px',
-              }}
-            >
-              <div
-                style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  background: '#34d399',
-                }}
-              />
-              {feature}
-            </div>
-          ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.8)', fontSize: '18px' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34d399', display: 'flex' }} />
+            <span>KI-Assistent</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.8)', fontSize: '18px' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34d399', display: 'flex' }} />
+            <span>CRM</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.8)', fontSize: '18px' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34d399', display: 'flex' }} />
+            <span>Exposés</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.8)', fontSize: '18px' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34d399', display: 'flex' }} />
+            <span>E-Mail</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.8)', fontSize: '18px' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34d399', display: 'flex' }} />
+            <span>Kalender</span>
+          </div>
         </div>
 
         {/* URL */}
@@ -147,6 +137,7 @@ export default async function OGImage() {
             bottom: '30px',
             color: 'rgba(255,255,255,0.4)',
             fontSize: '18px',
+            display: 'flex',
           }}
         >
           immivo.ai
