@@ -211,7 +211,7 @@ export default function LandingPage() {
               
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-8 sm:mb-12">
                 <Link 
-                  href="https://app.immivo.ai/login" 
+                  href="/login" 
                   className="group inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base font-semibold text-white bg-gradient-to-r from-indigo-600 to-violet-600 rounded-full hover:shadow-xl hover:shadow-indigo-500/30 transition-all hover:-translate-y-1"
                 >
                   14 Tage kostenlos testen
@@ -458,7 +458,7 @@ export default function LandingPage() {
               </div>
 
               <Link 
-                href="https://app.immivo.ai/login" 
+                href="/login" 
                 className="inline-flex items-center px-6 py-3 bg-white text-gray-900 rounded-full font-semibold hover:bg-gray-100 transition-all hover:-translate-y-1 shadow-lg"
               >
                 Jarvis kennenlernen
@@ -786,7 +786,7 @@ export default function LandingPage() {
               </div>
 
               <Link 
-                href="https://app.immivo.ai/login" 
+                href="/login" 
                 className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-fuchsia-500 to-pink-500 text-white rounded-full font-semibold hover:shadow-lg hover:shadow-fuchsia-500/30 transition-all hover:-translate-y-1"
               >
                 Jetzt ausprobieren
@@ -943,7 +943,7 @@ export default function LandingPage() {
           
           <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
             <Link 
-              href="https://app.immivo.ai/login" 
+              href="/login" 
               className="group inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-bold text-indigo-600 bg-white rounded-full hover:bg-gray-100 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1"
             >
               Jetzt kostenlos starten
