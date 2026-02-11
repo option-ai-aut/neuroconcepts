@@ -41,7 +41,7 @@ export interface EmailParseResult {
   error?: string;
 }
 
-const PARSE_PROMPT = `Du bist ein Email-Parser für Immobilien-Portale. Analysiere die folgende Email und extrahiere die Lead-Daten.
+const PARSE_PROMPT = `Du bist ein Email-Parser für Immobilien-Portale im DACH-Raum (Deutschland, Österreich, Schweiz). Analysiere die folgende Email und extrahiere die Lead-Daten.
 
 WICHTIG:
 1. Erkenne zuerst, ob die Email einen "Klick hier"-Link enthält, der geklickt werden muss, um die Daten zu sehen.
@@ -54,14 +54,36 @@ WICHTIG:
    - phone (Telefonnummer, falls vorhanden)
    - message (die Nachricht/Anfrage des Interessenten)
 
-3. Erkenne das Portal anhand von Absender oder Inhalt:
-   - ImmoScout24 (immobilienscout24.de)
-   - Immowelt (immowelt.de, immowelt.at)
-   - Willhaben (willhaben.at)
-   - Kleinanzeigen (kleinanzeigen.de, ebay-kleinanzeigen.de)
-   - Homegate (homegate.ch)
-   - ImmoScout24 CH (immoscout24.ch)
-   - Andere
+3. Erkenne das Portal anhand von Absender-Domain oder Inhalt. Unterstützte Portale:
+   DEUTSCHLAND:
+   - ImmobilienScout24 (immobilienscout24.de) - Absender: *@immobilienscout24.de
+   - Immowelt (immowelt.de) - Absender: *@immowelt.de
+   - Immonet (immonet.de) - Absender: *@immonet.de (gehört zu Immowelt)
+   - Kleinanzeigen (kleinanzeigen.de) - Absender: noreply-immobilien@mail.kleinanzeigen.de
+   - Kalaydo (kalaydo.de) - Absender: *@kalaydo.de
+   - Immozentral (immozentral.com) - Absender: *@immozentral.com
+   - Immopool (immopool.de) - Absender: *@immopool.de
+   - 1A Immobilien (1a-immobilienmarkt.de) - Absender: *@1a-immobilienmarkt.de
+   - IVD24 (ivd24immobilien.de) - Absender: *@ivd24immobilien.de, *@ivd24.de
+   - Neubau Kompass (neubaukompass.de) - Absender: *@neubaukompass.de
+   - SZ Immobilien (sueddeutsche.de) - Absender: *@sueddeutsche.de (Immobilien-Anfrage)
+   - FAZ Immobilien (faz.net) - Absender: *@faz.net (Immobilien-Anfrage)
+   - Welt Immobilien (welt.de) - Absender: *@welt.de (Immobilien-Anfrage)
+   
+   ÖSTERREICH:
+   - Willhaben (willhaben.at) - Absender: *@willhaben.at
+   - ImmobilienScout24 AT (immobilienscout24.at) - Absender: *@immobilienscout24.at
+   - Immmo.at (immmo.at) - Absender: *@immmo.at
+   - FindMyHome (findmyhome.at) - Absender: *@findmyhome.at
+   - Der Standard Immobilien (derstandard.at) - Absender: *@derstandard.at (Immobilien-Anfrage)
+   
+   SCHWEIZ:
+   - Homegate (homegate.ch) - Absender: *@homegate.ch
+   - ImmoScout24 CH (immoscout24.ch) - Absender: *@immoscout24.ch
+   - Comparis (comparis.ch) - Absender: *@comparis.ch
+   - Newhome (newhome.ch) - Absender: *@newhome.ch
+   - ImmoStreet (immostreet.ch) - Absender: *@immostreet.ch
+   - Flatfox (flatfox.ch) - Absender: *@flatfox.ch
 
 4. Extrahiere die Objekt-Referenz:
    - Portal-ID (z.B. "Scout-ID: 123456789", "Objekt-Nr: abc123")
@@ -158,26 +180,87 @@ ${content}
 }
 
 /**
- * Quick check if email is from a known portal
+ * Quick check if email is from a known portal (all 24 DACH portals)
  */
 export function isPortalEmail(from: string, subject: string): boolean {
-  const portalPatterns = [
-    'immobilienscout24',
+  // Domain patterns for all 24 supported portals
+  const portalDomainPatterns = [
+    // Deutschland (13)
+    'immobilienscout24.de',
+    'immowelt.de',
+    'immonet.de',
+    'kleinanzeigen.de',
+    'ebay-kleinanzeigen.de',
+    'kalaydo.de',
+    'immozentral.com',
+    'immopool.de',
+    '1a-immobilienmarkt.de',
+    'ivd24immobilien.de',
+    'ivd24.de',
+    'neubaukompass.de',
+    // Österreich (5)
+    'willhaben.at',
+    'immobilienscout24.at',
+    'immmo.at',
+    'findmyhome.at',
+    // Schweiz (6)
+    'homegate.ch',
+    'immoscout24.ch',
+    'comparis.ch',
+    'newhome.ch',
+    'immostreet.ch',
+    'flatfox.ch',
+  ];
+
+  // Subject/content patterns (for newspaper portals where domain may differ)
+  const subjectPatterns = [
+    'immobilienscout',
     'immoscout24',
     'immowelt',
     'willhaben',
     'kleinanzeigen',
-    'ebay-kleinanzeigen',
     'homegate',
     'comparis',
     'newhome',
     'immonet',
+    'kalaydo',
+    'immozentral',
+    'immopool',
+    'ivd24',
+    'neubaukompass',
+    'immostreet',
+    'flatfox',
+    'findmyhome',
+    // Newspaper portals - match by subject content (e.g. "Immobilien-Anfrage" from these)
+    'sueddeutsche.de',
+    'faz.net',
+    'welt.de',
+    'derstandard.at',
+    'immmo.at',
   ];
 
   const lowerFrom = from.toLowerCase();
   const lowerSubject = subject.toLowerCase();
 
-  return portalPatterns.some(
-    pattern => lowerFrom.includes(pattern) || lowerSubject.includes(pattern)
-  );
+  // Check if sender domain matches any portal
+  if (portalDomainPatterns.some(domain => lowerFrom.includes(domain))) {
+    return true;
+  }
+
+  // Check subject/content for portal indicators
+  if (subjectPatterns.some(pattern => lowerSubject.includes(pattern))) {
+    return true;
+  }
+
+  // Check for generic real estate inquiry patterns from newspaper portals
+  if (
+    (lowerFrom.includes('sueddeutsche.de') || lowerFrom.includes('faz.net') || 
+     lowerFrom.includes('welt.de') || lowerFrom.includes('derstandard.at')) &&
+    (lowerSubject.includes('immobili') || lowerSubject.includes('anfrage') || 
+     lowerSubject.includes('objekt') || lowerSubject.includes('inserat'))
+  ) {
+    return true;
+  }
+
+  return false;
 }
