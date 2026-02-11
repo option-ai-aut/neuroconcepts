@@ -140,7 +140,7 @@ ${content}
 `.trim();
 
     const response = await getOpenAI().chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5-mini',
       messages: [
         { role: 'system', content: PARSE_PROMPT },
         { role: 'user', content: emailContent }

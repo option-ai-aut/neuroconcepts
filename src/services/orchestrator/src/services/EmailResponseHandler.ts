@@ -201,7 +201,7 @@ Antworte im folgenden JSON-Format:
 
   try {
     const completion = await getOpenAI().chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5-mini',
       messages: [
         { role: 'system', content: 'Du bist ein präziser E-Mail-Analyse-Assistent. Antworte nur mit validem JSON.' },
         { role: 'user', content: prompt }
