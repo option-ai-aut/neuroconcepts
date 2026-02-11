@@ -3,7 +3,14 @@
 import { Amplify } from 'aws-amplify';
 import { Authenticator } from '@aws-amplify/ui-react';
 import { useEnv } from './EnvProvider';
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
+
+// Context to expose whether Amplify has been configured
+const AuthConfigContext = createContext<boolean>(false);
+
+export function useAuthConfigured() {
+  return useContext(AuthConfigContext);
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const config = useEnv();
@@ -26,13 +33,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Always render children - don't block the entire app.
   // Pages that need auth (login, dashboard) handle their own loading state.
   // Public pages (landing page, legal) render instantly.
-  if (!configured) {
-    return <>{children}</>;
-  }
-
   return (
-    <Authenticator.Provider>
-      {children}
-    </Authenticator.Provider>
+    <AuthConfigContext.Provider value={configured}>
+      {configured ? (
+        <Authenticator.Provider>
+          {children}
+        </Authenticator.Provider>
+      ) : (
+        <>{children}</>
+      )}
+    </AuthConfigContext.Provider>
   );
 }

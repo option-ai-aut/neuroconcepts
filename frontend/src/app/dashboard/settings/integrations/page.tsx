@@ -104,11 +104,15 @@ export default function IntegrationsSettingsPage() {
       } else if (provider === 'gmail') {
         setGmailConnected(true);
         if (email) setGmailEmail(decodeURIComponent(email));
-        setMessage({ type: 'success', text: 'Gmail erfolgreich verbunden!' });
+        setMessage({ type: 'success', text: 'Gmail erfolgreich verbunden! E-Mails werden synchronisiert...' });
+        // Trigger initial email sync after connecting
+        triggerEmailSync();
       } else if (provider === 'outlook-mail') {
         setOutlookMailConnected(true);
         if (email) setOutlookMailEmail(decodeURIComponent(email));
-        setMessage({ type: 'success', text: 'Outlook Mail erfolgreich verbunden!' });
+        setMessage({ type: 'success', text: 'Outlook Mail erfolgreich verbunden! E-Mails werden synchronisiert...' });
+        // Trigger initial email sync after connecting
+        triggerEmailSync();
       }
 
       // Clear URL params
@@ -205,6 +209,21 @@ export default function IntegrationsSettingsPage() {
     }
   };
 
+  // Trigger email sync after connecting a provider
+  const triggerEmailSync = async () => {
+    try {
+      const apiUrl = getApiUrl();
+      const headers = await getAuthHeaders();
+      await fetch(`${apiUrl}/emails/sync`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' }
+      });
+      console.log('📧 Email sync triggered after provider connect');
+    } catch (error) {
+      console.error('Error triggering email sync:', error);
+    }
+  };
+
   const handleSmtpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSmtpConfig({ ...smtpConfig, [e.target.name]: e.target.value });
   };
@@ -267,6 +286,9 @@ export default function IntegrationsSettingsPage() {
       if (response.ok) {
         const data = await response.json();
         window.location.href = data.authUrl;
+      } else if (response.status === 409) {
+        const data = await response.json();
+        setMessage({ type: 'error', text: data.error || 'Es ist bereits ein anderer E-Mail-Anbieter verbunden.' });
       } else {
         setMessage({ type: 'error', text: 'Fehler beim Starten der Authentifizierung' });
       }
@@ -393,8 +415,17 @@ export default function IntegrationsSettingsPage() {
           <h3 className="text-lg font-semibold text-gray-900">E-Mail</h3>
         </div>
 
+        {/* Info: Only one email provider at a time */}
+        {!gmailConnected && !outlookMailConnected && (
+          <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+            <p className="text-xs text-amber-700">
+              Du kannst nur einen E-Mail-Anbieter gleichzeitig verbinden. Wähle entweder Gmail oder Outlook.
+            </p>
+          </div>
+        )}
+
         {/* Gmail */}
-        <div className="flex items-center justify-between py-4 border-b border-gray-100">
+        <div className={`flex items-center justify-between py-4 border-b border-gray-100 ${outlookMailConnected ? 'opacity-50' : ''}`}>
           <div className="flex items-center gap-3">
             <svg viewBox="0 0 24 24" className="w-8 h-8">
               <path fill="#EA4335" d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/>
@@ -405,7 +436,11 @@ export default function IntegrationsSettingsPage() {
                 {gmailConnected && <Check className="w-4 h-4 text-green-500" />}
               </div>
               <div className="text-xs text-gray-500">
-                {gmailConnected ? `Verbunden als ${gmailEmail}` : 'E-Mails über Gmail senden und empfangen'}
+                {gmailConnected 
+                  ? `Verbunden als ${gmailEmail}` 
+                  : outlookMailConnected 
+                    ? 'Trenne zuerst Outlook, um Gmail zu nutzen'
+                    : 'E-Mails über Gmail senden und empfangen'}
               </div>
             </div>
           </div>
@@ -419,7 +454,8 @@ export default function IntegrationsSettingsPage() {
           ) : (
             <button
               onClick={() => handleConnectEmail('gmail')}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+              disabled={outlookMailConnected}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Verbinden
             </button>
@@ -427,7 +463,7 @@ export default function IntegrationsSettingsPage() {
         </div>
 
         {/* Outlook Mail */}
-        <div className="flex items-center justify-between py-4 border-b border-gray-100">
+        <div className={`flex items-center justify-between py-4 border-b border-gray-100 ${gmailConnected ? 'opacity-50' : ''}`}>
           <div className="flex items-center gap-3">
             <svg viewBox="0 0 24 24" className="w-8 h-8">
               <path fill="#0078D4" d="M24 7.387v10.478c0 .23-.08.424-.238.576-.158.152-.354.228-.586.228h-8.547v-6.959l1.2.914c.088.064.19.096.308.096.117 0 .22-.032.308-.096l7.317-5.478c.088-.064.158-.14.21-.228.053-.088.028-.176-.028-.264-.064-.088-.14-.14-.228-.14H14.63v-1.47c0-.23.076-.424.228-.576.152-.152.346-.228.576-.228h7.99c.23 0 .424.076.576.228.152.152.228.346.228.576v2.343zM14.63 19.478H.576c-.23 0-.424-.076-.576-.228C0 19.098 0 18.904 0 18.674V5.326c0-.23.076-.424.228-.576C.38 4.598.576 4.522.806 4.522h13.824v14.956zm-7.315-2.87c1.624 0 2.94-.476 3.948-1.428 1.008-.952 1.512-2.196 1.512-3.732 0-1.536-.504-2.78-1.512-3.732-1.008-.952-2.324-1.428-3.948-1.428-1.624 0-2.94.476-3.948 1.428C2.359 8.668 1.855 9.912 1.855 11.448c0 1.536.504 2.78 1.512 3.732 1.008.952 2.324 1.428 3.948 1.428zm0-1.764c-.952 0-1.708-.308-2.268-.924-.56-.616-.84-1.428-.84-2.436 0-1.008.28-1.82.84-2.436.56-.616 1.316-.924 2.268-.924.952 0 1.708.308 2.268.924.56.616.84 1.428.84 2.436 0 1.008-.28 1.82-.84 2.436-.56.616-1.316.924-2.268.924z"/>
@@ -438,7 +474,11 @@ export default function IntegrationsSettingsPage() {
                 {outlookMailConnected && <Check className="w-4 h-4 text-green-500" />}
               </div>
               <div className="text-xs text-gray-500">
-                {outlookMailConnected ? `Verbunden als ${outlookMailEmail}` : 'E-Mails über Outlook senden und empfangen'}
+                {outlookMailConnected 
+                  ? `Verbunden als ${outlookMailEmail}` 
+                  : gmailConnected 
+                    ? 'Trenne zuerst Gmail, um Outlook zu nutzen'
+                    : 'E-Mails über Outlook senden und empfangen'}
               </div>
             </div>
           </div>
@@ -452,7 +492,8 @@ export default function IntegrationsSettingsPage() {
           ) : (
             <button
               onClick={() => handleConnectEmail('outlook')}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+              disabled={gmailConnected}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Verbinden
             </button>

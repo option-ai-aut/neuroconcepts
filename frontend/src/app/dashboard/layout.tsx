@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import Sidebar from '@/components/Sidebar';
 import AiChatSidebar from '@/components/AiChatSidebar';
@@ -9,6 +9,7 @@ import GlobalDrawer from '@/components/GlobalDrawer';
 import ExposeEditor from '@/components/ExposeEditor';
 import PageHeader from '@/components/PageHeader';
 import { useGlobalState } from '@/context/GlobalStateContext';
+import { useAuthConfigured } from '@/components/AuthProvider';
 import { Loader2 } from 'lucide-react';
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
@@ -56,23 +57,30 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const authConfigured = useAuthConfigured();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
+    // Wait until Amplify is configured before checking auth
+    if (!authConfigured) return;
+
     const checkAuth = async () => {
       try {
         const session = await fetchAuthSession();
         if (session.tokens) {
           setIsAuthenticated(true);
         } else {
-          router.replace('/login');
+          const redirect = pathname && pathname !== '/dashboard' ? `?redirect=${encodeURIComponent(pathname)}` : '';
+          router.replace(`/login${redirect}`);
         }
       } catch {
-        router.replace('/login');
+        const redirect = pathname && pathname !== '/dashboard' ? `?redirect=${encodeURIComponent(pathname)}` : '';
+        router.replace(`/login${redirect}`);
       }
     };
     checkAuth();
-  }, [router]);
+  }, [router, pathname, authConfigured]);
 
   // Loading state
   if (isAuthenticated === null) {

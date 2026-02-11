@@ -259,17 +259,14 @@ export default function InboxPage() {
     { revalidateOnFocus: false }
   );
 
-  // Auto-sync on first load if no emails
+  // Auto-sync on first load to fetch latest emails from provider
+  const hasSyncedRef = useRef(false);
   useEffect(() => {
-    if (emailsData && emailsData.emails.length === 0 && !syncing) {
-      // Only auto-sync once per session
-      const hasAutoSynced = sessionStorage.getItem('inbox-auto-synced');
-      if (!hasAutoSynced) {
-        sessionStorage.setItem('inbox-auto-synced', 'true');
-        handleSync();
-      }
+    if (apiUrl && !syncing && !hasSyncedRef.current) {
+      hasSyncedRef.current = true;
+      handleSync();
     }
-  }, [emailsData]);
+  }, [apiUrl]);
 
   const emails = emailsData?.emails || [];
   const unreadCounts = emailsData?.unreadCounts || {};

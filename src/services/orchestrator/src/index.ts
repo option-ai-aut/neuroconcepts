@@ -4270,8 +4270,19 @@ import { EmailService } from './services/EmailService';
 // Gmail: Get Auth URL
 app.get('/email/gmail/auth-url', authMiddleware, async (req: any, res) => {
   try {
-    // Pass user email as state so callback can save tokens server-side
     const userEmail = req.user!.email;
+    
+    // Check if Outlook is already connected - only one email provider at a time
+    const db = prisma || (await initializePrisma());
+    const user = await db.user.findUnique({ where: { email: userEmail }, select: { tenantId: true } });
+    if (user) {
+      const settings = await db.tenantSettings.findUnique({ where: { tenantId: user.tenantId } });
+      if (settings?.outlookMailConfig) {
+        return res.status(409).json({ error: 'Outlook ist bereits verbunden. Trenne zuerst Outlook, um Gmail zu nutzen.' });
+      }
+    }
+    
+    // Pass user email as state so callback can save tokens server-side
     const state = Buffer.from(JSON.stringify({ email: userEmail })).toString('base64url');
     const authUrl = EmailService.getGmailAuthUrl(state);
     res.json({ authUrl });
@@ -4316,9 +4327,10 @@ app.get('/email/gmail/callback', async (req, res) => {
             email: tokens.email
           };
           
+          // Save Gmail config and clear Outlook config (only one provider at a time)
           await db.tenantSettings.upsert({
             where: { tenantId: user.tenantId },
-            update: { gmailConfig: encryptedConfig as any },
+            update: { gmailConfig: encryptedConfig as any, outlookMailConfig: Prisma.DbNull },
             create: { tenantId: user.tenantId, gmailConfig: encryptedConfig as any }
           });
           
@@ -4424,6 +4436,17 @@ app.post('/email/gmail/disconnect', authMiddleware, async (req, res) => {
 app.get('/email/outlook/auth-url', authMiddleware, async (req: any, res) => {
   try {
     const userEmail = req.user!.email;
+    
+    // Check if Gmail is already connected - only one email provider at a time
+    const db = prisma || (await initializePrisma());
+    const user = await db.user.findUnique({ where: { email: userEmail }, select: { tenantId: true } });
+    if (user) {
+      const settings = await db.tenantSettings.findUnique({ where: { tenantId: user.tenantId } });
+      if (settings?.gmailConfig) {
+        return res.status(409).json({ error: 'Gmail ist bereits verbunden. Trenne zuerst Gmail, um Outlook zu nutzen.' });
+      }
+    }
+    
     const state = Buffer.from(JSON.stringify({ email: userEmail })).toString('base64url');
     const authUrl = await EmailService.getOutlookMailAuthUrl(state);
     res.json({ authUrl });
@@ -4468,9 +4491,10 @@ app.get('/email/outlook/callback', async (req, res) => {
             email: tokens.email
           };
 
+          // Save Outlook config and clear Gmail config (only one provider at a time)
           await db.tenantSettings.upsert({
             where: { tenantId: user.tenantId },
-            update: { outlookMailConfig: encryptedConfig as any },
+            update: { outlookMailConfig: encryptedConfig as any, gmailConfig: Prisma.DbNull },
             create: { tenantId: user.tenantId, outlookMailConfig: encryptedConfig as any }
           });
 
