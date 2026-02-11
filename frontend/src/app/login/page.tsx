@@ -359,17 +359,42 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-white">
       {/* Left Side - Image/Brand */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-gray-900 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-800 z-10" />
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-40" />
+      <div className="hidden lg:flex lg:w-1/2 relative bg-black overflow-hidden">
+        <div className="absolute inset-0 bg-black z-10" />
         
+        <style jsx>{`
+          @keyframes login-particle {
+            0% { transform: translate(-50%, -50%) rotate(var(--angle)) translateX(0px); opacity: 0; }
+            10% { opacity: 0.5; }
+            50% { opacity: 0.2; }
+            100% { transform: translate(-50%, -50%) rotate(var(--angle)) translateX(var(--dist)); opacity: 0; }
+          }
+        `}</style>
         <div className="relative z-20 flex flex-col justify-between h-full p-12 text-white">
-          <div>
-            <Image src="/logo-white.png" alt="Immivo" width={140} height={38} className="h-9 w-auto" />
-          </div>
+          <div />
           
-          <div className="max-w-md">
-            <h2 className="text-4xl font-bold">
+          <div className="flex flex-col items-center justify-center">
+            <div className="relative mb-10">
+              {/* Particles */}
+              {Array.from({ length: 16 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute rounded-full bg-white"
+                  style={{
+                    width: `${2 + (i % 3)}px`,
+                    height: `${2 + (i % 3)}px`,
+                    left: '50%',
+                    top: '50%',
+                    opacity: 0,
+                    ['--angle' as string]: `${(i / 16) * 360}deg`,
+                    ['--dist' as string]: `${120 + (i % 4) * 30}px`,
+                    animation: `login-particle ${3 + (i % 5) * 0.6}s ease-out ${i * 0.35}s infinite`,
+                  }}
+                />
+              ))}
+              <Image src="/logo-icon-only.png" alt="Immivo" width={240} height={240} className="relative z-10 drop-shadow-[0_0_60px_rgba(255,255,255,0.15)]" />
+            </div>
+            <h2 className="text-4xl font-bold text-center">
               {view === 'signUp' || view === 'confirmSignUp' ? 'Willkommen.' : 'Willkommen zurück.'}
             </h2>
           </div>
@@ -558,7 +583,7 @@ export default function LoginPage() {
                     <select
                       value={dialCode}
                       onChange={(e) => setDialCode(e.target.value)}
-                      className="w-24 px-3 py-3 border border-gray-300 border-r-0 rounded-l-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-[76px] pl-3 pr-0 py-3 border border-gray-300 border-r-0 rounded-l-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2210%22%20height%3D%226%22%20viewBox%3D%220%200%2010%206%22%3E%3Cpath%20d%3D%22M0%200l5%206%205-6z%22%20fill%3D%22%239ca3af%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_6px_center] bg-[length:10px_6px]"
                     >
                       {COUNTRIES.map((c) => (
                         <option key={c.code} value={c.dialCode}>

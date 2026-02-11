@@ -158,6 +158,22 @@ export default function LandingPage() {
         .animation-delay-200 { animation-delay: 0.2s; }
         .animation-delay-400 { animation-delay: 0.4s; }
         .animation-delay-600 { animation-delay: 0.6s; }
+        @keyframes particle-out {
+          0% {
+            transform: translate(-50%, -50%) rotate(var(--particle-angle)) translateX(0px);
+            opacity: 0;
+          }
+          10% {
+            opacity: 0.6;
+          }
+          50% {
+            opacity: 0.3;
+          }
+          100% {
+            transform: translate(-50%, -50%) rotate(var(--particle-angle)) translateX(var(--particle-distance));
+            opacity: 0;
+          }
+        }
       `}</style>
 
       {/* Navigation */}
@@ -484,57 +500,42 @@ export default function LandingPage() {
                 ))}
               </div>
 
-              {/* Desktop: Orbit Visualization */}
-              <div className="hidden lg:flex relative items-center justify-center">
-                <div className="w-40 h-40 flex items-center justify-center animate-pulse-glow z-10">
-                  <NextImage src="/logo-icon.png" alt="Jarvis" width={140} height={140} className="rounded-3xl" />
-                </div>
-                
-                {/* Orbiting Capabilities - pre-calculated positions to avoid hydration mismatch */}
-                {[
-                  { icon: Mail, label: 'E-Mails', x: 140, y: 0 },
-                  { icon: Calendar, label: 'Termine', x: 70, y: 121 },
-                  { icon: FileText, label: 'Exposés', x: -70, y: 121 },
-                  { icon: Users, label: 'Leads', x: -140, y: 0 },
-                  { icon: Building2, label: 'Objekte', x: -70, y: -121 },
-                  { icon: MessageSquare, label: 'Chat', x: 70, y: -121 },
-                ].map((item, i) => (
-                  <div
-                    key={i}
-                    className={`absolute w-16 h-16 bg-white/10 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center border border-white/20 hover:bg-white/20 transition-all cursor-pointer group animate-float`}
-                    style={{ 
-                      transform: `translate(${item.x}px, ${item.y}px)`,
-                      animationDuration: `${3 + i * 0.5}s`,
-                      animationDelay: `${i * 0.3}s`,
-                    }}
-                  >
-                    <item.icon className="w-6 h-6 text-white mb-1 group-hover:scale-110 transition-transform" />
-                    <span className="text-[10px] text-gray-300">{item.label}</span>
-                  </div>
-                ))}
-
-                {/* Connection Lines */}
-                <svg className="absolute inset-0 w-full h-full" style={{ transform: 'translate(50%, 50%)' }}>
-                  {[
-                    { x: 140, y: 0 },
-                    { x: 70, y: 121 },
-                    { x: -70, y: 121 },
-                    { x: -140, y: 0 },
-                    { x: -70, y: -121 },
-                    { x: 70, y: -121 },
-                  ].map((pos, i) => (
-                    <line
+              {/* Desktop: Logo with Particles */}
+              <div className="hidden lg:flex relative items-center justify-center h-[360px]">
+                {/* Particles shooting outward */}
+                {Array.from({ length: 20 }).map((_, i) => {
+                  const angle = (i / 20) * 360;
+                  const delay = i * 0.4;
+                  const duration = 3 + (i % 5) * 0.8;
+                  const distance = 140 + (i % 4) * 40;
+                  const size = 2 + (i % 3);
+                  return (
+                    <div
                       key={i}
-                      x1="0"
-                      y1="0"
-                      x2={pos.x}
-                      y2={pos.y}
-                      stroke="rgba(255,255,255,0.1)"
-                      strokeWidth="1"
-                      strokeDasharray="4 4"
+                      className="absolute rounded-full bg-white"
+                      style={{
+                        width: `${size}px`,
+                        height: `${size}px`,
+                        left: '50%',
+                        top: '50%',
+                        opacity: 0,
+                        animation: `particle-out ${duration}s ease-out ${delay}s infinite`,
+                        ['--particle-angle' as string]: `${angle}deg`,
+                        ['--particle-distance' as string]: `${distance}px`,
+                      }}
                     />
-                  ))}
-                </svg>
+                  );
+                })}
+
+                {/* Main Logo */}
+                <NextImage 
+                  src="/logo-icon-only.png" 
+                  alt="Jarvis" 
+                  width={280} 
+                  height={280} 
+                  className="relative z-10 drop-shadow-[0_0_80px_rgba(255,255,255,0.15)]"
+                  priority
+                />
               </div>
             </div>
           </div>

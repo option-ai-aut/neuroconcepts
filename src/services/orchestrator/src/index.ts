@@ -305,41 +305,55 @@ app.use(cors({
 app.use(morgan('combined'));
 app.use(express.json({ limit: '20mb' }));
 
-// Multer setup for file uploads
-// In Lambda, use /tmp (the only writable directory)
-// Locally, use ./uploads relative to project
+// Multer setup for file uploads (memory storage for S3 upload)
 const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
-const uploadDir = isLambda ? '/tmp/uploads' : path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+const MEDIA_BUCKET = process.env.MEDIA_BUCKET_NAME || '';
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  }
-});
-
+// Use memory storage — files go to S3, not disk
 const upload = multer({ 
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
+    if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf' || file.mimetype.startsWith('application/')) {
       cb(null, true);
     } else {
-      cb(new Error('Nur Bilder erlaubt'));
+      cb(new Error('Dateityp nicht erlaubt'));
     }
   }
 });
 
-// Serve uploaded files - Note: In production, use signed URLs from S3
-// For now, files are publicly accessible if you know the URL
-// This is acceptable for property images which are meant to be shared
-app.use('/uploads', express.static(uploadDir));
+// S3 helper: upload buffer to S3 and return public URL
+const s3Client = new AWS.S3();
+async function uploadToS3(buffer: Buffer, filename: string, contentType: string, folder: string): Promise<string> {
+  const key = `${folder}/${filename}`;
+  
+  if (MEDIA_BUCKET) {
+    await s3Client.putObject({
+      Bucket: MEDIA_BUCKET,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    }).promise();
+    
+    // Return public S3 URL
+    return `https://${MEDIA_BUCKET}.s3.amazonaws.com/${key}`;
+  }
+  
+  // Fallback for local dev without S3: save to disk
+  const uploadDir = path.join(__dirname, '../uploads', folder);
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+  fs.writeFileSync(path.join(uploadDir, filename), buffer);
+  return `/uploads/${folder}/${filename}`;
+}
+
+// Serve uploaded files (local dev fallback only)
+const localUploadDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(localUploadDir)) {
+  fs.mkdirSync(localUploadDir, { recursive: true });
+}
+app.use('/uploads', express.static(localUploadDir));
 
 // --- Auth & User Management ---
 
@@ -1519,8 +1533,14 @@ app.post('/properties/:id/images', authMiddleware, upload.array('images', 10), a
       return res.status(404).json({ error: 'Property nicht gefunden' });
     }
 
-    // Generate URLs (for local dev, use relative paths)
-    const imageUrls = files.map(f => `/uploads/${f.filename}`);
+    // Upload to S3 (or local fallback)
+    const folder = `properties/${currentUser.tenantId}/${id}/${isFloorplan ? 'floorplans' : 'images'}`;
+    const imageUrls = await Promise.all(
+      files.map(async (f) => {
+        const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(f.originalname)}`;
+        return uploadToS3(f.buffer, uniqueName, f.mimetype, folder);
+      })
+    );
 
     // Add new images to existing ones (either images or floorplans)
     const arrayField = isFloorplan ? 'floorplans' : 'images';
@@ -1564,8 +1584,15 @@ app.delete('/properties/:id/images', authMiddleware, async (req, res) => {
       data: { [arrayField]: updatedArray }
     });
 
-    // Delete file from disk (if local)
-    if (imageUrl.startsWith('/uploads/')) {
+    // Delete file from S3 or disk
+    if (imageUrl.includes('.s3.amazonaws.com/') && MEDIA_BUCKET) {
+      try {
+        const key = imageUrl.split('.s3.amazonaws.com/')[1];
+        await s3Client.deleteObject({ Bucket: MEDIA_BUCKET, Key: key }).promise();
+      } catch (e) {
+        console.error('S3 delete error:', e);
+      }
+    } else if (imageUrl.startsWith('/uploads/')) {
       const filePath = path.join(__dirname, '..', imageUrl);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
@@ -1607,14 +1634,19 @@ app.post('/properties/:id/documents', authMiddleware, upload.array('documents', 
     const property = await prisma.property.findFirst({ where: { id, tenantId: currentUser.tenantId } });
     if (!property) return res.status(404).json({ error: 'Property nicht gefunden' });
 
-    // Create document entries
-    const newDocs: Document[] = files.map(f => ({
-      id: Math.random().toString(36).substr(2, 9),
-      name: f.originalname,
-      url: `/uploads/${f.filename}`,
-      type: f.mimetype,
-      size: f.size,
-      uploadedAt: new Date().toISOString()
+    // Upload to S3 and create document entries
+    const folder = `documents/${currentUser.tenantId}/${id}`;
+    const newDocs: Document[] = await Promise.all(files.map(async (f) => {
+      const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(f.originalname)}`;
+      const url = await uploadToS3(f.buffer, uniqueName, f.mimetype, folder);
+      return {
+        id: Math.random().toString(36).substr(2, 9),
+        name: f.originalname,
+        url,
+        type: f.mimetype,
+        size: f.size,
+        uploadedAt: new Date().toISOString()
+      };
     }));
 
     // Merge with existing documents
@@ -1659,12 +1691,15 @@ app.delete('/properties/:id/documents', authMiddleware, async (req, res) => {
       data: { documents: updatedDocs as unknown as Prisma.InputJsonValue }
     });
 
-    // Delete file from disk
-    if (docToDelete.url.startsWith('/uploads/')) {
+    // Delete file from S3 or disk
+    if (docToDelete.url.includes('.s3.amazonaws.com/') && MEDIA_BUCKET) {
+      try {
+        const key = docToDelete.url.split('.s3.amazonaws.com/')[1];
+        await s3Client.deleteObject({ Bucket: MEDIA_BUCKET, Key: key }).promise();
+      } catch (e) { console.error('S3 delete error:', e); }
+    } else if (docToDelete.url.startsWith('/uploads/')) {
       const filePath = path.join(__dirname, '..', docToDelete.url);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
     }
 
     res.json({ success: true });
@@ -1690,14 +1725,19 @@ app.post('/leads/:id/documents', authMiddleware, upload.array('documents', 20), 
     const lead = await prisma.lead.findFirst({ where: { id, tenantId: currentUser.tenantId } });
     if (!lead) return res.status(404).json({ error: 'Lead nicht gefunden' });
 
-    // Create document entries
-    const newDocs: Document[] = files.map(f => ({
-      id: Math.random().toString(36).substr(2, 9),
-      name: f.originalname,
-      url: `/uploads/${f.filename}`,
-      type: f.mimetype,
-      size: f.size,
-      uploadedAt: new Date().toISOString()
+    // Upload to S3 and create document entries
+    const folder = `lead-documents/${currentUser.tenantId}/${id}`;
+    const newDocs: Document[] = await Promise.all(files.map(async (f) => {
+      const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(f.originalname)}`;
+      const url = await uploadToS3(f.buffer, uniqueName, f.mimetype, folder);
+      return {
+        id: Math.random().toString(36).substr(2, 9),
+        name: f.originalname,
+        url,
+        type: f.mimetype,
+        size: f.size,
+        uploadedAt: new Date().toISOString()
+      };
     }));
 
     // Merge with existing documents
@@ -1742,17 +1782,20 @@ app.delete('/leads/:id/documents', authMiddleware, async (req, res) => {
       data: { documents: updatedDocs as unknown as Prisma.InputJsonValue }
     });
 
-    // Delete file from disk
-    if (docToDelete.url.startsWith('/uploads/')) {
+    // Delete file from S3 or disk
+    if (docToDelete.url.includes('.s3.amazonaws.com/') && MEDIA_BUCKET) {
+      try {
+        const key = docToDelete.url.split('.s3.amazonaws.com/')[1];
+        await s3Client.deleteObject({ Bucket: MEDIA_BUCKET, Key: key }).promise();
+      } catch (e) { console.error('S3 delete error:', e); }
+    } else if (docToDelete.url.startsWith('/uploads/')) {
       const filePath = path.join(__dirname, '..', docToDelete.url);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
     }
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Document delete error:', error);
+    console.error('Lead document delete error:', error);
     res.status(500).json({ error: 'Löschen fehlgeschlagen' });
   }
 });
@@ -2715,15 +2758,20 @@ app.post('/chat/stream',
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      // Process uploaded files - store them temporarily and create context
+      // Process uploaded files - upload to S3 and create context
       let fileContext = '';
       const uploadedFileUrls: string[] = [];
       if (files && files.length > 0) {
-        const fileInfos = files.map(f => ({
-          name: f.originalname,
-          type: f.mimetype,
-          size: f.size,
-          url: `/uploads/${f.filename}`
+        const folder = `chat-uploads/${currentUser.tenantId}/${currentUser.id}`;
+        const fileInfos = await Promise.all(files.map(async (f) => {
+          const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(f.originalname)}`;
+          const url = await uploadToS3(f.buffer, uniqueName, f.mimetype, folder);
+          return {
+            name: f.originalname,
+            type: f.mimetype,
+            size: f.size,
+            url
+          };
         }));
         uploadedFileUrls.push(...fileInfos.map(f => f.url));
         

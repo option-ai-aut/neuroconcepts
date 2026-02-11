@@ -240,6 +240,37 @@ export class ImmivoStack extends cdk.Stack {
       },
     });
 
+    // --- Media Upload Bucket (Property Images, Floorplans, Documents) ---
+    const mediaBucket = new s3.Bucket(this, 'MediaBucket', {
+      versioned: false,
+      removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
+      autoDeleteObjects: props.stageName === 'dev',
+      blockPublicAccess: new s3.BlockPublicAccess({
+        blockPublicAcls: false,
+        ignorePublicAcls: false,
+        blockPublicPolicy: false,
+        restrictPublicBuckets: false,
+      }),
+      cors: [{
+        allowedMethods: [s3.HttpMethod.GET],
+        allowedOrigins: ['*'],
+        allowedHeaders: ['*'],
+      }],
+    });
+
+    // Allow public read access for media files
+    mediaBucket.addToResourcePolicy(new cdk.aws_iam.PolicyStatement({
+      actions: ['s3:GetObject'],
+      resources: [mediaBucket.arnForObjects('*')],
+      principals: [new cdk.aws_iam.StarPrincipal()],
+    }));
+
+    // Grant orchestrator Lambda read/write access to the media bucket
+    mediaBucket.grantReadWrite(orchestratorLambda);
+
+    // Add bucket name to orchestrator Lambda environment
+    orchestratorLambda.addEnvironment('MEDIA_BUCKET_NAME', mediaBucket.bucketName);
+
     this.dbSecret.grantRead(orchestratorLambda);
     appSecret.grantRead(orchestratorLambda);
     
@@ -325,6 +356,7 @@ export class ImmivoStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'VpcId', { value: this.vpc.vpcId });
     new cdk.CfnOutput(this, 'DBEndpoint', { value: this.dbEndpoint });
     new cdk.CfnOutput(this, 'EmailBucketName', { value: emailBucket.bucketName });
+    new cdk.CfnOutput(this, 'MediaBucketName', { value: mediaBucket.bucketName });
     new cdk.CfnOutput(this, 'OrchestratorApiUrl', { value: api.url });
     new cdk.CfnOutput(this, 'FrontendUrl', { value: frontendUrl.url });
     new cdk.CfnOutput(this, 'UserPoolId', { value: this.userPool.userPoolId });

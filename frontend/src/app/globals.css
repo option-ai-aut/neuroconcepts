@@ -266,6 +266,16 @@ body {
   }
 }
 
+@keyframes typewriter {
+  from { width: 0ch; }
+  to { width: 6ch; }
+}
+
+@keyframes blink-caret {
+  from, to { border-color: transparent; }
+  50% { border-color: rgba(255,255,255,0.7); }
+}
+
 @keyframes float-rotate {
   0% {
     transform: translateY(0px) rotate(0deg);
