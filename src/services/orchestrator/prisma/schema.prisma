@@ -753,10 +753,11 @@ model PortalSyncLog {
 }
 
 enum PortalConnectionType {
-  OPENIMMO_FTP    // Standard: OpenImmo XML via FTP
+  OPENIMMO_FTP    // Standard DE/AT: OpenImmo XML via FTP
   OPENIMMO_SFTP   // OpenImmo XML via SFTP
-  REST_API        // Direct REST API (z.B. ImmoScout24)
-  SOAP_API        // SOAP API (z.B. Immowelt)
+  REST_API        // Direct REST API (z.B. ImmoScout24 DE, Flatfox CH)
+  IDX             // Standard CH: IDX 3.01 (Homegate, ImmoScout24 CH, Comparis, Newhome, ImmoStreet)
+  SOAP_API        // SOAP API
   CSV_FTP         // CSV via FTP
 }
 

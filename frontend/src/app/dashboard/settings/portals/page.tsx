@@ -148,6 +148,20 @@ export default function PortalsSettingsPage() {
         autoSyncEnabled: connection?.autoSyncEnabled || false,
         autoSyncInterval: connection?.autoSyncInterval || 24
       });
+    } else if (portal.connectionType === 'IDX') {
+      // Swiss IDX 3.01 standard - uses FTP with IDX files
+      setFormData({
+        ftpHost: connection?.ftpHost || portal.defaultFtpHost || '',
+        ftpPort: connection?.ftpPort || 21,
+        ftpUsername: connection?.ftpUsername || '',
+        ftpPassword: connection?.ftpPassword || '',
+        ftpPath: connection?.ftpPath || '/',
+        useSftp: connection?.useSftp || false,
+        providerId: connection?.providerId || '',
+        isEnabled: connection?.isEnabled ?? true,
+        autoSyncEnabled: connection?.autoSyncEnabled || false,
+        autoSyncInterval: connection?.autoSyncInterval || 24
+      });
     } else {
       setFormData({
         ftpHost: connection?.ftpHost || portal.defaultFtpHost || '',
@@ -269,7 +283,7 @@ export default function PortalsSettingsPage() {
 
   const totalConnected = portals.filter(p => {
     const effective = getEffectiveConnection(p.id);
-    return effective?.isEnabled && effective?.ftpUsername;
+    return effective?.isEnabled && (effective?.ftpUsername || effective?.apiKey);
   }).length;
 
   const totalAutoSync = [...tenantConnections, ...userConnections].filter(c => c.autoSyncEnabled).length;
@@ -332,7 +346,7 @@ export default function PortalsSettingsPage() {
               const tenantConn = getTenantConnection(portal.id);
               const userConn = getUserConnection(portal.id);
               const effectiveConn = getEffectiveConnection(portal.id);
-              const isConnected = effectiveConn?.isEnabled && effectiveConn?.ftpUsername;
+              const isConnected = effectiveConn?.isEnabled && (effectiveConn?.ftpUsername || effectiveConn?.apiKey);
               const isEditing = editingPortal === portal.id;
               const hasUserConn = !!userConn;
               
@@ -381,7 +395,8 @@ export default function PortalsSettingsPage() {
                         </div>
                         <div className="text-xs text-gray-500">
                           {portal.connectionType === 'OPENIMMO_FTP' ? 'OpenImmo + FTP' : 
-                           portal.connectionType === 'REST_API' ? 'REST API' : portal.connectionType}
+                           portal.connectionType === 'REST_API' ? 'REST API' :
+                           portal.connectionType === 'IDX' ? 'IDX 3.01' : portal.connectionType}
                         </div>
                       </div>
                     </div>
@@ -446,7 +461,8 @@ export default function PortalsSettingsPage() {
                             <div className="text-sm font-medium text-gray-900">Eigener Account</div>
                             <div className="text-xs text-gray-500">
                               {userConn ? 'Deine persönliche Verbindung' : 
-                               portal.connectionType === 'REST_API' ? 'Eigene API-Zugangsdaten nutzen' : 'Eigene FTP-Zugangsdaten nutzen'}
+                               portal.connectionType === 'REST_API' ? 'Eigene API-Zugangsdaten nutzen' :
+                               portal.connectionType === 'IDX' ? 'Eigene IDX-Zugangsdaten nutzen' : 'Eigene FTP-Zugangsdaten nutzen'}
                             </div>
                           </div>
                         </button>
@@ -455,7 +471,7 @@ export default function PortalsSettingsPage() {
                       {/* Connection Form */}
                       <div className="space-y-4 pt-4 border-t border-gray-200">
                         {portal.connectionType === 'REST_API' ? (
-                          // API Form
+                          // API Form (ImmoScout24 DE, Flatfox CH)
                           <>
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">API Key</label>
@@ -463,7 +479,7 @@ export default function PortalsSettingsPage() {
                                 type="text"
                                 value={formData.apiKey || ''}
                                 onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
-                                placeholder="Dein API Key von ImmobilienScout24"
+                                placeholder={portal.slug === 'flatfox' ? 'Dein API Key von Flatfox' : 'Dein API Key von ImmobilienScout24'}
                                 className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                               />
                             </div>
@@ -500,11 +516,106 @@ export default function PortalsSettingsPage() {
                             </div>
                             
                             <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-800">
-                              <strong>Hinweis:</strong> Du findest deine API-Zugangsdaten im ImmobilienScout24 Partner-Portal unter "Einstellungen" → "API-Zugang".
+                              {portal.slug === 'flatfox' ? (
+                                <><strong>Hinweis:</strong> Du findest deine API-Zugangsdaten unter <a href="https://flatfox.ch/en/docs/" target="_blank" rel="noopener noreferrer" className="underline">flatfox.ch/docs</a> im Business-Bereich.</>
+                              ) : (
+                                <><strong>Hinweis:</strong> Du findest deine API-Zugangsdaten im ImmobilienScout24 Partner-Portal unter &quot;Einstellungen&quot; → &quot;API-Zugang&quot;.</>
+                              )}
+                            </div>
+                          </>
+                        ) : portal.connectionType === 'IDX' ? (
+                          // IDX Form (Swiss portals: Homegate, ImmoScout24 CH, Comparis, Newhome, ImmoStreet)
+                          <>
+                            <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-800 mb-2">
+                              <strong>IDX 3.01</strong> — Schweizer Standard für den Immobilien-Datenaustausch. Die Zugangsdaten erhältst du direkt vom Portal oder über deine Maklersoftware (z.B. CASAONE, Immomig, RealForce).
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">FTP Host</label>
+                                <input
+                                  type="text"
+                                  value={formData.ftpHost || ''}
+                                  onChange={(e) => setFormData({ ...formData, ftpHost: e.target.value })}
+                                  placeholder="z.B. ftp.homegate.ch"
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Port</label>
+                                <input
+                                  type="number"
+                                  value={formData.ftpPort || 21}
+                                  onChange={(e) => setFormData({ ...formData, ftpPort: parseInt(e.target.value) })}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Benutzername</label>
+                                <input
+                                  type="text"
+                                  value={formData.ftpUsername || ''}
+                                  onChange={(e) => setFormData({ ...formData, ftpUsername: e.target.value })}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Passwort</label>
+                                <div className="relative">
+                                  <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={formData.ftpPassword || ''}
+                                    onChange={(e) => setFormData({ ...formData, ftpPassword: e.target.value })}
+                                    className="w-full px-3 py-2 pr-10 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                  >
+                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Verzeichnis</label>
+                                <input
+                                  type="text"
+                                  value={formData.ftpPath || '/'}
+                                  onChange={(e) => setFormData({ ...formData, ftpPath: e.target.value })}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Anbieternummer / Kunden-ID</label>
+                                <input
+                                  type="text"
+                                  value={formData.providerId || ''}
+                                  onChange={(e) => setFormData({ ...formData, providerId: e.target.value })}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-6">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={formData.useSftp || false}
+                                  onChange={(e) => setFormData({ ...formData, useSftp: e.target.checked })}
+                                  className="w-4 h-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <span className="text-sm text-gray-700">SFTP verwenden</span>
+                              </label>
                             </div>
                           </>
                         ) : (
-                          // FTP Form
+                          // OpenImmo FTP Form (DE/AT standard)
                           <>
                             <div className="grid grid-cols-2 gap-4">
                               <div>
@@ -677,10 +788,14 @@ export default function PortalsSettingsPage() {
       
       {/* Info Box */}
       {isAdmin ? (
-        <div className="bg-blue-50 rounded-xl p-4 text-sm text-blue-800">
-          <strong>Hinweis:</strong> Die Zugangsdaten erhältst du direkt vom jeweiligen Portal nach der Registrierung als gewerblicher Anbieter.
-          Die meisten Portale nutzen den OpenImmo-Standard mit FTP für den automatischen Datenimport. 
-          ImmobilienScout24 nutzt eine REST API mit API Key und Secret.
+        <div className="bg-blue-50 rounded-xl p-4 text-sm text-blue-800 space-y-1">
+          <strong>Schnittstellen-Übersicht:</strong>
+          <ul className="list-disc list-inside ml-1 space-y-0.5">
+            <li><strong>Deutschland & Österreich:</strong> OpenImmo XML + FTP — Branchenstandard. Zugangsdaten vom Portal nach gewerblicher Registrierung.</li>
+            <li><strong>Schweiz:</strong> IDX 3.01 — Schweizer Standard. Zugangsdaten über Maklersoftware (CASAONE, Immomig, RealForce) oder direkt vom Portal.</li>
+            <li><strong>ImmobilienScout24 DE:</strong> REST API — API Key & Secret im Partner-Portal unter „Einstellungen".</li>
+            <li><strong>Flatfox CH:</strong> REST API — Eigene API-Dokumentation unter flatfox.ch/docs.</li>
+          </ul>
         </div>
       ) : (
         <div className="bg-amber-50 rounded-xl p-4 text-sm text-amber-800">

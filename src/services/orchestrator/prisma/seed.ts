@@ -68,9 +68,14 @@ async function main() {
   console.log('Created Template');
 
   // 5. Seed Portals (DACH Region)
+  // Connection types researched per portal:
+  // - DE/AT: OpenImmo XML via FTP (Branchenstandard DACH)
+  // - CH: IDX 3.01 (Schweizer Standard)
+  // - REST API: ImmoScout24 DE, Flatfox CH
   const portals = [
-    // Deutschland
-    { name: 'Immowelt', slug: 'immowelt', country: 'DE', websiteUrl: 'https://www.immowelt.de', defaultFtpHost: 'ftp.immowelt.de', connectionType: 'OPENIMMO_FTP' },
+    // Deutschland (13) - OpenImmo FTP except ImmoScout24 (REST API)
+    { name: 'ImmobilienScout24', slug: 'immoscout24-de', country: 'DE', websiteUrl: 'https://www.immobilienscout24.de', connectionType: 'REST_API', isPremium: true },
+    { name: 'Immowelt', slug: 'immowelt', country: 'DE', websiteUrl: 'https://www.immowelt.de', defaultFtpHost: 'ftp2.immowelt.net', connectionType: 'OPENIMMO_FTP' },
     { name: 'Immonet', slug: 'immonet', country: 'DE', websiteUrl: 'https://www.immonet.de', defaultFtpHost: 'ftp.immonet.de', connectionType: 'OPENIMMO_FTP' },
     { name: 'Kleinanzeigen', slug: 'kleinanzeigen', country: 'DE', websiteUrl: 'https://www.kleinanzeigen.de', connectionType: 'OPENIMMO_FTP' },
     { name: 'Kalaydo', slug: 'kalaydo', country: 'DE', websiteUrl: 'https://www.kalaydo.de', connectionType: 'OPENIMMO_FTP' },
@@ -82,22 +87,21 @@ async function main() {
     { name: 'Süddeutsche Zeitung', slug: 'sz-immo', country: 'DE', websiteUrl: 'https://immobilienmarkt.sueddeutsche.de', connectionType: 'OPENIMMO_FTP' },
     { name: 'FAZ Immobilien', slug: 'faz-immo', country: 'DE', websiteUrl: 'https://fazimmo.faz.net', connectionType: 'OPENIMMO_FTP' },
     { name: 'Welt Immobilien', slug: 'welt-immo', country: 'DE', websiteUrl: 'https://www.welt.de/immobilien', connectionType: 'OPENIMMO_FTP' },
-    { name: 'ImmobilienScout24', slug: 'immoscout24-de', country: 'DE', websiteUrl: 'https://www.immobilienscout24.de', connectionType: 'REST_API', isPremium: true },
     
-    // Österreich
+    // Österreich (5) - Alle OpenImmo FTP
     { name: 'Willhaben', slug: 'willhaben', country: 'AT', websiteUrl: 'https://www.willhaben.at', connectionType: 'OPENIMMO_FTP' },
     { name: 'ImmobilienScout24 AT', slug: 'immoscout24-at', country: 'AT', websiteUrl: 'https://www.immobilienscout24.at', connectionType: 'OPENIMMO_FTP' },
     { name: 'Immmo.at', slug: 'immmo-at', country: 'AT', websiteUrl: 'https://www.immmo.at', connectionType: 'OPENIMMO_FTP' },
     { name: 'FindMyHome', slug: 'findmyhome', country: 'AT', websiteUrl: 'https://www.findmyhome.at', connectionType: 'OPENIMMO_FTP' },
     { name: 'Der Standard Immobilien', slug: 'derstandard-immo', country: 'AT', websiteUrl: 'https://immobilien.derstandard.at', connectionType: 'OPENIMMO_FTP' },
     
-    // Schweiz
-    { name: 'Homegate', slug: 'homegate', country: 'CH', websiteUrl: 'https://www.homegate.ch', connectionType: 'OPENIMMO_FTP' },
-    { name: 'ImmoScout24 CH', slug: 'immoscout24-ch', country: 'CH', websiteUrl: 'https://www.immoscout24.ch', connectionType: 'OPENIMMO_FTP' },
-    { name: 'Comparis', slug: 'comparis', country: 'CH', websiteUrl: 'https://www.comparis.ch/immobilien', connectionType: 'OPENIMMO_FTP' },
-    { name: 'Newhome', slug: 'newhome', country: 'CH', websiteUrl: 'https://www.newhome.ch', connectionType: 'OPENIMMO_FTP' },
-    { name: 'ImmoStreet', slug: 'immostreet', country: 'CH', websiteUrl: 'https://www.immostreet.ch', connectionType: 'OPENIMMO_FTP' },
-    { name: 'Flatfox', slug: 'flatfox', country: 'CH', websiteUrl: 'https://flatfox.ch', connectionType: 'OPENIMMO_FTP' },
+    // Schweiz (6) - IDX 3.01 (Schweizer Standard) except Flatfox (REST API)
+    { name: 'Homegate', slug: 'homegate', country: 'CH', websiteUrl: 'https://www.homegate.ch', connectionType: 'IDX' },
+    { name: 'ImmoScout24 CH', slug: 'immoscout24-ch', country: 'CH', websiteUrl: 'https://www.immoscout24.ch', connectionType: 'IDX' },
+    { name: 'Comparis', slug: 'comparis', country: 'CH', websiteUrl: 'https://www.comparis.ch/immobilien', connectionType: 'IDX' },
+    { name: 'Newhome', slug: 'newhome', country: 'CH', websiteUrl: 'https://www.newhome.ch', connectionType: 'IDX' },
+    { name: 'ImmoStreet', slug: 'immostreet', country: 'CH', websiteUrl: 'https://www.immostreet.ch', connectionType: 'IDX' },
+    { name: 'Flatfox', slug: 'flatfox', country: 'CH', websiteUrl: 'https://flatfox.ch', connectionType: 'REST_API' },
   ];
 
   for (const portal of portals) {
