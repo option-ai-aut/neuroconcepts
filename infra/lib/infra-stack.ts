@@ -92,7 +92,7 @@ export class ImmivoStack extends cdk.Stack {
       this.dbEndpoint = instance.dbInstanceEndpointAddress;
     } else {
       const cluster = new rds.DatabaseCluster(this, 'AuroraCluster', {
-        engine: rds.DatabaseClusterEngine.auroraPostgres({ version: rds.AuroraPostgresEngineVersion.VER_15_4 }),
+        engine: rds.DatabaseClusterEngine.auroraPostgres({ version: rds.AuroraPostgresEngineVersion.VER_16_6 }),
         vpc: this.vpc,
         vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
         writer: rds.ClusterInstance.serverlessV2('Writer'),
