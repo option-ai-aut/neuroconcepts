@@ -15,21 +15,21 @@ interface CalEvent {
 }
 
 const TEAM = [
-  { name: 'Dennis Kral', initials: 'DK', color: 'bg-red-500', role: 'Super Admin' },
-  { name: 'Max Huber', initials: 'MH', color: 'bg-violet-500', role: 'Developer' },
-  { name: 'Tom Fischer', initials: 'TF', color: 'bg-emerald-500', role: 'Developer' },
-  { name: 'Sarah Weber', initials: 'SW', color: 'bg-blue-500', role: 'Support' },
-  { name: 'Lisa Müller', initials: 'LM', color: 'bg-pink-500', role: 'Sales' },
+  { name: 'Dennis Kral', initials: 'DK', color: 'bg-gray-900', role: 'Super Admin' },
+  { name: 'Max Huber', initials: 'MH', color: 'bg-gray-700', role: 'Developer' },
+  { name: 'Tom Fischer', initials: 'TF', color: 'bg-gray-600', role: 'Developer' },
+  { name: 'Sarah Weber', initials: 'SW', color: 'bg-gray-600', role: 'Support' },
+  { name: 'Lisa Müller', initials: 'LM', color: 'bg-gray-500', role: 'Sales' },
 ];
 
 const MOCK_EVENTS: CalEvent[] = [
-  { id: '1', title: 'Daily Standup', start: '09:00', end: '09:15', member: 'Alle', color: 'bg-indigo-100 text-indigo-700 border-indigo-200', type: 'meeting' },
+  { id: '1', title: 'Daily Standup', start: '09:00', end: '09:15', member: 'Alle', color: 'bg-gray-100 text-gray-800 border-gray-200', type: 'meeting' },
   { id: '2', title: 'Sprint Planning', start: '10:00', end: '11:00', member: 'Dennis Kral', color: 'bg-red-100 text-red-700 border-red-200', type: 'meeting' },
-  { id: '3', title: 'Code Review: Email Parser', start: '11:00', end: '12:00', member: 'Max Huber', color: 'bg-violet-100 text-violet-700 border-violet-200', type: 'focus' },
-  { id: '4', title: 'Kundenanruf: Kellner Immo', start: '14:00', end: '14:30', member: 'Sarah Weber', color: 'bg-blue-100 text-blue-700 border-blue-200', type: 'call' },
-  { id: '5', title: 'Demo Call: Remax Wien', start: '15:00', end: '15:45', member: 'Lisa Müller', color: 'bg-pink-100 text-pink-700 border-pink-200', type: 'call' },
+  { id: '3', title: 'Code Review: Email Parser', start: '11:00', end: '12:00', member: 'Max Huber', color: 'bg-gray-100 text-gray-800 border-gray-200', type: 'focus' },
+  { id: '4', title: 'Kundenanruf: Kellner Immo', start: '14:00', end: '14:30', member: 'Sarah Weber', color: 'bg-gray-100 text-gray-800 border-gray-200', type: 'call' },
+  { id: '5', title: 'Demo Call: Remax Wien', start: '15:00', end: '15:45', member: 'Lisa Müller', color: 'bg-gray-100 text-gray-800 border-gray-200', type: 'call' },
   { id: '6', title: 'Deploy Review', start: '16:00', end: '16:30', member: 'Tom Fischer', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', type: 'meeting' },
-  { id: '7', title: '1:1 mit Dennis', start: '13:00', end: '13:30', member: 'Max Huber', color: 'bg-violet-100 text-violet-700 border-violet-200', type: 'meeting' },
+  { id: '7', title: '1:1 mit Dennis', start: '13:00', end: '13:30', member: 'Max Huber', color: 'bg-gray-100 text-gray-800 border-gray-200', type: 'meeting' },
   { id: '8', title: 'Finance Review Q1', start: '11:00', end: '12:00', member: 'Dennis Kral', color: 'bg-red-100 text-red-700 border-red-200', type: 'meeting' },
 ];
 
@@ -58,10 +58,10 @@ export default function AdminCalendar() {
           <button
             onClick={() => setSelectedMember(null)}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors mb-1 ${
-              !selectedMember ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'
+              !selectedMember ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
             }`}
           >
-            <div className="w-7 h-7 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-full flex items-center justify-center">
+            <div className="w-7 h-7 bg-gray-800 rounded-full flex items-center justify-center">
               <Users className="w-3.5 h-3.5 text-white" />
             </div>
             <div>
@@ -78,7 +78,7 @@ export default function AdminCalendar() {
                   key={member.name}
                   onClick={() => setSelectedMember(member.name)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors ${
-                    selectedMember === member.name ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'
+                    selectedMember === member.name ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
                   }`}
                 >
                   <div className={`w-7 h-7 ${member.color} rounded-full flex items-center justify-center text-white text-[10px] font-bold`}>
@@ -111,7 +111,7 @@ export default function AdminCalendar() {
               <p className="text-[10px] text-gray-400">{dayName}</p>
             </div>
           </div>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-lg hover:bg-gray-800 transition-colors">
             <Plus className="w-3.5 h-3.5" />
             Neuer Termin
           </button>
@@ -180,7 +180,7 @@ export default function AdminCalendar() {
               {selectedEvent.type === 'call' && (
                 <div className="flex items-center gap-2.5">
                   <Video className="w-4 h-4 text-gray-400" />
-                  <span className="text-xs text-indigo-600 cursor-pointer hover:underline">Video-Call beitreten</span>
+                  <span className="text-xs text-blue-600 cursor-pointer hover:underline">Video-Call beitreten</span>
                 </div>
               )}
             </div>

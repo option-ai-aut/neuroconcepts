@@ -29,9 +29,7 @@ export default function MobileBottomNav() {
             key={item.name}
             href={item.href}
             className={`flex flex-col items-center justify-center flex-1 h-full gap-0.5 transition-colors ${
-              isActive(item.href)
-                ? 'text-indigo-600'
-                : 'text-gray-400 active:text-gray-600'
+              isActive(item.href) ? 'text-gray-900' : 'text-gray-400 active:text-gray-600'
             }`}
           >
             <item.icon className={`w-5 h-5 ${isActive(item.href) ? 'stroke-[2.5]' : ''}`} />

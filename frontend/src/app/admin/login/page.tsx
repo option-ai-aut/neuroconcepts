@@ -102,9 +102,9 @@ export default function AdminLoginPage() {
     }
   };
 
-  const inputClass = "w-full px-4 py-3 border border-gray-600 bg-gray-800 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all";
+  const inputClass = "w-full px-4 py-3 border border-gray-600 bg-gray-800 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all";
   const labelClass = "block text-sm font-medium text-gray-300 mb-1.5";
-  const buttonClass = "w-full py-3 px-4 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed";
+  const buttonClass = "w-full py-3 px-4 bg-gray-800 text-white font-semibold rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-gray-600";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900 px-4">

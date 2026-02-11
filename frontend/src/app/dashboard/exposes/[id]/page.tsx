@@ -62,7 +62,7 @@ Ihr Makler Team`,
           )}
           <button 
             onClick={handleSave}
-            className="bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-sm flex items-center"
+            className="bg-gray-900 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 shadow-sm flex items-center"
           >
             <Save className="w-4 h-4 mr-2" />
             Speichern
@@ -81,7 +81,7 @@ Ihr Makler Team`,
                 type="text"
                 value={template.name}
                 onChange={(e) => setTemplate({...template, name: e.target.value})}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="z.B. Standard Exposé"
               />
             </div>
@@ -92,7 +92,7 @@ Ihr Makler Team`,
                 type="text"
                 value={template.subject}
                 onChange={(e) => setTemplate({...template, subject: e.target.value})}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="Betreff der E-Mail..."
               />
               <p className="text-xs text-gray-500 mt-1">Verfügbare Variablen: {'{{property.title}}'}, {'{{lead.firstName}}'}, ...</p>
@@ -104,7 +104,7 @@ Ihr Makler Team`,
                 rows={15}
                 value={template.body}
                 onChange={(e) => setTemplate({...template, body: e.target.value})}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-mono text-sm leading-relaxed"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all font-mono text-sm leading-relaxed"
                 placeholder="Schreiben Sie hier Ihre Vorlage..."
               />
             </div>
@@ -115,7 +115,7 @@ Ihr Makler Team`,
                 type="checkbox"
                 checked={template.active}
                 onChange={(e) => setTemplate({...template, active: e.target.checked})}
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
               <label htmlFor="active" className="text-sm font-medium text-gray-700">
                 Als aktive Standard-Vorlage verwenden

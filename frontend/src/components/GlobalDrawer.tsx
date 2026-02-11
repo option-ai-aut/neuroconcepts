@@ -87,10 +87,10 @@ const COUNTRY_OPTIONS = [
 ];
 
 // Consistent input styles
-const inputClass = "block w-full rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 sm:text-sm py-2.5 px-3 transition-all outline-none";
-const selectClass = "block w-full rounded-lg border border-gray-300 bg-white text-gray-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 sm:text-sm py-2.5 px-3 transition-all outline-none";
+const inputClass = "block w-full rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 sm:text-sm py-2.5 px-3 transition-all outline-none";
+const selectClass = "block w-full rounded-lg border border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 sm:text-sm py-2.5 px-3 transition-all outline-none";
 const labelClass = "block text-xs font-medium text-gray-600 mb-1.5";
-const textareaClass = "block w-full rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 sm:text-sm py-2.5 px-3 transition-all outline-none resize-none";
+const textareaClass = "block w-full rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 sm:text-sm py-2.5 px-3 transition-all outline-none resize-none";
 const sectionTitleClass = "text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2";
 
 // Email Composer Component
@@ -190,7 +190,7 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
             type="email"
             value={emailFormData.to || ''}
             onChange={(e) => updateEmailForm({ to: e.target.value })}
-            className="flex-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:bg-white text-sm py-2 px-3 transition-all outline-none"
+            className="flex-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white text-sm py-2 px-3 transition-all outline-none"
             placeholder="empfaenger@email.de"
           />
           <div className="flex gap-1 shrink-0">
@@ -198,7 +198,7 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
               <button
                 type="button"
                 onClick={() => setShowCc(true)}
-                className="px-2 py-1 text-xs text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                className="px-2 py-1 text-xs text-gray-500 hover:text-blue-600 hover:bg-gray-50 rounded transition-colors"
               >
                 CC
               </button>
@@ -207,7 +207,7 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
               <button
                 type="button"
                 onClick={() => setShowBcc(true)}
-                className="px-2 py-1 text-xs text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                className="px-2 py-1 text-xs text-gray-500 hover:text-blue-600 hover:bg-gray-50 rounded transition-colors"
               >
                 BCC
               </button>
@@ -223,7 +223,7 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
               type="email"
               value={emailFormData.cc || ''}
               onChange={(e) => updateEmailForm({ cc: e.target.value })}
-              className="flex-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:bg-white text-sm py-2 px-3 transition-all outline-none"
+              className="flex-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white text-sm py-2 px-3 transition-all outline-none"
               placeholder="cc@email.de"
             />
             <button
@@ -244,7 +244,7 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
               type="email"
               value={emailFormData.bcc || ''}
               onChange={(e) => updateEmailForm({ bcc: e.target.value })}
-              className="flex-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:bg-white text-sm py-2 px-3 transition-all outline-none"
+              className="flex-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white text-sm py-2 px-3 transition-all outline-none"
               placeholder="bcc@email.de"
             />
             <button
@@ -264,7 +264,7 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
             type="text"
             value={emailFormData.subject || ''}
             onChange={(e) => updateEmailForm({ subject: e.target.value })}
-            className="flex-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:bg-white text-sm py-2 px-3 transition-all outline-none font-medium"
+            className="flex-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white text-sm py-2 px-3 transition-all outline-none font-medium"
             placeholder="Betreff eingeben..."
           />
         </div>
@@ -332,7 +332,7 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
           <button
             type="button"
             onClick={insertSignature}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-gray-50 rounded-lg transition-colors"
             title="Signatur einfügen"
           >
             <User className="w-3.5 h-3.5" />
@@ -347,7 +347,7 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
           id="email-body"
           value={emailFormData.body || ''}
           onChange={(e) => updateEmailForm({ body: e.target.value })}
-          className="w-full h-full rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm py-3 px-4 transition-all outline-none resize-none leading-relaxed"
+          className="w-full h-full rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm py-3 px-4 transition-all outline-none resize-none leading-relaxed"
           placeholder="Schreiben Sie Ihre Nachricht..."
           style={{ minHeight: '280px' }}
         />
@@ -386,7 +386,7 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
             type="button"
             onClick={onSend}
             disabled={loading || !emailFormData.to}
-            className="px-5 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            className="px-5 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
           >
             <Send className="w-4 h-4" />
             {loading ? 'Senden...' : 'Senden'}
@@ -556,9 +556,9 @@ export default function GlobalDrawer() {
 
   const getHeaderColor = () => {
     switch (drawerType) {
-      case 'LEAD': return 'bg-indigo-500';
-      case 'PROPERTY': return 'bg-indigo-500';
-      case 'EMAIL': return 'bg-indigo-500';
+      case 'LEAD': return 'bg-gray-800';
+      case 'PROPERTY': return 'bg-gray-800';
+      case 'EMAIL': return 'bg-gray-800';
       default: return 'bg-gray-500';
     }
   };
@@ -598,11 +598,11 @@ export default function GlobalDrawer() {
         </div>
         <div className="flex items-center space-x-2">
           {drawerMinimized ? (
-            <button onClick={(e) => { e.stopPropagation(); maximizeDrawer(); }} className="p-1 text-gray-400 hover:text-indigo-600 rounded-md hover:bg-indigo-50">
+            <button onClick={(e) => { e.stopPropagation(); maximizeDrawer(); }} className="p-1 text-gray-400 hover:text-blue-600 rounded-md hover:bg-gray-50">
               <Maximize2 className="w-4 h-4" />
             </button>
           ) : (
-            <button onClick={minimizeDrawer} className="p-1 text-gray-400 hover:text-indigo-600 rounded-md hover:bg-indigo-50">
+            <button onClick={minimizeDrawer} className="p-1 text-gray-400 hover:text-blue-600 rounded-md hover:bg-gray-50">
               <Minus className="w-4 h-4" />
             </button>
           )}
@@ -650,7 +650,7 @@ export default function GlobalDrawer() {
                       onClick={() => updateLeadForm({ formalAddress: true })}
                       className={`flex-1 px-3 py-2 text-sm font-medium rounded-l-lg border transition-colors ${
                         leadFormData.formalAddress !== false
-                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          ? 'bg-gray-900 text-white border-gray-900'
                           : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                       }`}
                     >
@@ -661,7 +661,7 @@ export default function GlobalDrawer() {
                       onClick={() => updateLeadForm({ formalAddress: false })}
                       className={`flex-1 px-3 py-2 text-sm font-medium rounded-r-lg border-t border-r border-b transition-colors ${
                         leadFormData.formalAddress === false
-                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          ? 'bg-gray-900 text-white border-gray-900'
                           : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                       }`}
                     >
@@ -752,7 +752,7 @@ export default function GlobalDrawer() {
                 <button 
                   onClick={handleCreateLead}
                   disabled={loading || !leadFormData.email}
-                  className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                  className="px-6 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
                 >
                   {loading ? 'Speichern...' : 'Lead anlegen'}
                 </button>
@@ -810,7 +810,7 @@ export default function GlobalDrawer() {
                       onClick={() => updatePropertyForm({ marketingType: 'SALE' })}
                       className={`flex-1 px-4 py-2 text-sm font-medium rounded-l-lg border transition-colors ${
                         (propertyFormData.marketingType || 'SALE') === 'SALE'
-                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          ? 'bg-gray-900 text-white border-gray-900'
                           : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                       }`}
                     >
@@ -821,7 +821,7 @@ export default function GlobalDrawer() {
                       onClick={() => updatePropertyForm({ marketingType: 'RENT' })}
                       className={`flex-1 px-4 py-2 text-sm font-medium rounded-r-lg border-t border-r border-b transition-colors ${
                         propertyFormData.marketingType === 'RENT'
-                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          ? 'bg-gray-900 text-white border-gray-900'
                           : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                       }`}
                     >
@@ -1215,7 +1215,7 @@ export default function GlobalDrawer() {
                 <button 
                   onClick={handleCreateProperty}
                   disabled={loading || !propertyFormData.title || !propertyFormData.street || !propertyFormData.city}
-                  className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                  className="px-6 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
                 >
                   {loading ? 'Speichern...' : 'Objekt anlegen'}
                 </button>

@@ -88,7 +88,7 @@ export default function PageHeader() {
         {/* User Avatar (desktop only) */}
         {user && (
           <div 
-            className="hidden lg:flex w-7 h-7 bg-indigo-100 rounded-full items-center justify-center text-indigo-600 text-xs font-semibold cursor-default"
+            className="hidden lg:flex w-7 h-7 bg-gray-100 rounded-full items-center justify-center text-gray-600 text-xs font-semibold cursor-default"
             title={`${user.firstName} ${user.lastName}`}
           >
             {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}

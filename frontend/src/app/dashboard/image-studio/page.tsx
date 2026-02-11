@@ -138,27 +138,27 @@ function StagingLoader({ elapsed }: { elapsed: number }) {
       {/* Animated room with furniture appearing */}
       <div className="relative w-32 h-32 mb-8">
         {/* Room outline */}
-        <div className="absolute inset-0 border-2 border-indigo-200 rounded-2xl bg-gradient-to-br from-indigo-50 to-purple-50" />
+        <div className="absolute inset-0 border-2 border-gray-200 rounded-2xl bg-gray-100" />
         
         {/* Animated furniture pieces */}
-        <div className="absolute bottom-3 left-3 w-8 h-5 bg-indigo-400 rounded-sm animate-[staging-pop_2s_ease-in-out_infinite]" />
-        <div className="absolute bottom-3 right-4 w-6 h-8 bg-purple-400 rounded-sm animate-[staging-pop_2s_ease-in-out_0.4s_infinite]" />
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-10 h-3 bg-pink-400 rounded-sm animate-[staging-pop_2s_ease-in-out_0.8s_infinite]" />
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 w-7 h-7 border-2 border-indigo-300 rounded-lg animate-[staging-pop_2s_ease-in-out_1.2s_infinite]" />
+        <div className="absolute bottom-3 left-3 w-8 h-5 bg-gray-400 rounded-sm animate-[staging-pop_2s_ease-in-out_infinite]" />
+        <div className="absolute bottom-3 right-4 w-6 h-8 bg-gray-500 rounded-sm animate-[staging-pop_2s_ease-in-out_0.4s_infinite]" />
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-10 h-3 bg-gray-400 rounded-sm animate-[staging-pop_2s_ease-in-out_0.8s_infinite]" />
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 w-7 h-7 border-2 border-gray-300 rounded-lg animate-[staging-pop_2s_ease-in-out_1.2s_infinite]" />
         
         {/* Sparkle effects */}
         <div className="absolute -top-1 -right-1 animate-[staging-sparkle_1.5s_ease-in-out_infinite]">
           <Sparkles className="w-5 h-5 text-yellow-400" />
         </div>
         <div className="absolute -bottom-1 -left-1 animate-[staging-sparkle_1.5s_ease-in-out_0.75s_infinite]">
-          <Wand2 className="w-4 h-4 text-purple-400" />
+          <Wand2 className="w-4 h-4 text-gray-500" />
         </div>
       </div>
 
       {/* Progress bar */}
       <div className="w-48 h-1.5 bg-gray-100 rounded-full overflow-hidden mb-4">
         <div 
-          className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full transition-all duration-1000 ease-out"
+          className="h-full bg-gray-700 rounded-full transition-all duration-1000 ease-out"
           style={{ width: `${Math.min((elapsed / 45) * 100, 95)}%` }}
         />
       </div>
@@ -380,7 +380,7 @@ export default function ImageStudioPage() {
           <div className="w-full max-w-xl space-y-6">
             {/* Title */}
             <div className="text-center mb-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-xs font-medium mb-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-xs font-medium mb-4">
                 <Sparkles className="w-3.5 h-3.5" />
                 Virtual Staging mit Gemini 3
               </div>
@@ -413,7 +413,7 @@ export default function ImageStudioPage() {
                               <button
                                 key={idx}
                                 onClick={() => handlePropertyImageSelect(property, img)}
-                                className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 border-2 border-transparent hover:border-indigo-500 transition-colors"
+                                className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 border-2 border-transparent hover:border-blue-500 transition-colors"
                               >
                                 <img src={img} alt="" className="w-full h-full object-cover" />
                               </button>
@@ -441,9 +441,9 @@ export default function ImageStudioPage() {
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-200 rounded-xl p-10 md:p-12 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30 transition-all group"
+              className="border-2 border-dashed border-gray-200 rounded-xl p-10 md:p-12 text-center cursor-pointer hover:border-gray-400 hover:bg-gray-50/30 transition-all group"
             >
-              <Upload className="w-10 h-10 text-gray-300 group-hover:text-indigo-400 mx-auto mb-3 transition-colors" />
+              <Upload className="w-10 h-10 text-gray-300 group-hover:text-gray-500 mx-auto mb-3 transition-colors" />
               <p className="text-sm font-medium text-gray-700">Foto hochladen</p>
               <p className="text-xs text-gray-400 mt-1">Drag & Drop oder klicken · JPG, PNG, WebP</p>
               <input
@@ -488,8 +488,8 @@ export default function ImageStudioPage() {
                     onClick={() => setSelectedStyle(selectedStyle?.id === style.id ? null : style)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       selectedStyle?.id === style.id
-                        ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'bg-gray-50 border border-gray-150 text-gray-600 hover:border-indigo-200 hover:bg-indigo-50/50'
+                        ? 'bg-gray-900 text-white shadow-sm'
+                        : 'bg-gray-50 border border-gray-150 text-gray-600 hover:border-gray-300 hover:bg-gray-100'
                     }`}
                   >
                     {style.name}
@@ -515,8 +515,8 @@ export default function ImageStudioPage() {
                     onClick={() => setSelectedRoom(selectedRoom?.id === room.id ? null : room)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       selectedRoom?.id === room.id
-                        ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'bg-gray-50 border border-gray-150 text-gray-600 hover:border-indigo-200 hover:bg-indigo-50/50'
+                        ? 'bg-gray-900 text-white shadow-sm'
+                        : 'bg-gray-50 border border-gray-150 text-gray-600 hover:border-gray-300 hover:bg-gray-100'
                     }`}
                   >
                     {room.name}
@@ -536,7 +536,7 @@ export default function ImageStudioPage() {
                   value={customPrompt}
                   onChange={(e) => setCustomPrompt(e.target.value)}
                   placeholder="z.B. 'Graues Sofa, Holztisch' — je kürzer, desto besser"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400"
                   onKeyDown={(e) => { if (e.key === 'Enter' && hasSelection && !isProcessing) handleGenerate(); }}
                 />
               </div>
@@ -546,7 +546,7 @@ export default function ImageStudioPage() {
                 className={`flex items-center gap-2 px-5 py-2 rounded-lg font-medium text-sm transition-all shrink-0 ${
                   isProcessing || !hasSelection
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm hover:shadow-md'
+                    : 'bg-gray-900 text-white hover:bg-gray-800 shadow-sm hover:shadow-md'
                 }`}
               >
                 {isProcessing ? (
@@ -611,7 +611,7 @@ export default function ImageStudioPage() {
                   )}
                   <button
                     onClick={handleDownload}
-                    className="text-xs text-indigo-600 hover:text-indigo-700 flex items-center gap-1 px-2.5 py-1.5 rounded-md hover:bg-indigo-50 transition-colors"
+                    className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 px-2.5 py-1.5 rounded-md hover:bg-gray-50 transition-colors"
                   >
                     <Download className="w-3.5 h-3.5" />
                     Download

@@ -34,7 +34,7 @@ const CATEGORY_ICONS: Record<Category, any> = {
 };
 
 const LEVEL_STYLES: Record<LogLevel, string> = {
-  info: 'bg-blue-50 text-blue-600',
+  info: 'bg-gray-100 text-gray-700',
   warning: 'bg-amber-50 text-amber-600',
   error: 'bg-red-50 text-red-600',
   critical: 'bg-red-100 text-red-700',
@@ -84,7 +84,7 @@ export default function AuditPage() {
             placeholder="Aktion, Details oder Actor suchen..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
@@ -139,7 +139,7 @@ export default function AuditPage() {
                     {log.resource && (
                       <>
                         <span className="text-[10px] text-gray-300">·</span>
-                        <span className="text-[10px] text-indigo-500 font-mono">{log.resource}</span>
+                        <span className="text-[10px] text-blue-600 font-mono">{log.resource}</span>
                       </>
                     )}
                   </div>

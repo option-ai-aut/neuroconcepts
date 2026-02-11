@@ -423,7 +423,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 loadPortals();
                 setShowSyncDialog(true);
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-md hover:bg-gray-800 transition-colors"
             >
               <Globe className="w-4 h-4" />
               An Portale senden
@@ -472,7 +472,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 <select
                   value={formData.propertyType || 'APARTMENT'}
                   onChange={(e) => handleInputChange('propertyType', e.target.value)}
-                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
+                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
                 >
                   <option value="APARTMENT">Wohnung</option>
                   <option value="HOUSE">Haus</option>
@@ -491,7 +491,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                     onClick={() => handleInputChange('marketingType', 'SALE')}
                     className={`flex-1 px-4 py-3 rounded-md font-medium transition-all ${
                       (formData.marketingType || 'SALE') === 'SALE'
-                        ? 'bg-indigo-600 text-white'
+                        ? 'bg-gray-900 text-white'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
@@ -501,7 +501,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                     onClick={() => handleInputChange('marketingType', 'RENT')}
                     className={`flex-1 px-4 py-3 rounded-md font-medium transition-all ${
                       formData.marketingType === 'RENT'
-                        ? 'bg-indigo-600 text-white'
+                        ? 'bg-gray-900 text-white'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
@@ -516,7 +516,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   type="text"
                   value={formData.title || ''}
                   onChange={(e) => handleInputChange('title', e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                 />
               </div>
 
@@ -527,7 +527,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   <button
                     type="button"
                     onClick={() => setShowUserSelector(!showUserSelector)}
-                    className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all flex items-center justify-between"
+                    className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all flex items-center justify-between"
                   >
                     <div className="flex items-center gap-2">
                       <Users className="h-5 w-5 text-gray-400" />
@@ -555,8 +555,8 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                             className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
                           >
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                                <span className="text-sm font-medium text-indigo-600">
+                              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                                <span className="text-sm font-medium text-gray-700">
                                   {member.name?.charAt(0) || member.email.charAt(0).toUpperCase()}
                                 </span>
                               </div>
@@ -567,7 +567,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                             </div>
                             <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
                               assignedUserIds.includes(member.id) 
-                                ? 'bg-indigo-600 border-indigo-600' 
+                                ? 'bg-gray-900 border-gray-900' 
                                 : 'border-gray-300'
                             }`}>
                               {assignedUserIds.includes(member.id) && (
@@ -587,12 +587,12 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                     {assignedUserIds.map((userId) => {
                       const member = teamMembers.find(m => m.id === userId);
                       return member ? (
-                        <span key={userId} className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+                        <span key={userId} className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
                           {member.name || member.email}
                           <button
                             type="button"
                             onClick={() => handleToggleUserAssignment(userId)}
-                            className="hover:text-indigo-900"
+                            className="hover:text-gray-900"
                           >
                             <X className="w-3 h-3" />
                           </button>
@@ -613,7 +613,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                     type="text"
                     value={formData.address || ''}
                     onChange={(e) => handleInputChange('address', e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                   />
                 </div>
               </div>
@@ -624,7 +624,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   type="text"
                   value={formData.zipCode || ''}
                   onChange={(e) => handleInputChange('zipCode', e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                 />
               </div>
 
@@ -634,7 +634,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   type="text"
                   value={formData.city || ''}
                   onChange={(e) => handleInputChange('city', e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                 />
               </div>
 
@@ -650,7 +650,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                       type="number"
                       value={formData.salePrice || formData.price || ''}
                       onChange={(e) => handleInputChange('salePrice', parseFloat(e.target.value))}
-                      className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                      className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                     />
                   </div>
                 </div>
@@ -666,7 +666,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                         type="number"
                         value={formData.rentCold || ''}
                         onChange={(e) => handleInputChange('rentCold', parseFloat(e.target.value))}
-                        className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                        className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                       />
                     </div>
                   </div>
@@ -680,7 +680,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                         type="number"
                         value={formData.additionalCosts || ''}
                         onChange={(e) => handleInputChange('additionalCosts', parseFloat(e.target.value))}
-                        className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                        className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                       />
                     </div>
                   </div>
@@ -698,7 +698,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                     step="0.5"
                     value={formData.rooms || ''}
                     onChange={(e) => handleInputChange('rooms', parseFloat(e.target.value))}
-                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                   />
                 </div>
               </div>
@@ -713,7 +713,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                     type="number"
                     value={formData.livingArea || formData.area || ''}
                     onChange={(e) => handleInputChange('livingArea', parseFloat(e.target.value))}
-                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                   />
                 </div>
               </div>
@@ -724,7 +724,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   type="number"
                   value={formData.yearBuilt || ''}
                   onChange={(e) => handleInputChange('yearBuilt', parseInt(e.target.value))}
-                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                 />
               </div>
 
@@ -733,7 +733,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 <select
                   value={formData.condition || ''}
                   onChange={(e) => handleInputChange('condition', e.target.value)}
-                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
+                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
                 >
                   <option value="">Bitte wählen</option>
                   <option value="FIRST_OCCUPANCY">Erstbezug</option>
@@ -761,7 +761,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 <select
                   value={formData.energyCertificateType || ''}
                   onChange={(e) => handleInputChange('energyCertificateType', e.target.value)}
-                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
+                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
                 >
                   <option value="">Bitte wählen</option>
                   <option value="DEMAND">Bedarfsausweis</option>
@@ -774,7 +774,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 <select
                   value={formData.energyEfficiencyClass || ''}
                   onChange={(e) => handleInputChange('energyEfficiencyClass', e.target.value)}
-                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
+                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
                 >
                   <option value="">Bitte wählen</option>
                   <option value="A_PLUS">A+</option>
@@ -795,7 +795,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   type="number"
                   value={formData.energyConsumption || ''}
                   onChange={(e) => handleInputChange('energyConsumption', parseFloat(e.target.value))}
-                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                   placeholder="75"
                 />
               </div>
@@ -806,7 +806,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   type="text"
                   value={formData.primaryEnergySource || ''}
                   onChange={(e) => handleInputChange('primaryEnergySource', e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                   placeholder="Gas, Fernwärme, etc."
                 />
               </div>
@@ -823,7 +823,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 rows={6}
                 value={formData.description || ''}
                 onChange={(e) => handleInputChange('description', e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all resize-none"
+                className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all resize-none"
               />
             </div>
           </div>
@@ -843,7 +843,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               <select
                 value={formData.defaultExposeTemplateId || ''}
                 onChange={(e) => handleInputChange('defaultExposeTemplateId', e.target.value || '')}
-                className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
               >
                 <option value="">Keine automatische Erstellung</option>
                 {exposeTemplates.map((template) => (
@@ -868,8 +868,8 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                       className="flex items-center gap-4 flex-1 cursor-pointer"
                       onClick={() => handleOpenExposeEditor(expose.id)}
                     >
-                      <div className="w-12 h-12 bg-indigo-50 rounded-md flex items-center justify-center">
-                        <FileImage className="w-6 h-6 text-indigo-600" />
+                      <div className="w-12 h-12 bg-gray-100 rounded-md flex items-center justify-center">
+                        <FileImage className="w-6 h-6 text-gray-600" />
                       </div>
                       <div>
                         <p className="text-base font-medium text-gray-900">
@@ -884,11 +884,11 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDownloadPdf(expose.id); }}
                         disabled={downloadingPdf}
-                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors disabled:opacity-50"
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors disabled:opacity-50"
                         title="Als PDF herunterladen"
                       >
                         {downloadingPdf ? (
-                          <div className="w-5 h-5 border-2 border-gray-300 border-t-indigo-600 rounded-full animate-spin" />
+                          <div className="w-5 h-5 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
                         ) : (
                           <Download className="w-5 h-5" />
                         )}
@@ -933,7 +933,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               onDrop={(e) => handleDrop(e, false)}
               className={`border-2 border-dashed rounded-xl p-4 transition-all ${
                 isDragging 
-                  ? 'border-indigo-500 bg-indigo-50/50' 
+                  ? 'border-gray-300 bg-gray-50/50' 
                   : 'border-gray-200 bg-gray-100'
               }`}
             >
@@ -957,7 +957,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   {/* Add More Button */}
                   <div 
                     onClick={() => fileInputRef.current?.click()}
-                    className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-all"
+                    className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 hover:bg-gray-50/50 transition-all"
                   >
                     <Plus className="w-8 h-8 text-gray-400" />
                     <span className="text-xs text-gray-500 mt-1">Hinzufügen</span>
@@ -968,7 +968,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   onClick={() => fileInputRef.current?.click()}
                   className="py-8 text-center cursor-pointer"
                 >
-                  <Upload className={`w-12 h-12 mx-auto mb-3 ${isDragging ? 'text-indigo-600' : 'text-gray-400'}`} />
+                  <Upload className={`w-12 h-12 mx-auto mb-3 ${isDragging ? 'text-gray-600' : 'text-gray-400'}`} />
                   <p className="text-base text-gray-600 font-medium">
                     {uploading ? 'Wird hochgeladen...' : 'Bilder hierher ziehen oder klicken'}
                   </p>
@@ -998,7 +998,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               onDrop={(e) => handleDrop(e, true)}
               className={`border-2 border-dashed rounded-xl p-4 transition-all ${
                 isDragging 
-                  ? 'border-indigo-500 bg-indigo-50/50' 
+                  ? 'border-gray-300 bg-gray-50/50' 
                   : 'border-gray-200 bg-gray-100'
               }`}
             >
@@ -1022,7 +1022,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   {/* Add More Button */}
                   <div 
                     onClick={() => floorplanInputRef.current?.click()}
-                    className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-all"
+                    className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 hover:bg-gray-50/50 transition-all"
                   >
                     <Plus className="w-8 h-8 text-gray-400" />
                     <span className="text-xs text-gray-500 mt-1">Hinzufügen</span>
@@ -1033,7 +1033,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   onClick={() => floorplanInputRef.current?.click()}
                   className="py-8 text-center cursor-pointer"
                 >
-                  <Upload className={`w-12 h-12 mx-auto mb-3 ${isDragging ? 'text-indigo-600' : 'text-gray-400'}`} />
+                  <Upload className={`w-12 h-12 mx-auto mb-3 ${isDragging ? 'text-gray-600' : 'text-gray-400'}`} />
                   <p className="text-base text-gray-600 font-medium">
                     {uploading ? 'Wird hochgeladen...' : 'Grundrisse hierher ziehen oder klicken'}
                   </p>
@@ -1088,7 +1088,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => downloadDocument(doc)}
-                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors"
                         title="Herunterladen"
                       >
                         <Download className="w-4 h-4" />
@@ -1146,7 +1146,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                         }}
                         className={`p-4 rounded-xl border-2 transition-all text-left ${
                           isSelected
-                            ? 'border-indigo-500 bg-indigo-50'
+                            ? 'border-gray-300 bg-gray-50'
                             : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
@@ -1158,7 +1158,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                             </div>
                           </div>
                           {isSelected && (
-                            <Check className="w-5 h-5 text-indigo-600 shrink-0" />
+                            <Check className="w-5 h-5 text-blue-600 shrink-0" />
                           )}
                         </div>
                       </button>
@@ -1183,7 +1183,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                 <button
                   onClick={handleSyncToPortals}
                   disabled={syncing || selectedPortals.length === 0}
-                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {syncing ? 'Sende...' : 'Jetzt senden'}
                 </button>

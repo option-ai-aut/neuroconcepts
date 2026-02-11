@@ -34,7 +34,7 @@ const PRIORITY_CONFIG: Record<Priority, { label: string; color: string; icon: an
 
 const STATUS_CONFIG: Record<Status, { label: string; color: string }> = {
   open: { label: 'Offen', color: 'bg-red-50 text-red-600 border-red-200' },
-  in_progress: { label: 'In Bearbeitung', color: 'bg-blue-50 text-blue-600 border-blue-200' },
+  in_progress: { label: 'In Bearbeitung', color: 'bg-gray-100 text-gray-700 border-gray-200' },
   waiting: { label: 'Wartet auf Kunde', color: 'bg-amber-50 text-amber-600 border-amber-200' },
   resolved: { label: 'Gelöst', color: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
   closed: { label: 'Geschlossen', color: 'bg-gray-50 text-gray-500 border-gray-200' },
@@ -77,7 +77,7 @@ export default function SupportPage() {
         <div className="px-4 py-3 border-b border-gray-100">
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-base font-bold text-gray-900">Support & Tickets</h1>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700">
+            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-lg hover:bg-gray-800">
               <Plus className="w-3.5 h-3.5" />
               Neues Ticket
             </button>
@@ -87,7 +87,7 @@ export default function SupportPage() {
           <div className="grid grid-cols-4 gap-2 mb-3">
             {[
               { label: 'Offen', value: stats.open, color: 'text-red-600 bg-red-50' },
-              { label: 'In Bearbeitung', value: stats.inProgress, color: 'text-blue-600 bg-blue-50' },
+              { label: 'In Bearbeitung', value: stats.inProgress, color: 'text-gray-700 bg-gray-100' },
               { label: 'Wartet', value: stats.waiting, color: 'text-amber-600 bg-amber-50' },
               { label: 'Gelöst', value: stats.resolved, color: 'text-emerald-600 bg-emerald-50' },
             ].map((s) => (
@@ -106,7 +106,7 @@ export default function SupportPage() {
               placeholder="Ticket ID, Betreff oder Tenant..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full pl-9 pr-3 py-2 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -118,7 +118,7 @@ export default function SupportPage() {
               key={tab.key}
               onClick={() => setStatusFilter(tab.key as Status | 'all')}
               className={`px-2.5 py-1 text-[11px] font-medium rounded-md whitespace-nowrap transition-colors ${
-                statusFilter === tab.key ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                statusFilter === tab.key ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
             >
               {tab.label}
@@ -133,7 +133,7 @@ export default function SupportPage() {
               key={ticket.id}
               onClick={() => setSelectedTicket(ticket)}
               className={`px-4 py-3 border-b border-gray-50 cursor-pointer transition-colors ${
-                selectedTicket?.id === ticket.id ? 'bg-indigo-50/50' : 'hover:bg-gray-50'
+                selectedTicket?.id === ticket.id ? 'bg-gray-100' : 'hover:bg-gray-50'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
@@ -221,7 +221,7 @@ export default function SupportPage() {
 
           {/* Reply Input */}
           <div className="px-5 py-3 border-t border-gray-100">
-            <div className="bg-gray-50 rounded-xl p-2 focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
+            <div className="bg-gray-50 rounded-xl p-2 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
               <textarea
                 value={reply}
                 onChange={(e) => setReply(e.target.value)}
@@ -231,7 +231,7 @@ export default function SupportPage() {
               />
               <div className="flex items-center justify-between mt-1">
                 <button className="p-1 text-gray-400 hover:text-gray-600 rounded-md"><Paperclip className="w-4 h-4" /></button>
-                <button className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-md hover:bg-indigo-700 flex items-center gap-1.5">
+                <button className="px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-md hover:bg-gray-800 flex items-center gap-1.5">
                   <Send className="w-3 h-3" />Senden
                 </button>
               </div>

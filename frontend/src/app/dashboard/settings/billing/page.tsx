@@ -135,7 +135,7 @@ export default function BillingSettingsPage() {
               <button className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50">
                 Zahlungsmethode ändern
               </button>
-              <button className="px-4 py-2 rounded-lg text-sm font-medium text-indigo-600 hover:bg-indigo-50 flex items-center gap-2">
+              <button className="px-4 py-2 rounded-lg text-sm font-medium text-blue-600 hover:bg-gray-50 flex items-center gap-2">
                 <ExternalLink className="w-4 h-4" />
                 Stripe Portal öffnen
               </button>
@@ -148,7 +148,7 @@ export default function BillingSettingsPage() {
             <p className="text-sm text-gray-500 mb-6">
               Verbinden Sie Stripe, um Abonnements und Rechnungen zu verwalten.
             </p>
-            <button className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 inline-flex items-center gap-2">
+            <button className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 inline-flex items-center gap-2">
               <ExternalLink className="w-4 h-4" />
               Stripe verbinden
             </button>
@@ -208,7 +208,7 @@ export default function BillingSettingsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button className="text-indigo-600 hover:text-indigo-900 p-1 hover:bg-indigo-50 rounded-lg flex items-center gap-1 ml-auto">
+                      <button className="text-blue-600 hover:text-blue-700 p-1 hover:bg-gray-50 rounded-lg flex items-center gap-1 ml-auto">
                         <Download className="w-4 h-4" />
                         PDF
                       </button>

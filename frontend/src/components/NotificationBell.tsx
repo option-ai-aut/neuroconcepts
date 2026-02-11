@@ -19,7 +19,7 @@ interface Notification {
 }
 
 const notificationIcons: Record<string, React.ReactNode> = {
-  JARVIS_QUESTION: <MessageSquare className="w-4 h-4 text-indigo-400" />,
+  JARVIS_QUESTION: <MessageSquare className="w-4 h-4 text-blue-400" />,
   REMINDER: <Clock className="w-4 h-4 text-amber-400" />,
   ESCALATION: <AlertCircle className="w-4 h-4 text-red-400" />,
   NEW_LEAD: <UserPlus className="w-4 h-4 text-green-400" />,
@@ -111,7 +111,7 @@ export default function NotificationBell() {
             {unreadCount > 0 && (
               <button
                 onClick={markAllAsRead}
-                className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
               >
                 <CheckCheck className="w-3 h-3" />
                 Alle gelesen
@@ -152,7 +152,7 @@ export default function NotificationBell() {
                           {notification.title}
                         </p>
                         {!notification.read && (
-                          <span className="w-2 h-2 bg-indigo-500 rounded-full shrink-0" />
+                          <span className="w-2 h-2 bg-blue-500 rounded-full shrink-0" />
                         )}
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
@@ -171,7 +171,7 @@ export default function NotificationBell() {
           {/* Footer */}
           {notifications.length > 0 && (
             <div className="px-4 py-2 border-t border-gray-700">
-              <button className="w-full text-center text-sm text-indigo-400 hover:text-indigo-300 py-1">
+              <button className="w-full text-center text-sm text-blue-400 hover:text-blue-300 py-1">
                 Alle anzeigen
               </button>
             </div>

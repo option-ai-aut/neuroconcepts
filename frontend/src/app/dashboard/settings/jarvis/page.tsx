@@ -120,8 +120,8 @@ export default function JarvisSettingsPage() {
           {/* Auto Reply */}
           <div className="flex items-center justify-between py-4 border-b border-gray-100">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-indigo-600" />
+              <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                <MessageSquare className="w-5 h-5 text-gray-600" />
               </div>
               <div>
                 <span className="text-sm font-medium text-gray-900">Automatische Antwort</span>
@@ -131,7 +131,7 @@ export default function JarvisSettingsPage() {
             <button
               onClick={() => setAutoReply(!autoReply)}
               className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                autoReply ? 'bg-indigo-600' : 'bg-gray-200'
+                autoReply ? 'bg-gray-900' : 'bg-gray-200'
               }`}
             >
               <span
@@ -156,7 +156,7 @@ export default function JarvisSettingsPage() {
             <button
               onClick={() => setAutoMatch(!autoMatch)}
               className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                autoMatch ? 'bg-indigo-600' : 'bg-gray-200'
+                autoMatch ? 'bg-gray-900' : 'bg-gray-200'
               }`}
             >
               <span
@@ -181,7 +181,7 @@ export default function JarvisSettingsPage() {
             <button
               onClick={() => setNotifyOnMatch(!notifyOnMatch)}
               className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                notifyOnMatch ? 'bg-indigo-600' : 'bg-gray-200'
+                notifyOnMatch ? 'bg-gray-900' : 'bg-gray-200'
               }`}
             >
               <span
@@ -211,7 +211,7 @@ export default function JarvisSettingsPage() {
                 step="1"
                 value={delay}
                 onChange={(e) => setDelay(parseInt(e.target.value))}
-                className="w-full max-w-xs h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                className="w-full max-w-xs h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
               />
               <div className="mt-2 text-sm text-gray-900 font-medium">{delay} Minuten</div>
             </div>
@@ -241,7 +241,7 @@ export default function JarvisSettingsPage() {
             <button
               onClick={() => setEmailNotifications(!emailNotifications)}
               className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                emailNotifications ? 'bg-indigo-600' : 'bg-gray-200'
+                emailNotifications ? 'bg-gray-900' : 'bg-gray-200'
               }`}
             >
               <span
@@ -256,8 +256,8 @@ export default function JarvisSettingsPage() {
           <div className="py-4 border-b border-gray-100">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-purple-600" />
+                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-gray-600" />
                 </div>
                 <div>
                   <span className="text-sm font-medium text-gray-900">Besichtigungs-Präferenzen</span>
@@ -267,7 +267,7 @@ export default function JarvisSettingsPage() {
               <button
                 onClick={() => setViewingEnabled(!viewingEnabled)}
                 className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  viewingEnabled ? 'bg-indigo-600' : 'bg-gray-200'
+                  viewingEnabled ? 'bg-gray-900' : 'bg-gray-200'
                 }`}
               >
                 <span
@@ -290,7 +290,7 @@ export default function JarvisSettingsPage() {
                         onClick={() => toggleWeekday(day.value)}
                         className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
                           viewingWeekdays.includes(day.value)
-                            ? 'bg-indigo-600 text-white'
+                            ? 'bg-gray-900 text-white'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                       >
@@ -308,7 +308,7 @@ export default function JarvisSettingsPage() {
                       type="time"
                       value={viewingStartTime}
                       onChange={(e) => setViewingStartTime(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-gray-400"
                     />
                   </div>
                   <div>
@@ -317,7 +317,7 @@ export default function JarvisSettingsPage() {
                       type="time"
                       value={viewingEndTime}
                       onChange={(e) => setViewingEndTime(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-gray-400"
                     />
                   </div>
                 </div>
@@ -334,7 +334,7 @@ export default function JarvisSettingsPage() {
                     step="15"
                     value={slotDuration}
                     onChange={(e) => setSlotDuration(parseInt(e.target.value))}
-                    className="w-full max-w-xs h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    className="w-full max-w-xs h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   />
                 </div>
 
@@ -350,7 +350,7 @@ export default function JarvisSettingsPage() {
                     step="5"
                     value={bufferTime}
                     onChange={(e) => setBufferTime(parseInt(e.target.value))}
-                    className="w-full max-w-xs h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    className="w-full max-w-xs h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   />
                 </div>
               </div>
@@ -363,7 +363,7 @@ export default function JarvisSettingsPage() {
           <button
             onClick={saveSettings}
             disabled={saving}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {saving ? (
               <Loader2 className="w-4 h-4 animate-spin" />

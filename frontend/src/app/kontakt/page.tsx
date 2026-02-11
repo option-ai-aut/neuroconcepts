@@ -41,24 +41,24 @@ export default function KontaktPage() {
               
               <div className="space-y-4 sm:space-y-6">
                 <div className="flex items-start gap-3 sm:gap-4">
-                  <div className="w-10 sm:w-12 h-10 sm:h-12 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Mail className="w-5 sm:w-6 h-5 sm:h-6 text-indigo-600" />
+                  <div className="w-10 sm:w-12 h-10 sm:h-12 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Mail className="w-5 sm:w-6 h-5 sm:h-6 text-blue-600" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1 text-sm sm:text-base">E-Mail</h3>
-                    <a href="mailto:hello@immivo.ai" className="text-indigo-600 hover:underline text-sm sm:text-base">
+                    <a href="mailto:hello@immivo.ai" className="text-blue-600 hover:underline text-sm sm:text-base">
                       hello@immivo.ai
                     </a>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3 sm:gap-4">
-                  <div className="w-10 sm:w-12 h-10 sm:h-12 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Phone className="w-5 sm:w-6 h-5 sm:h-6 text-indigo-600" />
+                  <div className="w-10 sm:w-12 h-10 sm:h-12 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Phone className="w-5 sm:w-6 h-5 sm:h-6 text-blue-600" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1 text-sm sm:text-base">Telefon</h3>
-                    <a href="tel:+4312345678" className="text-indigo-600 hover:underline text-sm sm:text-base">
+                    <a href="tel:+4312345678" className="text-blue-600 hover:underline text-sm sm:text-base">
                       +43 1 234 56 78
                     </a>
                     <p className="text-xs sm:text-sm text-gray-500 mt-1">Mo-Fr, 9:00-18:00 Uhr</p>
@@ -66,8 +66,8 @@ export default function KontaktPage() {
                 </div>
 
                 <div className="flex items-start gap-3 sm:gap-4">
-                  <div className="w-10 sm:w-12 h-10 sm:h-12 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <MapPin className="w-5 sm:w-6 h-5 sm:h-6 text-indigo-600" />
+                  <div className="w-10 sm:w-12 h-10 sm:h-12 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <MapPin className="w-5 sm:w-6 h-5 sm:h-6 text-blue-600" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1 text-sm sm:text-base">Adresse</h3>
@@ -88,7 +88,7 @@ export default function KontaktPage() {
                 </p>
                 <Link 
                   href="/#demo"
-                  className="inline-flex items-center text-indigo-600 font-medium hover:underline text-sm sm:text-base"
+                  className="inline-flex items-center text-blue-600 font-medium hover:underline text-sm sm:text-base"
                 >
                   Demo-Termin vereinbaren →
                 </Link>
@@ -115,7 +115,7 @@ export default function KontaktPage() {
                       <input 
                         type="text" 
                         required
-                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                       />
                     </div>
                     <div>
@@ -123,7 +123,7 @@ export default function KontaktPage() {
                       <input 
                         type="text" 
                         required
-                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                       />
                     </div>
                   </div>
@@ -133,14 +133,14 @@ export default function KontaktPage() {
                     <input 
                       type="email" 
                       required
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Betreff</label>
                     <select 
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                     >
                       <option>Allgemeine Anfrage</option>
                       <option>Demo buchen</option>
@@ -155,13 +155,13 @@ export default function KontaktPage() {
                     <textarea 
                       rows={5}
                       required
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 resize-none"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 resize-none"
                     />
                   </div>
 
                   <button 
                     type="submit"
-                    className="w-full flex items-center justify-center px-6 py-3 sm:py-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-indigo-500/30 transition-all"
+                    className="w-full flex items-center justify-center px-6 py-3 sm:py-4 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 transition-all"
                   >
                     Nachricht senden
                     <Send className="ml-2 w-5 h-5" />

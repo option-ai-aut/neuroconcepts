@@ -343,15 +343,15 @@ export default function LoginPage() {
     }
   };
 
-  const inputClass = "w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all";
+  const inputClass = "w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all";
   const labelClass = "block text-sm font-medium text-gray-700 mb-1.5";
-  const buttonClass = "w-full py-3 px-4 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed";
+  const buttonClass = "w-full py-3 px-4 bg-gray-900 text-white font-semibold rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed";
 
   // Show nothing while checking existing session (prevents login page flash)
   if (checkingSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-gray-900" />
       </div>
     );
   }
@@ -360,7 +360,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col lg:flex-row bg-white">
       {/* Left Side - Image/Brand */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-gray-900 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 to-blue-600/20 z-10" />
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-800 z-10" />
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-40" />
         
         <div className="relative z-20 flex flex-col justify-between h-full p-12 text-white">
@@ -450,7 +450,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setView('forgotPassword')}
-                    className="text-sm text-indigo-600 hover:text-indigo-700"
+                    className="text-sm text-blue-600 hover:text-blue-700"
                   >
                     Passwort vergessen?
                   </button>
@@ -465,7 +465,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => { setView('signUp'); setError(''); }}
-                    className="text-indigo-600 hover:text-indigo-700 font-medium"
+                    className="text-blue-600 hover:text-blue-700 font-medium"
                   >
                     Jetzt registrieren
                   </button>
@@ -560,7 +560,7 @@ export default function LoginPage() {
                     <select
                       value={dialCode}
                       onChange={(e) => setDialCode(e.target.value)}
-                      className="w-24 px-3 py-3 border border-gray-300 border-r-0 rounded-l-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-24 px-3 py-3 border border-gray-300 border-r-0 rounded-l-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       {COUNTRIES.map((c) => (
                         <option key={c.code} value={c.dialCode}>
@@ -573,7 +573,7 @@ export default function LoginPage() {
                       value={phoneNumber}
                       onChange={(e) => setPhoneNumber(e.target.value.replace(/[^\d]/g, ''))}
                       placeholder="6701234567"
-                      className="flex-1 px-4 py-3 border border-gray-300 rounded-r-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-r-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -630,8 +630,8 @@ export default function LoginPage() {
 
                 <p className="text-center text-xs text-gray-400">
                   Mit der Registrierung akzeptierst du unsere{' '}
-                  <Link href="/agb" className="text-indigo-600 hover:underline">AGB</Link> und{' '}
-                  <Link href="/datenschutz" className="text-indigo-600 hover:underline">Datenschutzerklärung</Link>.
+                <Link href="/agb" className="text-blue-600 hover:underline">AGB</Link> und{' '}
+                <Link href="/datenschutz" className="text-blue-600 hover:underline">Datenschutzerklärung</Link>.
                 </p>
 
                 <p className="text-center text-sm text-gray-500">
@@ -639,7 +639,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => { setView('signIn'); setError(''); }}
-                    className="text-indigo-600 hover:text-indigo-700 font-medium"
+                    className="text-blue-600 hover:text-blue-700 font-medium"
                   >
                     Anmelden
                   </button>
@@ -683,7 +683,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setView('signIn')}
-                    className="text-indigo-600 hover:text-indigo-700 font-medium"
+                    className="text-blue-600 hover:text-blue-700 font-medium"
                   >
                     Zurück zur Anmeldung
                   </button>
@@ -724,7 +724,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setView('signIn')}
-                    className="text-indigo-600 hover:text-indigo-700 font-medium"
+                    className="text-blue-600 hover:text-blue-700 font-medium"
                   >
                     Zurück zur Anmeldung
                   </button>
@@ -778,7 +778,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setView('signIn')}
-                    className="text-indigo-600 hover:text-indigo-700 font-medium"
+                    className="text-blue-600 hover:text-blue-700 font-medium"
                   >
                     Zurück zur Anmeldung
                   </button>
@@ -790,7 +790,7 @@ export default function LoginPage() {
             {view === 'newPasswordRequired' && (
               <form onSubmit={handleNewPassword} className="space-y-5">
                 <div className="text-center mb-8">
-                  <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <div className="w-16 h-16 bg-gray-900 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                     <span className="text-3xl">👋</span>
                   </div>
                   <h3 className="text-2xl font-bold text-gray-900">Willkommen bei Immivo!</h3>
@@ -876,7 +876,7 @@ export default function LoginPage() {
             {view === 'onboarding' && (
               <form onSubmit={handleOnboarding} className="space-y-5">
                 <div className="text-center mb-8">
-                  <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <div className="w-16 h-16 bg-gray-900 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                     <span className="text-3xl">👋</span>
                   </div>
                   <h3 className="text-2xl font-bold text-gray-900">Willkommen bei Immivo!</h3>

@@ -25,7 +25,7 @@ interface TeamMember {
 
 const ROLE_CONFIG: Record<Role, { label: string; color: string; icon: any; level: number }> = {
   SUPER_ADMIN: { label: 'Super Admin', color: 'bg-red-50 text-red-700 border-red-200', icon: Shield, level: 3 },
-  ADMIN: { label: 'Admin / Developer', color: 'bg-violet-50 text-violet-700 border-violet-200', icon: ShieldCheck, level: 2 },
+  ADMIN: { label: 'Admin / Developer', color: 'bg-gray-100 text-gray-700 border-gray-200', icon: ShieldCheck, level: 2 },
   STAFF: { label: 'Mitarbeiter', color: 'bg-blue-50 text-blue-700 border-blue-200', icon: UserCheck, level: 1 },
 };
 
@@ -129,7 +129,7 @@ export default function UsersPage() {
         </div>
         <button
           onClick={() => { setShowCreateModal(true); generatePassword(); }}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors shadow-sm"
         >
           <Plus className="w-4 h-4" />
           Neuer Mitarbeiter
@@ -142,8 +142,8 @@ export default function UsersPage() {
         <div className="grid grid-cols-3 gap-4">
           {(Object.entries(ROLE_CONFIG) as [Role, typeof ROLE_CONFIG[Role]][]).map(([key, config]) => (
             <div key={key} className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${key === 'SUPER_ADMIN' ? 'bg-red-100' : key === 'ADMIN' ? 'bg-violet-100' : 'bg-blue-100'}`}>
-                <config.icon className={`w-4 h-4 ${key === 'SUPER_ADMIN' ? 'text-red-600' : key === 'ADMIN' ? 'text-violet-600' : 'text-blue-600'}`} />
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${key === 'SUPER_ADMIN' ? 'bg-red-100' : key === 'ADMIN' ? 'bg-gray-100' : 'bg-blue-100'}`}>
+                <config.icon className={`w-4 h-4 ${key === 'SUPER_ADMIN' ? 'text-red-600' : key === 'ADMIN' ? 'text-gray-600' : 'text-blue-600'}`} />
               </div>
               <div>
                 <p className="text-xs font-semibold text-gray-900">Level {config.level} — {config.label}</p>
@@ -167,7 +167,7 @@ export default function UsersPage() {
             placeholder="Name oder E-Mail suchen..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
@@ -204,9 +204,9 @@ export default function UsersPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                      member.role === 'SUPER_ADMIN' ? 'bg-gradient-to-br from-red-500 to-orange-500 text-white' :
-                      member.role === 'ADMIN' ? 'bg-gradient-to-br from-violet-500 to-indigo-500 text-white' :
-                      'bg-gradient-to-br from-blue-500 to-cyan-500 text-white'
+                      member.role === 'SUPER_ADMIN' ? 'bg-gray-900 text-white' :
+                      member.role === 'ADMIN' ? 'bg-gray-800 text-white' :
+                      'bg-gray-600 text-white'
                     }`}>
                       {member.firstName[0]}{member.lastName[0]}
                     </div>
@@ -281,7 +281,7 @@ export default function UsersPage() {
                     value={newMember.firstName}
                     onChange={(e) => setNewMember(prev => ({ ...prev, firstName: e.target.value }))}
                     onBlur={generateEmail}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Max"
                   />
                 </div>
@@ -292,7 +292,7 @@ export default function UsersPage() {
                     value={newMember.lastName}
                     onChange={(e) => setNewMember(prev => ({ ...prev, lastName: e.target.value }))}
                     onBlur={generateEmail}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Mustermann"
                   />
                 </div>
@@ -306,7 +306,7 @@ export default function UsersPage() {
                     type="email"
                     value={newMember.email}
                     onChange={(e) => setNewMember(prev => ({ ...prev, email: e.target.value }))}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="max.mustermann@immivo.ai"
                   />
                   <button
@@ -323,7 +323,7 @@ export default function UsersPage() {
                     id="createEmail"
                     checked={newMember.createEmail}
                     onChange={(e) => setNewMember(prev => ({ ...prev, createEmail: e.target.checked }))}
-                    className="w-3.5 h-3.5 text-indigo-600 rounded border-gray-300"
+                    className="w-3.5 h-3.5 text-blue-600 rounded border-gray-300"
                   />
                   <label htmlFor="createEmail" className="text-[11px] text-gray-500">AWS SES E-Mail-Adresse erstellen</label>
                 </div>
@@ -338,7 +338,7 @@ export default function UsersPage() {
                       type={showPassword ? 'text' : 'password'}
                       value={newMember.password}
                       onChange={(e) => setNewMember(prev => ({ ...prev, password: e.target.value }))}
-                      className="w-full px-3 py-2 pr-9 text-sm font-mono border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-3 py-2 pr-9 text-sm font-mono border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     <button
                       type="button"
@@ -350,7 +350,7 @@ export default function UsersPage() {
                   </div>
                   <button
                     onClick={generatePassword}
-                    className="px-3 py-2 text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100"
+                    className="px-3 py-2 text-xs font-medium text-blue-600 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200"
                   >
                     Generieren
                   </button>
@@ -365,7 +365,7 @@ export default function UsersPage() {
                   <select
                     value={newMember.role}
                     onChange={(e) => setNewMember(prev => ({ ...prev, role: e.target.value as Role }))}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                   >
                     <option value="STAFF">Level 1 — Mitarbeiter</option>
                     <option value="ADMIN">Level 2 — Admin / Developer</option>
@@ -377,7 +377,7 @@ export default function UsersPage() {
                   <select
                     value={newMember.department}
                     onChange={(e) => setNewMember(prev => ({ ...prev, department: e.target.value as Department }))}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                   >
                     {Object.entries(DEPARTMENTS).map(([key, label]) => (
                       <option key={key} value={key}>{label}</option>
@@ -387,9 +387,9 @@ export default function UsersPage() {
               </div>
 
               {/* Info */}
-              <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                <AlertCircle className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-blue-700 leading-relaxed">
+              <div className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <AlertCircle className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-gray-700 leading-relaxed">
                   Der Mitarbeiter erhält eine Einladungs-E-Mail mit den Zugangsdaten. Beim ersten Login muss ein neues Passwort gesetzt werden.
                 </p>
               </div>
@@ -405,7 +405,7 @@ export default function UsersPage() {
               <button
                 onClick={handleCreate}
                 disabled={!newMember.firstName || !newMember.lastName || !newMember.email || !newMember.password || creating}
-                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 {creating ? 'Wird erstellt...' : 'Erstellen'}

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { 
   Bot, Shield, Globe, Mail, Database, Key, Bell, Palette,
   Save, RefreshCw, AlertCircle, CheckCircle2, Eye, EyeOff,
-  Server, Zap, Lock, FileText, Copy, ExternalLink
+  Server, Zap, Lock, FileText, Copy, ExternalLink, Settings
 } from 'lucide-react';
 
 interface SettingSection {
@@ -65,10 +65,10 @@ export default function SettingsPage() {
               key={section.id}
               onClick={() => setActiveSection(section.id)}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors ${
-                activeSection === section.id ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'
+                activeSection === section.id ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
-              <section.icon className={`w-4 h-4 ${activeSection === section.id ? 'text-indigo-500' : 'text-gray-400'}`} />
+              <section.icon className={`w-4 h-4 ${activeSection === section.id ? 'text-blue-600' : 'text-gray-400'}`} />
               <span className="text-xs font-medium">{section.label}</span>
             </button>
           ))}
@@ -89,7 +89,7 @@ export default function SettingsPage() {
               <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
                 <div className="p-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">KI-Modell</label>
-                  <select value={aiModel} onChange={(e) => setAiModel(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                  <select value={aiModel} onChange={(e) => setAiModel(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                     <option value="gpt-5-mini">GPT-5 Mini (Standard, schnell)</option>
                     <option value="gpt-5">GPT-5 (Premium, langsamer)</option>
                     <option value="gpt-4o">GPT-4o (Legacy)</option>
@@ -100,13 +100,13 @@ export default function SettingsPage() {
 
                 <div className="p-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Temperature</label>
-                  <input type="number" step="0.1" min="0" max="2" value={aiTemperature} onChange={(e) => setAiTemperature(e.target.value)} className="w-32 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                  <input type="number" step="0.1" min="0" max="2" value={aiTemperature} onChange={(e) => setAiTemperature(e.target.value)} className="w-32 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                   <p className="text-[10px] text-gray-400 mt-1">0 = deterministisch, 1 = kreativ. Standard: 0.7</p>
                 </div>
 
                 <div className="p-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Max Output Tokens</label>
-                  <input type="number" value={aiMaxTokens} onChange={(e) => setAiMaxTokens(e.target.value)} className="w-32 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                  <input type="number" value={aiMaxTokens} onChange={(e) => setAiMaxTokens(e.target.value)} className="w-32 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                 </div>
 
                 <div className="p-4">
@@ -116,7 +116,7 @@ export default function SettingsPage() {
                     onChange={(e) => setSystemPromptAppend(e.target.value)}
                     placeholder="Optionaler Text der an den System-Prompt aller Tenants angehängt wird..."
                     rows={3}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                   />
                 </div>
               </div>
@@ -197,15 +197,15 @@ export default function SettingsPage() {
               <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
                 <div className="p-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">E-Mail Domain</label>
-                  <input type="text" value={emailDomain} onChange={(e) => setEmailDomain(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                  <input type="text" value={emailDomain} onChange={(e) => setEmailDomain(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                 </div>
                 <div className="p-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Absender-Name</label>
-                  <input type="text" value={emailFromName} onChange={(e) => setEmailFromName(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                  <input type="text" value={emailFromName} onChange={(e) => setEmailFromName(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                 </div>
                 <div className="p-4">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Tägliches Sendelimit</label>
-                  <input type="number" value={dailyLimit} onChange={(e) => setDailyLimit(e.target.value)} className="w-32 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                  <input type="number" value={dailyLimit} onChange={(e) => setDailyLimit(e.target.value)} className="w-32 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                 </div>
               </div>
             </>
@@ -235,7 +235,7 @@ export default function SettingsPage() {
             </button>
             <button
               onClick={handleSave}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
             >
               {saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
               {saved ? 'Gespeichert!' : 'Speichern'}

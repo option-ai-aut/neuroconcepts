@@ -88,7 +88,7 @@ export default function PreisePage() {
                 key={i} 
                 className={`relative rounded-2xl p-6 sm:p-8 ${
                   plan.popular 
-                    ? 'bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-xl shadow-indigo-500/30' 
+                    ? 'bg-gray-900 text-white shadow-xl' 
                     : 'bg-white border border-gray-200'
                 }`}
               >
@@ -99,15 +99,15 @@ export default function PreisePage() {
                 )}
                 
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 sm:mb-6 ${
-                  plan.popular ? 'bg-white/20' : 'bg-indigo-100'
+                  plan.popular ? 'bg-white/20' : 'bg-gray-100'
                 }`}>
-                  <plan.icon className={`w-6 h-6 ${plan.popular ? 'text-white' : 'text-indigo-600'}`} />
+                  <plan.icon className={`w-6 h-6 ${plan.popular ? 'text-white' : 'text-blue-600'}`} />
                 </div>
 
                 <h3 className={`text-xl sm:text-2xl font-bold mb-2 ${plan.popular ? 'text-white' : 'text-gray-900'}`}>
                   {plan.name}
                 </h3>
-                <p className={`text-sm mb-4 sm:mb-6 ${plan.popular ? 'text-indigo-200' : 'text-gray-500'}`}>
+                <p className={`text-sm mb-4 sm:mb-6 ${plan.popular ? 'text-gray-300' : 'text-gray-500'}`}>
                   {plan.description}
                 </p>
 
@@ -115,7 +115,7 @@ export default function PreisePage() {
                   <span className={`text-4xl sm:text-5xl font-extrabold ${plan.popular ? 'text-white' : 'text-gray-900'}`}>
                     {plan.price.startsWith('Auf') ? '' : '€'}{plan.price}
                   </span>
-                  <span className={plan.popular ? 'text-indigo-200' : 'text-gray-500'}>
+                  <span className={plan.popular ? 'text-gray-300' : 'text-gray-500'}>
                     {plan.period}
                   </span>
                 </div>
@@ -124,7 +124,7 @@ export default function PreisePage() {
                   {plan.features.map((feature, j) => (
                     <li key={j} className="flex items-center gap-3">
                       <CheckCircle2 className={`w-5 h-5 flex-shrink-0 ${
-                        plan.popular ? 'text-indigo-200' : 'text-green-500'
+                        plan.popular ? 'text-gray-300' : 'text-green-500'
                       }`} />
                       <span className={`text-sm sm:text-base ${plan.popular ? 'text-white' : 'text-gray-700'}`}>
                         {feature}
@@ -137,8 +137,8 @@ export default function PreisePage() {
                   href={plan.name === 'Enterprise' ? '/kontakt' : '/login'}
                   className={`w-full flex items-center justify-center px-6 py-3 rounded-xl font-semibold transition-all hover:-translate-y-0.5 ${
                     plan.popular 
-                      ? 'bg-white text-indigo-600 hover:bg-gray-100' 
-                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                      ? 'bg-white text-blue-600 hover:bg-gray-100' 
+                      : 'bg-gray-900 text-white hover:bg-gray-800'
                   }`}
                 >
                   {plan.cta}

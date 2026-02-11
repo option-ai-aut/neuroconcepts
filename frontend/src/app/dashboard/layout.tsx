@@ -98,7 +98,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       {!mobileJarvisOpen && !jarvisClosing && (
         <button
           onClick={() => setMobileJarvisOpen(true)}
-          className="lg:hidden fixed bottom-[72px] right-4 z-40 w-14 h-14 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg animate-fab-pulse active:scale-95 transition-transform safe-bottom"
+          className="lg:hidden fixed bottom-[72px] right-4 z-40 w-14 h-14 bg-gray-900 rounded-full flex items-center justify-center shadow-lg animate-fab-pulse active:scale-95 transition-transform safe-bottom"
           style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
           aria-label="Jarvis KI-Chat öffnen"
         >
@@ -170,7 +170,7 @@ export default function DashboardLayout({
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto" />
           <p className="mt-4 text-gray-600">Wird geladen...</p>
         </div>
       </div>

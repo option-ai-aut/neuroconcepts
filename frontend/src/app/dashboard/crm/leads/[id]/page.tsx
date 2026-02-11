@@ -227,8 +227,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const LEAD_STAGES = [
     { id: 'NEW', label: 'Neu', color: 'blue' },
     { id: 'CONTACTED', label: 'Kontaktiert', color: 'yellow' },
-    { id: 'CONVERSATION', label: 'Im Gespräch', color: 'purple' },
-    { id: 'BOOKED', label: 'Termin', color: 'indigo' },
+    { id: 'CONVERSATION', label: 'Im Gespräch', color: 'gray' },
+    { id: 'BOOKED', label: 'Termin', color: 'gray' },
     { id: 'WON', label: 'Abschluss', color: 'green' },
   ];
 
@@ -276,7 +276,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               className={`flex items-center gap-2 px-4 py-2 rounded-md cursor-pointer transition-all font-medium text-sm ${
                 formData.status === 'NEW' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' :
                 formData.status === 'CONTACTED' ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' :
-                formData.status === 'CONVERSATION' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' :
+                formData.status === 'CONVERSATION' ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' :
                 formData.status === 'BOOKED' ? 'bg-green-100 text-green-700 hover:bg-green-200' :
                 formData.status === 'WON' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' :
                 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -297,8 +297,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 {[
                   { value: 'NEW', label: 'Neu', color: 'text-blue-700 hover:bg-blue-50' },
                   { value: 'CONTACTED', label: 'Kontaktiert', color: 'text-yellow-700 hover:bg-yellow-50' },
-                  { value: 'CONVERSATION', label: 'Im Gespräch', color: 'text-purple-700 hover:bg-purple-50' },
-                  { value: 'BOOKED', label: 'Termin gebucht', color: 'text-indigo-700 hover:bg-indigo-50' },
+                  { value: 'CONVERSATION', label: 'Im Gespräch', color: 'text-gray-700 hover:bg-gray-50' },
+                  { value: 'BOOKED', label: 'Termin gebucht', color: 'text-gray-700 hover:bg-gray-50' },
                   { value: 'WON', label: 'Abgeschlossen', color: 'text-emerald-700 hover:bg-emerald-50' },
                   { value: 'LOST', label: 'Verloren', color: 'text-gray-700 hover:bg-gray-50' },
                 ].map((option) => (
@@ -357,8 +357,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   switch (stage.color) {
                     case 'blue': return 'bg-blue-500';
                     case 'yellow': return 'bg-yellow-500';
-                    case 'purple': return 'bg-purple-500';
-                    case 'indigo': return 'bg-indigo-500';
+                    case 'purple': return 'bg-gray-400';
+                    case 'indigo': return 'bg-gray-800';
                     case 'green': return 'bg-green-500';
                     default: return 'bg-gray-400';
                   }
@@ -370,8 +370,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   switch (stage.color) {
                     case 'blue': return 'bg-blue-500 border-blue-500';
                     case 'yellow': return 'bg-yellow-500 border-yellow-500';
-                    case 'purple': return 'bg-purple-500 border-purple-500';
-                    case 'indigo': return 'bg-indigo-500 border-indigo-500';
+                    case 'purple': return 'bg-gray-400 border-gray-400';
+                    case 'indigo': return 'bg-gray-800 border-gray-800';
                     case 'green': return 'bg-green-500 border-green-500';
                     default: return 'bg-gray-400 border-gray-400';
                   }
@@ -428,7 +428,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   <Building className="w-4 h-4 text-gray-400" />
                   <Link 
                     href={`/dashboard/crm/properties/${assignedProperty.id}`}
-                    className="text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                   >
                     {assignedProperty.title}
                   </Link>
@@ -444,7 +444,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   <div className="flex items-center gap-1">
                     {assignedUsers.map((user, index) => (
                       <span key={user.id} className="inline-flex items-center gap-1">
-                        <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+                        <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
                           {user.name || user.email}
                         </span>
                         {index < assignedUsers.length - 1 && <span className="text-gray-300">,</span>}
@@ -472,7 +472,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 <select
                   value={formData.salutation || 'NONE'}
                   onChange={(e) => handleInputChange('salutation', e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                 >
                   <option value="NONE">Keine</option>
                   <option value="MR">Herr</option>
@@ -489,7 +489,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     onClick={() => handleInputChange('formalAddress', true)}
                     className={`px-4 py-2 text-sm font-medium rounded-l-md border transition-colors ${
                       formData.formalAddress !== false
-                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        ? 'bg-gray-900 text-white border-gray-900'
                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                     }`}
                   >
@@ -500,7 +500,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     onClick={() => handleInputChange('formalAddress', false)}
                     className={`px-4 py-2 text-sm font-medium rounded-r-md border-t border-r border-b transition-colors ${
                       formData.formalAddress === false
-                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        ? 'bg-gray-900 text-white border-gray-900'
                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                     }`}
                   >
@@ -515,7 +515,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   type="text"
                   value={formData.firstName || ''}
                   onChange={(e) => handleInputChange('firstName', e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                 />
               </div>
 
@@ -525,7 +525,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   type="text"
                   value={formData.lastName || ''}
                   onChange={(e) => handleInputChange('lastName', e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                 />
               </div>
             </div>
@@ -542,7 +542,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     type="email"
                     value={formData.email || ''}
                     onChange={(e) => handleInputChange('email', e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                   />
                 </div>
               </div>
@@ -557,7 +557,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     type="tel"
                     value={formData.phone || ''}
                     onChange={(e) => handleInputChange('phone', e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                   />
                 </div>
               </div>
@@ -582,7 +582,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     type="number"
                     value={formData.budgetMin || ''}
                     onChange={(e) => handleInputChange('budgetMin', parseFloat(e.target.value))}
-                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                   />
                 </div>
               </div>
@@ -597,7 +597,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     type="number"
                     value={formData.budgetMax || ''}
                     onChange={(e) => handleInputChange('budgetMax', parseFloat(e.target.value))}
-                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                   />
                 </div>
               </div>
@@ -607,7 +607,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 <select
                   value={formData.preferredType || ''}
                   onChange={(e) => handleInputChange('preferredType', e.target.value)}
-                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
+                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
                 >
                   <option value="">Keine Präferenz</option>
                   <option value="APARTMENT">Wohnung</option>
@@ -629,7 +629,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     type="text"
                     value={formData.preferredLocation || ''}
                     onChange={(e) => handleInputChange('preferredLocation', e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                   />
                 </div>
               </div>
@@ -645,7 +645,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     step="0.5"
                     value={formData.minRooms || ''}
                     onChange={(e) => handleInputChange('minRooms', parseFloat(e.target.value))}
-                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                   />
                 </div>
               </div>
@@ -660,7 +660,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     type="number"
                     value={formData.minArea || ''}
                     onChange={(e) => handleInputChange('minArea', parseFloat(e.target.value))}
-                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                    className="w-full pl-12 pr-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                   />
                 </div>
               </div>
@@ -670,7 +670,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 <select
                   value={formData.timeFrame || ''}
                   onChange={(e) => handleInputChange('timeFrame', e.target.value)}
-                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
+                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
                 >
                   <option value="">Bitte wählen</option>
                   <option value="IMMEDIATE">Sofort</option>
@@ -686,7 +686,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 <select
                   value={formData.financingStatus || 'NOT_CLARIFIED'}
                   onChange={(e) => handleInputChange('financingStatus', e.target.value)}
-                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
+                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
                 >
                   <option value="NOT_CLARIFIED">Noch nicht geklärt</option>
                   <option value="PRE_QUALIFIED">Vorqualifiziert</option>
@@ -707,7 +707,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 <select
                   value={formData.source || 'WEBSITE'}
                   onChange={(e) => handleInputChange('source', e.target.value)}
-                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
+                  className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
                 >
                   <option value="WEBSITE">Eigene Website</option>
                   <option value="PORTAL">Immobilienportal</option>
@@ -725,7 +725,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   type="text"
                   value={formData.sourceDetails || ''}
                   onChange={(e) => handleInputChange('sourceDetails', e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all"
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
                 />
               </div>
             </div>
@@ -742,7 +742,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 rows={6}
                 value={formData.notes || ''}
                 onChange={(e) => handleInputChange('notes', e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base text-gray-900 transition-all resize-none"
+                className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all resize-none"
               />
             </div>
           </div>
@@ -795,7 +795,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => downloadDocument(doc)}
-                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors"
                         title="Herunterladen"
                       >
                         <Download className="w-4 h-4" />
@@ -823,7 +823,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   updateEmailForm({ leadId: lead.id });
                   openDrawer('EMAIL');
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-md hover:bg-gray-800 transition-colors"
               >
                 <Mail className="w-4 h-4" />
                 E-Mail schreiben
@@ -851,10 +851,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       iconBg = 'bg-blue-100 text-blue-600';
                     } else if (activity.type === 'EMAIL_SENT') {
                       icon = <Send className="w-4 h-4" />;
-                      iconBg = 'bg-indigo-100 text-indigo-600';
+                      iconBg = 'bg-gray-100 text-gray-600';
                     } else if (activity.type === 'EMAIL_RECEIVED') {
                       icon = <Mail className="w-4 h-4" />;
-                      iconBg = 'bg-purple-100 text-purple-600';
+                      iconBg = 'bg-gray-100 text-gray-600';
                     } else if (activity.type === 'NOTE_ADDED') {
                       icon = <FileText className="w-4 h-4" />;
                       iconBg = 'bg-yellow-100 text-yellow-600';
@@ -899,7 +899,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                             <div className="mt-3 pt-3 border-t border-gray-200 flex justify-end">
                               <button
                                 onClick={() => handleSendDraft(activity.id)}
-                                className="text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-md transition-colors flex items-center"
+                                className="text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 px-4 py-2 rounded-md transition-colors flex items-center"
                               >
                                 <Send className="w-3 h-3 mr-1.5" />
                                 Senden

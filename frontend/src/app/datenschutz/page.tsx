@@ -22,7 +22,7 @@ export default function DatenschutzPage() {
               Immivo AI GmbH<br />
               Musterstraße 123<br />
               1010 Wien, Österreich<br />
-              E-Mail: <a href="mailto:datenschutz@immivo.ai" className="text-indigo-600 hover:underline">datenschutz@immivo.ai</a>
+              E-Mail: <a href="mailto:datenschutz@immivo.ai" className="text-blue-600 hover:underline">datenschutz@immivo.ai</a>
             </p>
 
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-6 sm:mt-8 mb-3 sm:mb-4">2. Erhebung und Verarbeitung personenbezogener Daten</h2>
@@ -139,13 +139,13 @@ export default function DatenschutzPage() {
             <p className="text-sm sm:text-base">
               Österreichische Datenschutzbehörde<br />
               Barichgasse 40-42, 1030 Wien<br />
-              <a href="https://www.dsb.gv.at" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">www.dsb.gv.at</a>
+              <a href="https://www.dsb.gv.at" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">www.dsb.gv.at</a>
             </p>
 
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-6 sm:mt-8 mb-3 sm:mb-4">12. Kontakt</h2>
             <p className="text-sm sm:text-base">
               Bei Fragen zum Datenschutz kontaktieren Sie uns bitte unter:{' '}
-              <a href="mailto:datenschutz@immivo.ai" className="text-indigo-600 hover:underline">
+              <a href="mailto:datenschutz@immivo.ai" className="text-blue-600 hover:underline">
                 datenschutz@immivo.ai
               </a>
             </p>

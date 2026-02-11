@@ -36,12 +36,12 @@ const CHANNELS: Channel[] = [
 ];
 
 const MOCK_MESSAGES: ChatMessage[] = [
-  { id: '1', user: { name: 'Dennis Kral', initials: 'DK', color: 'from-red-500 to-orange-500' }, content: 'Guten Morgen zusammen! Stand-up in 10 Minuten.', time: '09:00' },
-  { id: '2', user: { name: 'Max Huber', initials: 'MH', color: 'from-violet-500 to-indigo-500' }, content: 'Bin dabei. Kurze Info: der neue Email-Parser für Homegate ist fertig und in Staging deployed. Tests laufen durch.', time: '09:02', reactions: [{ emoji: '🚀', count: 3 }, { emoji: '👍', count: 2 }] },
-  { id: '3', user: { name: 'Sarah Weber', initials: 'SW', color: 'from-blue-500 to-cyan-500' }, content: 'Super! Wir haben 3 neue Tickets von gestern Abend. Eines ist urgent — Kalender-Sync bei Kellner Immobilien funktioniert nicht mehr.', time: '09:05' },
-  { id: '4', user: { name: 'Tom Fischer', initials: 'TF', color: 'from-emerald-500 to-teal-500' }, content: 'Das schaue ich mir direkt an. Wahrscheinlich ist der Google OAuth Token abgelaufen. Fixe ich vor dem Standup.', time: '09:06', reactions: [{ emoji: '💪', count: 2 }] },
-  { id: '5', user: { name: 'Dennis Kral', initials: 'DK', color: 'from-red-500 to-orange-500' }, content: 'Perfekt, danke Tom. @Sarah bitte dem Kunden schon mal Bescheid geben, dass wir dran sind.', time: '09:07' },
-  { id: '6', user: { name: 'Lisa Müller', initials: 'LM', color: 'from-pink-500 to-rose-500' }, content: 'Ich hab gestern noch zwei Demo-Calls mit neuen Leads gehabt. Sieht gut aus — einer davon ist eine Kette mit 15 Maklern. 🎯', time: '09:10', reactions: [{ emoji: '🔥', count: 4 }, { emoji: '🎉', count: 2 }] },
+  { id: '1', user: { name: 'Dennis Kral', initials: 'DK', color: 'bg-gray-900' }, content: 'Guten Morgen zusammen! Stand-up in 10 Minuten.', time: '09:00' },
+  { id: '2', user: { name: 'Max Huber', initials: 'MH', color: 'bg-gray-800' }, content: 'Bin dabei. Kurze Info: der neue Email-Parser für Homegate ist fertig und in Staging deployed. Tests laufen durch.', time: '09:02', reactions: [{ emoji: '🚀', count: 3 }, { emoji: '👍', count: 2 }] },
+  { id: '3', user: { name: 'Sarah Weber', initials: 'SW', color: 'bg-gray-700' }, content: 'Super! Wir haben 3 neue Tickets von gestern Abend. Eines ist urgent — Kalender-Sync bei Kellner Immobilien funktioniert nicht mehr.', time: '09:05' },
+  { id: '4', user: { name: 'Tom Fischer', initials: 'TF', color: 'bg-gray-700' }, content: 'Das schaue ich mir direkt an. Wahrscheinlich ist der Google OAuth Token abgelaufen. Fixe ich vor dem Standup.', time: '09:06', reactions: [{ emoji: '💪', count: 2 }] },
+  { id: '5', user: { name: 'Dennis Kral', initials: 'DK', color: 'bg-gray-900' }, content: 'Perfekt, danke Tom. @Sarah bitte dem Kunden schon mal Bescheid geben, dass wir dran sind.', time: '09:07' },
+  { id: '6', user: { name: 'Lisa Müller', initials: 'LM', color: 'bg-gray-600' }, content: 'Ich hab gestern noch zwei Demo-Calls mit neuen Leads gehabt. Sieht gut aus — einer davon ist eine Kette mit 15 Maklern. 🎯', time: '09:10', reactions: [{ emoji: '🔥', count: 4 }, { emoji: '🎉', count: 2 }] },
 ];
 
 export default function AdminChat() {
@@ -64,7 +64,7 @@ export default function AdminChat() {
     if (!input.trim()) return;
     setMessages(prev => [...prev, {
       id: String(Date.now()),
-      user: { name: 'Dennis Kral', initials: 'DK', color: 'from-red-500 to-orange-500' },
+      user: { name: 'Dennis Kral', initials: 'DK', color: 'bg-gray-900' },
       content: input,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }]);
@@ -92,7 +92,7 @@ export default function AdminChat() {
               placeholder="Suchen..."
               value={channelSearch}
               onChange={(e) => setChannelSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -108,13 +108,13 @@ export default function AdminChat() {
                   key={channel.id}
                   onClick={() => setActiveChannel(channel)}
                   className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors ${
-                    activeChannel.id === channel.id ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'
+                    activeChannel.id === channel.id ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
                   }`}
                 >
                   <Hash className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                   <span className="text-xs font-medium truncate flex-1">{channel.name}</span>
                   {channel.unread > 0 && (
-                    <span className="bg-indigo-600 text-white text-[10px] font-bold w-4.5 h-4.5 flex items-center justify-center rounded-full">{channel.unread}</span>
+                    <span className="bg-gray-900 text-white text-[10px] font-bold w-4.5 h-4.5 flex items-center justify-center rounded-full">{channel.unread}</span>
                   )}
                 </button>
               ))}
@@ -127,13 +127,13 @@ export default function AdminChat() {
                 key={channel.id}
                 onClick={() => setActiveChannel(channel)}
                 className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors ${
-                  activeChannel.id === channel.id ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'
+                  activeChannel.id === channel.id ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
                 {channel.type === 'private' ? <Lock className="w-3 h-3 text-gray-400 shrink-0" /> : <Hash className="w-3.5 h-3.5 text-gray-400 shrink-0" />}
                 <span className="text-xs font-medium truncate flex-1">{channel.name}</span>
                 {channel.unread > 0 && (
-                  <span className="bg-indigo-600 text-white text-[10px] font-bold min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1">{channel.unread}</span>
+                  <span className="bg-gray-900 text-white text-[10px] font-bold min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1">{channel.unread}</span>
                 )}
               </button>
             ))}
@@ -169,7 +169,7 @@ export default function AdminChat() {
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {messages.map((msg) => (
             <div key={msg.id} className="flex items-start gap-3 group">
-              <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${msg.user.color} flex items-center justify-center text-white text-[10px] font-bold shrink-0`}>
+              <div className={`w-8 h-8 rounded-lg ${msg.user.color} flex items-center justify-center text-white text-[10px] font-bold shrink-0`}>
                 {msg.user.initials}
               </div>
               <div className="flex-1 min-w-0">
@@ -196,7 +196,7 @@ export default function AdminChat() {
 
         {/* Input */}
         <div className="px-5 py-3 border-t border-gray-100">
-          <div className="bg-gray-50 rounded-xl p-2 focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
+          <div className="bg-gray-50 rounded-xl p-2 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
             <div className="flex items-end gap-2">
               <textarea
                 value={input}
@@ -217,7 +217,7 @@ export default function AdminChat() {
                 <button
                   onClick={handleSend}
                   disabled={!input.trim()}
-                  className="p-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-30 transition-all"
+                  className="p-1.5 bg-gray-900 text-white rounded-md hover:bg-gray-800 disabled:opacity-30 transition-all"
                 >
                   <Send className="w-4 h-4" />
                 </button>

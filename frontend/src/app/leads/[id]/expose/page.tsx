@@ -24,7 +24,7 @@ anbei das Exposé für "Traumwohnung Berlin".
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">Template wählen</label>
           <select 
-            className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2 border"
+            className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm p-2 border"
             value={template}
             onChange={(e) => setTemplate(e.target.value)}
           >
@@ -38,7 +38,7 @@ anbei das Exposé für "Traumwohnung Berlin".
           <label className="block text-sm font-medium text-gray-700 mb-2">Vorschau & Bearbeiten</label>
           <textarea
             rows={10}
-            className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md p-3 border"
+            className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md p-3 border"
             value={content}
             onChange={(e) => setContent(e.target.value)}
           />
@@ -50,7 +50,7 @@ anbei das Exposé für "Traumwohnung Berlin".
           </button>
           <button 
             onClick={handleSend}
-            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             Senden
           </button>

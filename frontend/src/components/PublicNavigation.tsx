@@ -64,7 +64,7 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
               </div>
             </div>
 
-            <Link href="/preise" className={`text-sm font-medium transition-colors ${currentPage === 'preise' ? 'text-indigo-600' : 'text-gray-600 hover:text-gray-900'}`}>
+            <Link href="/preise" className={`text-sm font-medium transition-colors ${currentPage === 'preise' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'}`}>
               Preise
             </Link>
             
@@ -100,7 +100,7 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
             </Link>
             <Link 
               href="/login" 
-              className="bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/30 transition-all hover:-translate-y-0.5"
+              className="bg-gray-900 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:shadow-lg hover:shadow-gray-500/20 transition-all hover:-translate-y-0.5"
             >
               Kostenlos starten
             </Link>
@@ -144,7 +144,7 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
             </div>
 
             <div className="border-t border-gray-100 pt-4">
-              <Link href="/preise" className={`block py-2 font-medium ${currentPage === 'preise' ? 'text-indigo-600' : 'text-gray-900'}`} onClick={() => setMobileMenuOpen(false)}>
+                <Link href="/preise" className={`block py-2 font-medium ${currentPage === 'preise' ? 'text-blue-600' : 'text-gray-900'}`} onClick={() => setMobileMenuOpen(false)}>
                 Preise
               </Link>
             </div>
@@ -177,7 +177,7 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
               </Link>
               <Link 
                 href="/login" 
-                className="block w-full text-center py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-medium rounded-xl hover:shadow-lg transition-all"
+                className="block w-full text-center py-3 bg-gray-900 text-white font-medium rounded-xl hover:shadow-lg transition-all"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Kostenlos starten

@@ -68,8 +68,8 @@ export default function KarrierePage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
             {benefits.map((benefit, i) => (
               <div key={i} className="text-center">
-                <div className="w-12 sm:w-14 h-12 sm:h-14 bg-indigo-100 rounded-xl flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                  <benefit.icon className="w-6 sm:w-7 h-6 sm:h-7 text-indigo-600" />
+                <div className="w-12 sm:w-14 h-12 sm:h-14 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                  <benefit.icon className="w-6 sm:w-7 h-6 sm:h-7 text-blue-600" />
                 </div>
                 <h3 className="font-semibold text-gray-900 mb-1 sm:mb-2 text-sm sm:text-base">{benefit.title}</h3>
                 <p className="text-xs sm:text-sm text-gray-600">{benefit.description}</p>
@@ -91,7 +91,7 @@ export default function KarrierePage() {
                     <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-1">{job.title}</h3>
                     <p className="text-gray-600 text-sm mb-3">{job.description}</p>
                     <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
-                      <span className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md font-medium">
+                      <span className="px-2 py-1 bg-gray-50 text-blue-600 rounded-md font-medium">
                         {job.department}
                       </span>
                       <span className="flex items-center gap-1">
@@ -106,7 +106,7 @@ export default function KarrierePage() {
                   </div>
                   <Link 
                     href="/kontakt"
-                    className="inline-flex items-center justify-center px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors text-sm sm:text-base w-full sm:w-auto"
+                    className="inline-flex items-center justify-center px-5 py-2.5 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 transition-colors text-sm sm:text-base w-full sm:w-auto"
                   >
                     Bewerben
                     <ArrowRight className="ml-2 w-4 h-4" />
@@ -130,7 +130,7 @@ export default function KarrierePage() {
           </p>
           <Link 
             href="/kontakt"
-            className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-full font-semibold hover:shadow-lg hover:shadow-indigo-500/30 transition-all"
+            className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 bg-gray-900 text-white rounded-full font-semibold hover:bg-gray-800 transition-all"
           >
             Initiativbewerbung senden
             <ArrowRight className="ml-2 w-5 h-5" />

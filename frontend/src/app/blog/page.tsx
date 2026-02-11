@@ -73,10 +73,10 @@ export default function BlogPage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             {posts.map((post, i) => (
               <article key={i} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all">
-                <div className="aspect-[16/9] bg-gradient-to-br from-indigo-100 to-violet-100" />
+                <div className="aspect-[16/9] bg-gradient-to-br from-gray-100 to-gray-200" />
                 <div className="p-4 sm:p-6">
                   <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-500 mb-2 sm:mb-3">
-                    <span className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md text-xs font-medium">
+                    <span className="px-2 py-1 bg-gray-50 text-blue-600 rounded-md text-xs font-medium">
                       {post.category}
                     </span>
                     <span className="flex items-center gap-1">
@@ -92,7 +92,7 @@ export default function BlogPage() {
                   </p>
                   <div className="flex items-center justify-between">
                     <span className="text-xs sm:text-sm text-gray-400">{post.date}</span>
-                    <span className="text-indigo-600 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all cursor-pointer">
+                    <span className="text-blue-600 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all cursor-pointer">
                       Lesen <ArrowRight className="w-4 h-4" />
                     </span>
                   </div>
@@ -116,9 +116,9 @@ export default function BlogPage() {
             <input 
               type="email" 
               placeholder="deine@email.de"
-              className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
+              className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
             />
-            <button className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors">
+            <button className="px-6 py-3 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 transition-colors">
               Abonnieren
             </button>
           </div>

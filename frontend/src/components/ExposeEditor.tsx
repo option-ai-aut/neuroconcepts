@@ -197,7 +197,7 @@ interface ColorPalette {
 }
 
 const COLOR_PALETTES: ColorPalette[] = [
-  { id: 'indigo', name: 'Indigo', colors: { primary: '#4F46E5', secondary: '#1F2937', accent: '#6366F1', background: '#FFFFFF' } },
+  { id: 'indigo', name: 'Grau', colors: { primary: '#111827', secondary: '#1F2937', accent: '#3B82F6', background: '#FFFFFF' } },
   { id: 'slate', name: 'Slate', colors: { primary: '#0F172A', secondary: '#334155', accent: '#3B82F6', background: '#F8FAFC' } },
   { id: 'amber', name: 'Amber', colors: { primary: '#78350F', secondary: '#451A03', accent: '#D97706', background: '#FFFBEB' } },
   { id: 'zinc', name: 'Zink', colors: { primary: '#18181B', secondary: '#3F3F46', accent: '#71717A', background: '#FAFAFA' } },
@@ -217,8 +217,8 @@ const BG_COLORS = [
   { id: 'gray-800', name: 'Dunkelgrau', value: '#1F2937' },
   { id: 'gray-900', name: 'Fast Schwarz', value: '#111827' },
   { id: 'black', name: 'Schwarz', value: '#000000' },
-  { id: 'indigo-50', name: 'Indigo Hell', value: '#EEF2FF' },
-  { id: 'indigo-900', name: 'Indigo Dunkel', value: '#312E81' },
+  { id: 'indigo-50', name: 'Grau Hell', value: '#F9FAFB' },
+  { id: 'indigo-900', name: 'Grau Dunkel', value: '#1F2937' },
   { id: 'blue-50', name: 'Blau Hell', value: '#EFF6FF' },
   { id: 'blue-900', name: 'Blau Dunkel', value: '#1E3A5F' },
   { id: 'emerald-50', name: 'Grün Hell', value: '#ECFDF5' },
@@ -237,7 +237,7 @@ const TEXT_COLORS = [
   { id: 'gray-800', name: 'Dunkelgrau', value: '#1F2937' },
   { id: 'gray-900', name: 'Fast Schwarz', value: '#111827' },
   { id: 'black', name: 'Schwarz', value: '#000000' },
-  { id: 'indigo-600', name: 'Indigo', value: '#4F46E5' },
+  { id: 'indigo-600', name: 'Blau (Link)', value: '#2563EB' },
   { id: 'blue-600', name: 'Blau', value: '#2563EB' },
   { id: 'emerald-600', name: 'Grün', value: '#059669' },
   { id: 'amber-600', name: 'Amber', value: '#D97706' },
@@ -891,7 +891,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         {/* Selection indicator - inner border overlay */}
         {isSelected && !isDragging && (
           <div 
-            className={`absolute inset-0 pointer-events-none z-20 border-2 border-indigo-400 ${roundedClasses}`}
+            className={`absolute inset-0 pointer-events-none z-20 border-2 border-gray-400 ${roundedClasses}`}
             style={{ boxShadow: 'inset 0 0 12px rgba(99,102,241,0.3)' }}
           />
         )}
@@ -899,7 +899,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         {/* Drop indicator line */}
         {isHoverTarget && (
           <div className="absolute inset-x-0 -top-0.5 z-30 pointer-events-none">
-            <div className="h-1 bg-indigo-500 rounded-full mx-2" />
+            <div className="h-1 bg-gray-800 rounded-full mx-2" />
           </div>
         )}
 
@@ -916,7 +916,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                 <ChevronUp className="w-3.5 h-3.5 text-gray-500" />
               </button>
               <div 
-                className="p-1.5 bg-white rounded-md shadow cursor-grab hover:bg-indigo-50 hover:shadow-md transition-all"
+                className="p-1.5 bg-white rounded-md shadow cursor-grab hover:bg-gray-50 hover:shadow-md transition-all"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -1216,7 +1216,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                 />
               </div>
             ) : (
-              <div className="aspect-video bg-gradient-to-br from-indigo-100 to-purple-100 rounded flex flex-col items-center justify-center text-gray-500">
+              <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 rounded flex flex-col items-center justify-center text-gray-500">
                 <Eye className="w-12 h-12 mb-2" />
                 <span className="text-sm">360° Tour URL eingeben</span>
               </div>
@@ -1359,7 +1359,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                     <button
                       key={field.id}
                       type="button"
-                      className="w-full px-3 py-1.5 text-left hover:bg-indigo-50 flex items-center gap-2 transition-colors"
+                      className="w-full px-3 py-1.5 text-left hover:bg-gray-50 flex items-center gap-2 transition-colors"
                       onMouseDown={(e) => {
                         e.preventDefault(); // Prevent blur
                       }}
@@ -1394,7 +1394,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     const field = TEMPLATE_FIELDS.find(f => f.variable === variable);
     if (!field) return variable;
     return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
         {field.icon} {field.label}
       </span>
     );
@@ -1412,7 +1412,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
       'data-field-id': fieldId,
       value: value || '',
       placeholder: isTemplate ? `${placeholder} (tippe @ für Felder)` : placeholder,
-      className: "w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500" + (multiline ? " resize-none" : ""),
+      className: "w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" + (multiline ? " resize-none" : ""),
       onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         if (isTemplate) {
           handleMentionInput(e, fieldId, value, onChange);
@@ -1511,7 +1511,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                       e.dataTransfer.setData('text/plain', field.variable);
                       e.dataTransfer.effectAllowed = 'copy';
                     }}
-                    className={`flex items-center py-1.5 bg-white rounded border border-gray-200 cursor-grab hover:border-indigo-300 hover:bg-indigo-50 transition-colors ${
+                    className={`flex items-center py-1.5 bg-white rounded border border-gray-200 cursor-grab hover:border-gray-300 hover:bg-gray-50 transition-colors ${
                       showFieldsSidebar ? 'px-2 gap-2' : 'justify-center w-9 mx-auto'
                     }`}
                     title={field.label}
@@ -1604,7 +1604,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                   ) : (
                     <button
                       onClick={() => setShowImagePicker({ blockIndex: selectedBlockIndex, field: 'imageUrl', type: 'image' })}
-                      className="w-full p-4 border-2 border-dashed border-gray-300 rounded-md hover:border-indigo-400 hover:bg-indigo-50 transition-colors flex flex-col items-center gap-2"
+                      className="w-full p-4 border-2 border-dashed border-gray-300 rounded-md hover:border-gray-400 hover:bg-gray-50 transition-colors flex flex-col items-center gap-2"
                     >
                       <Upload className="w-6 h-6 text-gray-400" />
                       <span className="text-sm text-gray-500">Bild auswählen</span>
@@ -1633,7 +1633,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               <select
                 value={block.style || 'normal'}
                 onChange={(e) => updateBlock(selectedBlockIndex, { style: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="normal">Normal</option>
                 <option value="highlight">Hervorgehoben</option>
@@ -1758,7 +1758,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                 id="showGreeting"
                 checked={block.showGreeting !== false}
                 onChange={(e) => updateBlock(selectedBlockIndex, { showGreeting: e.target.checked })}
-                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
               <label htmlFor="showGreeting" className="text-xs text-gray-700">
                 Persönliche Anrede anzeigen
@@ -1775,7 +1775,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                 type="text"
                 value={block.buttonText || ''}
                 onChange={(e) => updateBlock(selectedBlockIndex, { buttonText: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Jetzt Termin vereinbaren"
               />
             </div>
@@ -1785,7 +1785,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                 type="text"
                 value={block.buttonUrl || ''}
                 onChange={(e) => updateBlock(selectedBlockIndex, { buttonUrl: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="https://..."
               />
             </div>
@@ -1799,7 +1799,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               <select
                 value={block.energyClass || ''}
                 onChange={(e) => updateBlock(selectedBlockIndex, { energyClass: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">Auswählen...</option>
                 {['A+', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map(c => (
@@ -1813,7 +1813,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                 type="text"
                 value={block.consumption || ''}
                 onChange={(e) => updateBlock(selectedBlockIndex, { consumption: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="z.B. 85 kWh/(m²·a)"
               />
             </div>
@@ -1843,7 +1843,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                 ) : (
                   <button
                     onClick={() => setShowImagePicker({ blockIndex: selectedBlockIndex, field: 'imageUrl', type: 'floorplan' })}
-                    className="w-full p-4 border-2 border-dashed border-gray-300 rounded-md hover:border-indigo-400 hover:bg-indigo-50 transition-colors flex flex-col items-center gap-2"
+                    className="w-full p-4 border-2 border-dashed border-gray-300 rounded-md hover:border-gray-400 hover:bg-gray-50 transition-colors flex flex-col items-center gap-2"
                   >
                     <Home className="w-6 h-6 text-gray-400" />
                     <span className="text-sm text-gray-500">Grundriss auswählen</span>
@@ -1861,7 +1861,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               type="text"
               value={block.videoUrl || ''}
               onChange={(e) => updateBlock(selectedBlockIndex, { videoUrl: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
               placeholder="YouTube, Vimeo oder direkte Video-URL"
             />
             <p className="mt-1 text-xs text-gray-500">Unterstützt: YouTube, Vimeo, MP4</p>
@@ -1875,7 +1875,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               type="text"
               value={block.tourUrl || ''}
               onChange={(e) => updateBlock(selectedBlockIndex, { tourUrl: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Matterport, 3DVista, etc."
             />
             <p className="mt-1 text-xs text-gray-500">Embed-URL der virtuellen Tour</p>
@@ -1890,7 +1890,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                 value={block.leftContent || ''}
                 onChange={(e) => updateBlock(selectedBlockIndex, { leftContent: e.target.value })}
                 rows={4}
-                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 resize-none"
                 placeholder="Inhalt linke Spalte..."
               />
             </div>
@@ -1900,7 +1900,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                 value={block.rightContent || ''}
                 onChange={(e) => updateBlock(selectedBlockIndex, { rightContent: e.target.value })}
                 rows={4}
-                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 resize-none"
                 placeholder="Inhalt rechte Spalte..."
               />
             </div>
@@ -1957,7 +1957,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                   const newItems = [...(block.items || []), { label: '', value: '' }];
                   updateBlock(selectedBlockIndex, { items: newItems });
                 }}
-                className="w-full py-2 border-2 border-dashed border-gray-200 rounded text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+                className="w-full py-2 border-2 border-dashed border-gray-200 rounded text-sm text-gray-500 hover:border-gray-400 hover:text-blue-600 transition-colors"
               >
                 <Plus className="w-4 h-4 inline mr-1" />
                 Hinzufügen
@@ -2019,7 +2019,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                   const newItems = [...(block.items || []), { label: '', value: '' }];
                   updateBlock(selectedBlockIndex, { items: newItems });
                 }}
-                className="w-full py-2 border-2 border-dashed border-gray-200 rounded text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+                className="w-full py-2 border-2 border-dashed border-gray-200 rounded text-sm text-gray-500 hover:border-gray-400 hover:text-blue-600 transition-colors"
               >
                 <Plus className="w-4 h-4 inline mr-1" />
                 Position hinzufügen
@@ -2063,7 +2063,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                   const newItems = [...(block.items || []), ''];
                   updateBlock(selectedBlockIndex, { items: newItems });
                 }}
-                className="w-full py-2 border-2 border-dashed border-gray-200 rounded text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+                className="w-full py-2 border-2 border-dashed border-gray-200 rounded text-sm text-gray-500 hover:border-gray-400 hover:text-blue-600 transition-colors"
               >
                 <Plus className="w-4 h-4 inline mr-1" />
                 {block.type === 'features' ? 'Merkmal hinzufügen' : 'Highlight hinzufügen'}
@@ -2088,7 +2088,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                       })}
                       className={`w-5 h-5 rounded border-2 transition-all ${
                         (block.backgroundColor === color.value || (!block.backgroundColor && color.value === 'transparent'))
-                          ? 'border-indigo-500 scale-110' 
+                          ? 'border-blue-500 scale-110' 
                           : 'border-gray-200 hover:border-gray-400'
                       }`}
                       style={{ 
@@ -2110,13 +2110,13 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                           onClick={() => updateBlock(selectedBlockIndex, { backgroundColor: color })}
                           className={`w-5 h-5 rounded border-2 transition-all relative ${
                             block.backgroundColor === color
-                              ? 'border-indigo-500 scale-110' 
+                              ? 'border-blue-500 scale-110' 
                               : 'border-gray-200 hover:border-gray-400'
                           }`}
                           style={{ backgroundColor: color }}
                           title={`Eigene: ${color}`}
                         >
-                          <Pipette className="w-2 h-2 absolute -top-0.5 -right-0.5 text-indigo-500 drop-shadow-sm" />
+                          <Pipette className="w-2 h-2 absolute -top-0.5 -right-0.5 text-blue-500 drop-shadow-sm" />
                         </button>
                       ))}
                     </>
@@ -2134,7 +2134,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                       })}
                       className={`w-5 h-5 rounded border-2 transition-all ${
                         block.titleColor === color.value
-                          ? 'border-indigo-500 scale-110' 
+                          ? 'border-blue-500 scale-110' 
                           : 'border-gray-200 hover:border-gray-400'
                       }`}
                       style={{ backgroundColor: color.value }}
@@ -2151,13 +2151,13 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                           onClick={() => updateBlock(selectedBlockIndex, { titleColor: color })}
                           className={`w-5 h-5 rounded border-2 transition-all relative ${
                             block.titleColor === color
-                              ? 'border-indigo-500 scale-110' 
+                              ? 'border-blue-500 scale-110' 
                               : 'border-gray-200 hover:border-gray-400'
                           }`}
                           style={{ backgroundColor: color }}
                           title={`Eigene: ${color}`}
                         >
-                          <Pipette className="w-2 h-2 absolute -top-0.5 -right-0.5 text-indigo-500 drop-shadow-sm" />
+                          <Pipette className="w-2 h-2 absolute -top-0.5 -right-0.5 text-blue-500 drop-shadow-sm" />
                         </button>
                       ))}
                     </>
@@ -2184,7 +2184,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                       })}
                       className={`w-5 h-5 rounded border-2 transition-all ${
                         block.textColor === color.value
-                          ? 'border-indigo-500 scale-110' 
+                          ? 'border-blue-500 scale-110' 
                           : 'border-gray-200 hover:border-gray-400'
                       }`}
                       style={{ backgroundColor: color.value }}
@@ -2201,13 +2201,13 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                           onClick={() => updateBlock(selectedBlockIndex, { textColor: color })}
                           className={`w-5 h-5 rounded border-2 transition-all relative ${
                             block.textColor === color
-                              ? 'border-indigo-500 scale-110' 
+                              ? 'border-blue-500 scale-110' 
                               : 'border-gray-200 hover:border-gray-400'
                           }`}
                           style={{ backgroundColor: color }}
                           title={`Eigene: ${color}`}
                         >
-                          <Pipette className="w-2 h-2 absolute -top-0.5 -right-0.5 text-indigo-500 drop-shadow-sm" />
+                          <Pipette className="w-2 h-2 absolute -top-0.5 -right-0.5 text-blue-500 drop-shadow-sm" />
                         </button>
                       ))}
                     </>
@@ -2234,7 +2234,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               <select
                 value={block.columns || 2}
                 onChange={(e) => updateBlock(selectedBlockIndex, { columns: parseInt(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value={2}>2 Spalten</option>
                 <option value={3}>3 Spalten</option>
@@ -2271,7 +2271,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                   )}
                   <button
                     onClick={() => setShowImagePicker({ blockIndex: selectedBlockIndex, field: 'images', type: 'gallery' })}
-                    className="w-full p-3 border-2 border-dashed border-gray-300 rounded-md hover:border-indigo-400 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
+                    className="w-full p-3 border-2 border-dashed border-gray-300 rounded-md hover:border-gray-400 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
                   >
                     <Plus className="w-4 h-4 text-gray-400" />
                     <span className="text-sm text-gray-500">Bilder hinzufügen</span>
@@ -2314,7 +2314,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         {/* Header */}
         <div className="flex items-center justify-between px-6 h-12 border-b border-gray-100 rounded-t-xl">
           <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 rounded-full bg-indigo-500" />
+            <div className="w-2 h-2 rounded-full bg-gray-800" />
             <h3 className="text-gray-900 font-semibold text-sm">Vorlage auswählen</h3>
           </div>
           <button onClick={handleClose} className="p-1 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50 transition-colors">
@@ -2331,10 +2331,10 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                 <button
                   key={t.id}
                   onClick={() => handleCreateFromTemplate(t.id)}
-                  className="group p-4 border-2 border-gray-200 rounded-xl hover:border-indigo-500 hover:shadow-lg transition-all text-left"
+                  className="group p-4 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:shadow-lg transition-all text-left"
                 >
                   <div className="aspect-[3/4] bg-gray-100 rounded-lg mb-4 flex items-center justify-center">
-                    <LayoutGrid className="w-12 h-12 text-gray-300 group-hover:text-indigo-300 transition-colors" />
+                    <LayoutGrid className="w-12 h-12 text-gray-300 group-hover:text-gray-400 transition-colors" />
                   </div>
                   <h3 className="font-medium text-gray-900">{t.name}</h3>
                   <p className="text-sm text-gray-500">{(t.blocks as any[])?.length || 0} Blöcke</p>
@@ -2359,7 +2359,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         }}
       >
         <div className="flex items-center justify-center h-full">
-          <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
         </div>
       </div>
     );
@@ -2381,7 +2381,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         onClick={() => setMinimized(!minimized)}
       >
         <div className="flex items-center space-x-3">
-          <div className="w-2 h-2 rounded-full bg-indigo-500" />
+          <div className="w-2 h-2 rounded-full bg-gray-800" />
           {isTemplate && template ? (
             <input
               type="text"
@@ -2435,7 +2435,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                             setPreviewProperty(prop); 
                             setShowPropertySelector(false); 
                           }}
-                          className={`flex flex-col w-full px-3 py-2 text-left hover:bg-gray-50 ${previewProperty?.id === prop.id ? 'bg-indigo-50' : ''}`}
+                          className={`flex flex-col w-full px-3 py-2 text-left hover:bg-gray-50 ${previewProperty?.id === prop.id ? 'bg-gray-50' : ''}`}
                         >
                           <span className="text-sm text-gray-900 font-medium truncate">{prop.title}</span>
                           <span className="text-xs text-gray-500">{prop.city} • {prop.rooms} Zimmer • {prop.livingArea} m²</span>
@@ -2462,7 +2462,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                       <button
                         key={style.id}
                         onClick={(e) => { e.stopPropagation(); setTheme(style.id); setShowThemeSelector(false); }}
-                        className={`flex items-center gap-3 w-full px-3 py-2 text-sm text-gray-900 hover:bg-gray-50 ${currentTheme === style.id ? 'bg-indigo-50' : ''}`}
+                        className={`flex items-center gap-3 w-full px-3 py-2 text-sm text-gray-900 hover:bg-gray-50 ${currentTheme === style.id ? 'bg-gray-50' : ''}`}
                       >
                         <span style={{ fontFamily: style.fontFamily }} className="text-base">{style.name}</span>
                       </button>
@@ -2480,7 +2480,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                   <Palette className="w-4 h-4" />
                   <span className="hidden sm:inline">Farben</span>
                   {customColors.length > 0 && (
-                    <span className="bg-indigo-100 text-indigo-600 text-[10px] font-medium rounded-full w-4 h-4 flex items-center justify-center">
+                    <span className="bg-gray-100 text-blue-600 text-[10px] font-medium rounded-full w-4 h-4 flex items-center justify-center">
                       {customColors.length}
                     </span>
                   )}
@@ -2542,7 +2542,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                                 addCustomColor(colorPickerValue);
                               }
                             }}
-                            className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-md hover:bg-indigo-700 transition-colors whitespace-nowrap"
+                            className="px-3 py-1.5 bg-gray-900 text-white text-xs rounded-md hover:bg-gray-800 transition-colors whitespace-nowrap"
                           >
                             <Plus className="w-3.5 h-3.5" />
                           </button>
@@ -2565,7 +2565,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                               onClick={() => setColorPickerValue(c)}
                               onDoubleClick={() => addCustomColor(c)}
                               className={`w-5 h-5 rounded border transition-all ${
-                                colorPickerValue === c ? 'border-indigo-500 scale-110' : 'border-gray-200 hover:border-gray-400'
+                                colorPickerValue === c ? 'border-blue-500 scale-110' : 'border-gray-200 hover:border-gray-400'
                               }`}
                               style={{ backgroundColor: c }}
                               title={`${c} — Doppelklick zum Hinzufügen`}
@@ -2619,8 +2619,8 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                   saveState === 'saved' 
                     ? 'bg-green-500' 
                     : saveState === 'saving'
-                    ? 'bg-indigo-500'
-                    : 'bg-indigo-600 hover:bg-indigo-700'
+                    ? 'bg-gray-800'
+                    : 'bg-gray-900 hover:bg-gray-800'
                 }`}
               >
                 <Save className="w-4 h-4 shrink-0" />
@@ -2631,11 +2631,11 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
 
           {/* Minimize/Maximize */}
           {minimized ? (
-            <button onClick={(e) => { e.stopPropagation(); setMinimized(false); }} className="p-1 text-gray-400 hover:text-indigo-600 rounded-md hover:bg-indigo-50">
+            <button onClick={(e) => { e.stopPropagation(); setMinimized(false); }} className="p-1 text-gray-400 hover:text-blue-600 rounded-md hover:bg-gray-50">
               <Maximize2 className="w-4 h-4" />
             </button>
           ) : (
-            <button onClick={(e) => { e.stopPropagation(); setMinimized(true); }} className="p-1 text-gray-400 hover:text-indigo-600 rounded-md hover:bg-indigo-50">
+            <button onClick={(e) => { e.stopPropagation(); setMinimized(true); }} className="p-1 text-gray-400 hover:text-blue-600 rounded-md hover:bg-gray-50">
               <Minus className="w-4 h-4" />
             </button>
           )}
@@ -2676,7 +2676,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                       <button
                         key={blockType.type}
                         onClick={() => addBlock(blockType.type)}
-                        className="w-full flex items-center pl-2 pr-3 py-1.5 text-sm text-gray-600 hover:bg-white hover:text-indigo-600 hover:shadow-sm rounded-md transition-colors"
+                        className="w-full flex items-center pl-2 pr-3 py-1.5 text-sm text-gray-600 hover:bg-white hover:text-blue-600 hover:shadow-sm rounded-md transition-colors"
                         title={blockType.label}
                       >
                         <blockType.icon className="w-4 h-4 shrink-0" />
@@ -2782,7 +2782,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                         )}
                         <button
                           onClick={() => setShowBlockLibrary(true)}
-                          className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700"
+                          className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800"
                         >
                           <Plus className="w-4 h-4 inline mr-2" />
                           Block hinzufügen
@@ -2808,7 +2808,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                         <div className="flex justify-center py-4">
                           <button
                             onClick={() => setShowBlockLibrary(true)}
-                            className="flex items-center gap-2 px-3 py-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors text-sm"
+                            className="flex items-center gap-2 px-3 py-1.5 text-gray-400 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors text-sm"
                           >
                             <Plus className="w-3 h-3" />
                             Block hinzufügen
@@ -2837,7 +2837,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                 };
                 updateBlocks([...currentBlocks, newBlock]);
               }}
-              className="flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-md transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-blue-600 hover:bg-white rounded-md transition-colors"
             >
               <FilePlus className="w-4 h-4" />
               <span className="text-sm">Neue Seite hinzufügen</span>
@@ -2888,7 +2888,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                             setShowImagePicker(null);
                           }
                         }}
-                        className="aspect-video rounded-lg overflow-hidden border-2 border-transparent hover:border-indigo-500 transition-colors"
+                        className="aspect-video rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 transition-colors"
                       >
                         <img src={img} alt="" className="w-full h-full object-cover" />
                       </button>
@@ -2912,7 +2912,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                           updateBlock(showImagePicker.blockIndex, { [showImagePicker.field]: img });
                           setShowImagePicker(null);
                         }}
-                        className="aspect-[4/3] rounded-lg overflow-hidden border-2 border-transparent hover:border-indigo-500 transition-colors bg-gray-50"
+                        className="aspect-[4/3] rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 transition-colors bg-gray-50"
                       >
                         <img src={img} alt="" className="w-full h-full object-contain" />
                       </button>
@@ -2947,7 +2947,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                   <input
                     type="text"
                     placeholder="https://..."
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         const url = (e.target as HTMLInputElement).value;
@@ -2977,7 +2977,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                         setShowImagePicker(null);
                       }
                     }}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700"
+                    className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800"
                   >
                     Hinzufügen
                   </button>
@@ -2990,7 +2990,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 flex justify-end">
                 <button
                   onClick={() => setShowImagePicker(null)}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700"
+                  className="px-4 py-2 bg-gray-900 text-white rounded-md text-sm hover:bg-gray-800"
                 >
                   Fertig
                 </button>

@@ -225,13 +225,13 @@ export default function ProfileSettingsPage() {
         
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <div className="flex items-center space-x-4 mb-6">
-            <div className="h-16 w-16 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 text-xl font-bold">
+            <div className="h-16 w-16 bg-gray-100 rounded-full flex items-center justify-center text-gray-700 text-xl font-bold">
               {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
             </div>
             <div>
               <h3 className="text-lg font-medium text-gray-900">{user.firstName} {user.lastName}</h3>
               <p className="text-sm text-gray-500">{user.email}</p>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 mt-2">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 mt-2">
                 {user.role}
               </span>
             </div>
@@ -245,7 +245,7 @@ export default function ProfileSettingsPage() {
                   type="text" 
                   value={firstName || user.firstName || ''} 
                   onChange={(e) => { setFirstName(e.target.value); setIsEditingProfile(true); }}
-                  className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                  className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" 
                 />
               </div>
               <div>
@@ -254,7 +254,7 @@ export default function ProfileSettingsPage() {
                   type="text" 
                   value={lastName || user.lastName || ''} 
                   onChange={(e) => { setLastName(e.target.value); setIsEditingProfile(true); }}
-                  className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                  className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" 
                 />
               </div>
             </div>
@@ -266,7 +266,7 @@ export default function ProfileSettingsPage() {
                   type="email" 
                   value={email || user.email || ''} 
                   onChange={(e) => { setEmail(e.target.value); setIsEditingProfile(true); }}
-                  className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                  className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" 
                 />
               </div>
               <div>
@@ -275,7 +275,7 @@ export default function ProfileSettingsPage() {
                   type="tel" 
                   value={phone || user.phone || ''} 
                   onChange={(e) => { setPhone(e.target.value); setIsEditingProfile(true); }}
-                  className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                  className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" 
                 />
               </div>
             </div>
@@ -289,7 +289,7 @@ export default function ProfileSettingsPage() {
                     type="text" 
                     value={street || user.street || ''} 
                     onChange={(e) => { setStreet(e.target.value); setIsEditingProfile(true); }}
-                    className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                    className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" 
                   />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -299,7 +299,7 @@ export default function ProfileSettingsPage() {
                       type="text" 
                       value={postalCode || user.postalCode || ''} 
                       onChange={(e) => { setPostalCode(e.target.value); setIsEditingProfile(true); }}
-                      className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                      className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" 
                     />
                   </div>
                   <div className="md:col-span-2">
@@ -308,7 +308,7 @@ export default function ProfileSettingsPage() {
                       type="text" 
                       value={city || user.city || ''} 
                       onChange={(e) => { setCity(e.target.value); setIsEditingProfile(true); }}
-                      className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                      className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" 
                     />
                   </div>
                 </div>
@@ -317,7 +317,7 @@ export default function ProfileSettingsPage() {
                   <select 
                     value={country || user.country || ''} 
                     onChange={(e) => { setCountry(e.target.value); setIsEditingProfile(true); }}
-                    className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Bitte wählen</option>
                     <option value="DE">Deutschland</option>
@@ -340,7 +340,7 @@ export default function ProfileSettingsPage() {
             {isEditingProfile && (
               <button 
                 onClick={handleSaveProfile}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700"
+                className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800"
               >
                 Speichern
               </button>
@@ -369,7 +369,7 @@ export default function ProfileSettingsPage() {
                     onChange={(e) => { setCurrentPassword(e.target.value); setPasswordError(''); }}
                     required
                     disabled={changingPassword}
-                    className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 pr-10 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100" 
+                    className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 pr-10 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" 
                   />
                   <button
                     type="button"
@@ -390,7 +390,7 @@ export default function ProfileSettingsPage() {
                     required
                     minLength={8}
                     disabled={changingPassword}
-                    className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 pr-10 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100" 
+                    className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 pr-10 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" 
                   />
                   <button
                     type="button"
@@ -410,7 +410,7 @@ export default function ProfileSettingsPage() {
                   onChange={(e) => { setConfirmPassword(e.target.value); setPasswordError(''); }}
                   required
                   disabled={changingPassword}
-                  className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100" 
+                  className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" 
                 />
               </div>
               <div className="flex justify-end gap-3 pt-4">
@@ -431,7 +431,7 @@ export default function ProfileSettingsPage() {
                 <button 
                   type="submit"
                   disabled={changingPassword}
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
+                  className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50 flex items-center gap-2"
                 >
                   {changingPassword && <Loader2 className="w-4 h-4 animate-spin" />}
                   {changingPassword ? 'Wird geändert...' : 'Passwort ändern'}
@@ -454,7 +454,7 @@ export default function ProfileSettingsPage() {
           </div>
           <button 
             onClick={() => setIsInviteOpen(true)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center shadow-sm"
+            className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 flex items-center shadow-sm"
           >
             <Plus className="w-4 h-4 mr-2" />
             Mitarbeiter einladen
@@ -471,7 +471,7 @@ export default function ProfileSettingsPage() {
                 placeholder="mitarbeiter@firma.de"
                 value={newSeatEmail}
                 onChange={(e) => setNewSeatEmail(e.target.value)}
-                className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+                className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500" 
               />
             </div>
             <div className="w-40">
@@ -479,7 +479,7 @@ export default function ProfileSettingsPage() {
               <select 
                 value={newSeatRole}
                 onChange={(e) => setNewSeatRole(e.target.value)}
-                className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="AGENT">Agent</option>
                 <option value="ADMIN">Admin</option>
@@ -487,7 +487,7 @@ export default function ProfileSettingsPage() {
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={() => setIsInviteOpen(false)} className="px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100">Abbrechen</button>
-              <button type="submit" className="bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700">Einladen</button>
+              <button type="submit" className="bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800">Einladen</button>
             </div>
           </form>
         )}

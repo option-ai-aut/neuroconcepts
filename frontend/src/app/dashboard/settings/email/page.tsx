@@ -83,7 +83,7 @@ export default function EmailSettingsPage() {
   <p style="margin: 0; font-weight: bold;">${user.name || 'Ihr Name'}</p>
   ${user.tenant?.name ? `<p style="margin: 4px 0 0 0; color: #666;">${user.tenant.name}</p>` : ''}
   <p style="margin: 8px 0 0 0;">
-    ${user.email ? `<span style="color: #4f46e5;">${user.email}</span>` : ''}
+    ${user.email ? `<span style="color: #2563eb;">${user.email}</span>` : ''}
     ${user.phone ? `<span style="margin-left: 16px;">${user.phone}</span>` : ''}
   </p>
 </div>
@@ -138,7 +138,7 @@ export default function EmailSettingsPage() {
           value={signatureName}
           onChange={(e) => setSignatureName(e.target.value)}
           placeholder="z.B. Geschäftlich, Privat..."
-          className="w-full max-w-md rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 outline-none transition-all"
+          className="w-full max-w-md rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 outline-none transition-all"
         />
       </div>
 
@@ -172,7 +172,7 @@ export default function EmailSettingsPage() {
         <button
           onClick={generateSignature}
           disabled={generating}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 disabled:opacity-50 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
         >
           {generating ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -255,7 +255,7 @@ export default function EmailSettingsPage() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2 px-6 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          className="flex items-center gap-2 px-6 py-2.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
         >
           {saving ? (
             <Loader2 className="w-4 h-4 animate-spin" />

@@ -9,10 +9,10 @@ import {
 
 // Mock data
 const STATS = [
-  { label: 'Aktive Tenants', value: '47', change: '+12%', up: true, icon: Building2, color: 'from-indigo-500 to-violet-500' },
-  { label: 'Gesamt-User', value: '312', change: '+8%', up: true, icon: Users, color: 'from-blue-500 to-cyan-500' },
-  { label: 'MRR', value: '€18.4k', change: '+15%', up: true, icon: DollarSign, color: 'from-emerald-500 to-teal-500' },
-  { label: 'Churn Rate', value: '2.1%', change: '-0.3%', up: false, icon: TrendingUp, color: 'from-orange-500 to-amber-500' },
+  { label: 'Aktive Tenants', value: '47', change: '+12%', up: true, icon: Building2, color: 'bg-gray-900' },
+  { label: 'Gesamt-User', value: '312', change: '+8%', up: true, icon: Users, color: 'bg-gray-800' },
+  { label: 'MRR', value: '€18.4k', change: '+15%', up: true, icon: DollarSign, color: 'bg-gray-700' },
+  { label: 'Churn Rate', value: '2.1%', change: '-0.3%', up: false, icon: TrendingUp, color: 'bg-gray-600' },
 ];
 
 const SYSTEM_HEALTH = [
@@ -62,7 +62,7 @@ export default function AdminDashboard() {
         {STATS.map((stat) => (
           <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-3">
-              <div className={`w-9 h-9 bg-gradient-to-br ${stat.color} rounded-lg flex items-center justify-center`}>
+              <div className={`w-9 h-9 ${stat.color} rounded-lg flex items-center justify-center`}>
                 <stat.icon className="w-4.5 h-4.5 text-white" />
               </div>
               <div className={`flex items-center gap-0.5 text-xs font-medium ${stat.up ? 'text-emerald-600' : 'text-red-500'}`}>
@@ -86,7 +86,7 @@ export default function AdminDashboard() {
               href={action.href}
               className="flex flex-col items-center gap-1.5 p-3 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all group"
             >
-              <action.icon className="w-5 h-5 text-gray-400 group-hover:text-indigo-500 transition-colors" />
+              <action.icon className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
               <span className="text-[11px] font-medium text-gray-600 group-hover:text-gray-900 text-center leading-tight">{action.label}</span>
             </a>
           ))}
@@ -120,7 +120,7 @@ export default function AdminDashboard() {
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-gray-900">Letzte Aktivitäten</h2>
-            <a href="/admin/audit" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">Alle ansehen</a>
+            <a href="/admin/audit" className="text-xs text-blue-600 hover:text-blue-700 font-medium">Alle ansehen</a>
           </div>
           <div className="space-y-3">
             {RECENT_ACTIVITY.map((activity, i) => (
@@ -129,13 +129,13 @@ export default function AdminDashboard() {
                   activity.type === 'create' ? 'bg-emerald-100' :
                   activity.type === 'warning' ? 'bg-amber-100' :
                   activity.type === 'deploy' ? 'bg-blue-100' :
-                  activity.type === 'config' ? 'bg-violet-100' :
+                  activity.type === 'config' ? 'bg-gray-100' :
                   'bg-gray-100'
                 }`}>
                   {activity.type === 'create' && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
                   {activity.type === 'warning' && <AlertTriangle className="w-3 h-3 text-amber-600" />}
                   {activity.type === 'deploy' && <Zap className="w-3 h-3 text-blue-600" />}
-                  {activity.type === 'config' && <Activity className="w-3 h-3 text-violet-600" />}
+                  {activity.type === 'config' && <Activity className="w-3 h-3 text-gray-600" />}
                   {activity.type === 'system' && <Globe className="w-3 h-3 text-gray-500" />}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -151,7 +151,7 @@ export default function AdminDashboard() {
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-gray-900">Offene Tickets</h2>
-            <a href="/admin/support" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">Alle ansehen</a>
+            <a href="/admin/support" className="text-xs text-blue-600 hover:text-blue-700 font-medium">Alle ansehen</a>
           </div>
           <div className="space-y-2.5">
             {OPEN_TICKETS.map((ticket) => (
@@ -186,7 +186,7 @@ export default function AdminDashboard() {
           </div>
           <div className="flex gap-1">
             {['7T', '30T', '90T', '1J'].map((period) => (
-              <button key={period} className={`px-2.5 py-1 text-[10px] font-medium rounded-md ${period === '30T' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}>
+              <button key={period} className={`px-2.5 py-1 text-[10px] font-medium rounded-md ${period === '30T' ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}>
                 {period}
               </button>
             ))}

@@ -6,20 +6,9 @@ import { usePathname } from 'next/navigation';
 import { signOut } from 'aws-amplify/auth';
 import { useState } from 'react';
 import { 
-  LayoutDashboard, 
-  Users, 
-  Building2, 
-  Settings, 
-  LogOut, 
-  ChevronDown,
-  Inbox,
-  Calendar,
-  FileText,
-  MessageSquare,
-  Wand2,
-  Activity
+  LayoutDashboard, Users, Settings, LogOut, Inbox,
+  Calendar, FileText, MessageSquare, Wand2, Activity
 } from 'lucide-react';
-
 import { useRouter } from 'next/navigation';
 import { useGlobalState } from '@/context/GlobalStateContext';
 
@@ -45,66 +34,46 @@ export default function Sidebar() {
     { name: 'Team Chat', href: '/dashboard/assistant', icon: MessageSquare },
   ];
 
-  // Helper to check if a link is active (exact match or specific sub-paths)
   const isActive = (itemHref: string) => {
-    if (itemHref === '/dashboard') {
-      return pathname === '/dashboard';
-    }
-    // Special handling for CRM - active for all /dashboard/crm/* routes
-    if (itemHref === '/dashboard/crm/leads') {
-      return pathname.startsWith('/dashboard/crm');
-    }
+    if (itemHref === '/dashboard') return pathname === '/dashboard';
+    if (itemHref === '/dashboard/crm/leads') return pathname.startsWith('/dashboard/crm');
     return pathname.startsWith(itemHref);
   };
 
   return (
     <div 
-      className={`hidden lg:flex flex-col bg-slate-900 h-screen relative z-20 transition-all duration-300 ease-in-out ${
+      className={`hidden lg:flex flex-col bg-gray-950 h-screen relative z-20 transition-all duration-300 ease-in-out ${
         isHovered ? 'w-64' : 'w-20'
       }`}
-      onMouseEnter={() => {
-        setIsHovered(true);
-        setSidebarExpanded(true);
-      }}
-      onMouseLeave={() => {
-        setIsHovered(false);
-        setSidebarExpanded(false);
-      }}
+      onMouseEnter={() => { setIsHovered(true); setSidebarExpanded(true); }}
+      onMouseLeave={() => { setIsHovered(false); setSidebarExpanded(false); }}
     >
       {/* Logo */}
       <div className="flex items-center h-16 px-6 shrink-0 overflow-hidden">
         <Image src="/logo-icon-only.png" alt="Immivo" width={32} height={32} className="shrink-0" />
         <Image 
-          src="/logo-white.png" 
-          alt="Immivo" 
-          width={90} 
-          height={24} 
-          className={`h-6 w-auto ml-3 whitespace-nowrap transition-opacity duration-300 ${
-            isHovered ? 'opacity-100' : 'opacity-0'
-          }`}
+          src="/logo-white.png" alt="Immivo" width={90} height={24} 
+          className={`h-6 w-auto ml-3 whitespace-nowrap transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}
         />
       </div>
       
       {/* Main Navigation */}
       <div className="flex-1 flex flex-col overflow-y-auto py-6 px-3 space-y-1">
         {mainNavigation.map((item) => (
-          <div key={item.name}>
-            <Link
-              href={item.href}
-              className={`flex items-center pl-[17px] pr-3 py-2.5 text-sm font-medium rounded-md transition-all duration-200 ${
-                isActive(item.href)
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/50'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-              }`}
-            >
-              <item.icon className={`w-5 h-5 shrink-0 ${isActive(item.href) ? 'text-white' : 'text-gray-400'}`} />
-              <span className={`ml-3 whitespace-nowrap transition-opacity duration-300 ${
-                isHovered ? 'opacity-100' : 'opacity-0'
-              }`}>
-                {item.name}
-              </span>
-            </Link>
-          </div>
+          <Link
+            key={item.name}
+            href={item.href}
+            className={`flex items-center pl-[17px] pr-3 py-2.5 text-sm font-medium rounded-md transition-all duration-200 ${
+              isActive(item.href)
+                ? 'bg-white text-gray-950'
+                : 'text-gray-500 hover:bg-gray-800 hover:text-white'
+            }`}
+          >
+            <item.icon className={`w-5 h-5 shrink-0 ${isActive(item.href) ? 'text-gray-950' : 'text-gray-500'}`} />
+            <span className={`ml-3 whitespace-nowrap transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+              {item.name}
+            </span>
+          </Link>
         ))}
       </div>
 
@@ -113,26 +82,20 @@ export default function Sidebar() {
         <Link
           href="/dashboard/settings"
           className={`flex items-center pl-[17px] pr-3 py-2.5 text-sm font-medium rounded-md transition-colors ${
-            pathname.includes('/settings')
-              ? 'bg-gray-800 text-white'
-              : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+            pathname.includes('/settings') ? 'bg-gray-800 text-white' : 'text-gray-500 hover:bg-gray-800 hover:text-white'
           }`}
         >
-          <Settings className="w-5 h-5 shrink-0 text-gray-400" />
-          <span className={`ml-3 whitespace-nowrap transition-opacity duration-300 ${
-            isHovered ? 'opacity-100' : 'opacity-0'
-          }`}>
+          <Settings className="w-5 h-5 shrink-0 text-gray-500" />
+          <span className={`ml-3 whitespace-nowrap transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
             Einstellungen
           </span>
         </Link>
         <button
           onClick={handleSignOut}
-          className="w-full flex items-center pl-[17px] pr-3 py-2.5 text-sm font-medium text-red-400 rounded-md hover:bg-red-900/20 transition-colors"
+          className="w-full flex items-center pl-[17px] pr-3 py-2.5 text-sm font-medium text-gray-500 rounded-md hover:bg-gray-800 hover:text-white transition-colors"
         >
           <LogOut className="w-5 h-5 shrink-0" />
-          <span className={`ml-3 whitespace-nowrap transition-opacity duration-300 ${
-            isHovered ? 'opacity-100' : 'opacity-0'
-          }`}>
+          <span className={`ml-3 whitespace-nowrap transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
             Abmelden
           </span>
         </button>

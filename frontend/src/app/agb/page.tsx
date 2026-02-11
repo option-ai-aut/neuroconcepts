@@ -72,7 +72,7 @@ export default function AGBPage() {
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-6 sm:mt-8 mb-3 sm:mb-4">§ 9 Datenschutz</h2>
             <p className="text-sm sm:text-base">
               Die Verarbeitung personenbezogener Daten erfolgt gemäß unserer 
-              <Link href="/datenschutz" className="text-indigo-600 hover:underline"> Datenschutzerklärung</Link>.
+              <Link href="/datenschutz" className="text-blue-600 hover:underline"> Datenschutzerklärung</Link>.
             </p>
 
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mt-6 sm:mt-8 mb-3 sm:mb-4">§ 10 Schlussbestimmungen</h2>

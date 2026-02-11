@@ -7,10 +7,10 @@ import {
 } from 'lucide-react';
 
 const FINANCE_KPIS = [
-  { label: 'MRR', value: '€18.400', change: '+15%', up: true, icon: DollarSign, color: 'from-emerald-500 to-teal-500' },
-  { label: 'ARR', value: '€220.8k', change: '+15%', up: true, icon: TrendingUp, color: 'from-blue-500 to-indigo-500' },
-  { label: 'Zahlende Kunden', value: '47', change: '+5', up: true, icon: Users, color: 'from-violet-500 to-purple-500' },
-  { label: 'Offene Rechnungen', value: '3', change: '€2.1k', up: false, icon: Receipt, color: 'from-orange-500 to-amber-500' },
+  { label: 'MRR', value: '€18.400', change: '+15%', up: true, icon: DollarSign, color: 'bg-gray-700' },
+  { label: 'ARR', value: '€220.8k', change: '+15%', up: true, icon: TrendingUp, color: 'bg-gray-800' },
+  { label: 'Zahlende Kunden', value: '47', change: '+5', up: true, icon: Users, color: 'bg-gray-800' },
+  { label: 'Offene Rechnungen', value: '3', change: '€2.1k', up: false, icon: Receipt, color: 'bg-gray-600' },
 ];
 
 const INVOICES = [
@@ -24,9 +24,9 @@ const INVOICES = [
 ];
 
 const PLANS_DISTRIBUTION = [
-  { name: 'Starter (€79/mo)', count: 15, percentage: 32, color: 'bg-blue-500' },
-  { name: 'Pro (€149/mo)', count: 24, percentage: 51, color: 'bg-indigo-500' },
-  { name: 'Enterprise (€890/mo)', count: 8, percentage: 17, color: 'bg-violet-500' },
+  { name: 'Starter (€79/mo)', count: 15, percentage: 32, color: 'bg-gray-500' },
+  { name: 'Pro (€149/mo)', count: 24, percentage: 51, color: 'bg-gray-600' },
+  { name: 'Enterprise (€890/mo)', count: 8, percentage: 17, color: 'bg-gray-700' },
 ];
 
 export default function FinancePage() {
@@ -42,7 +42,7 @@ export default function FinancePage() {
             <Download className="w-3.5 h-3.5" />
             Export CSV
           </button>
-          <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+          <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800">
             <FileText className="w-3.5 h-3.5" />
             Neue Rechnung
           </button>
@@ -54,7 +54,7 @@ export default function FinancePage() {
         {FINANCE_KPIS.map((kpi) => (
           <div key={kpi.label} className="bg-white rounded-xl border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-3">
-              <div className={`w-9 h-9 bg-gradient-to-br ${kpi.color} rounded-lg flex items-center justify-center`}>
+              <div className={`w-9 h-9 ${kpi.color} rounded-lg flex items-center justify-center`}>
                 <kpi.icon className="w-4 h-4 text-white" />
               </div>
               <span className={`flex items-center gap-0.5 text-xs font-medium ${kpi.up ? 'text-emerald-600' : 'text-red-500'}`}>

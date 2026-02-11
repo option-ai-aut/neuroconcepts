@@ -383,7 +383,7 @@ export default function CalendarPage() {
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
       </div>
     );
   }
@@ -396,8 +396,8 @@ export default function CalendarPage() {
         {/* Empty State */}
         <div className="flex-1 flex flex-col items-center justify-center p-8">
           <div className="max-w-md text-center space-y-6">
-            <div className="w-20 h-20 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-2xl flex items-center justify-center mx-auto">
-              <CalendarIcon className="w-10 h-10 text-indigo-600" />
+            <div className="w-20 h-20 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto">
+              <CalendarIcon className="w-10 h-10 text-blue-600" />
             </div>
             
             <div className="space-y-2">
@@ -409,8 +409,8 @@ export default function CalendarPage() {
             
             <div className="space-y-3 pt-4">
               <div className="flex items-start gap-3 text-left">
-                <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Clock className="w-3 h-3 text-indigo-600" />
+                <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Clock className="w-3 h-3 text-blue-600" />
                 </div>
                 <div>
                   <div className="text-sm font-medium text-gray-900">Automatische Terminbuchung</div>
@@ -419,8 +419,8 @@ export default function CalendarPage() {
               </div>
               
               <div className="flex items-start gap-3 text-left">
-                <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Users className="w-3 h-3 text-indigo-600" />
+                <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Users className="w-3 h-3 text-blue-600" />
                 </div>
                 <div>
                   <div className="text-sm font-medium text-gray-900">Team-Synchronisation</div>
@@ -429,8 +429,8 @@ export default function CalendarPage() {
               </div>
               
               <div className="flex items-start gap-3 text-left">
-                <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <MapPin className="w-3 h-3 text-indigo-600" />
+                <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <MapPin className="w-3 h-3 text-blue-600" />
                 </div>
                 <div>
                   <div className="text-sm font-medium text-gray-900">Standort-Integration</div>
@@ -442,7 +442,7 @@ export default function CalendarPage() {
             <div className="pt-6">
               <Link 
                 href="/dashboard/settings/integrations"
-                className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 transition-colors w-full"
+                className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium rounded-lg text-white bg-gray-900 hover:bg-gray-800 transition-colors w-full"
               >
                 Kalender verbinden
               </Link>
@@ -495,7 +495,7 @@ export default function CalendarPage() {
               }));
               setShowNewEventModal(true);
             }}
-            className="bg-indigo-600 text-white px-3 lg:px-4 py-2 rounded-lg text-xs lg:text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-1.5 lg:gap-2"
+            className="bg-gray-900 text-white px-3 lg:px-4 py-2 rounded-lg text-xs lg:text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-1.5 lg:gap-2"
           >
             <Plus className="w-4 h-4" />
             <span className="hidden lg:inline">Neuer Termin</span>
@@ -591,17 +591,17 @@ export default function CalendarPage() {
                     <div 
                       key={event.id}
                       onClick={() => setSelectedEvent(event)}
-                      className="absolute left-1 right-1 lg:left-2 lg:right-2 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-md lg:rounded-lg p-1.5 lg:p-3 cursor-pointer hover:shadow-md transition-all"
+                      className="absolute left-1 right-1 lg:left-2 lg:right-2 bg-gray-50 rounded-md lg:rounded-lg p-1.5 lg:p-3 cursor-pointer hover:shadow-md transition-all"
                       style={{ top: `${top}px`, height: `${height}px` }}
                     >
                       <div className="pl-1.5 lg:pl-3 h-full overflow-hidden">
-                        <div className="text-xs lg:text-sm font-medium text-indigo-900 leading-tight truncate">{event.title}</div>
-                        <div className="hidden lg:block text-xs text-indigo-600 mt-1">
+                        <div className="text-xs lg:text-sm font-medium text-gray-900 leading-tight truncate">{event.title}</div>
+                        <div className="hidden lg:block text-xs text-blue-600 mt-1">
                           {formatTime(event.start)} - {formatTime(event.end)}
                         </div>
-                        <div className="lg:hidden text-[10px] text-indigo-500 mt-0.5">{formatTime(event.start)}</div>
+                        <div className="lg:hidden text-[10px] text-gray-600 mt-0.5">{formatTime(event.start)}</div>
                         {event.location && (
-                          <div className="hidden lg:flex text-xs text-indigo-500 mt-1 items-center gap-1">
+                          <div className="hidden lg:flex text-xs text-gray-600 mt-1 items-center gap-1">
                             <MapPin className="w-3 h-3" />
                             {event.location}
                           </div>
@@ -638,7 +638,7 @@ export default function CalendarPage() {
                     {/* Day Header */}
                     <div className="text-center py-2 border-b border-gray-100 sticky top-0 bg-white z-10 h-14">
                       <div className="text-xs font-medium text-gray-500">{dayNames[i]}</div>
-                      <div className={`text-lg font-semibold mt-1 ${isToday ? 'text-white bg-indigo-600 rounded-full w-8 h-8 flex items-center justify-center mx-auto' : 'text-gray-900'}`}>
+                      <div className={`text-lg font-semibold mt-1 ${isToday ? 'text-white bg-gray-900 rounded-full w-8 h-8 flex items-center justify-center mx-auto' : 'text-gray-900'}`}>
                         {day.getDate()}
                       </div>
                     </div>
@@ -663,17 +663,17 @@ export default function CalendarPage() {
                         <div 
                           key={event.id}
                           onClick={() => setSelectedEvent(event)}
-                          className="absolute left-1 right-1 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg p-2 cursor-pointer hover:shadow-md transition-all overflow-hidden"
+                          className="absolute left-1 right-1 bg-gray-50 rounded-lg p-2 cursor-pointer hover:shadow-md transition-all overflow-hidden"
                           style={{ top: `${top}px`, height: `${height}px` }}
                           title={event.title}
                         >
                           <div className="pl-2 h-full overflow-hidden">
-                            <div className="text-xs font-semibold text-indigo-900 truncate">{event.title}</div>
-                            <div className="text-[10px] text-indigo-600 mt-0.5">
+                            <div className="text-xs font-semibold text-gray-900 truncate">{event.title}</div>
+                            <div className="text-[10px] text-blue-600 mt-0.5">
                               {formatTime(event.start)}
                             </div>
                             {event.location && height > 60 && (
-                              <div className="text-[10px] text-indigo-500 mt-1 flex items-center gap-1 truncate">
+                              <div className="text-[10px] text-gray-600 mt-1 flex items-center gap-1 truncate">
                                 <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
                                 <span className="truncate">{event.location}</span>
                               </div>
@@ -724,14 +724,14 @@ export default function CalendarPage() {
                       }
                     }}
                   >
-                    <div className={`text-[10px] lg:text-sm font-medium mb-0.5 lg:mb-2 ${isToday ? 'text-white bg-indigo-600 rounded-full w-5 h-5 lg:w-7 lg:h-7 flex items-center justify-center text-[10px] lg:text-sm' : isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}`}>
+                    <div className={`text-[10px] lg:text-sm font-medium mb-0.5 lg:mb-2 ${isToday ? 'text-white bg-gray-900 rounded-full w-5 h-5 lg:w-7 lg:h-7 flex items-center justify-center text-[10px] lg:text-sm' : isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}`}>
                       {day.getDate()}
                     </div>
                     {/* Mobile: only show dot indicators */}
                     {dayEvents.length > 0 && (
                       <div className="lg:hidden flex gap-0.5 justify-center">
                         {dayEvents.slice(0, 3).map((event) => (
-                          <div key={event.id} className="w-1 h-1 rounded-full bg-indigo-500"></div>
+                          <div key={event.id} className="w-1 h-1 rounded-full bg-gray-500"></div>
                         ))}
                       </div>
                     )}
@@ -741,7 +741,7 @@ export default function CalendarPage() {
                         <div 
                           key={event.id}
                           onClick={(e) => { e.stopPropagation(); setSelectedEvent(event); }}
-                          className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded truncate cursor-pointer hover:bg-indigo-100"
+                          className="text-xs bg-gray-50 text-gray-900 px-2 py-1 rounded truncate cursor-pointer hover:bg-gray-100"
                           title={event.title}
                         >
                           {formatTime(event.start)} {event.title}
@@ -782,7 +782,7 @@ export default function CalendarPage() {
                   type="text"
                   value={newEvent.title}
                   onChange={(e) => setNewEvent(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="z.B. Besichtigung Musterstraße 1"
                 />
               </div>
@@ -793,7 +793,7 @@ export default function CalendarPage() {
                   type="date"
                   value={newEvent.date}
                   onChange={(e) => setNewEvent(prev => ({ ...prev, date: e.target.value }))}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
               
@@ -804,7 +804,7 @@ export default function CalendarPage() {
                     type="time"
                     value={newEvent.startTime}
                     onChange={(e) => setNewEvent(prev => ({ ...prev, startTime: e.target.value }))}
-                    className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -813,7 +813,7 @@ export default function CalendarPage() {
                     type="time"
                     value={newEvent.endTime}
                     onChange={(e) => setNewEvent(prev => ({ ...prev, endTime: e.target.value }))}
-                    className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -824,7 +824,7 @@ export default function CalendarPage() {
                   type="text"
                   value={newEvent.location}
                   onChange={(e) => setNewEvent(prev => ({ ...prev, location: e.target.value }))}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="z.B. Musterstraße 1, 1010 Wien"
                 />
               </div>
@@ -834,7 +834,7 @@ export default function CalendarPage() {
                 <textarea
                   value={newEvent.description}
                   onChange={(e) => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                   rows={2}
                   placeholder="Optionale Notizen..."
                 />
@@ -851,7 +851,7 @@ export default function CalendarPage() {
               <button
                 onClick={handleCreateEvent}
                 disabled={!newEvent.title || !newEvent.date || creatingEvent}
-                className="flex-1 px-4 py-2.5 lg:py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2.5 lg:py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {creatingEvent && <Loader2 className="w-4 h-4 animate-spin" />}
                 Erstellen
@@ -887,7 +887,7 @@ export default function CalendarPage() {
                       type="text"
                       value={editEvent.title}
                       onChange={(e) => setEditEvent(prev => ({ ...prev, title: e.target.value }))}
-                      className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                   
@@ -897,7 +897,7 @@ export default function CalendarPage() {
                       type="date"
                       value={editEvent.date}
                       onChange={(e) => setEditEvent(prev => ({ ...prev, date: e.target.value }))}
-                      className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                   
@@ -908,7 +908,7 @@ export default function CalendarPage() {
                         type="time"
                         value={editEvent.startTime}
                         onChange={(e) => setEditEvent(prev => ({ ...prev, startTime: e.target.value }))}
-                        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
                     <div>
@@ -917,7 +917,7 @@ export default function CalendarPage() {
                         type="time"
                         value={editEvent.endTime}
                         onChange={(e) => setEditEvent(prev => ({ ...prev, endTime: e.target.value }))}
-                        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
                   </div>
@@ -928,7 +928,7 @@ export default function CalendarPage() {
                       type="text"
                       value={editEvent.location}
                       onChange={(e) => setEditEvent(prev => ({ ...prev, location: e.target.value }))}
-                      className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                   
@@ -937,7 +937,7 @@ export default function CalendarPage() {
                     <textarea
                       value={editEvent.description}
                       onChange={(e) => setEditEvent(prev => ({ ...prev, description: e.target.value }))}
-                      className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                      className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                       rows={2}
                     />
                   </div>
@@ -948,8 +948,8 @@ export default function CalendarPage() {
                   {/* Title */}
                   <div>
                     <div className="flex items-start gap-2.5">
-                      <div className="w-8 h-8 lg:w-10 lg:h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <CalendarIcon className="w-4 h-4 lg:w-5 lg:h-5 text-indigo-600" />
+                      <div className="w-8 h-8 lg:w-10 lg:h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <CalendarIcon className="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
                       </div>
                       <div>
                         <h3 className="text-sm lg:text-xl font-semibold text-gray-900 leading-snug">{selectedEvent.title}</h3>
@@ -1028,7 +1028,7 @@ export default function CalendarPage() {
                   <button
                     onClick={handleUpdateEvent}
                     disabled={!editEvent.title || !editEvent.date || savingEvent}
-                    className="flex-1 px-4 py-2.5 lg:py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="flex-1 px-4 py-2.5 lg:py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {savingEvent && <Loader2 className="w-4 h-4 animate-spin" />}
                     Speichern
@@ -1046,7 +1046,7 @@ export default function CalendarPage() {
                   </button>
                   <button
                     onClick={startEditEvent}
-                    className="flex-1 px-4 py-2.5 lg:py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+                    className="flex-1 px-4 py-2.5 lg:py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
                   >
                     Bearbeiten
                   </button>

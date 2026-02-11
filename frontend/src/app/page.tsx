@@ -119,8 +119,8 @@ export default function LandingPage() {
           50% { transform: translateY(-30px) rotate(5deg); }
         }
         @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
-          50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.6); }
+          0%, 100% { box-shadow: 0 0 20px rgba(0, 0, 0, 0.2); }
+          50% { box-shadow: 0 0 40px rgba(0, 0, 0, 0.3); }
         }
         @keyframes gradient-shift {
           0% { background-position: 0% 50%; }
@@ -167,15 +167,15 @@ export default function LandingPage() {
         {/* Animated Background */}
         <div className="absolute inset-0 -z-10">
           {/* Gradient Mesh */}
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-violet-50/50" />
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-gray-50/80 to-gray-100/50" />
           
           {/* Animated Orbs */}
           <div 
-            className="absolute top-1/4 left-1/4 w-[300px] h-[300px] sm:w-[600px] sm:h-[600px] bg-indigo-400/20 rounded-full blur-3xl animate-float-slow"
+            className="absolute top-1/4 left-1/4 w-[300px] h-[300px] sm:w-[600px] sm:h-[600px] bg-gray-300/30 rounded-full blur-3xl animate-float-slow"
             style={{ transform: `translate(${mousePosition.x * 2}px, ${mousePosition.y * 2}px)` }}
           />
           <div 
-            className="absolute bottom-1/4 right-1/4 w-[250px] h-[250px] sm:w-[500px] sm:h-[500px] bg-violet-400/20 rounded-full blur-3xl animate-float"
+            className="absolute bottom-1/4 right-1/4 w-[250px] h-[250px] sm:w-[500px] sm:h-[500px] bg-gray-300/20 rounded-full blur-3xl animate-float"
             style={{ transform: `translate(${-mousePosition.x * 1.5}px, ${-mousePosition.y * 1.5}px)` }}
           />
           <div 
@@ -191,7 +191,7 @@ export default function LandingPage() {
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             {/* Left: Text Content */}
             <div className="text-left">
-              <div className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gradient-to-r from-indigo-500/10 to-violet-500/10 text-indigo-600 text-xs sm:text-sm font-medium mb-5 sm:mb-8 border border-indigo-200/50 backdrop-blur-sm">
+              <div className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gray-100 text-blue-600 text-xs sm:text-sm font-medium mb-5 sm:mb-8 border border-gray-200 backdrop-blur-sm">
                 <span className="flex w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
                 Jarvis 1.0
               </div>
@@ -199,7 +199,7 @@ export default function LandingPage() {
               <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 mb-4 sm:mb-6 leading-[1.05]">
                 Dein Büro arbeitet.
                 <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 animate-gradient">
+                <span className="font-extrabold text-gray-900">
                   Du verdienst.
                 </span>
               </h1>
@@ -212,7 +212,7 @@ export default function LandingPage() {
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-8 sm:mb-12">
                 <Link 
                   href="/login" 
-                  className="group inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base font-semibold text-white bg-gradient-to-r from-indigo-600 to-violet-600 rounded-full hover:shadow-xl hover:shadow-indigo-500/30 transition-all hover:-translate-y-1"
+                  className="group inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base font-semibold text-white bg-gray-900 rounded-full hover:shadow-xl hover:shadow-gray-500/20 transition-all hover:-translate-y-1"
                 >
                   14 Tage kostenlos testen
                   <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -222,7 +222,7 @@ export default function LandingPage() {
                   onClick={(e) => handleAnchorClick(e, 'demo')}
                   className="group inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base font-semibold text-gray-700 bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-all hover:-translate-y-1 shadow-sm"
                 >
-                  <Calendar className="mr-2 w-5 h-5 text-indigo-600" />
+                  <Calendar className="mr-2 w-5 h-5 text-blue-600" />
                   Demo buchen
                 </a>
               </div>
@@ -279,18 +279,18 @@ export default function LandingPage() {
                       <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/30">
                         <p className="text-xs text-gray-500 mb-1">Exposés gesendet</p>
                         <p className="text-2xl font-bold text-white">15</p>
-                        <p className="text-xs text-indigo-400 mt-1">automatisch</p>
+                        <p className="text-xs text-blue-400 mt-1">automatisch</p>
                       </div>
                     </div>
 
                     {/* Jarvis Chat Preview */}
-                    <div className="bg-gradient-to-br from-indigo-600/20 to-violet-600/20 rounded-xl p-4 border border-indigo-500/30">
+                    <div className="bg-gradient-to-br from-gray-800/50 to-gray-700/50 rounded-xl p-4 border border-gray-600/30">
                       <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-xl flex items-center justify-center flex-shrink-0 animate-pulse-glow">
+                        <div className="w-10 h-10 bg-gray-800 rounded-xl flex items-center justify-center flex-shrink-0 animate-pulse-glow">
                           <Bot className="w-5 h-5 text-white" />
                         </div>
                         <div>
-                          <p className="text-xs text-indigo-300 mb-1">Jarvis • Gerade eben</p>
+                          <p className="text-xs text-gray-400 mb-1">Jarvis • Gerade eben</p>
                           <p className="text-sm text-white">
                             Ich habe 3 neue Anfragen bearbeitet, Exposés versendet und einen Besichtigungstermin für morgen 14 Uhr eingetragen. Alles erledigt! 🎯
                           </p>
@@ -303,7 +303,7 @@ export default function LandingPage() {
                       {[
                         { icon: Mail, text: 'Lead qualifiziert: Familie Müller', time: 'vor 2 Min', color: 'text-blue-400' },
                         { icon: Calendar, text: 'Besichtigung gebucht: Penthouse Wien', time: 'vor 5 Min', color: 'text-green-400' },
-                        { icon: FileText, text: 'Exposé erstellt: 3-Zi-Wohnung Berlin', time: 'vor 8 Min', color: 'text-violet-400' },
+                        { icon: FileText, text: 'Exposé erstellt: 3-Zi-Wohnung Berlin', time: 'vor 8 Min', color: 'text-gray-400' },
                       ].map((item, i) => (
                         <div key={i} className="flex items-center gap-3 bg-gray-800/30 rounded-lg px-3 py-2">
                           <item.icon className={`w-4 h-4 ${item.color}`} />
@@ -334,8 +334,8 @@ export default function LandingPage() {
               <div className="absolute -right-4 bottom-1/4 animate-float" style={{ animationDelay: '2s' }}>
                 <div className="bg-white rounded-xl shadow-xl p-3 border border-gray-100">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
-                      <Zap className="w-4 h-4 text-indigo-600" />
+                    <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <Zap className="w-4 h-4 text-gray-600" />
                     </div>
                     <div>
                       <p className="text-xs text-gray-500">Antwortzeit</p>
@@ -357,7 +357,7 @@ export default function LandingPage() {
           className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${section1.isInView ? 'animate-slide-up' : 'opacity-0'}`}
         >
           <div className="text-center mb-8 sm:mb-16">
-            <span className="text-indigo-600 font-semibold text-sm uppercase tracking-wider">Das Problem</span>
+            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">Das Problem</span>
             <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mt-3 sm:mt-4 mb-4 sm:mb-6">
               Du bist Makler, kein Sachbearbeiter.
             </h2>
@@ -417,7 +417,7 @@ export default function LandingPage() {
       </section>
 
       {/* Jarvis AI Section */}
-      <section id="jarvis" className="py-12 sm:py-24 bg-gradient-to-br from-gray-900 via-indigo-950 to-violet-950 text-white overflow-hidden">
+      <section id="jarvis" className="py-12 sm:py-24 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white overflow-hidden">
         <div 
           ref={section2.ref}
           className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${section2.isInView ? 'animate-slide-up' : 'opacity-0'}`}
@@ -425,13 +425,13 @@ export default function LandingPage() {
           <div className="grid lg:grid-cols-2 gap-8 sm:gap-16 items-center">
             {/* Left: Jarvis Introduction */}
             <div>
-              <div className="inline-flex items-center px-3 sm:px-4 py-2 rounded-full bg-white/10 text-indigo-300 text-xs sm:text-sm font-medium mb-4 sm:mb-6 border border-white/10">
+              <div className="inline-flex items-center px-3 sm:px-4 py-2 rounded-full bg-white/10 text-gray-300 text-xs sm:text-sm font-medium mb-4 sm:mb-6 border border-white/10">
                 <Brain className="w-4 h-4 mr-2" />
                 Powered by OpenAI GPT-5
               </div>
               
               <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6 leading-tight">
-                Triff <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">Jarvis</span>,
+                Triff <span className="text-gray-200">Jarvis</span>,
                 <br />deinen KI-Assistenten.
               </h2>
               
@@ -449,7 +449,7 @@ export default function LandingPage() {
                   'Eskaliert automatisch bei komplexen Fällen'
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <div className="w-6 h-6 bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
                       <CheckCircle2 className="w-4 h-4 text-white" />
                     </div>
                     <span className="text-gray-200">{item}</span>
@@ -487,7 +487,7 @@ export default function LandingPage() {
 
               {/* Desktop: Orbit Visualization */}
               <div className="hidden lg:flex relative items-center justify-center">
-                <div className="w-40 h-40 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-full flex items-center justify-center animate-pulse-glow z-10">
+                <div className="w-40 h-40 bg-gray-800 rounded-full flex items-center justify-center animate-pulse-glow z-10">
                   <Bot className="w-20 h-20 text-white" />
                 </div>
                 
@@ -549,7 +549,7 @@ export default function LandingPage() {
           className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${section3.isInView ? 'animate-slide-up' : 'opacity-0'}`}
         >
           <div className="text-center mb-8 sm:mb-16">
-            <span className="text-indigo-600 font-semibold text-sm uppercase tracking-wider">Echte Ergebnisse</span>
+            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">Echte Ergebnisse</span>
             <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mt-3 sm:mt-4 mb-4 sm:mb-6">
               Mehr Umsatz. Weniger Stress.
             </h2>
@@ -570,7 +570,7 @@ export default function LandingPage() {
                 key={i} 
                 className="text-center p-4 sm:p-8 rounded-2xl bg-gradient-to-br from-gray-50 to-white border border-gray-100 hover:shadow-lg transition-all"
               >
-                <stat.icon className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600 mx-auto mb-2 sm:mb-4" />
+                <stat.icon className="w-6 h-6 sm:w-8 sm:h-8 text-gray-600 mx-auto mb-2 sm:mb-4" />
                 <div className="text-3xl sm:text-5xl font-bold text-gray-900 mb-1 sm:mb-2">
                   <AnimatedCounter end={stat.value} suffix={stat.suffix} />
                 </div>
@@ -580,13 +580,13 @@ export default function LandingPage() {
           </div>
 
           {/* Testimonial */}
-          <div className="bg-gradient-to-br from-indigo-50 to-violet-50 rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-12 border border-indigo-100">
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-12 border border-gray-200">
             <div className="flex flex-col md:flex-row items-center gap-4 sm:gap-8">
-              <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-full flex items-center justify-center flex-shrink-0">
+              <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gray-800 rounded-full flex items-center justify-center flex-shrink-0">
                 <span className="text-xl sm:text-3xl font-bold text-white">MK</span>
               </div>
               <div>
-                <Quote className="w-6 h-6 sm:w-10 sm:h-10 text-indigo-300 mb-2 sm:mb-4" />
+                <Quote className="w-6 h-6 sm:w-10 sm:h-10 text-gray-400 mb-2 sm:mb-4" />
                 <p className="text-sm sm:text-xl text-gray-700 mb-3 sm:mb-4 leading-relaxed">
                   "Seit wir Immivo nutzen, habe ich endlich wieder Zeit für das, was ich liebe: 
                   Kunden beraten und Deals abschließen. Jarvis erledigt den ganzen Papierkram. 
@@ -609,7 +609,7 @@ export default function LandingPage() {
           className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${section4.isInView ? 'animate-slide-up' : 'opacity-0'}`}
         >
           <div className="text-center mb-8 sm:mb-16">
-            <span className="text-indigo-600 font-semibold text-sm uppercase tracking-wider">Alles inklusive</span>
+            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">Alles inklusive</span>
             <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mt-3 sm:mt-4 mb-4 sm:mb-6">
               Ein System. Unendliche Möglichkeiten.
             </h2>
@@ -624,13 +624,13 @@ export default function LandingPage() {
                 icon: Bot,
                 title: 'Jarvis KI-Assistent',
                 description: '24/7 verfügbar, beantwortet Anfragen in Sekunden, qualifiziert Leads automatisch.',
-                gradient: 'from-indigo-500 to-violet-500'
+                gradient: 'from-gray-700 to-gray-800'
               },
               {
                 icon: Wand2,
                 title: 'KI-Bildbearbeitung',
                 description: 'Virtual Staging: Möbel einbauen, Räume umgestalten — ultra-realistisch mit KI.',
-                gradient: 'from-fuchsia-500 to-pink-500'
+                gradient: 'from-gray-600 to-gray-700'
               },
               {
                 icon: Users,
@@ -654,13 +654,13 @@ export default function LandingPage() {
                 icon: Calendar,
                 title: 'Kalender-Integration',
                 description: 'Automatische Terminbuchung direkt in Google Calendar oder Outlook.',
-                gradient: 'from-pink-500 to-rose-500'
+                gradient: 'from-gray-500 to-gray-600'
               },
               {
                 icon: Mail,
                 title: 'E-Mail-Automatisierung',
                 description: 'White-Label-Versand über deine Domain. Jarvis antwortet in deinem Namen.',
-                gradient: 'from-violet-500 to-purple-500'
+                gradient: 'from-gray-600 to-gray-700'
               },
               {
                 icon: Globe,
@@ -716,13 +716,13 @@ export default function LandingPage() {
                     </div>
                   </div>
                   {/* After Side */}
-                  <div className="absolute inset-0 left-1/2 w-1/2 bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center">
+                  <div className="absolute inset-0 left-1/2 w-1/2 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
                     <div className="text-center">
-                      <div className="w-16 h-16 bg-indigo-500/30 rounded-xl flex items-center justify-center mx-auto mb-3">
-                        <Wand2 className="w-8 h-8 text-indigo-600" />
+                        <div className="w-16 h-16 bg-gray-600/30 rounded-xl flex items-center justify-center mx-auto mb-3">
+                        <Wand2 className="w-8 h-8 text-gray-600" />
                       </div>
-                      <p className="text-indigo-600 font-medium">Nachher</p>
-                      <p className="text-indigo-500 text-sm">Mit Möbeln</p>
+                      <p className="text-gray-900 font-medium">Nachher</p>
+                      <p className="text-gray-600 text-sm">Mit Möbeln</p>
                     </div>
                   </div>
                   {/* Divider */}
@@ -750,7 +750,7 @@ export default function LandingPage() {
 
             {/* Right: Content */}
             <div>
-              <div className="inline-flex items-center px-4 py-2 rounded-full bg-fuchsia-50 text-fuchsia-600 text-sm font-medium mb-6 border border-fuchsia-200">
+              <div className="inline-flex items-center px-4 py-2 rounded-full bg-gray-100 text-gray-700 text-sm font-medium mb-6 border border-gray-200">
                 <Wand2 className="w-4 h-4 mr-2" />
                 KI-Bildbearbeitung
               </div>
@@ -758,7 +758,7 @@ export default function LandingPage() {
               <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4 sm:mb-6 leading-tight">
                 Virtual Staging mit
                 <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-500 to-pink-500">
+                <span className="text-gray-900">
                   KI-Präzision
                 </span>
               </h2>
@@ -777,7 +777,7 @@ export default function LandingPage() {
                   'Mehr Klicks, mehr Anfragen, schnellere Verkäufe'
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-gradient-to-br from-fuchsia-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <div className="w-6 h-6 bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
                       <CheckCircle2 className="w-4 h-4 text-white" />
                     </div>
                     <span className="text-gray-700">{item}</span>
@@ -787,7 +787,7 @@ export default function LandingPage() {
 
               <Link 
                 href="/login" 
-                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-fuchsia-500 to-pink-500 text-white rounded-full font-semibold hover:shadow-lg hover:shadow-fuchsia-500/30 transition-all hover:-translate-y-1"
+                className="inline-flex items-center px-6 py-3 bg-gray-900 text-white rounded-full font-semibold hover:shadow-lg hover:shadow-gray-500/20 transition-all hover:-translate-y-1"
               >
                 Jetzt ausprobieren
                 <ArrowRight className="ml-2 w-5 h-5" />
@@ -804,7 +804,7 @@ export default function LandingPage() {
           className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${section5.isInView ? 'animate-slide-up' : 'opacity-0'}`}
         >
           <div className="text-center mb-8 sm:mb-16">
-            <span className="text-indigo-600 font-semibold text-sm uppercase tracking-wider">So funktioniert&apos;s</span>
+            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">So funktioniert&apos;s</span>
             <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mt-3 sm:mt-4 mb-4 sm:mb-6">
               In 3 Schritten zur KI-Automatisierung
             </h2>
@@ -833,14 +833,14 @@ export default function LandingPage() {
             ].map((item, i) => (
               <div key={i} className="relative">
                 {i < 2 && (
-                  <div className="hidden md:block absolute top-16 left-full w-full h-0.5 bg-gradient-to-r from-indigo-200 to-transparent -translate-x-1/2" />
+                  <div className="hidden md:block absolute top-16 left-full w-full h-0.5 bg-gradient-to-r from-gray-200 to-transparent -translate-x-1/2" />
                 )}
                 <div className="text-center">
                   <div className="relative inline-block mb-6">
-                    <div className="w-20 h-20 bg-gradient-to-br from-indigo-100 to-violet-100 rounded-2xl flex items-center justify-center">
-                      <item.icon className="w-10 h-10 text-indigo-600" />
+                    <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center">
+                      <item.icon className="w-10 h-10 text-gray-600" />
                     </div>
-                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-gray-900 rounded-full flex items-center justify-center text-white text-sm font-bold">
                       {item.step}
                     </div>
                   </div>
@@ -858,7 +858,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-8 sm:gap-16 items-center">
             <div>
-              <div className="inline-flex items-center px-4 py-2 rounded-full bg-indigo-50 text-indigo-600 text-sm font-medium mb-6 border border-indigo-200">
+              <div className="inline-flex items-center px-4 py-2 rounded-full bg-gray-100 text-blue-600 text-sm font-medium mb-6 border border-gray-200">
                 <Calendar className="w-4 h-4 mr-2" />
                 Persönliche Demo
               </div>
@@ -866,7 +866,7 @@ export default function LandingPage() {
               <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4 sm:mb-6 leading-tight">
                 Erlebe Immivo
                 <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">
+                <span className="text-gray-900">
                   live in Aktion
                 </span>
               </h2>
@@ -899,13 +899,13 @@ export default function LandingPage() {
                 Wähle einen Termin
               </h3>
               <div className="bg-white rounded-xl p-6 border border-gray-100 text-center">
-                <Calendar className="w-16 h-16 text-indigo-600 mx-auto mb-4" />
+                <Calendar className="w-16 h-16 text-gray-600 mx-auto mb-4" />
                 <p className="text-gray-600 mb-6">
                   Unser Kalender wird in Kürze hier eingebunden.
                 </p>
                 <a 
                   href="mailto:hello@immivo.ai?subject=Demo-Anfrage"
-                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-indigo-500/30 transition-all"
+                  className="inline-flex items-center px-6 py-3 bg-gray-900 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-gray-500/20 transition-all"
                 >
                   Per E-Mail anfragen
                   <ArrowRight className="ml-2 w-5 h-5" />
@@ -917,7 +917,7 @@ export default function LandingPage() {
       </section>
 
       {/* Final CTA */}
-      <section className="py-12 sm:py-24 bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 text-white relative overflow-hidden">
+      <section className="py-12 sm:py-24 bg-gray-900 text-white relative overflow-hidden">
         {/* Background Effects */}
         <div className="absolute inset-0">
           <div className="absolute top-0 left-1/4 w-48 h-48 sm:w-96 sm:h-96 bg-white/10 rounded-full blur-3xl" />
@@ -944,7 +944,7 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
             <Link 
               href="/login" 
-              className="group inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-bold text-indigo-600 bg-white rounded-full hover:bg-gray-100 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1"
+              className="group inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-bold text-gray-900 bg-white rounded-full hover:bg-gray-100 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1"
             >
               Jetzt kostenlos starten
               <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />

@@ -67,11 +67,11 @@ export default function LeadsPage() {
             <RefreshCw className="w-4 h-4" />
           </button>
           {selectedLeads.size > 0 && (
-            <div className="flex items-center space-x-2 bg-indigo-50 px-3 py-1 rounded-md">
-              <span className="text-sm font-medium text-indigo-700">{selectedLeads.size} ausgewählt</span>
+            <div className="flex items-center space-x-2 bg-gray-50 px-3 py-1 rounded-md">
+              <span className="text-sm font-medium text-gray-700">{selectedLeads.size} ausgewählt</span>
               <button 
                 onClick={handleDelete}
-                className="text-indigo-600 hover:text-red-600 p-1 rounded transition-colors"
+                className="text-blue-600 hover:text-red-600 p-1 rounded transition-colors"
                 title="Ausgewählte löschen"
               >
                 <Trash2 className="w-4 h-4" />
@@ -81,7 +81,7 @@ export default function LeadsPage() {
         </div>
         <button 
           onClick={() => openDrawer('LEAD')}
-          className="bg-indigo-600 text-white px-3 py-1.5 text-sm font-medium rounded-md hover:bg-indigo-700 shadow-sm transition-colors"
+          className="bg-gray-900 text-white px-3 py-1.5 text-sm font-medium rounded-md hover:bg-gray-800 shadow-sm transition-colors"
         >
           Neuer Lead
         </button>
@@ -94,7 +94,7 @@ export default function LeadsPage() {
               <th className="px-6 py-3 w-10">
                 <input 
                   type="checkbox" 
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   checked={leads.length > 0 && selectedLeads.size === leads.length}
                   onChange={toggleSelectAll}
                 />
@@ -127,12 +127,12 @@ export default function LeadsPage() {
                   <tr 
                     key={lead.id} 
                     onClick={() => router.push(`/dashboard/crm/leads/${lead.id}`)}
-                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${selectedLeads.has(lead.id) ? 'bg-indigo-50/50' : ''}`}
+                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${selectedLeads.has(lead.id) ? 'bg-gray-50/50' : ''}`}
                   >
                     <td className="px-6 py-3" onClick={(e) => e.stopPropagation()}>
                       <input 
                         type="checkbox" 
-                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         checked={selectedLeads.has(lead.id)}
                         onChange={() => toggleSelect(lead.id)}
                       />
@@ -160,7 +160,7 @@ export default function LeadsPage() {
                         lead.status === 'NEW' ? 'bg-blue-100 text-blue-700' :
                         lead.status === 'CONTACTED' ? 'bg-yellow-100 text-yellow-700' :
                         lead.status === 'QUALIFIED' ? 'bg-green-100 text-green-700' :
-                        lead.status === 'CONVERTED' ? 'bg-indigo-100 text-indigo-700' :
+                        lead.status === 'CONVERTED' ? 'bg-gray-100 text-gray-700' :
                         'bg-gray-100 text-gray-600'
                       }`}>
                         {lead.status === 'NEW' ? 'Neu' :

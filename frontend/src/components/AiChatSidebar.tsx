@@ -702,9 +702,9 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     >
       {/* Drop overlay */}
       {isDragging && (
-        <div className="absolute inset-0 z-50 bg-indigo-600/10 border-2 border-dashed border-indigo-400 rounded-lg flex items-center justify-center backdrop-blur-[1px]">
+        <div className="absolute inset-0 z-50 bg-gray-900/10 border-2 border-dashed border-gray-400 rounded-lg flex items-center justify-center backdrop-blur-[1px]">
           <div className="bg-white rounded-xl shadow-lg px-6 py-4 text-center">
-            <Paperclip className="w-8 h-8 text-indigo-500 mx-auto mb-2" />
+            <Paperclip className="w-8 h-8 text-blue-500 mx-auto mb-2" />
             <p className="text-sm font-medium text-gray-800">Dateien hier ablegen</p>
             <p className="text-xs text-gray-500 mt-0.5">Bilder, PDFs, Dokumente</p>
           </div>
@@ -714,7 +714,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         <div className="flex items-center space-x-2">
           <NextImage src="/logo-icon-only.png" alt="Jarvis" width={32} height={32} />
           <span className="font-bold text-gray-900">Jarvis</span>
-          <span className="text-[9px] font-medium text-indigo-500 bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5 leading-none">KI</span>
+          <span className="text-[9px] font-medium text-blue-500 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 leading-none">KI</span>
         </div>
         <div className="flex items-center space-x-1">
           <button
@@ -793,10 +793,10 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           if (msg.isAction) {
             return (
               <div key={index} className="flex justify-center">
-                <div className="bg-indigo-50 text-indigo-600 rounded-full px-3 py-1.5 text-xs font-medium flex items-center gap-1.5">
-                  <div className="w-1 h-1 bg-indigo-500 rounded-full animate-ping"></div>
-                  <div className="w-1 h-1 bg-indigo-500 rounded-full animate-ping delay-75"></div>
-                  <div className="w-1 h-1 bg-indigo-500 rounded-full animate-ping delay-150"></div>
+                <div className="bg-gray-100 text-gray-900 rounded-full px-3 py-1.5 text-xs font-medium flex items-center gap-1.5">
+                  <div className="w-1 h-1 bg-gray-500 rounded-full animate-ping"></div>
+                  <div className="w-1 h-1 bg-gray-500 rounded-full animate-ping delay-75"></div>
+                  <div className="w-1 h-1 bg-gray-500 rounded-full animate-ping delay-150"></div>
                 </div>
               </div>
             );
@@ -818,7 +818,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
             <div key={index} className={`flex ${msg.role === 'USER' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[85%] rounded-lg p-3 text-sm ${
                 msg.role === 'USER' 
-                  ? 'bg-indigo-600 text-white rounded-br-none' 
+                  ? 'bg-gray-900 text-white rounded-br-none' 
                   : 'bg-white text-gray-800 rounded-bl-none'
               }`}>
                 {/* Show tools used as tags - grouped by tool type with count */}
@@ -834,7 +834,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                       return Object.entries(toolCounts).map(([tool, count], i) => {
                         const { label, icon } = getToolLabel(tool);
                         return (
-                          <span key={i} className="inline-flex items-center gap-1 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 border border-indigo-100 rounded-md px-2 py-0.5 text-[10px] font-medium shadow-sm">
+                          <span key={i} className="inline-flex items-center gap-1 bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 border border-gray-200 rounded-md px-2 py-0.5 text-[10px] font-medium shadow-sm">
                             <span>{icon}</span>
                             {count > 1 ? `${count}x ${label}` : label}
                           </span>
@@ -879,14 +879,14 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           activeTip && tipVisible ? 'max-h-24 opacity-100 mb-3' : 'max-h-0 opacity-0 mb-0'
         }`}>
           {activeTip && (
-            <div className="bg-indigo-50 border border-indigo-100 rounded-md p-3 relative">
+            <div className="bg-gray-50 border border-gray-200 rounded-md p-3 relative">
               <button
                 onClick={dismissTip}
-                className="absolute top-2 right-2 p-1 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-100 rounded transition-colors"
+                className="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
               >
                 <X className="w-3 h-3" />
               </button>
-              <p className="text-xs text-indigo-700 pr-6">{activeTip.message}</p>
+              <p className="text-xs text-gray-700 pr-6">{activeTip.message}</p>
             </div>
           )}
         </div>
@@ -939,7 +939,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
             }}
             placeholder="Nachricht an Jarvis..."
             rows={1}
-            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-[16px] lg:text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white transition-all placeholder-gray-400 resize-none overflow-y-auto"
+            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-[16px] lg:text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all placeholder-gray-400 resize-none overflow-y-auto"
             style={{ maxHeight: '5.5rem', minHeight: '2.25rem' }}
             onInput={(e) => {
               const target = e.target as HTMLTextAreaElement;
@@ -969,7 +969,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
               <button
                 type="submit"
                 disabled={!aiChatDraft.trim() && uploadedFiles.length === 0}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-md hover:bg-gray-800 disabled:opacity-50 disabled:hover:bg-gray-900 transition-colors"
               >
                 Senden
                 <Send className="w-3.5 h-3.5" />

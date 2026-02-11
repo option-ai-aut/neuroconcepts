@@ -354,7 +354,7 @@ export default function IntegrationsSettingsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-gray-600" />
       </div>
     );
   }
@@ -376,19 +376,19 @@ export default function IntegrationsSettingsPage() {
             <h3 className="text-lg font-semibold text-gray-900">Portal-Weiterleitungsadresse</h3>
           </div>
           
-          <div className="bg-indigo-50 rounded-xl p-6">
+          <div className="bg-gray-50 rounded-xl p-6">
             <p className="text-sm text-gray-700 mb-4">
               Leite Anfragen von Immobilienportalen an diese E-Mail-Adresse weiter. 
               Jarvis wird die Anfragen automatisch verarbeiten und Leads erstellen.
             </p>
             
             <div className="flex items-center gap-3">
-              <div className="flex-1 bg-white rounded-lg px-4 py-3 border border-indigo-200">
-                <code className="text-sm font-mono text-indigo-700">{inboundLeadEmail}</code>
+              <div className="flex-1 bg-white rounded-lg px-4 py-3 border border-gray-200">
+                <code className="text-sm font-mono text-gray-700">{inboundLeadEmail}</code>
               </div>
               <button
                 onClick={handleCopyEmail}
-                className="flex items-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-lg transition-colors"
               >
                 {copiedEmail ? (
                   <>
@@ -458,7 +458,7 @@ export default function IntegrationsSettingsPage() {
             <button
               onClick={() => handleConnectEmail('gmail')}
               disabled={outlookMailConnected}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Verbinden
             </button>
@@ -496,7 +496,7 @@ export default function IntegrationsSettingsPage() {
             <button
               onClick={() => handleConnectEmail('outlook')}
               disabled={gmailConnected}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Verbinden
             </button>
@@ -521,7 +521,7 @@ export default function IntegrationsSettingsPage() {
                   type="text" 
                   value={smtpConfig.host}
                   onChange={handleSmtpChange}
-                  className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
@@ -531,7 +531,7 @@ export default function IntegrationsSettingsPage() {
                   type="number" 
                   value={smtpConfig.port}
                   onChange={handleSmtpChange}
-                  className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -543,7 +543,7 @@ export default function IntegrationsSettingsPage() {
                 type="text" 
                 value={smtpConfig.user}
                 onChange={handleSmtpChange}
-                className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             
@@ -555,7 +555,7 @@ export default function IntegrationsSettingsPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={smtpConfig.password}
                   onChange={handleSmtpChange}
-                  className="w-full px-3 py-2 pr-10 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 pr-10 bg-gray-50 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button
                   type="button"
@@ -567,7 +567,7 @@ export default function IntegrationsSettingsPage() {
               </div>
             </div>
             
-            <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
+            <button className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors">
               Testen & Speichern
             </button>
           </div>
@@ -623,7 +623,7 @@ export default function IntegrationsSettingsPage() {
             <button
               onClick={() => handleConnectCalendar('google')}
               disabled={outlookCalendarConnected}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Verbinden
             </button>
@@ -663,7 +663,7 @@ export default function IntegrationsSettingsPage() {
             <button
               onClick={() => handleConnectCalendar('outlook')}
               disabled={googleCalendarConnected}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Verbinden
             </button>
@@ -679,7 +679,7 @@ export default function IntegrationsSettingsPage() {
           <button
             onClick={handleShareToggle}
             className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-              shareCalendar ? 'bg-indigo-600' : 'bg-gray-300'
+              shareCalendar ? 'bg-gray-900' : 'bg-gray-300'
             }`}
           >
             <span

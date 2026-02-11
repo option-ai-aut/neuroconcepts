@@ -9,10 +9,10 @@ import {
 
 const PIPELINE_STAGES = [
   { name: 'Kontaktiert', count: 12, value: '€14.4k', color: 'bg-gray-200' },
-  { name: 'Demo gebucht', count: 8, value: '€9.6k', color: 'bg-blue-200' },
-  { name: 'Demo durchgeführt', count: 5, value: '€6.0k', color: 'bg-indigo-200' },
-  { name: 'Angebot gesendet', count: 3, value: '€3.6k', color: 'bg-violet-200' },
-  { name: 'Verhandlung', count: 2, value: '€2.4k', color: 'bg-purple-300' },
+  { name: 'Demo gebucht', count: 8, value: '€9.6k', color: 'bg-gray-200' },
+  { name: 'Demo durchgeführt', count: 5, value: '€6.0k', color: 'bg-gray-300' },
+  { name: 'Angebot gesendet', count: 3, value: '€3.6k', color: 'bg-gray-300' },
+  { name: 'Verhandlung', count: 2, value: '€2.4k', color: 'bg-gray-400' },
   { name: 'Gewonnen', count: 4, value: '€4.8k', color: 'bg-emerald-300' },
 ];
 
@@ -46,7 +46,7 @@ export default function SalesPage() {
           <h1 className="text-xl font-bold text-gray-900">Sales & Pipeline</h1>
           <p className="text-sm text-gray-500 mt-0.5">Vertrieb, Leads und Kundenakquise</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+        <button className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800">
           <Plus className="w-4 h-4" />
           Neuer Deal
         </button>
@@ -87,7 +87,7 @@ export default function SalesPage() {
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-gray-900">Aktive Deals</h2>
-            <button className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">Alle anzeigen</button>
+            <button className="text-xs text-blue-600 hover:text-blue-700 font-medium">Alle anzeigen</button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -109,7 +109,7 @@ export default function SalesPage() {
                     </td>
                     <td className="px-4 py-2.5 text-xs font-semibold text-gray-900">{deal.value}</td>
                     <td className="px-4 py-2.5">
-                      <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{deal.stage}</span>
+                      <span className="text-[10px] font-medium text-gray-700 bg-gray-100 px-2 py-0.5 rounded">{deal.stage}</span>
                     </td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
@@ -134,11 +134,11 @@ export default function SalesPage() {
             {ACTIVITIES.map((act, i) => (
               <div key={i} className="flex items-start gap-2.5">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
-                  act.type === 'call' ? 'bg-green-100' : act.type === 'email' ? 'bg-blue-100' : act.type === 'meeting' ? 'bg-violet-100' : 'bg-amber-100'
+                  act.type === 'call' ? 'bg-gray-100' : act.type === 'email' ? 'bg-gray-100' : act.type === 'meeting' ? 'bg-gray-100' : 'bg-amber-100'
                 }`}>
-                  {act.type === 'call' && <Phone className="w-3 h-3 text-green-600" />}
-                  {act.type === 'email' && <Mail className="w-3 h-3 text-blue-600" />}
-                  {act.type === 'meeting' && <Calendar className="w-3 h-3 text-violet-600" />}
+                  {act.type === 'call' && <Phone className="w-3 h-3 text-gray-600" />}
+                  {act.type === 'email' && <Mail className="w-3 h-3 text-gray-600" />}
+                  {act.type === 'meeting' && <Calendar className="w-3 h-3 text-gray-600" />}
                   {act.type === 'task' && <CheckCircle2 className="w-3 h-3 text-amber-600" />}
                 </div>
                 <div className="flex-1 min-w-0">

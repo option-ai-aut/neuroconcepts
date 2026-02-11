@@ -84,12 +84,12 @@ function AdminSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
                   href={item.href}
                   className={`flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg transition-all ${
                     isActive(item.href)
-                      ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20'
-                      : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200 border border-transparent'
+                      ? 'bg-white text-gray-950 border border-transparent'
+                      : 'text-gray-500 hover:bg-gray-800/50 hover:text-gray-200 border border-transparent'
                   }`}
                   title={collapsed ? item.name : undefined}
                 >
-                  <item.icon className={`w-4 h-4 shrink-0 ${isActive(item.href) ? 'text-indigo-400' : 'text-gray-500'}`} />
+                  <item.icon className={`w-4 h-4 shrink-0 ${isActive(item.href) ? 'text-gray-950' : 'text-gray-500'}`} />
                   {!collapsed && <span>{item.name}</span>}
                 </Link>
               ))}
@@ -111,7 +111,7 @@ function AdminSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
             await signOut();
             window.location.href = '/admin/login';
           }}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[13px] text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[13px] text-gray-500 hover:text-white hover:bg-gray-800/50 rounded-lg transition-all"
         >
           <LogOut className="w-4 h-4" />
           {!collapsed && <span>Abmelden</span>}
@@ -139,7 +139,7 @@ function AdminTopBar() {
           <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full" />
         </button>
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-full flex items-center justify-center">
+          <div className="w-7 h-7 bg-gray-800 rounded-full flex items-center justify-center">
             <Shield className="w-3.5 h-3.5 text-white" />
           </div>
           <div className="hidden sm:block">
@@ -211,7 +211,7 @@ export default function AdminLayout({
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-950">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mx-auto" />
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto" />
           <p className="mt-4 text-gray-400 text-sm">Admin wird geladen...</p>
         </div>
       </div>

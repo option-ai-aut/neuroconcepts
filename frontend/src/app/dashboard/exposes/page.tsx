@@ -218,7 +218,7 @@ export default function ExposesPage() {
       if (part.match(/^\{\{[^}]+\}\}$/)) {
         const label = VARIABLE_LABELS[part] || part.replace(/[{}]/g, '');
         return (
-          <span key={i} className="inline-flex items-center px-1.5 py-0.5 mx-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">
+          <span key={i} className="inline-flex items-center px-1.5 py-0.5 mx-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
             {label}
           </span>
         );
@@ -278,8 +278,8 @@ export default function ExposesPage() {
   const getThemeColors = () => {
     const theme = selectedTemplate?.theme || 'default';
     const themes: Record<string, { primary: string; secondary: string; accent: string }> = {
-      default: { primary: '#4F46E5', secondary: '#1F2937', accent: '#6366F1' },
-      modern: { primary: '#0EA5E9', secondary: '#0F172A', accent: '#38BDF8' },
+      default: { primary: '#111827', secondary: '#1F2937', accent: '#2563EB' },
+      modern: { primary: '#111827', secondary: '#0F172A', accent: '#2563EB' },
       elegant: { primary: '#78716C', secondary: '#292524', accent: '#A8A29E' },
       minimal: { primary: '#18181B', secondary: '#27272A', accent: '#52525B' },
     };
@@ -300,7 +300,7 @@ export default function ExposesPage() {
     switch (block.type) {
       case 'hero':
         return (
-          <div className="relative h-64 bg-indigo-900 overflow-hidden">
+          <div className="relative h-64 bg-gray-900 overflow-hidden">
             {block.imageUrl ? (
               <img src={block.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
             ) : (
@@ -380,7 +380,7 @@ export default function ExposesPage() {
 
       case 'leadInfo':
         return (
-          <div className="p-6 bg-gradient-to-r from-indigo-50 to-purple-50 border-l-4" style={{ borderColor: themeColors.accent }}>
+          <div className="p-6 bg-gray-50 border-l-4" style={{ borderColor: themeColors.accent }}>
             {block.showGreeting !== false && (
               <p className="text-sm text-gray-500 mb-2">Erstellt für</p>
             )}
@@ -499,7 +499,7 @@ export default function ExposesPage() {
         return (
           <div className="p-6">
             {block.title && <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>{rv(block.title)}</h3>}
-            <div className="aspect-video bg-gradient-to-br from-indigo-100 to-purple-100 rounded flex flex-col items-center justify-center text-gray-500">
+            <div className="aspect-video bg-gray-100 rounded flex flex-col items-center justify-center text-gray-500">
               <Eye className="w-12 h-12 mb-2" />
               <span className="text-sm">{block.type === 'video' ? 'Video' : '360° Tour'}</span>
             </div>
@@ -534,12 +534,12 @@ export default function ExposesPage() {
                 placeholder="Suchen..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent focus:bg-white focus:border-indigo-500 focus:ring-0 rounded-md text-sm transition-all"
+                className="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent focus:bg-white focus:border-blue-500 focus:ring-0 rounded-md text-sm transition-all"
               />
             </div>
             <button 
               onClick={handleCreateTemplate}
-              className="bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 transition-colors"
+              className="bg-gray-900 text-white p-2 rounded-md hover:bg-gray-800 transition-colors"
               title="Neue Vorlage"
             >
               <Plus className="w-5 h-5" />
@@ -593,12 +593,12 @@ export default function ExposesPage() {
                       onChange={(e) => setEditedName(e.target.value)}
                       onBlur={handleNameSave}
                       onKeyDown={handleNameKeyDown}
-                      className="text-xl font-bold text-gray-900 bg-transparent border-b-2 border-indigo-500 focus:outline-none px-1"
+                      className="text-xl font-bold text-gray-900 bg-transparent border-b-2 border-gray-300 focus:outline-none px-1"
                     />
                   ) : (
                     <h2 
                       onClick={handleNameClick}
-                      className="text-xl font-bold text-gray-900 cursor-pointer hover:text-indigo-600 transition-colors px-1"
+                      className="text-xl font-bold text-gray-900 cursor-pointer hover:text-blue-600 transition-colors px-1"
                       title="Klicken zum Umbenennen"
                     >
                       {selectedTemplate.name}
@@ -617,7 +617,7 @@ export default function ExposesPage() {
                 <div className="flex items-center gap-2">
                   <button 
                     onClick={() => handleEditTemplate(selectedId!)}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all font-medium shadow-sm hover:shadow-md"
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all font-medium shadow-sm hover:shadow-md"
                   >
                     <Edit2 className="w-4 h-4" />
                     Bearbeiten
@@ -642,7 +642,7 @@ export default function ExposesPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-500">Seiten:</span>
-                      <span className="text-sm font-semibold text-indigo-600">{calculatePages.length}</span>
+                      <span className="text-sm font-semibold text-blue-600">{calculatePages.length}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-500">Theme:</span>
@@ -662,7 +662,7 @@ export default function ExposesPage() {
                           const prop = properties.find(p => p.id === e.target.value);
                           setPreviewProperty(prop || null);
                         }}
-                        className="text-xs border border-gray-200 rounded px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="text-xs border border-gray-200 rounded px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
                       >
                         <option value="">Variablen anzeigen</option>
                         {properties.map(p => (
@@ -679,8 +679,8 @@ export default function ExposesPage() {
                 {(selectedTemplate.blocks || []).length === 0 ? (
                   /* Empty State */
                   <div className="h-full flex flex-col items-center justify-center text-center p-6">
-                    <div className="w-20 h-20 bg-gradient-to-br from-indigo-100 to-violet-100 rounded-2xl flex items-center justify-center mb-6">
-                      <Sparkles className="w-10 h-10 text-indigo-600" />
+                    <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mb-6">
+                      <Sparkles className="w-10 h-10 text-gray-600" />
                     </div>
                     <h3 className="text-xl font-bold text-gray-900 mb-2">Vorlage ist leer</h3>
                     <p className="text-gray-500 mb-6 max-w-sm">
@@ -688,7 +688,7 @@ export default function ExposesPage() {
                     </p>
                     <button 
                       onClick={() => handleEditTemplate(selectedId!)}
-                      className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all font-medium shadow-lg"
+                      className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all font-medium shadow-lg"
                     >
                       <Edit2 className="w-5 h-5" />
                       Jetzt bearbeiten
@@ -744,7 +744,7 @@ export default function ExposesPage() {
               </p>
               <button 
                 onClick={handleCreateTemplate}
-                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all font-medium shadow-lg"
+                className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all font-medium shadow-lg"
               >
                 <Plus className="w-5 h-5" />
                 Neue Vorlage erstellen

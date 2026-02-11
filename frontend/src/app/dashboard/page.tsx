@@ -83,9 +83,9 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
-  NEW: 'bg-blue-100 text-blue-700',
+  NEW: 'bg-gray-100 text-gray-700',
   CONTACTED: 'bg-yellow-100 text-yellow-700',
-  CONVERSATION: 'bg-purple-100 text-purple-700',
+  CONVERSATION: 'bg-gray-100 text-gray-700',
   BOOKED: 'bg-green-100 text-green-700',
   LOST: 'bg-gray-100 text-gray-500'
 };
@@ -147,7 +147,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center bg-white">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     );
   }
@@ -187,7 +187,7 @@ export default function DashboardPage() {
           <div className="flex gap-2 md:gap-3">
             <button
               onClick={() => openDrawer('LEAD')}
-              className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-xs md:text-sm font-medium"
+              className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-xs md:text-sm font-medium"
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Neuer</span> Lead
@@ -213,10 +213,10 @@ export default function DashboardPage() {
             className="bg-white rounded-xl border border-gray-100 p-4 md:p-6 hover:shadow-md transition-all group"
           >
             <div className="flex items-center justify-between mb-3 md:mb-4">
-              <div className="p-2 md:p-3 bg-indigo-50 rounded-lg">
-                <Users className="w-4 md:w-5 h-4 md:h-5 text-indigo-600" />
+              <div className="p-2 md:p-3 bg-gray-50 rounded-lg">
+                <Users className="w-4 md:w-5 h-4 md:h-5 text-blue-600" />
               </div>
-              <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-indigo-500 transition-colors" />
+              <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" />
             </div>
             <div className="text-2xl md:text-3xl font-bold text-gray-900">{activeLeads}</div>
             <div className="text-xs md:text-sm text-gray-500 mt-1">Aktive Leads</div>
@@ -234,10 +234,10 @@ export default function DashboardPage() {
             className="bg-white rounded-xl border border-gray-100 p-4 md:p-6 hover:shadow-md transition-all group"
           >
             <div className="flex items-center justify-between mb-3 md:mb-4">
-              <div className="p-2 md:p-3 bg-purple-50 rounded-lg">
-                <Building2 className="w-4 md:w-5 h-4 md:h-5 text-purple-600" />
+              <div className="p-2 md:p-3 bg-gray-50 rounded-lg">
+                <Building2 className="w-4 md:w-5 h-4 md:h-5 text-gray-600" />
               </div>
-              <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-purple-500 transition-colors" />
+              <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
             </div>
             <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats.properties.active}</div>
             <div className="text-xs md:text-sm text-gray-500 mt-1">Aktive Objekte</div>
@@ -287,7 +287,7 @@ export default function DashboardPage() {
               <h2 className="text-lg font-semibold text-gray-900">Leads - Handlungsbedarf</h2>
               <Link 
                 href="/dashboard/crm/leads?status=NEW" 
-                className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
               >
                 Alle anzeigen
               </Link>
@@ -307,7 +307,7 @@ export default function DashboardPage() {
                     className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors group"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-medium">
+                      <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 font-medium">
                         {lead.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
@@ -323,10 +323,10 @@ export default function DashboardPage() {
                           {lead.daysSinceCreated} Tage
                         </span>
                       )}
-                      <span className="text-xs px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full">
-                        Neu
-                      </span>
-                      <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-indigo-500 transition-colors" />
+<span className="text-xs px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full">
+                                        Neu
+                                      </span>
+                      <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" />
                     </div>
                   </Link>
                 ))}
@@ -372,7 +372,7 @@ export default function DashboardPage() {
             <h2 className="text-lg font-semibold text-gray-900">Lead-Pipeline</h2>
             <Link 
               href="/dashboard/crm/leads" 
-              className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
             >
               CRM öffnen
             </Link>

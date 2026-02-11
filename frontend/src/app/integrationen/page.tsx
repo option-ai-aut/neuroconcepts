@@ -62,8 +62,8 @@ export default function IntegrationenPage() {
               <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
                 {category.items.map((item, j) => (
                   <div key={j} className="bg-white rounded-xl p-4 sm:p-6 border border-gray-200 hover:shadow-lg hover:-translate-y-1 transition-all">
-                    <div className="w-10 sm:w-12 h-10 sm:h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-3 sm:mb-4">
-                      <Globe className="w-5 sm:w-6 h-5 sm:h-6 text-indigo-600" />
+                    <div className="w-10 sm:w-12 h-10 sm:h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-3 sm:mb-4">
+                      <Globe className="w-5 sm:w-6 h-5 sm:h-6 text-blue-600" />
                     </div>
                     <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">{item.name}</h3>
                     <p className="text-gray-600 text-sm">{item.description}</p>
@@ -76,17 +76,17 @@ export default function IntegrationenPage() {
       </section>
 
       {/* CTA */}
-      <section className="py-12 sm:py-16 bg-gradient-to-br from-indigo-600 to-violet-600">
+      <section className="py-12 sm:py-16 bg-gray-900">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4 sm:mb-6">
             Deine Integration fehlt?
           </h2>
-          <p className="text-lg sm:text-xl text-indigo-100 mb-6 sm:mb-8 px-4">
+          <p className="text-lg sm:text-xl text-gray-300 mb-6 sm:mb-8 px-4">
             Kontaktiere uns und wir prüfen, ob wir dein Tool integrieren können.
           </p>
           <Link 
             href="/kontakt"
-            className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 bg-white text-indigo-600 rounded-full font-semibold hover:bg-gray-100 transition-all"
+            className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 bg-white text-blue-600 rounded-full font-semibold hover:bg-gray-100 transition-all"
           >
             Kontakt aufnehmen
             <ArrowRight className="ml-2 w-5 h-5" />

@@ -47,8 +47,8 @@ export default function UeberUnsPage() {
                 { icon: Users, title: 'Fokus', description: 'Makler-zentrierte Entwicklung' }
               ].map((item, i) => (
                 <div key={i} className="bg-gray-50 rounded-xl p-4 sm:p-6">
-                  <div className="w-8 sm:w-10 h-8 sm:h-10 bg-indigo-100 rounded-lg flex items-center justify-center mb-3 sm:mb-4">
-                    <item.icon className="w-4 sm:w-5 h-4 sm:h-5 text-indigo-600" />
+                  <div className="w-8 sm:w-10 h-8 sm:h-10 bg-gray-100 rounded-lg flex items-center justify-center mb-3 sm:mb-4">
+                    <item.icon className="w-4 sm:w-5 h-4 sm:h-5 text-blue-600" />
                   </div>
                   <h3 className="font-semibold text-gray-900 mb-1 text-sm sm:text-base">{item.title}</h3>
                   <p className="text-xs sm:text-sm text-gray-600">{item.description}</p>
@@ -70,7 +70,7 @@ export default function UeberUnsPage() {
               { value: '99.9%', label: 'Uptime' }
             ].map((stat, i) => (
               <div key={i}>
-                <div className="text-2xl sm:text-4xl font-extrabold text-indigo-600 mb-1 sm:mb-2">{stat.value}</div>
+                <div className="text-2xl sm:text-4xl font-extrabold text-blue-600 mb-1 sm:mb-2">{stat.value}</div>
                 <div className="text-sm sm:text-base text-gray-600">{stat.label}</div>
               </div>
             ))}
@@ -89,7 +89,7 @@ export default function UeberUnsPage() {
           </p>
           <Link 
             href="/login"
-            className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-full font-semibold hover:shadow-lg hover:shadow-indigo-500/30 transition-all"
+            className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 bg-gray-900 text-white rounded-full font-semibold hover:bg-gray-800 transition-all"
           >
             Jetzt kostenlos starten
             <ArrowRight className="ml-2 w-5 h-5" />

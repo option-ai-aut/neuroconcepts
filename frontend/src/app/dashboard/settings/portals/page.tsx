@@ -523,8 +523,8 @@ export default function PortalsSettingsPage() {
           <div className="text-3xl font-bold text-green-600">{totalConnected}</div>
           <div className="text-sm text-gray-500">Verbunden</div>
         </div>
-        <div className="bg-indigo-50 rounded-xl p-4">
-          <div className="text-3xl font-bold text-indigo-600">{totalAutoSync}</div>
+        <div className="bg-gray-50 rounded-xl p-4">
+          <div className="text-3xl font-bold text-blue-600">{totalAutoSync}</div>
           <div className="text-sm text-gray-500">Auto-Sync aktiv</div>
         </div>
       </div>
@@ -577,7 +577,7 @@ export default function PortalsSettingsPage() {
                 <div 
                   key={portal.id}
                   className={`bg-white rounded-xl border transition-all ${
-                    isEditing ? 'border-indigo-300 shadow-lg' : 'border-gray-200 hover:border-gray-300'
+                    isEditing ? 'border-gray-300 shadow-lg' : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
                   {/* Portal Header */}
@@ -603,9 +603,9 @@ export default function PortalsSettingsPage() {
                             <>
                               <Check className="w-4 h-4 text-green-500" />
                               {hasUserConn ? (
-                                <div className="flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-[10px] font-medium">
-                                  <User className="w-3 h-3 text-indigo-600" />
-                                  <span className="text-indigo-600">Eigener Account</span>
+                                <div className="flex items-center gap-1 px-2 py-0.5 bg-gray-50 text-[10px] font-medium">
+                                  <User className="w-3 h-3 text-blue-600" />
+                                  <span className="text-blue-600">Eigener Account</span>
                                 </div>
                               ) : (
                                 <div className="flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-[10px] font-medium">
@@ -645,13 +645,13 @@ export default function PortalsSettingsPage() {
                           disabled={!isAdmin}
                           className={`w-full flex items-center gap-2 p-3 bg-white rounded-lg border-2 transition-colors ${
                             !isAdmin ? 'opacity-50 cursor-not-allowed' : 
-                            editMode === 'tenant' ? 'border-indigo-500' : 'border-gray-200 hover:border-gray-300'
+                            editMode === 'tenant' ? 'border-blue-500' : 'border-gray-200 hover:border-gray-300'
                           }`}
                         >
                           <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                            editMode === 'tenant' ? 'border-indigo-500' : 'border-gray-300'
+                            editMode === 'tenant' ? 'border-blue-500' : 'border-gray-300'
                           }`}>
-                            {editMode === 'tenant' && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
+                            {editMode === 'tenant' && <div className="w-2 h-2 rounded-full bg-gray-500" />}
                           </div>
                           <Building2 className="w-4 h-4" />
                           <div className="flex-1 text-left">
@@ -669,13 +669,13 @@ export default function PortalsSettingsPage() {
                         <button
                           onClick={() => setEditMode('user')}
                           className={`w-full flex items-center gap-2 p-3 bg-white rounded-lg border-2 transition-colors ${
-                            editMode === 'user' ? 'border-indigo-500' : 'border-gray-200 hover:border-gray-300'
+                            editMode === 'user' ? 'border-blue-500' : 'border-gray-200 hover:border-gray-300'
                           }`}
                         >
                           <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                            editMode === 'user' ? 'border-indigo-500' : 'border-gray-300'
+                            editMode === 'user' ? 'border-blue-500' : 'border-gray-300'
                           }`}>
-                            {editMode === 'user' && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
+                            {editMode === 'user' && <div className="w-2 h-2 rounded-full bg-gray-500" />}
                           </div>
                           <User className="w-4 h-4" />
                           <div className="flex-1 text-left">
@@ -712,7 +712,7 @@ export default function PortalsSettingsPage() {
                                     value={formData.apiKey || ''}
                                     onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
                                     placeholder={cfg.apiKeyPlaceholder || 'Dein API Key'}
-                                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                   />
                                 </div>
                                 
@@ -724,7 +724,7 @@ export default function PortalsSettingsPage() {
                                       value={formData.apiSecret || ''}
                                       onChange={(e) => setFormData({ ...formData, apiSecret: e.target.value })}
                                       placeholder="Dein API Secret"
-                                      className="w-full px-3 py-2 pr-10 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                      className="w-full px-3 py-2 pr-10 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                     <button
                                       type="button"
@@ -743,7 +743,7 @@ export default function PortalsSettingsPage() {
                                     value={formData.providerId || ''}
                                     onChange={(e) => setFormData({ ...formData, providerId: e.target.value })}
                                     placeholder={cfg.providerPlaceholder || 'Deine Anbieternummer'}
-                                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                   />
                                 </div>
                               </>
@@ -758,7 +758,7 @@ export default function PortalsSettingsPage() {
                                       value={formData.ftpHost || ''}
                                       onChange={(e) => setFormData({ ...formData, ftpHost: e.target.value })}
                                       placeholder={cfg.ftpHostPlaceholder || 'ftp.portal.de'}
-                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                   </div>
                                   <div>
@@ -767,7 +767,7 @@ export default function PortalsSettingsPage() {
                                       type="number"
                                       value={formData.ftpPort || 21}
                                       onChange={(e) => setFormData({ ...formData, ftpPort: parseInt(e.target.value) })}
-                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                   </div>
                                 </div>
@@ -779,7 +779,7 @@ export default function PortalsSettingsPage() {
                                       type="text"
                                       value={formData.ftpUsername || ''}
                                       onChange={(e) => setFormData({ ...formData, ftpUsername: e.target.value })}
-                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                   </div>
                                   <div>
@@ -789,7 +789,7 @@ export default function PortalsSettingsPage() {
                                         type={showPassword ? 'text' : 'password'}
                                         value={formData.ftpPassword || ''}
                                         onChange={(e) => setFormData({ ...formData, ftpPassword: e.target.value })}
-                                        className="w-full px-3 py-2 pr-10 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        className="w-full px-3 py-2 pr-10 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                       />
                                       <button
                                         type="button"
@@ -809,7 +809,7 @@ export default function PortalsSettingsPage() {
                                       type="text"
                                       value={formData.ftpPath || '/'}
                                       onChange={(e) => setFormData({ ...formData, ftpPath: e.target.value })}
-                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                   </div>
                                   <div>
@@ -819,7 +819,7 @@ export default function PortalsSettingsPage() {
                                       value={formData.providerId || ''}
                                       onChange={(e) => setFormData({ ...formData, providerId: e.target.value })}
                                       placeholder={cfg.providerPlaceholder || 'Deine Anbieternummer'}
-                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                   </div>
                                 </div>
@@ -830,7 +830,7 @@ export default function PortalsSettingsPage() {
                                       type="checkbox"
                                       checked={formData.useSftp || false}
                                       onChange={(e) => setFormData({ ...formData, useSftp: e.target.checked })}
-                                      className="w-4 h-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                      className="w-4 h-4 border-gray-300 text-blue-600 focus:ring-blue-500"
                                     />
                                     <span className="text-sm text-gray-700">SFTP verwenden</span>
                                   </label>
@@ -845,7 +845,7 @@ export default function PortalsSettingsPage() {
                                   type="checkbox"
                                   checked={formData.isEnabled ?? true}
                                   onChange={(e) => setFormData({ ...formData, isEnabled: e.target.checked })}
-                                  className="w-4 h-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                  className="w-4 h-4 border-gray-300 text-blue-600 focus:ring-blue-500"
                                 />
                                 <span className="text-sm text-gray-700">Aktiviert</span>
                               </label>
@@ -855,7 +855,7 @@ export default function PortalsSettingsPage() {
                                   type="checkbox"
                                   checked={formData.autoSyncEnabled || false}
                                   onChange={(e) => setFormData({ ...formData, autoSyncEnabled: e.target.checked })}
-                                  className="w-4 h-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                  className="w-4 h-4 border-gray-300 text-blue-600 focus:ring-blue-500"
                                 />
                                 <span className="text-sm text-gray-700">Auto-Sync</span>
                               </label>
@@ -905,7 +905,7 @@ export default function PortalsSettingsPage() {
                                 </button>
                                 <button
                                   onClick={handleSave}
-                                  className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                                  className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 transition-colors"
                                 >
                                   Speichern
                                 </button>

@@ -97,7 +97,7 @@ export default function TeamChatPage() {
                 <input 
                   type="text" 
                   placeholder="Suchen..." 
-                  className="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent focus:bg-white focus:border-indigo-500 focus:ring-0 rounded-lg text-sm transition-all"
+                  className="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent focus:bg-white focus:border-gray-300 focus:ring-2 focus:ring-blue-500 rounded-lg text-sm transition-all"
                 />
               </div>
             </div>
@@ -116,12 +116,12 @@ export default function TeamChatPage() {
                       }}
                       className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg group ${
                         activeChannelId === channel.id 
-                          ? 'bg-indigo-50 text-indigo-700' 
+                          ? 'bg-gray-50 text-gray-900' 
                           : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                       }`}
                     >
                       <div className="flex items-center min-w-0">
-                        <Hash className={`w-4 h-4 mr-2 shrink-0 ${activeChannelId === channel.id ? 'text-indigo-500' : 'text-gray-400'}`} />
+                        <Hash className={`w-4 h-4 mr-2 shrink-0 ${activeChannelId === channel.id ? 'text-blue-600' : 'text-gray-400'}`} />
                         <span className="truncate">{channel.name}</span>
                       </div>
                       <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
@@ -161,7 +161,7 @@ export default function TeamChatPage() {
               <input 
                 type="text" 
                 placeholder="Suchen..." 
-                className="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent focus:bg-white focus:border-indigo-500 focus:ring-0 rounded-lg text-sm transition-all"
+                className="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent focus:bg-white focus:border-gray-300 focus:ring-2 focus:ring-blue-500 rounded-lg text-sm transition-all"
               />
             </div>
           </div>
@@ -246,7 +246,7 @@ export default function TeamChatPage() {
                 )}
                 {messages.map((msg: any) => (
                   <div key={msg.id} className="flex items-start space-x-2.5 lg:space-x-3 group">
-                    <div className="w-8 h-8 lg:w-10 lg:h-10 rounded bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs lg:text-sm shrink-0">
+                    <div className="w-8 h-8 lg:w-10 lg:h-10 rounded bg-gray-100 flex items-center justify-center text-blue-600 font-bold text-xs lg:text-sm shrink-0">
                       {msg.user.firstName?.charAt(0)}{msg.user.lastName?.charAt(0)}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -263,7 +263,7 @@ export default function TeamChatPage() {
 
               {/* Input Area */}
               <div className="p-3 lg:p-4 safe-bottom">
-                <div className="bg-gray-50 rounded-xl p-1.5 lg:p-2 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent transition-all">
+                <div className="bg-gray-50 rounded-xl p-1.5 lg:p-2 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
                   <textarea
                     rows={1}
                     className="w-full bg-transparent border-none focus:ring-0 resize-none text-[16px] lg:text-sm p-2"
@@ -284,7 +284,7 @@ export default function TeamChatPage() {
                     <button 
                       onClick={handleSendMessage}
                       className={`p-2 rounded-lg transition-colors ${
-                        message.trim() ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        message.trim() ? 'bg-gray-900 text-white hover:bg-gray-800' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       }`}
                       disabled={!message.trim()}
                     >

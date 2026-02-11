@@ -67,11 +67,11 @@ export default function PropertiesPage() {
             <RefreshCw className="w-4 h-4" />
           </button>
           {selectedProperties.size > 0 && (
-            <div className="flex items-center space-x-2 bg-indigo-50 px-3 py-1 rounded-md">
-              <span className="text-sm font-medium text-indigo-700">{selectedProperties.size} ausgewählt</span>
+            <div className="flex items-center space-x-2 bg-gray-50 px-3 py-1 rounded-md">
+              <span className="text-sm font-medium text-gray-700">{selectedProperties.size} ausgewählt</span>
               <button 
                 onClick={handleDelete}
-                className="text-indigo-600 hover:text-red-600 p-1 rounded transition-colors"
+                className="text-blue-600 hover:text-red-600 p-1 rounded transition-colors"
                 title="Ausgewählte löschen"
               >
                 <Trash2 className="w-4 h-4" />
@@ -81,7 +81,7 @@ export default function PropertiesPage() {
         </div>
         <button 
           onClick={() => openDrawer('PROPERTY')}
-          className="bg-indigo-600 text-white px-3 py-1.5 text-sm font-medium rounded-md hover:bg-indigo-700 shadow-sm transition-colors"
+          className="bg-gray-900 text-white px-3 py-1.5 text-sm font-medium rounded-md hover:bg-gray-800 shadow-sm transition-colors"
         >
           Neues Objekt
         </button>
@@ -94,7 +94,7 @@ export default function PropertiesPage() {
               <th className="px-6 py-3 w-10">
                 <input 
                   type="checkbox" 
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   checked={properties.length > 0 && selectedProperties.size === properties.length}
                   onChange={toggleSelectAll}
                 />
@@ -126,12 +126,12 @@ export default function PropertiesPage() {
                   <tr 
                     key={prop.id} 
                     onClick={() => router.push(`/dashboard/crm/properties/${prop.id}`)}
-                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${selectedProperties.has(prop.id) ? 'bg-indigo-50/50' : ''}`}
+                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${selectedProperties.has(prop.id) ? 'bg-gray-50/50' : ''}`}
                   >
                     <td className="px-6 py-3" onClick={(e) => e.stopPropagation()}>
                       <input 
                         type="checkbox" 
-                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         checked={selectedProperties.has(prop.id)}
                         onChange={() => toggleSelect(prop.id)}
                       />
