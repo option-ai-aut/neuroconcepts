@@ -8,7 +8,18 @@ import JarvisActionService from './JarvisActionService';
 import NotificationService from './NotificationService';
 import OpenAI from 'openai';
 
-const prisma = new PrismaClient();
+let prisma: PrismaClient;
+
+export function setEmailResponsePrisma(client: PrismaClient) {
+  prisma = client;
+}
+
+function getPrisma(): PrismaClient {
+  if (!prisma) {
+    prisma = new PrismaClient();
+  }
+  return prisma;
+}
 
 // Lazy-init to avoid crash before secrets are loaded
 let _openai: OpenAI | null = null;
@@ -90,7 +101,7 @@ export async function findLeadByEmailOrName(
   tenantId: string
 ) {
   // 1. Direct email match
-  let lead = await prisma.lead.findFirst({
+  let lead = await getPrisma().lead.findFirst({
     where: { email, tenantId },
     include: { property: true, assignedTo: true }
   });
@@ -100,7 +111,7 @@ export async function findLeadByEmailOrName(
   }
 
   // 2. Check alternateEmails (JSON array) - fetch all leads and filter in memory
-  const allLeads = await prisma.lead.findMany({
+  const allLeads = await getPrisma().lead.findMany({
     where: { tenantId },
     include: { property: true, assignedTo: true }
   });
@@ -119,7 +130,7 @@ export async function findLeadByEmailOrName(
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(' ');
 
-    const candidates = await prisma.lead.findMany({
+    const candidates = await getPrisma().lead.findMany({
       where: { 
         tenantId,
         status: { not: 'LOST' }
@@ -137,7 +148,7 @@ export async function findLeadByEmailOrName(
         // Save alternate email for future matching
         const existingAlternates = (candidate.alternateEmails as string[] | null) || [];
         if (!existingAlternates.includes(email)) {
-          await prisma.lead.update({
+          await getPrisma().lead.update({
             where: { id: candidate.id },
             data: { alternateEmails: [...existingAlternates, email] }
           });
@@ -236,7 +247,7 @@ export async function processEmailResponse(
 
   if (!lead) {
     // No lead found - escalate to admin
-    const admins = await prisma.user.findMany({
+    const admins = await getPrisma().user.findMany({
       where: { tenantId, role: { in: ['ADMIN', 'SUPER_ADMIN'] } }
     });
 
@@ -258,7 +269,7 @@ export async function processEmailResponse(
   }
 
   // Get property info
-  const property = lead.propertyId ? await prisma.property.findUnique({ where: { id: lead.propertyId } }) : null;
+  const property = lead.propertyId ? await getPrisma().property.findUnique({ where: { id: lead.propertyId } }) : null;
 
   // 2. Analyze the email
   const analysis = await analyzeEmailIntent(
@@ -268,7 +279,7 @@ export async function processEmailResponse(
   );
 
   // 3. Create activity log
-  await prisma.leadActivity.create({
+  await getPrisma().leadActivity.create({
     data: {
       leadId: lead.id,
       type: 'EMAIL_RECEIVED',
@@ -301,7 +312,7 @@ export async function processEmailResponse(
   switch (analysis.intent) {
     case 'INTERESTED':
       // Update lead status
-      await prisma.lead.update({
+      await getPrisma().lead.update({
         where: { id: lead.id },
         data: { status: 'CONVERSATION' }
       });
@@ -322,7 +333,7 @@ export async function processEmailResponse(
 
     case 'QUESTION':
       // Update lead status
-      await prisma.lead.update({
+      await getPrisma().lead.update({
         where: { id: lead.id },
         data: { status: 'CONVERSATION' }
       });
@@ -343,13 +354,13 @@ export async function processEmailResponse(
 
     case 'NOT_INTERESTED':
       // Update lead status
-      await prisma.lead.update({
+      await getPrisma().lead.update({
         where: { id: lead.id },
         data: { status: 'LOST' }
       });
 
       // Log the reason
-      await prisma.leadActivity.create({
+      await getPrisma().leadActivity.create({
         data: {
           leadId: lead.id,
           type: 'STATUS_CHANGED',
@@ -385,7 +396,7 @@ export async function processEmailResponse(
  * Get default agent for a tenant (first admin or agent)
  */
 async function getDefaultAgent(tenantId: string): Promise<string | null> {
-  const user = await prisma.user.findFirst({
+  const user = await getPrisma().user.findFirst({
     where: { tenantId },
     orderBy: { role: 'asc' } // ADMIN comes before AGENT
   });

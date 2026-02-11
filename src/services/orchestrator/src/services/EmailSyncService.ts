@@ -9,7 +9,18 @@ import { Client } from '@microsoft/microsoft-graph-client';
 import { encryptionService } from './EncryptionService';
 import EmailResponseHandler from './EmailResponseHandler';
 
-const prisma = new PrismaClient();
+let prisma: PrismaClient;
+
+export function setEmailSyncPrisma(client: PrismaClient) {
+  prisma = client;
+}
+
+function getPrisma(): PrismaClient {
+  if (!prisma) {
+    prisma = new PrismaClient();
+  }
+  return prisma;
+}
 
 // Helper function to get config at runtime
 const getGoogleEmailConfig = () => ({
@@ -43,7 +54,7 @@ export class EmailSyncService {
   static async syncGmail(tenantId: string): Promise<{ synced: number; errors: string[] }> {
     console.log(`📧 Starting Gmail sync for tenant ${tenantId}...`);
     
-    const settings = await prisma.tenantSettings.findUnique({
+    const settings = await getPrisma().tenantSettings.findUnique({
       where: { tenantId }
     });
 
@@ -89,7 +100,7 @@ export class EmailSyncService {
 
     try {
       // Get last sync time
-      const lastEmail = await prisma.email.findFirst({
+      const lastEmail = await getPrisma().email.findFirst({
         where: { tenantId, provider: 'GMAIL' },
         orderBy: { receivedAt: 'desc' }
       });
@@ -114,7 +125,7 @@ export class EmailSyncService {
       for (const msg of messages) {
         try {
           // Check if already synced
-          const existing = await prisma.email.findFirst({
+          const existing = await getPrisma().email.findFirst({
             where: { tenantId, messageId: msg.id }
           });
 
@@ -130,7 +141,7 @@ export class EmailSyncService {
           const emailData = this.parseGmailMessage(fullMessage.data);
           
           // Save to database
-          const email = await prisma.email.create({
+          const email = await getPrisma().email.create({
             data: {
               tenantId,
               ...emailData
@@ -155,7 +166,7 @@ export class EmailSyncService {
 
       for (const msg of sentResponse.data.messages || []) {
         try {
-          const existing = await prisma.email.findFirst({
+          const existing = await getPrisma().email.findFirst({
             where: { tenantId, messageId: msg.id }
           });
 
@@ -170,7 +181,7 @@ export class EmailSyncService {
           const emailData = this.parseGmailMessage(fullMessage.data);
           emailData.folder = 'SENT';
 
-          await prisma.email.create({
+          await getPrisma().email.create({
             data: {
               tenantId,
               ...emailData
@@ -262,7 +273,7 @@ export class EmailSyncService {
    * Sync Outlook emails for a tenant
    */
   static async syncOutlook(tenantId: string): Promise<{ synced: number; errors: string[] }> {
-    const settings = await prisma.tenantSettings.findUnique({
+    const settings = await getPrisma().tenantSettings.findUnique({
       where: { tenantId }
     });
 
@@ -304,7 +315,7 @@ export class EmailSyncService {
       for (const msg of messages) {
         try {
           // Check if already synced
-          const existing = await prisma.email.findFirst({
+          const existing = await getPrisma().email.findFirst({
             where: { tenantId, messageId: msg.id }
           });
 
@@ -312,7 +323,7 @@ export class EmailSyncService {
 
           const emailData = this.parseOutlookMessage(msg);
 
-          const email = await prisma.email.create({
+          const email = await getPrisma().email.create({
             data: {
               tenantId,
               ...emailData
@@ -338,7 +349,7 @@ export class EmailSyncService {
 
       for (const msg of sentResponse.value || []) {
         try {
-          const existing = await prisma.email.findFirst({
+          const existing = await getPrisma().email.findFirst({
             where: { tenantId, messageId: msg.id }
           });
 
@@ -348,7 +359,7 @@ export class EmailSyncService {
           emailData.folder = 'SENT';
           emailData.receivedAt = new Date(msg.sentDateTime);
 
-          await prisma.email.create({
+          await getPrisma().email.create({
             data: {
               tenantId,
               ...emailData
@@ -409,7 +420,7 @@ export class EmailSyncService {
       const lead = await EmailResponseHandler.findLeadByEmailOrName(fromEmail, fromName, tenantId);
       
       if (lead) {
-        await prisma.email.update({
+        await getPrisma().email.update({
           where: { id: emailId },
           data: { leadId: lead.id }
         });
@@ -436,21 +447,21 @@ export class EmailSyncService {
    * Get sync status for a tenant
    */
   static async getSyncStatus(tenantId: string) {
-    const settings = await prisma.tenantSettings.findUnique({
+    const settings = await getPrisma().tenantSettings.findUnique({
       where: { tenantId }
     });
 
-    const lastGmailEmail = await prisma.email.findFirst({
+    const lastGmailEmail = await getPrisma().email.findFirst({
       where: { tenantId, provider: 'GMAIL' },
       orderBy: { receivedAt: 'desc' }
     });
 
-    const lastOutlookEmail = await prisma.email.findFirst({
+    const lastOutlookEmail = await getPrisma().email.findFirst({
       where: { tenantId, provider: 'OUTLOOK' },
       orderBy: { receivedAt: 'desc' }
     });
 
-    const totalEmails = await prisma.email.count({
+    const totalEmails = await getPrisma().email.count({
       where: { tenantId }
     });
 

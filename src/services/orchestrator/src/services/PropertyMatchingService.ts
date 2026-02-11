@@ -7,7 +7,18 @@
 
 import { PrismaClient, Property } from '@prisma/client';
 
-const prisma = new PrismaClient();
+let prisma: PrismaClient;
+
+export function setPropertyMatchingPrisma(client: PrismaClient) {
+  prisma = client;
+}
+
+function getPrisma(): PrismaClient {
+  if (!prisma) {
+    prisma = new PrismaClient();
+  }
+  return prisma;
+}
 
 export interface PropertyRef {
   type: 'PORTAL_ID' | 'ADDRESS' | 'TITLE';
@@ -73,7 +84,7 @@ async function matchByPortalId(
   // TODO: Implement when externalIds field is added to Property model
   // For now, try to match by searching the portalId in title or notes
   
-  const properties = await prisma.property.findMany({
+  const properties = await getPrisma().property.findMany({
     where: { 
       tenantId,
       OR: [
@@ -96,7 +107,7 @@ async function matchByAddress(
   const normalizedQuery = normalizeAddress(addressQuery);
 
   // First try exact match on full address
-  let property = await prisma.property.findFirst({
+  let property = await getPrisma().property.findFirst({
     where: {
       tenantId,
       address: { contains: normalizedQuery, mode: 'insensitive' },
@@ -106,7 +117,7 @@ async function matchByAddress(
   if (property) return property;
 
   // Try matching individual components
-  const properties = await prisma.property.findMany({
+  const properties = await getPrisma().property.findMany({
     where: { tenantId },
   });
 
@@ -134,7 +145,7 @@ async function matchByTitle(
 ): Promise<Property | null> {
   const normalizedQuery = titleQuery.toLowerCase().trim();
 
-  return await prisma.property.findFirst({
+  return await getPrisma().property.findFirst({
     where: {
       tenantId,
       title: { contains: normalizedQuery, mode: 'insensitive' },
@@ -197,7 +208,7 @@ export async function getPropertiesForSelection(tenantId: string): Promise<Array
   label: string;
   address: string;
 }>> {
-  const properties = await prisma.property.findMany({
+  const properties = await getPrisma().property.findMany({
     where: { tenantId, status: 'ACTIVE' },
     select: {
       id: true,

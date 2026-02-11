@@ -17,6 +17,11 @@ import { encryptionService } from './services/EncryptionService';
 import { ConversationMemory, setPrismaClient as setConversationPrisma } from './services/ConversationMemory';
 import { CalendarService } from './services/CalendarService';
 import { setPrismaClient as setAiToolsPrisma } from './services/AiTools';
+import { setJarvisActionPrisma } from './services/JarvisActionService';
+import { setEmailResponsePrisma } from './services/EmailResponseHandler';
+import { setEmailSyncPrisma } from './services/EmailSyncService';
+import { setPropertyMatchingPrisma } from './services/PropertyMatchingService';
+import { setNotificationPrisma } from './services/NotificationService';
 import { authMiddleware, adminAuthMiddleware } from './middleware/auth';
 import { AiSafetyMiddleware, wrapAiResponse } from './middleware/aiSafety';
 import * as AWS from 'aws-sdk';
@@ -78,6 +83,18 @@ async function loadAppSecrets() {
   appSecretsLoaded = true;
 }
 
+// Inject prisma client into all services
+function injectPrismaIntoServices(client: PrismaClient) {
+  setTemplatePrisma(client);
+  setConversationPrisma(client);
+  setAiToolsPrisma(client);
+  setJarvisActionPrisma(client);
+  setEmailResponsePrisma(client);
+  setEmailSyncPrisma(client);
+  setPropertyMatchingPrisma(client);
+  setNotificationPrisma(client);
+}
+
 // Function to initialize Prisma with DATABASE_URL from AWS Secrets Manager
 async function initializePrisma() {
   if (prisma) return prisma;
@@ -85,17 +102,14 @@ async function initializePrisma() {
   // Load app secrets first
   await loadAppSecrets();
   
-  // If DATABASE_URL is already set (local dev), use it
+  // If DATABASE_URL is already set (from app secrets or local dev), use it
   if (process.env.DATABASE_URL) {
     prisma = new PrismaClient();
-    // Inject prisma into services
-    setTemplatePrisma(prisma);
-    setConversationPrisma(prisma);
-    setAiToolsPrisma(prisma);
+    injectPrismaIntoServices(prisma);
     return prisma;
   }
   
-  // In Lambda, get credentials from Secrets Manager
+  // In Lambda, get credentials from DB Secret in Secrets Manager
   if (process.env.DB_SECRET_ARN) {
     const secretsManager = new AWS.SecretsManager();
     try {
@@ -105,10 +119,7 @@ async function initializePrisma() {
         const dbUrl = `postgresql://${credentials.username}:${credentials.password}@${credentials.host}:${credentials.port}/postgres?schema=public`;
         process.env.DATABASE_URL = dbUrl;
         prisma = new PrismaClient();
-        // Inject prisma into services
-        setTemplatePrisma(prisma);
-        setConversationPrisma(prisma);
-        setAiToolsPrisma(prisma);
+        injectPrismaIntoServices(prisma);
       }
     } catch (error) {
       console.error('Failed to get DB credentials from Secrets Manager:', error);
@@ -118,10 +129,7 @@ async function initializePrisma() {
   
   if (!prisma) {
     prisma = new PrismaClient();
-    // Inject prisma into services
-    setTemplatePrisma(prisma);
-    setConversationPrisma(prisma);
-    setAiToolsPrisma(prisma);
+    injectPrismaIntoServices(prisma);
   }
   
   return prisma;
@@ -130,10 +138,7 @@ async function initializePrisma() {
 // Initialize Prisma on startup for local dev
 if (!process.env.AWS_LAMBDA_FUNCTION_NAME && process.env.DATABASE_URL) {
   prisma = new PrismaClient();
-  // Inject prisma into services
-  setTemplatePrisma(prisma);
-  setConversationPrisma(prisma);
-  setAiToolsPrisma(prisma);
+  injectPrismaIntoServices(prisma);
 }
 
 const cognito = new AWS.CognitoIdentityServiceProvider({

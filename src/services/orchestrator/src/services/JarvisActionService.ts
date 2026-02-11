@@ -11,7 +11,18 @@ import {
   renderEscalationEmail 
 } from './SystemEmailService';
 
-const prisma = new PrismaClient();
+let prisma: PrismaClient;
+
+export function setJarvisActionPrisma(client: PrismaClient) {
+  prisma = client;
+}
+
+function getPrisma(): PrismaClient {
+  if (!prisma) {
+    prisma = new PrismaClient();
+  }
+  return prisma;
+}
 
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 
@@ -31,7 +42,7 @@ export async function createPendingAction(params: CreateActionParams) {
   const { tenantId, userId, leadId, type, question, context } = params;
 
   // Get user details
-  const user = await prisma.user.findUnique({
+  const user = await getPrisma().user.findUnique({
     where: { id: userId },
     include: { settings: true }
   });
@@ -45,7 +56,7 @@ export async function createPendingAction(params: CreateActionParams) {
   let propertyTitle: string | undefined;
 
   if (leadId) {
-    const lead = await prisma.lead.findUnique({
+    const lead = await getPrisma().lead.findUnique({
       where: { id: leadId },
       include: { property: true }
     });
@@ -56,7 +67,7 @@ export async function createPendingAction(params: CreateActionParams) {
   }
 
   // Create the pending action
-  const action = await prisma.jarvisPendingAction.create({
+  const action = await getPrisma().jarvisPendingAction.create({
     data: {
       tenantId,
       userId,
@@ -69,7 +80,7 @@ export async function createPendingAction(params: CreateActionParams) {
   });
 
   // Create in-app notification
-  await prisma.notification.create({
+  await getPrisma().notification.create({
     data: {
       tenantId,
       userId,
@@ -106,7 +117,7 @@ export async function createPendingAction(params: CreateActionParams) {
  * Send reminder for a pending action (called by EventBridge after 24h)
  */
 export async function sendReminder(actionId: string) {
-  const action = await prisma.jarvisPendingAction.findUnique({
+  const action = await getPrisma().jarvisPendingAction.findUnique({
     where: { id: actionId },
     include: { user: { include: { settings: true } } }
   });
@@ -122,7 +133,7 @@ export async function sendReminder(actionId: string) {
   const actionUrl = `${APP_URL}/dashboard/assistant?action=${action.id}`;
 
   // Update action status
-  await prisma.jarvisPendingAction.update({
+  await getPrisma().jarvisPendingAction.update({
     where: { id: actionId },
     data: { 
       status: 'REMINDED',
@@ -131,7 +142,7 @@ export async function sendReminder(actionId: string) {
   });
 
   // Create reminder notification
-  await prisma.notification.create({
+  await getPrisma().notification.create({
     data: {
       tenantId: action.tenantId,
       userId: user.id,
@@ -163,7 +174,7 @@ export async function sendReminder(actionId: string) {
  * Escalate a pending action to admin (called by EventBridge after 48h)
  */
 export async function escalateAction(actionId: string) {
-  const action = await prisma.jarvisPendingAction.findUnique({
+  const action = await getPrisma().jarvisPendingAction.findUnique({
     where: { id: actionId },
     include: { 
       user: true
@@ -176,7 +187,7 @@ export async function escalateAction(actionId: string) {
   }
 
   // Find admin(s) in the tenant
-  const admins = await prisma.user.findMany({
+  const admins = await getPrisma().user.findMany({
     where: {
       tenantId: action.tenantId,
       role: { in: ['ADMIN', 'SUPER_ADMIN'] }
@@ -196,14 +207,14 @@ export async function escalateAction(actionId: string) {
   // Get lead name if available
   let leadName: string | undefined;
   if (action.leadId) {
-    const lead = await prisma.lead.findUnique({ where: { id: action.leadId } });
+    const lead = await getPrisma().lead.findUnique({ where: { id: action.leadId } });
     if (lead) {
       leadName = [lead.firstName, lead.lastName].filter(Boolean).join(' ') || lead.email;
     }
   }
 
   // Update action status
-  await prisma.jarvisPendingAction.update({
+  await getPrisma().jarvisPendingAction.update({
     where: { id: actionId },
     data: { 
       status: 'ESCALATED',
@@ -216,7 +227,7 @@ export async function escalateAction(actionId: string) {
     const adminName = [admin.firstName, admin.lastName].filter(Boolean).join(' ') || admin.email;
 
     // Create escalation notification
-    await prisma.notification.create({
+    await getPrisma().notification.create({
       data: {
         tenantId: action.tenantId,
         userId: admin.id,
@@ -251,7 +262,7 @@ export async function escalateAction(actionId: string) {
  * Resolve a pending action
  */
 export async function resolveAction(actionId: string, resolution: string, resolvedBy?: string) {
-  const action = await prisma.jarvisPendingAction.update({
+  const action = await getPrisma().jarvisPendingAction.update({
     where: { id: actionId },
     data: {
       status: 'RESOLVED',
@@ -268,7 +279,7 @@ export async function resolveAction(actionId: string, resolution: string, resolv
  * Cancel a pending action
  */
 export async function cancelAction(actionId: string, reason?: string) {
-  const action = await prisma.jarvisPendingAction.update({
+  const action = await getPrisma().jarvisPendingAction.update({
     where: { id: actionId },
     data: {
       status: 'CANCELLED',
@@ -285,7 +296,7 @@ export async function cancelAction(actionId: string, reason?: string) {
  * Get pending actions for a user
  */
 export async function getPendingActionsForUser(userId: string) {
-  return prisma.jarvisPendingAction.findMany({
+  return getPrisma().jarvisPendingAction.findMany({
     where: {
       userId,
       status: { in: ['PENDING', 'REMINDED', 'ESCALATED'] }
@@ -298,7 +309,7 @@ export async function getPendingActionsForUser(userId: string) {
  * Get all pending actions for a tenant (for admin view)
  */
 export async function getPendingActionsForTenant(tenantId: string) {
-  return prisma.jarvisPendingAction.findMany({
+  return getPrisma().jarvisPendingAction.findMany({
     where: {
       tenantId,
       status: { in: ['PENDING', 'REMINDED', 'ESCALATED'] }

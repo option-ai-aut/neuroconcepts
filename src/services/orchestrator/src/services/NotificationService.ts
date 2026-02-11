@@ -4,7 +4,18 @@
 
 import { PrismaClient, NotificationType } from '@prisma/client';
 
-const prisma = new PrismaClient();
+let prisma: PrismaClient;
+
+export function setNotificationPrisma(client: PrismaClient) {
+  prisma = client;
+}
+
+function getPrisma(): PrismaClient {
+  if (!prisma) {
+    prisma = new PrismaClient();
+  }
+  return prisma;
+}
 
 interface CreateNotificationParams {
   tenantId: string;
@@ -21,7 +32,7 @@ interface CreateNotificationParams {
 export async function createNotification(params: CreateNotificationParams) {
   const { tenantId, userId, type, title, message, metadata } = params;
 
-  const notification = await prisma.notification.create({
+  const notification = await getPrisma().notification.create({
     data: {
       tenantId,
       userId,
@@ -46,7 +57,7 @@ export async function getNotificationsForUser(userId: string, options?: {
 }) {
   const { unreadOnly = false, limit = 50, offset = 0 } = options || {};
 
-  const notifications = await prisma.notification.findMany({
+  const notifications = await getPrisma().notification.findMany({
     where: {
       userId,
       ...(unreadOnly && { read: false })
@@ -63,7 +74,7 @@ export async function getNotificationsForUser(userId: string, options?: {
  * Get unread notification count for a user
  */
 export async function getUnreadCount(userId: string): Promise<number> {
-  return prisma.notification.count({
+  return getPrisma().notification.count({
     where: {
       userId,
       read: false
@@ -75,7 +86,7 @@ export async function getUnreadCount(userId: string): Promise<number> {
  * Mark a notification as read
  */
 export async function markAsRead(notificationId: string, userId: string) {
-  const notification = await prisma.notification.updateMany({
+  const notification = await getPrisma().notification.updateMany({
     where: {
       id: notificationId,
       userId // Ensure user owns this notification
@@ -90,7 +101,7 @@ export async function markAsRead(notificationId: string, userId: string) {
  * Mark all notifications as read for a user
  */
 export async function markAllAsRead(userId: string) {
-  const result = await prisma.notification.updateMany({
+  const result = await getPrisma().notification.updateMany({
     where: {
       userId,
       read: false
@@ -109,7 +120,7 @@ export async function deleteOldNotifications(daysOld: number = 30) {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
-  const result = await prisma.notification.deleteMany({
+  const result = await getPrisma().notification.deleteMany({
     where: {
       createdAt: { lt: cutoffDate },
       read: true // Only delete read notifications
