@@ -3403,10 +3403,12 @@ app.post('/portal-connections/:id/test', authMiddleware, async (req, res) => {
 // --- Calendar Integration ---
 
 // Google Calendar: Get Auth URL
-app.get('/calendar/google/auth-url', authMiddleware, async (req, res) => {
+app.get('/calendar/google/auth-url', authMiddleware, async (req: any, res) => {
   try {
-    const authUrl = CalendarService.getGoogleAuthUrl();
-    console.log('🔗 Generated Google Auth URL:', authUrl);
+    const userEmail = req.user!.email;
+    const state = Buffer.from(JSON.stringify({ email: userEmail })).toString('base64url');
+    const authUrl = CalendarService.getGoogleAuthUrl(state);
+    console.log('🔗 Generated Google Auth URL for:', userEmail);
     res.json({ authUrl });
   } catch (error) {
     console.error('Error generating Google auth URL:', error);
@@ -3414,28 +3416,65 @@ app.get('/calendar/google/auth-url', authMiddleware, async (req, res) => {
   }
 });
 
-// Google Calendar: OAuth Callback
+// Google Calendar: OAuth Callback - saves tokens directly server-side
 app.get('/calendar/google/callback', async (req, res) => {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   
   try {
-    const { code } = req.query;
+    const { code, state } = req.query;
     
     if (!code) {
       return res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=google-calendar&error=true`);
     }
 
-    // Exchange code for tokens
     const tokens = await CalendarService.exchangeGoogleCode(code as string);
+    console.log('✅ Google Calendar tokens exchanged for:', tokens.email);
 
-    // Redirect with tokens in URL (frontend will save them)
+    // Save tokens directly server-side using state parameter
+    let saved = false;
+    if (state) {
+      try {
+        const stateData = JSON.parse(Buffer.from(state as string, 'base64url').toString());
+        const userEmail = stateData.email;
+        console.log('📅 Saving Google Calendar config for user:', userEmail);
+
+        const db = prisma || (await initializePrisma());
+        const user = await db.user.findUnique({
+          where: { email: userEmail },
+          select: { tenantId: true }
+        });
+
+        if (user) {
+          const encryptedConfig = {
+            accessToken: encryptionService.encrypt(tokens.accessToken),
+            refreshToken: encryptionService.encrypt(tokens.refreshToken),
+            expiryDate: tokens.expiryDate,
+            email: tokens.email
+          };
+
+          await db.tenantSettings.upsert({
+            where: { tenantId: user.tenantId },
+            update: { googleCalendarConfig: encryptedConfig as any },
+            create: { tenantId: user.tenantId, googleCalendarConfig: encryptedConfig as any }
+          });
+
+          saved = true;
+          console.log('✅ Google Calendar config saved for tenant:', user.tenantId);
+        }
+      } catch (stateError) {
+        console.error('Error saving Google Calendar config server-side:', stateError);
+      }
+    }
+
     const params = new URLSearchParams({
       provider: 'google-calendar',
       success: 'true',
       email: tokens.email,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      expiryDate: tokens.expiryDate.toString()
+      ...(saved ? {} : {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiryDate: tokens.expiryDate.toString()
+      })
     });
     
     res.redirect(`${frontendUrl}/dashboard/settings/integrations?${params.toString()}`);
@@ -3573,9 +3612,11 @@ app.post('/calendar/google/disconnect', authMiddleware, async (req, res) => {
 });
 
 // Outlook Calendar: Get Auth URL
-app.get('/calendar/outlook/auth-url', authMiddleware, async (req, res) => {
+app.get('/calendar/outlook/auth-url', authMiddleware, async (req: any, res) => {
   try {
-    const authUrl = await CalendarService.getOutlookAuthUrl();
+    const userEmail = req.user!.email;
+    const state = Buffer.from(JSON.stringify({ email: userEmail })).toString('base64url');
+    const authUrl = await CalendarService.getOutlookAuthUrl(state);
     res.json({ authUrl });
   } catch (error) {
     console.error('Error generating Outlook auth URL:', error);
@@ -3583,28 +3624,65 @@ app.get('/calendar/outlook/auth-url', authMiddleware, async (req, res) => {
   }
 });
 
-// Outlook Calendar: OAuth Callback
+// Outlook Calendar: OAuth Callback - saves tokens directly server-side
 app.get('/calendar/outlook/callback', async (req, res) => {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   
   try {
-    const { code } = req.query;
+    const { code, state } = req.query;
     
     if (!code) {
       return res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=outlook-calendar&error=true`);
     }
 
-    // Exchange code for tokens
     const tokens = await CalendarService.exchangeOutlookCode(code as string);
+    console.log('✅ Outlook Calendar tokens exchanged for:', tokens.email);
 
-    // Redirect with tokens in URL (frontend will save them)
+    // Save tokens directly server-side
+    let saved = false;
+    if (state) {
+      try {
+        const stateData = JSON.parse(Buffer.from(state as string, 'base64url').toString());
+        const userEmail = stateData.email;
+        console.log('📅 Saving Outlook Calendar config for user:', userEmail);
+
+        const db = prisma || (await initializePrisma());
+        const user = await db.user.findUnique({
+          where: { email: userEmail },
+          select: { tenantId: true }
+        });
+
+        if (user) {
+          const encryptedConfig = {
+            accessToken: encryptionService.encrypt(tokens.accessToken),
+            refreshToken: encryptionService.encrypt(tokens.refreshToken),
+            expiryDate: tokens.expiryDate,
+            email: tokens.email
+          };
+
+          await db.tenantSettings.upsert({
+            where: { tenantId: user.tenantId },
+            update: { outlookCalendarConfig: encryptedConfig as any },
+            create: { tenantId: user.tenantId, outlookCalendarConfig: encryptedConfig as any }
+          });
+
+          saved = true;
+          console.log('✅ Outlook Calendar config saved for tenant:', user.tenantId);
+        }
+      } catch (stateError) {
+        console.error('Error saving Outlook Calendar config server-side:', stateError);
+      }
+    }
+
     const params = new URLSearchParams({
       provider: 'outlook-calendar',
       success: 'true',
       email: tokens.email,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      expiryDate: tokens.expiryDate.toString()
+      ...(saved ? {} : {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiryDate: tokens.expiryDate.toString()
+      })
     });
     
     res.redirect(`${frontendUrl}/dashboard/settings/integrations?${params.toString()}`);
@@ -4343,9 +4421,11 @@ app.post('/email/gmail/disconnect', authMiddleware, async (req, res) => {
 });
 
 // Outlook Mail: Get Auth URL
-app.get('/email/outlook/auth-url', authMiddleware, async (req, res) => {
+app.get('/email/outlook/auth-url', authMiddleware, async (req: any, res) => {
   try {
-    const authUrl = await EmailService.getOutlookMailAuthUrl();
+    const userEmail = req.user!.email;
+    const state = Buffer.from(JSON.stringify({ email: userEmail })).toString('base64url');
+    const authUrl = await EmailService.getOutlookMailAuthUrl(state);
     res.json({ authUrl });
   } catch (error) {
     console.error('Error getting Outlook Mail auth URL:', error);
@@ -4353,26 +4433,64 @@ app.get('/email/outlook/auth-url', authMiddleware, async (req, res) => {
   }
 });
 
-// Outlook Mail: OAuth Callback
+// Outlook Mail: OAuth Callback - saves tokens directly server-side
 app.get('/email/outlook/callback', async (req, res) => {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   
   try {
-    const { code } = req.query;
+    const { code, state } = req.query;
     if (!code) {
       return res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=outlook-mail&error=true`);
     }
 
     const tokens = await EmailService.exchangeOutlookMailCode(code as string);
-    
-    // Redirect with tokens in URL (frontend will save them)
+    console.log('✅ Outlook Mail tokens exchanged for:', tokens.email);
+
+    // Save tokens directly server-side
+    let saved = false;
+    if (state) {
+      try {
+        const stateData = JSON.parse(Buffer.from(state as string, 'base64url').toString());
+        const userEmail = stateData.email;
+        console.log('📧 Saving Outlook Mail config for user:', userEmail);
+
+        const db = prisma || (await initializePrisma());
+        const user = await db.user.findUnique({
+          where: { email: userEmail },
+          select: { tenantId: true }
+        });
+
+        if (user) {
+          const encryptedConfig = {
+            accessToken: encryptionService.encrypt(tokens.accessToken),
+            refreshToken: encryptionService.encrypt(tokens.refreshToken),
+            expiryDate: tokens.expiryDate,
+            email: tokens.email
+          };
+
+          await db.tenantSettings.upsert({
+            where: { tenantId: user.tenantId },
+            update: { outlookMailConfig: encryptedConfig as any },
+            create: { tenantId: user.tenantId, outlookMailConfig: encryptedConfig as any }
+          });
+
+          saved = true;
+          console.log('✅ Outlook Mail config saved for tenant:', user.tenantId);
+        }
+      } catch (stateError) {
+        console.error('Error saving Outlook Mail config server-side:', stateError);
+      }
+    }
+
     const params = new URLSearchParams({
       provider: 'outlook-mail',
       success: 'true',
       email: tokens.email,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      expiryDate: tokens.expiryDate.toString()
+      ...(saved ? {} : {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiryDate: tokens.expiryDate.toString()
+      })
     });
     
     res.redirect(`${frontendUrl}/dashboard/settings/integrations?${params.toString()}`);

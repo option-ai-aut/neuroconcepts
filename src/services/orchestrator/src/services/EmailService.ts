@@ -189,7 +189,7 @@ export class EmailService {
 
   // ===== OUTLOOK MAIL =====
 
-  static async getOutlookMailAuthUrl(): Promise<string> {
+  static async getOutlookMailAuthUrl(state?: string): Promise<string> {
     const config = getMicrosoftEmailConfig();
     const msalConfig = {
       auth: {
@@ -200,9 +200,10 @@ export class EmailService {
     };
 
     const cca = new ConfidentialClientApplication(msalConfig);
-    const authCodeUrlParameters = {
+    const authCodeUrlParameters: any = {
       scopes: ['Mail.ReadWrite', 'Mail.Send', 'User.Read', 'offline_access'],
-      redirectUri: config.redirectUri
+      redirectUri: config.redirectUri,
+      ...(state && { state })
     };
 
     return await cca.getAuthCodeUrl(authCodeUrlParameters);

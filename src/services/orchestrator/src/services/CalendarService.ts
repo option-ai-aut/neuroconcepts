@@ -19,7 +19,7 @@ const getMicrosoftConfig = () => ({
 export class CalendarService {
   // ===== GOOGLE CALENDAR =====
   
-  static getGoogleAuthUrl(): string {
+  static getGoogleAuthUrl(state?: string): string {
     const config = getGoogleConfig();
     console.log('🔑 Google Calendar Redirect URI:', config.redirectUri);
     
@@ -38,7 +38,8 @@ export class CalendarService {
     return oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: scopes,
-      prompt: 'consent' // Force consent to get refresh token
+      prompt: 'consent', // Force consent to get refresh token
+      state: state || undefined
     });
   }
 
@@ -113,7 +114,7 @@ export class CalendarService {
 
   // ===== MICROSOFT OUTLOOK CALENDAR =====
 
-  static async getOutlookAuthUrl(): Promise<string> {
+  static async getOutlookAuthUrl(state?: string): Promise<string> {
     const config = getMicrosoftConfig();
     const msalConfig = {
       auth: {
@@ -124,9 +125,10 @@ export class CalendarService {
     };
 
     const cca = new ConfidentialClientApplication(msalConfig);
-    const authCodeUrlParameters = {
+    const authCodeUrlParameters: any = {
       scopes: ['Calendars.ReadWrite', 'User.Read', 'offline_access'],
-      redirectUri: config.redirectUri
+      redirectUri: config.redirectUri,
+      ...(state && { state })
     };
 
     return await cca.getAuthCodeUrl(authCodeUrlParameters);
