@@ -9,14 +9,14 @@ import useSWR from 'swr';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 
-// Helper to get full image URL (handles relative /uploads/ paths)
+// Helper to get full image URL (handles relative /uploads/ paths and S3 URLs)
 const getImageUrl = (url: string): string => {
   if (!url) return '';
   if (url.startsWith('http')) return url;
   if (url.startsWith('/uploads/')) {
     const config = getRuntimeConfig();
-    const apiUrl = config.apiUrl || '';
-    return `${apiUrl}${url}`;
+    const apiUrl = config.apiUrl || process.env.NEXT_PUBLIC_API_URL || '';
+    return apiUrl ? `${apiUrl}${url}` : url;
   }
   return url;
 };

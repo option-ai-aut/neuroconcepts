@@ -252,7 +252,7 @@ export class ImmivoStack extends cdk.Stack {
         restrictPublicBuckets: false,
       }),
       cors: [{
-        allowedMethods: [s3.HttpMethod.GET],
+        allowedMethods: [s3.HttpMethods.GET],
         allowedOrigins: ['*'],
         allowedHeaders: ['*'],
       }],
