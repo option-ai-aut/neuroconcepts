@@ -265,7 +265,7 @@ export class ImmivoStack extends cdk.Stack {
 
     const emailProcessor = new lambdaNode.NodejsFunction(this, 'EmailProcessor', {
       runtime: lambda.Runtime.NODEJS_22_X,
-      entry: path.join(__dirname, '../src/services/email-parser/index.ts'),
+      entry: path.join(__dirname, '../../src/services/email-parser/index.ts'),
       handler: 'handler',
       timeout: cdk.Duration.seconds(30),
       memorySize: 256,
