@@ -62,10 +62,14 @@ export function middleware(request: NextRequest) {
   // ========================================
   // app.immivo.ai (App Domain)
   // Login, Dashboard, Settings, etc.
-  // Landing pages redirect to immivo.ai
+  // Root -> /login, other landing pages -> immivo.ai
   // ========================================
   if (isAppDomain) {
-    // Redirect marketing landing pages to immivo.ai
+    // Root path -> redirect to login page
+    if (pathname === '/') {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+    // Redirect other marketing landing pages to immivo.ai
     if (LANDING_PAGES.includes(pathname)) {
       return NextResponse.redirect(new URL(`https://${MARKETING_DOMAIN}${pathname}`));
     }

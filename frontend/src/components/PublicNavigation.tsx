@@ -95,7 +95,7 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
           </div>
 
           {/* Desktop CTA */}
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden lg:flex items-center space-x-4">
             <Link href="https://app.immivo.ai/login" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
               Anmelden
             </Link>

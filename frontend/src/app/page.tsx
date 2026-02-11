@@ -162,8 +162,8 @@ export default function LandingPage() {
       {/* Navigation */}
       <PublicNavigation currentPage="home" />
 
-      {/* Hero Section - Full Screen with Video/Image Background */}
-      <section ref={heroRef} className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      {/* Hero Section */}
+      <section ref={heroRef} className="relative min-h-[80vh] lg:min-h-screen flex items-center justify-center overflow-hidden">
         {/* Animated Background */}
         <div className="absolute inset-0 -z-10">
           {/* Gradient Mesh */}
@@ -171,15 +171,15 @@ export default function LandingPage() {
           
           {/* Animated Orbs */}
           <div 
-            className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-indigo-400/20 rounded-full blur-3xl animate-float-slow"
+            className="absolute top-1/4 left-1/4 w-[300px] h-[300px] sm:w-[600px] sm:h-[600px] bg-indigo-400/20 rounded-full blur-3xl animate-float-slow"
             style={{ transform: `translate(${mousePosition.x * 2}px, ${mousePosition.y * 2}px)` }}
           />
           <div 
-            className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-violet-400/20 rounded-full blur-3xl animate-float"
+            className="absolute bottom-1/4 right-1/4 w-[250px] h-[250px] sm:w-[500px] sm:h-[500px] bg-violet-400/20 rounded-full blur-3xl animate-float"
             style={{ transform: `translate(${-mousePosition.x * 1.5}px, ${-mousePosition.y * 1.5}px)` }}
           />
           <div 
-            className="absolute top-1/2 right-1/3 w-[400px] h-[400px] bg-blue-400/10 rounded-full blur-3xl"
+            className="absolute top-1/2 right-1/3 w-[200px] h-[200px] sm:w-[400px] sm:h-[400px] bg-blue-400/10 rounded-full blur-3xl"
             style={{ transform: `translate(${mousePosition.x}px, ${mousePosition.y}px)` }}
           />
           
@@ -187,16 +187,16 @@ export default function LandingPage() {
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:40px_40px]" />
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-8 sm:pb-16">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             {/* Left: Text Content */}
             <div className="text-left">
-              <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-indigo-500/10 to-violet-500/10 text-indigo-600 text-sm font-medium mb-8 border border-indigo-200/50 backdrop-blur-sm">
+              <div className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gradient-to-r from-indigo-500/10 to-violet-500/10 text-indigo-600 text-xs sm:text-sm font-medium mb-5 sm:mb-8 border border-indigo-200/50 backdrop-blur-sm">
                 <span className="flex w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
                 Jarvis 1.0
               </div>
               
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 mb-6 leading-[1.05]">
+              <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 mb-4 sm:mb-6 leading-[1.05]">
                 Dein Büro arbeitet.
                 <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 animate-gradient">
@@ -204,15 +204,15 @@ export default function LandingPage() {
                 </span>
               </h1>
               
-              <p className="text-xl text-gray-600 mb-10 leading-relaxed max-w-xl">
+              <p className="text-base sm:text-xl text-gray-600 mb-6 sm:mb-10 leading-relaxed max-w-xl">
                 Immivo ist das erste <strong>vollständig KI-gesteuerte</strong> Betriebssystem für Immobilienmakler. 
                 Jarvis übernimmt dein Tagesgeschäft — du konzentrierst dich auf Abschlüsse.
               </p>
               
-              <div className="flex flex-col sm:flex-row gap-4 mb-12">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-8 sm:mb-12">
                 <Link 
                   href="https://app.immivo.ai/login" 
-                  className="group inline-flex items-center justify-center px-8 py-4 text-base font-semibold text-white bg-gradient-to-r from-indigo-600 to-violet-600 rounded-full hover:shadow-xl hover:shadow-indigo-500/30 transition-all hover:-translate-y-1"
+                  className="group inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base font-semibold text-white bg-gradient-to-r from-indigo-600 to-violet-600 rounded-full hover:shadow-xl hover:shadow-indigo-500/30 transition-all hover:-translate-y-1"
                 >
                   14 Tage kostenlos testen
                   <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -220,7 +220,7 @@ export default function LandingPage() {
                 <a 
                   href="#demo" 
                   onClick={(e) => handleAnchorClick(e, 'demo')}
-                  className="group inline-flex items-center justify-center px-8 py-4 text-base font-semibold text-gray-700 bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-all hover:-translate-y-1 shadow-sm"
+                  className="group inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base font-semibold text-gray-700 bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-all hover:-translate-y-1 shadow-sm"
                 >
                   <Calendar className="mr-2 w-5 h-5 text-indigo-600" />
                   Demo buchen
@@ -228,7 +228,7 @@ export default function LandingPage() {
               </div>
 
               {/* Trust Indicators */}
-              <div className="flex items-center gap-6 text-sm text-gray-500">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm text-gray-500">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-green-500" />
                   Keine Kreditkarte
@@ -245,7 +245,7 @@ export default function LandingPage() {
             </div>
 
             {/* Right: Hero Image / Dashboard Preview */}
-            <div className="relative">
+            <div className="relative hidden lg:block">
               <FloatingElement delay={0}>
                 <div className="relative rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 shadow-2xl border border-gray-700/50 p-1 transform perspective-1000 hover:scale-[1.02] transition-transform duration-500">
                   {/* Browser Chrome */}
@@ -351,23 +351,23 @@ export default function LandingPage() {
       </section>
 
       {/* Problem / Why Section */}
-      <section id="warum" className="py-24 bg-gray-50">
+      <section id="warum" className="py-12 sm:py-24 bg-gray-50">
         <div 
           ref={section1.ref}
           className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${section1.isInView ? 'animate-slide-up' : 'opacity-0'}`}
         >
-          <div className="text-center mb-16">
+          <div className="text-center mb-8 sm:mb-16">
             <span className="text-indigo-600 font-semibold text-sm uppercase tracking-wider">Das Problem</span>
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mt-4 mb-6">
+            <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mt-3 sm:mt-4 mb-4 sm:mb-6">
               Du bist Makler, kein Sachbearbeiter.
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className="text-base sm:text-xl text-gray-600 max-w-3xl mx-auto">
               80% deiner Zeit geht für E-Mails, Terminabsprachen und Papierkram drauf. 
               Nur 20% für das, was wirklich zählt: Kunden treffen und Deals abschließen.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-8">
             {[
               {
                 icon: Mail,
@@ -393,7 +393,7 @@ export default function LandingPage() {
             ].map((item, i) => (
               <div 
                 key={i} 
-                className={`group relative bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-500 hover:-translate-y-2 ${section1.isInView ? 'animate-slide-up' : 'opacity-0'}`}
+                className={`group relative bg-white rounded-xl sm:rounded-2xl p-5 sm:p-8 shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-500 hover:-translate-y-2 ${section1.isInView ? 'animate-slide-up' : 'opacity-0'}`}
                 style={{ animationDelay: `${i * 0.2}s` }}
               >
                 <div className={`w-14 h-14 bg-gradient-to-br ${item.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
@@ -417,31 +417,31 @@ export default function LandingPage() {
       </section>
 
       {/* Jarvis AI Section */}
-      <section id="jarvis" className="py-24 bg-gradient-to-br from-gray-900 via-indigo-950 to-violet-950 text-white overflow-hidden">
+      <section id="jarvis" className="py-12 sm:py-24 bg-gradient-to-br from-gray-900 via-indigo-950 to-violet-950 text-white overflow-hidden">
         <div 
           ref={section2.ref}
           className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${section2.isInView ? 'animate-slide-up' : 'opacity-0'}`}
         >
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <div className="grid lg:grid-cols-2 gap-8 sm:gap-16 items-center">
             {/* Left: Jarvis Introduction */}
             <div>
-              <div className="inline-flex items-center px-4 py-2 rounded-full bg-white/10 text-indigo-300 text-sm font-medium mb-6 border border-white/10">
+              <div className="inline-flex items-center px-3 sm:px-4 py-2 rounded-full bg-white/10 text-indigo-300 text-xs sm:text-sm font-medium mb-4 sm:mb-6 border border-white/10">
                 <Brain className="w-4 h-4 mr-2" />
                 Powered by Google Gemini 3
               </div>
               
-              <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
+              <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6 leading-tight">
                 Triff <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">Jarvis</span>,
                 <br />deinen KI-Assistenten.
               </h2>
               
-              <p className="text-xl text-gray-300 mb-8 leading-relaxed">
+              <p className="text-base sm:text-xl text-gray-300 mb-6 sm:mb-8 leading-relaxed">
                 Jarvis ist kein Chatbot. Er ist ein vollwertiger Mitarbeiter, der dein Business versteht. 
                 Er liest E-Mails, qualifiziert Leads, erstellt Exposés und bucht Termine — 
                 <strong className="text-white"> 24/7, ohne Pause, ohne Fehler.</strong>
               </p>
 
-              <div className="space-y-4 mb-10">
+              <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-10">
                 {[
                   'Vollständiger Zugriff auf CRM, E-Mails, Kalender & Objekte',
                   'Erstellt professionelle Exposés in Sekunden',
@@ -468,8 +468,25 @@ export default function LandingPage() {
 
             {/* Right: Jarvis Capabilities Visualization */}
             <div className="relative">
-              {/* Central Jarvis Node */}
-              <div className="relative flex items-center justify-center">
+              {/* Mobile: Simple Grid */}
+              <div className="grid grid-cols-3 gap-3 lg:hidden">
+                {[
+                  { icon: Mail, label: 'E-Mails' },
+                  { icon: Calendar, label: 'Termine' },
+                  { icon: FileText, label: 'Exposés' },
+                  { icon: Users, label: 'Leads' },
+                  { icon: Building2, label: 'Objekte' },
+                  { icon: MessageSquare, label: 'Chat' },
+                ].map((item, i) => (
+                  <div key={i} className="bg-white/10 backdrop-blur-sm rounded-xl p-3 flex flex-col items-center justify-center border border-white/20">
+                    <item.icon className="w-6 h-6 text-white mb-1.5" />
+                    <span className="text-xs text-gray-300">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop: Orbit Visualization */}
+              <div className="hidden lg:flex relative items-center justify-center">
                 <div className="w-40 h-40 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-full flex items-center justify-center animate-pulse-glow z-10">
                   <Bot className="w-20 h-20 text-white" />
                 </div>
@@ -529,23 +546,23 @@ export default function LandingPage() {
       </section>
 
       {/* Results / ROI Section */}
-      <section id="ergebnisse" className="py-24 bg-white">
+      <section id="ergebnisse" className="py-12 sm:py-24 bg-white">
         <div 
           ref={section3.ref}
           className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${section3.isInView ? 'animate-slide-up' : 'opacity-0'}`}
         >
-          <div className="text-center mb-16">
+          <div className="text-center mb-8 sm:mb-16">
             <span className="text-indigo-600 font-semibold text-sm uppercase tracking-wider">Echte Ergebnisse</span>
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mt-4 mb-6">
+            <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mt-3 sm:mt-4 mb-4 sm:mb-6">
               Mehr Umsatz. Weniger Stress.
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className="text-base sm:text-xl text-gray-600 max-w-3xl mx-auto">
               Unsere Kunden berichten von dramatischen Verbesserungen in Effizienz und Umsatz.
             </p>
           </div>
 
           {/* Stats Grid */}
-          <div className="grid md:grid-cols-4 gap-8 mb-16">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 mb-8 sm:mb-16">
             {[
               { value: 15, suffix: 'h', label: 'Zeitersparnis pro Woche', icon: Clock },
               { value: 40, suffix: '%', label: 'Mehr qualifizierte Leads', icon: Target },
@@ -554,26 +571,26 @@ export default function LandingPage() {
             ].map((stat, i) => (
               <div 
                 key={i} 
-                className="text-center p-8 rounded-2xl bg-gradient-to-br from-gray-50 to-white border border-gray-100 hover:shadow-lg transition-all"
+                className="text-center p-4 sm:p-8 rounded-2xl bg-gradient-to-br from-gray-50 to-white border border-gray-100 hover:shadow-lg transition-all"
               >
-                <stat.icon className="w-8 h-8 text-indigo-600 mx-auto mb-4" />
-                <div className="text-5xl font-bold text-gray-900 mb-2">
+                <stat.icon className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600 mx-auto mb-2 sm:mb-4" />
+                <div className="text-3xl sm:text-5xl font-bold text-gray-900 mb-1 sm:mb-2">
                   <AnimatedCounter end={stat.value} suffix={stat.suffix} />
                 </div>
-                <p className="text-gray-600">{stat.label}</p>
+                <p className="text-xs sm:text-base text-gray-600">{stat.label}</p>
               </div>
             ))}
           </div>
 
           {/* Testimonial */}
-          <div className="bg-gradient-to-br from-indigo-50 to-violet-50 rounded-3xl p-8 md:p-12 border border-indigo-100">
-            <div className="flex flex-col md:flex-row items-center gap-8">
-              <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-3xl font-bold text-white">MK</span>
+          <div className="bg-gradient-to-br from-indigo-50 to-violet-50 rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-12 border border-indigo-100">
+            <div className="flex flex-col md:flex-row items-center gap-4 sm:gap-8">
+              <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-xl sm:text-3xl font-bold text-white">MK</span>
               </div>
               <div>
-                <Quote className="w-10 h-10 text-indigo-300 mb-4" />
-                <p className="text-xl text-gray-700 mb-4 leading-relaxed">
+                <Quote className="w-6 h-6 sm:w-10 sm:h-10 text-indigo-300 mb-2 sm:mb-4" />
+                <p className="text-sm sm:text-xl text-gray-700 mb-3 sm:mb-4 leading-relaxed">
                   "Seit wir Immivo nutzen, habe ich endlich wieder Zeit für das, was ich liebe: 
                   Kunden beraten und Deals abschließen. Jarvis erledigt den ganzen Papierkram. 
                   <strong> Mein Umsatz ist um 30% gestiegen</strong>, während ich weniger arbeite."
@@ -589,22 +606,22 @@ export default function LandingPage() {
       </section>
 
       {/* Features Grid */}
-      <section id="features" className="py-24 bg-gray-50">
+      <section id="features" className="py-12 sm:py-24 bg-gray-50">
         <div 
           ref={section4.ref}
           className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${section4.isInView ? 'animate-slide-up' : 'opacity-0'}`}
         >
-          <div className="text-center mb-16">
+          <div className="text-center mb-8 sm:mb-16">
             <span className="text-indigo-600 font-semibold text-sm uppercase tracking-wider">Alles inklusive</span>
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mt-4 mb-6">
+            <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mt-3 sm:mt-4 mb-4 sm:mb-6">
               Ein System. Unendliche Möglichkeiten.
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className="text-base sm:text-xl text-gray-600 max-w-3xl mx-auto">
               Immivo ersetzt dein CRM, deine E-Mail-Tools und deine Exposé-Software — in einer einzigen, KI-gesteuerten Plattform.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
             {[
               {
                 icon: Bot,
@@ -669,13 +686,13 @@ export default function LandingPage() {
             ].map((feature, i) => (
               <div 
                 key={i}
-                className="group bg-white rounded-2xl p-6 border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                className="group bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
               >
-                <div className={`w-12 h-12 bg-gradient-to-br ${feature.gradient} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                  <feature.icon className="w-6 h-6 text-white" />
+                <div className={`w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br ${feature.gradient} rounded-lg sm:rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform`}>
+                  <feature.icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">{feature.title}</h3>
-                <p className="text-gray-600 text-sm leading-relaxed">{feature.description}</p>
+                <h3 className="text-sm sm:text-lg font-bold text-gray-900 mb-1 sm:mb-2">{feature.title}</h3>
+                <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">{feature.description}</p>
               </div>
             ))}
           </div>
@@ -683,9 +700,9 @@ export default function LandingPage() {
       </section>
 
       {/* AI Image Editing / Virtual Staging Section */}
-      <section id="bildbearbeitung" className="py-24 bg-white overflow-hidden">
+      <section id="bildbearbeitung" className="py-12 sm:py-24 bg-white overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <div className="grid lg:grid-cols-2 gap-8 sm:gap-16 items-center">
             {/* Left: Image Preview */}
             <div className="relative">
               <div className="relative rounded-2xl overflow-hidden shadow-2xl">
@@ -721,7 +738,7 @@ export default function LandingPage() {
               </div>
 
               {/* Floating Stats */}
-              <div className="absolute -right-4 -bottom-4 bg-white rounded-xl shadow-xl p-4 border border-gray-100">
+              <div className="absolute -right-2 sm:-right-4 -bottom-2 sm:-bottom-4 bg-white rounded-xl shadow-xl p-3 sm:p-4 border border-gray-100">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
                     <TrendingUp className="w-5 h-5 text-green-600" />
@@ -741,7 +758,7 @@ export default function LandingPage() {
                 KI-Bildbearbeitung
               </div>
               
-              <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
+              <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4 sm:mb-6 leading-tight">
                 Virtual Staging mit
                 <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-500 to-pink-500">
@@ -749,7 +766,7 @@ export default function LandingPage() {
                 </span>
               </h2>
               
-              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
+              <p className="text-base sm:text-xl text-gray-600 mb-6 sm:mb-8 leading-relaxed">
                 Verwandle leere Räume in einladende Wohnträume. Unsere KI fügt 
                 <strong className="text-gray-900"> ultra-realistische Möbel</strong> ein — 
                 in Sekunden, nicht Stunden.
@@ -784,19 +801,19 @@ export default function LandingPage() {
       </section>
 
       {/* How It Works */}
-      <section className="py-24 bg-gray-50">
+      <section className="py-12 sm:py-24 bg-gray-50">
         <div 
           ref={section5.ref}
           className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${section5.isInView ? 'animate-slide-up' : 'opacity-0'}`}
         >
-          <div className="text-center mb-16">
-            <span className="text-indigo-600 font-semibold text-sm uppercase tracking-wider">So funktioniert's</span>
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mt-4 mb-6">
+          <div className="text-center mb-8 sm:mb-16">
+            <span className="text-indigo-600 font-semibold text-sm uppercase tracking-wider">So funktioniert&apos;s</span>
+            <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mt-3 sm:mt-4 mb-4 sm:mb-6">
               In 3 Schritten zur KI-Automatisierung
             </h2>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid sm:grid-cols-3 gap-6 sm:gap-8">
             {[
               {
                 step: '01',
@@ -840,16 +857,16 @@ export default function LandingPage() {
       </section>
 
       {/* Demo Section */}
-      <section id="demo" className="py-24 bg-white">
+      <section id="demo" className="py-12 sm:py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <div className="grid lg:grid-cols-2 gap-8 sm:gap-16 items-center">
             <div>
               <div className="inline-flex items-center px-4 py-2 rounded-full bg-indigo-50 text-indigo-600 text-sm font-medium mb-6 border border-indigo-200">
                 <Calendar className="w-4 h-4 mr-2" />
                 Persönliche Demo
               </div>
               
-              <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
+              <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4 sm:mb-6 leading-tight">
                 Erlebe Immivo
                 <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">
@@ -857,7 +874,7 @@ export default function LandingPage() {
                 </span>
               </h2>
               
-              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
+              <p className="text-base sm:text-xl text-gray-600 mb-6 sm:mb-8 leading-relaxed">
                 In einer 30-minütigen Demo zeigen wir dir, wie Jarvis dein Tagesgeschäft 
                 revolutioniert. Keine Verpflichtungen, keine Verkaufsgespräche — nur Mehrwert.
               </p>
@@ -903,11 +920,11 @@ export default function LandingPage() {
       </section>
 
       {/* Final CTA */}
-      <section className="py-24 bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 text-white relative overflow-hidden">
+      <section className="py-12 sm:py-24 bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 text-white relative overflow-hidden">
         {/* Background Effects */}
         <div className="absolute inset-0">
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
+          <div className="absolute top-0 left-1/4 w-48 h-48 sm:w-96 sm:h-96 bg-white/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/4 w-48 h-48 sm:w-96 sm:h-96 bg-white/10 rounded-full blur-3xl" />
         </div>
 
         <div 
@@ -919,32 +936,32 @@ export default function LandingPage() {
             14 Tage kostenlos • Keine Kreditkarte
           </div>
 
-          <h2 className="text-4xl md:text-6xl font-bold mb-6">
+          <h2 className="text-2xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6">
             Bereit, dein Business zu transformieren?
           </h2>
-          <p className="text-xl text-white/80 mb-10 max-w-2xl mx-auto">
+          <p className="text-base sm:text-xl text-white/80 mb-6 sm:mb-10 max-w-2xl mx-auto">
             Schließe dich hunderten Maklern an, die mit Immivo mehr verdienen und weniger arbeiten. 
             Starte heute — in 5 Minuten bist du live.
           </p>
           
-          <div className="flex flex-col sm:flex-row justify-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
             <Link 
               href="https://app.immivo.ai/login" 
-              className="group inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-indigo-600 bg-white rounded-full hover:bg-gray-100 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1"
+              className="group inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-bold text-indigo-600 bg-white rounded-full hover:bg-gray-100 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1"
             >
               Jetzt kostenlos starten
               <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <a 
               href="mailto:hello@immivo.ai" 
-              className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white border-2 border-white/30 rounded-full hover:bg-white/10 transition-all"
+              className="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-semibold text-white border-2 border-white/30 rounded-full hover:bg-white/10 transition-all"
             >
               Persönliche Demo buchen
             </a>
           </div>
 
           {/* Trust Logos */}
-          <div className="mt-16 pt-8 border-t border-white/20">
+          <div className="mt-8 sm:mt-16 pt-6 sm:pt-8 border-t border-white/20">
             <p className="text-sm text-white/60 mb-6">Integriert mit den Tools, die du bereits nutzt</p>
             <div className="flex justify-center items-center gap-8 flex-wrap opacity-70">
               {['Alle gängigen Portale', 'Google Workspace', 'Microsoft 365'].map((name, i) => (

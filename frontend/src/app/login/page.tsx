@@ -340,26 +340,26 @@ export default function LoginPage() {
       </div>
 
       {/* Right Side - Form */}
-      <div className="flex-1 flex flex-col py-6 lg:py-8 px-4 sm:px-6 lg:px-12 xl:px-20 bg-white overflow-y-auto">
-        <div className="flex-shrink-0 mb-4 lg:mb-6">
+      <div className="flex-1 flex flex-col py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-12 xl:px-20 bg-white overflow-y-auto">
+        <div className="flex-shrink-0 mb-3 sm:mb-4 lg:mb-6">
           <a 
             href="https://immivo.ai" 
-            className="group inline-flex items-center px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-full transition-all"
+            className="group inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-full transition-all"
           >
-            <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+            <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 group-hover:-translate-x-1 transition-transform" />
             Zurück zur Startseite
           </a>
         </div>
 
-        <div className="flex-1 flex flex-col pt-4 lg:pt-8">
+        <div className="flex-1 flex flex-col pt-2 sm:pt-4 lg:pt-8">
           {/* Mobile Logo */}
-          <div className="mb-6 lg:hidden text-center">
+          <div className="mb-4 sm:mb-6 lg:hidden text-center">
             <div className="flex items-center justify-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-2xl">N</span>
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center shadow-lg">
+                <span className="text-white font-bold text-xl sm:text-2xl">N</span>
               </div>
             </div>
-            <h2 className="mt-4 text-2xl font-extrabold text-gray-900">Immivo</h2>
+            <h2 className="mt-2 sm:mt-4 text-xl sm:text-2xl font-extrabold text-gray-900">Immivo</h2>
           </div>
 
           <div className="mx-auto w-full max-w-md">
@@ -460,7 +460,7 @@ export default function LoginPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className={labelClass}>Passwort *</label>
                     <input
@@ -483,7 +483,7 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className={labelClass}>Vorname *</label>
                     <input
@@ -550,7 +550,7 @@ export default function LoginPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className={labelClass}>PLZ</label>
                     <input
@@ -560,7 +560,7 @@ export default function LoginPage() {
                       className={inputClass}
                     />
                   </div>
-                  <div className="col-span-2">
+                  <div className="sm:col-span-2">
                     <label className={labelClass}>Ort</label>
                     <input
                       type="text"
@@ -767,7 +767,7 @@ export default function LoginPage() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className={labelClass}>Vorname *</label>
                     <input
