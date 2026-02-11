@@ -3406,6 +3406,17 @@ app.post('/portal-connections/:id/test', authMiddleware, async (req, res) => {
 app.get('/calendar/google/auth-url', authMiddleware, async (req: any, res) => {
   try {
     const userEmail = req.user!.email;
+    
+    // Check if Outlook Calendar is already connected - only one calendar provider at a time
+    const db = prisma || (await initializePrisma());
+    const user = await db.user.findUnique({ where: { email: userEmail }, select: { tenantId: true } });
+    if (user) {
+      const settings = await db.tenantSettings.findUnique({ where: { tenantId: user.tenantId } });
+      if (settings?.outlookCalendarConfig) {
+        return res.status(409).json({ error: 'Outlook Calendar ist bereits verbunden. Trenne zuerst Outlook Calendar.' });
+      }
+    }
+    
     const state = Buffer.from(JSON.stringify({ email: userEmail })).toString('base64url');
     const authUrl = CalendarService.getGoogleAuthUrl(state);
     console.log('🔗 Generated Google Auth URL for:', userEmail);
@@ -3452,9 +3463,10 @@ app.get('/calendar/google/callback', async (req, res) => {
             email: tokens.email
           };
 
+          // Save Google Calendar config and clear Outlook Calendar (only one provider at a time)
           await db.tenantSettings.upsert({
             where: { tenantId: user.tenantId },
-            update: { googleCalendarConfig: encryptedConfig as any },
+            update: { googleCalendarConfig: encryptedConfig as any, outlookCalendarConfig: Prisma.DbNull },
             create: { tenantId: user.tenantId, googleCalendarConfig: encryptedConfig as any }
           });
 
@@ -3515,7 +3527,7 @@ app.post('/calendar/google/connect', authMiddleware, async (req, res) => {
       email: tokens.email
     };
 
-    // Update tenant settings
+    // Save Google Calendar config and clear Outlook Calendar (only one provider at a time)
     await prisma.tenantSettings.upsert({
       where: { tenantId: user.tenantId },
       create: {
@@ -3523,7 +3535,8 @@ app.post('/calendar/google/connect', authMiddleware, async (req, res) => {
         googleCalendarConfig: encryptedConfig as any
       },
       update: {
-        googleCalendarConfig: encryptedConfig as any
+        googleCalendarConfig: encryptedConfig as any,
+        outlookCalendarConfig: Prisma.DbNull
       }
     });
 
@@ -3562,7 +3575,7 @@ app.post('/calendar/google/save', authMiddleware, async (req, res) => {
       email: email || ''
     };
 
-    // Update tenant settings
+    // Update tenant settings - clear Outlook Calendar (only one provider at a time)
     await prisma.tenantSettings.upsert({
       where: { tenantId: user.tenantId },
       create: {
@@ -3570,7 +3583,8 @@ app.post('/calendar/google/save', authMiddleware, async (req, res) => {
         googleCalendarConfig: encryptedConfig as any
       },
       update: {
-        googleCalendarConfig: encryptedConfig as any
+        googleCalendarConfig: encryptedConfig as any,
+        outlookCalendarConfig: Prisma.DbNull
       }
     });
 
@@ -3615,6 +3629,17 @@ app.post('/calendar/google/disconnect', authMiddleware, async (req, res) => {
 app.get('/calendar/outlook/auth-url', authMiddleware, async (req: any, res) => {
   try {
     const userEmail = req.user!.email;
+    
+    // Check if Google Calendar is already connected - only one calendar provider at a time
+    const db = prisma || (await initializePrisma());
+    const user = await db.user.findUnique({ where: { email: userEmail }, select: { tenantId: true } });
+    if (user) {
+      const settings = await db.tenantSettings.findUnique({ where: { tenantId: user.tenantId } });
+      if (settings?.googleCalendarConfig) {
+        return res.status(409).json({ error: 'Google Calendar ist bereits verbunden. Trenne zuerst Google Calendar.' });
+      }
+    }
+    
     const state = Buffer.from(JSON.stringify({ email: userEmail })).toString('base64url');
     const authUrl = await CalendarService.getOutlookAuthUrl(state);
     res.json({ authUrl });
@@ -3660,9 +3685,10 @@ app.get('/calendar/outlook/callback', async (req, res) => {
             email: tokens.email
           };
 
+          // Save Outlook Calendar config and clear Google Calendar (only one provider at a time)
           await db.tenantSettings.upsert({
             where: { tenantId: user.tenantId },
-            update: { outlookCalendarConfig: encryptedConfig as any },
+            update: { outlookCalendarConfig: encryptedConfig as any, googleCalendarConfig: Prisma.DbNull },
             create: { tenantId: user.tenantId, outlookCalendarConfig: encryptedConfig as any }
           });
 
@@ -3723,7 +3749,7 @@ app.post('/calendar/outlook/connect', authMiddleware, async (req, res) => {
       email: tokens.email
     };
 
-    // Update tenant settings
+    // Update tenant settings - clear Google Calendar (only one provider at a time)
     await prisma.tenantSettings.upsert({
       where: { tenantId: user.tenantId },
       create: {
@@ -3731,7 +3757,8 @@ app.post('/calendar/outlook/connect', authMiddleware, async (req, res) => {
         outlookCalendarConfig: encryptedConfig as any
       },
       update: {
-        outlookCalendarConfig: encryptedConfig as any
+        outlookCalendarConfig: encryptedConfig as any,
+        googleCalendarConfig: Prisma.DbNull
       }
     });
 
@@ -3770,7 +3797,7 @@ app.post('/calendar/outlook/save', authMiddleware, async (req, res) => {
       email: email || ''
     };
 
-    // Update tenant settings
+    // Update tenant settings - clear Google Calendar (only one provider at a time)
     await prisma.tenantSettings.upsert({
       where: { tenantId: user.tenantId },
       create: {
@@ -3778,7 +3805,8 @@ app.post('/calendar/outlook/save', authMiddleware, async (req, res) => {
         outlookCalendarConfig: encryptedConfig as any
       },
       update: {
-        outlookCalendarConfig: encryptedConfig as any
+        outlookCalendarConfig: encryptedConfig as any,
+        googleCalendarConfig: Prisma.DbNull
       }
     });
 

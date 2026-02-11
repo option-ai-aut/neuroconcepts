@@ -237,6 +237,9 @@ export default function IntegrationsSettingsPage() {
       if (response.ok) {
         const data = await response.json();
         window.location.href = data.authUrl;
+      } else if (response.status === 409) {
+        const data = await response.json();
+        setMessage({ type: 'error', text: data.error || 'Es ist bereits ein anderer Kalender-Anbieter verbunden.' });
       } else {
         setMessage({ type: 'error', text: 'Fehler beim Starten der Authentifizierung' });
       }
@@ -600,8 +603,17 @@ export default function IntegrationsSettingsPage() {
           <h3 className="text-lg font-semibold text-gray-900">Kalender</h3>
         </div>
 
+        {/* Info: Only one calendar provider at a time */}
+        {!googleCalendarConnected && !outlookCalendarConnected && (
+          <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+            <p className="text-xs text-amber-700">
+              Du kannst nur einen Kalender-Anbieter gleichzeitig verbinden. Wähle entweder Google Calendar oder Outlook Calendar.
+            </p>
+          </div>
+        )}
+
         {/* Google Calendar */}
-        <div className="flex items-center justify-between py-4 border-b border-gray-100">
+        <div className={`flex items-center justify-between py-4 border-b border-gray-100 ${outlookCalendarConnected ? 'opacity-50' : ''}`}>
           <div className="flex items-center gap-3">
             <img 
               src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg" 
@@ -614,7 +626,11 @@ export default function IntegrationsSettingsPage() {
                 {googleCalendarConnected && <Check className="w-4 h-4 text-green-500" />}
               </div>
               <div className="text-xs text-gray-500">
-                {googleCalendarConnected ? `Verbunden als ${googleCalendarEmail}` : 'Nicht verbunden'}
+                {googleCalendarConnected 
+                  ? `Verbunden als ${googleCalendarEmail}` 
+                  : outlookCalendarConnected 
+                    ? 'Trenne zuerst Outlook Calendar, um Google Calendar zu nutzen'
+                    : 'Nicht verbunden'}
               </div>
             </div>
           </div>
@@ -628,7 +644,8 @@ export default function IntegrationsSettingsPage() {
           ) : (
             <button
               onClick={() => handleConnectCalendar('google')}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+              disabled={outlookCalendarConnected}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Verbinden
             </button>
@@ -636,7 +653,7 @@ export default function IntegrationsSettingsPage() {
         </div>
 
         {/* Outlook Calendar */}
-        <div className="flex items-center justify-between py-4 border-b border-gray-100">
+        <div className={`flex items-center justify-between py-4 border-b border-gray-100 ${googleCalendarConnected ? 'opacity-50' : ''}`}>
           <div className="flex items-center gap-3">
             <svg viewBox="0 0 24 24" className="w-8 h-8">
               <path fill="#0078D4" d="M21.5 2h-19A.5.5 0 002 2.5v19a.5.5 0 00.5.5h19a.5.5 0 00.5-.5v-19a.5.5 0 00-.5-.5z"/>
@@ -649,7 +666,11 @@ export default function IntegrationsSettingsPage() {
                 {outlookCalendarConnected && <Check className="w-4 h-4 text-green-500" />}
               </div>
               <div className="text-xs text-gray-500">
-                {outlookCalendarConnected ? `Verbunden als ${outlookCalendarEmail}` : 'Nicht verbunden'}
+                {outlookCalendarConnected 
+                  ? `Verbunden als ${outlookCalendarEmail}` 
+                  : googleCalendarConnected 
+                    ? 'Trenne zuerst Google Calendar, um Outlook Calendar zu nutzen'
+                    : 'Nicht verbunden'}
               </div>
             </div>
           </div>
@@ -663,7 +684,8 @@ export default function IntegrationsSettingsPage() {
           ) : (
             <button
               onClick={() => handleConnectCalendar('outlook')}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+              disabled={googleCalendarConnected}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Verbinden
             </button>
