@@ -104,6 +104,15 @@ body {
   animation: slide-down 0.25s ease-in forwards;
 }
 
+/* Mobile slide-right animation for drawers */
+@keyframes slide-right {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+.animate-slide-right {
+  animation: slide-right 0.25s ease-out forwards;
+}
+
 /* Jarvis FAB pulse */
 @keyframes fab-pulse {
   0%, 100% { box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4); }
