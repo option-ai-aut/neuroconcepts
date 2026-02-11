@@ -2521,21 +2521,39 @@ app.get('/chat/history', authMiddleware, async (req, res) => {
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
 
+    // Only load last 100 messages to prevent frontend from hanging
+    const MAX_HISTORY = 100;
+    
+    const totalCount = await prisma.userChat.count({
+      where: { userId: currentUser.id, archived: false }
+    });
+
     const history = await prisma.userChat.findMany({
       where: { 
         userId: currentUser.id,
-        archived: false // Nur aktiven Chat laden
+        archived: false
       },
-      orderBy: { createdAt: 'asc' }
+      orderBy: { createdAt: 'asc' },
+      // If more than MAX, take the last MAX messages
+      ...(totalCount > MAX_HISTORY ? { skip: totalCount - MAX_HISTORY, take: MAX_HISTORY } : {})
     });
 
-    // Map to frontend format (role as string, not enum)
-    const formattedHistory = history.map(msg => ({
+    // If we truncated, add a system message indicating older messages exist
+    const formattedHistory: any[] = [];
+    if (totalCount > MAX_HISTORY) {
+      formattedHistory.push({
+        role: 'SYSTEM',
+        content: `[${totalCount - MAX_HISTORY} ältere Nachrichten wurden archiviert. Jarvis erinnert sich an den Kontext.]`
+      });
+    }
+
+    // Map to frontend format
+    formattedHistory.push(...history.map(msg => ({
       role: msg.role,
       content: msg.content
-    }));
+    })));
 
-    console.log(`📜 Chat-Historie geladen für User ${currentUser.id}: ${formattedHistory.length} Nachrichten`);
+    console.log(`📜 Chat-Historie geladen für User ${currentUser.id}: ${formattedHistory.length}/${totalCount} Nachrichten`);
     res.json(formattedHistory);
   } catch (error) {
     console.error('Error fetching chat history:', error);

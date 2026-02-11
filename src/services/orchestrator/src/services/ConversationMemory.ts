@@ -35,9 +35,9 @@ export class ConversationMemory {
     recentMessages: Message[]; 
     summary: string | null;
   }> {
-    // Get all messages
+    // Get only non-archived messages (active conversation)
     const allMessages = await prisma.userChat.findMany({
-      where: { userId },
+      where: { userId, archived: false },
       orderBy: { createdAt: 'asc' },
       select: {
         role: true,
@@ -59,50 +59,65 @@ export class ConversationMemory {
     const oldMessages = allMessages.slice(0, splitIndex);
     const recentMessages = allMessages.slice(splitIndex);
 
-    // Check if we have a cached summary
+    // Check if we have a cached summary (use latest available, not exact match)
     const cachedSummary = await prisma.conversationSummary.findFirst({
-      where: { 
-        userId,
-        messageCount: oldMessages.length 
-      }
+      where: { userId },
+      orderBy: { createdAt: 'desc' }
     });
 
     if (cachedSummary) {
+      // Use cached summary even if message count doesn't exactly match
+      // Schedule a background update if significantly out of date
+      if (oldMessages.length - (cachedSummary.messageCount || 0) > 20) {
+        // Fire-and-forget: generate new summary in background
+        this.generateSummary(oldMessages).then(summary => {
+          prisma.conversationSummary.create({
+            data: { userId, summary, messageCount: oldMessages.length }
+          }).then(() => this.cleanupOldSummaries(userId)).catch(console.error);
+        }).catch(console.error);
+      }
       return {
         recentMessages,
         summary: cachedSummary.summary
       };
     }
 
-    // Generate new summary
-    const summary = await this.generateSummary(oldMessages);
-    
-    // Cache the summary
-    await prisma.conversationSummary.create({
-      data: {
-        userId,
-        summary,
-        messageCount: oldMessages.length,
-      }
-    });
+    // No cached summary at all — generate one but DON'T block the request
+    // Use a simple fallback immediately, generate proper summary in background
+    const fallbackSummary = oldMessages
+      .filter(m => m.role === 'USER')
+      .slice(-5)
+      .map(m => m.content.substring(0, 100))
+      .join('; ');
+
+    // Generate proper summary in background (fire-and-forget)
+    this.generateSummary(oldMessages).then(summary => {
+      prisma.conversationSummary.create({
+        data: { userId, summary, messageCount: oldMessages.length }
+      }).catch(console.error);
+    }).catch(console.error);
 
     return {
       recentMessages,
-      summary
+      summary: fallbackSummary ? `Bisherige Themen: ${fallbackSummary}` : null
     };
   }
 
   /**
    * Generate a concise summary of conversation history
+   * Has a timeout to prevent hanging if Gemini is slow
    */
   private static async generateSummary(messages: Message[]): Promise<string> {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
-    
-    const conversationText = messages
-      .map(m => `${m.role}: ${m.content}`)
-      .join('\n');
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      
+      // Only use last 100 messages for summary to avoid token limits
+      const relevantMessages = messages.slice(-100);
+      const conversationText = relevantMessages
+        .map(m => `${m.role}: ${m.content.substring(0, 500)}`) // Truncate long messages
+        .join('\n');
 
-    const prompt = `Fasse diese Konversation zwischen einem User und Jarvis (KI-Assistent für Immobilien-CRM) zusammen.
+      const prompt = `Fasse diese Konversation zwischen einem User und Jarvis (KI-Assistent für Immobilien-CRM) zusammen.
 Fokussiere auf:
 - Wichtige Informationen (Namen, Objekte, Präferenzen)
 - Offene Aufgaben oder Fragen
@@ -115,8 +130,23 @@ ${conversationText}
 
 Zusammenfassung:`;
 
-    const result = await model.generateContent(prompt);
-    return result.response.text();
+      // Timeout after 15 seconds to prevent hanging
+      const timeoutPromise = new Promise<string>((_, reject) => 
+        setTimeout(() => reject(new Error('Summary generation timed out')), 15000)
+      );
+      
+      const resultPromise = model.generateContent(prompt).then(r => r.response.text());
+      return await Promise.race([resultPromise, timeoutPromise]);
+    } catch (error) {
+      console.error('❌ Summary generation failed, using fallback:', error);
+      // Fallback: Create a simple bullet-point summary from message content
+      const topics = messages
+        .filter(m => m.role === 'USER')
+        .slice(-10)
+        .map(m => m.content.substring(0, 100))
+        .join('; ');
+      return `Gesprächsthemen: ${topics || 'Allgemeine Unterhaltung'}`;
+    }
   }
 
   /**
@@ -349,15 +379,17 @@ Zusammenfassung:`;
       return currentSummary || 'Noch keine ausreichende Gesprächshistorie.';
     }
 
-    // Generate updated summary
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    
-    const conversationText = recentMessages
-      .reverse()
-      .map(m => `${m.role}: ${m.content}`)
-      .join('\n');
+    // Generate updated summary with timeout
+    let newSummary: string;
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      
+      const conversationText = recentMessages
+        .reverse()
+        .map(m => `${m.role}: ${m.content.substring(0, 500)}`) // Truncate long messages
+        .join('\n');
 
-    const prompt = `Du bist ein Gedächtnis-Assistent. Aktualisiere die Langzeit-Zusammenfassung basierend auf neuen Gesprächen.
+      const prompt = `Du bist ein Gedächtnis-Assistent. Aktualisiere die Langzeit-Zusammenfassung basierend auf neuen Gesprächen.
 
 ${currentSummary ? `BISHERIGE ZUSAMMENFASSUNG:\n${currentSummary}\n\n` : ''}NEUE GESPRÄCHE:
 ${conversationText}
@@ -372,8 +404,18 @@ Sei präzise und strukturiert (max. 300 Wörter). Behalte wichtige Informationen
 
 AKTUALISIERTE ZUSAMMENFASSUNG:`;
 
-    const result = await model.generateContent(prompt);
-    const newSummary = result.response.text();
+      // Timeout after 20 seconds
+      const timeoutPromise = new Promise<string>((_, reject) => 
+        setTimeout(() => reject(new Error('Long-term memory update timed out')), 20000)
+      );
+      
+      const resultPromise = model.generateContent(prompt).then(r => r.response.text());
+      newSummary = await Promise.race([resultPromise, timeoutPromise]);
+    } catch (error) {
+      console.error('❌ Long-term memory update failed:', error);
+      // Keep current summary if update fails
+      return currentSummary || 'Zusammenfassung konnte nicht erstellt werden.';
+    }
 
     // Save the new summary
     await prisma.conversationSummary.create({

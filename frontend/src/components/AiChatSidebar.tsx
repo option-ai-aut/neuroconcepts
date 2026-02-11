@@ -787,6 +787,17 @@ export default function AiChatSidebar() {
               </div>
             );
           }
+
+          // System info message (e.g. "older messages archived")
+          if (msg.role === 'SYSTEM') {
+            return (
+              <div key={index} className="flex justify-center">
+                <div className="bg-gray-100 text-gray-500 rounded-full px-3 py-1.5 text-[10px] font-medium">
+                  {msg.content}
+                </div>
+              </div>
+            );
+          }
           
           // Regular messages
           return (
