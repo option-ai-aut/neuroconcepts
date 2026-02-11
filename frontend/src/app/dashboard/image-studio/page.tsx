@@ -23,8 +23,21 @@ import { getRuntimeConfig } from '@/components/EnvProvider';
 interface Property {
   id: string;
   title: string;
+  address?: string;
   images?: string[];
 }
+
+// Helper to resolve image URLs (handles relative /uploads/ paths and S3 URLs)
+const getImageUrl = (url: string): string => {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  if (url.startsWith('/uploads/')) {
+    const config = getRuntimeConfig();
+    const apiUrl = config.apiUrl || process.env.NEXT_PUBLIC_API_URL || '';
+    return apiUrl ? `${apiUrl}${url}` : url;
+  }
+  return url;
+};
 
 const STYLES = [
   { id: 'modern', name: 'Modern', desc: 'Klar & minimalistisch' },
@@ -403,27 +416,43 @@ export default function ImageStudioPage() {
                 </button>
                 
                 {showPropertyDropdown && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 max-h-64 overflow-y-auto z-20">
-                    {properties.map((property) => (
-                      <div key={property.id} className="p-2 border-b border-gray-50 last:border-0">
-                        <div className="px-3 py-1.5 text-sm font-medium text-gray-900">{property.title}</div>
-                        {property.images && property.images.length > 0 ? (
-                          <div className="flex gap-2 px-3 pb-2 overflow-x-auto">
-                            {property.images.slice(0, 6).map((img, idx) => (
-                              <button
-                                key={idx}
-                                onClick={() => handlePropertyImageSelect(property, img)}
-                                className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 border-2 border-transparent hover:border-blue-500 transition-colors"
-                              >
-                                <img src={img} alt="" className="w-full h-full object-cover" />
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="px-3 pb-2 text-xs text-gray-400">Keine Bilder</div>
-                        )}
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-200 max-h-[420px] overflow-y-auto z-20">
+                    {properties.filter(p => p.images && p.images.length > 0).length === 0 ? (
+                      <div className="p-6 text-center text-gray-400 text-sm">
+                        <ImageIcon className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                        Keine Objekte mit Bildern vorhanden
                       </div>
-                    ))}
+                    ) : (
+                      properties.filter(p => p.images && p.images.length > 0).map((property) => (
+                        <div key={property.id} className="border-b border-gray-100 last:border-0">
+                          <div className="px-4 pt-3 pb-2">
+                            <p className="text-sm font-semibold text-gray-900">{property.title}</p>
+                            {property.address && (
+                              <p className="text-xs text-gray-400 mt-0.5">{property.address}</p>
+                            )}
+                          </div>
+                          <div className="px-3 pb-3 grid grid-cols-3 gap-2">
+                            {property.images!.slice(0, 9).map((img, idx) => {
+                              const resolvedUrl = getImageUrl(img);
+                              return (
+                                <button
+                                  key={idx}
+                                  onClick={() => handlePropertyImageSelect(property, resolvedUrl)}
+                                  className="relative aspect-[4/3] rounded-lg overflow-hidden border-2 border-transparent hover:border-gray-900 transition-all group bg-gray-100"
+                                >
+                                  <img 
+                                    src={resolvedUrl} 
+                                    alt={`${property.title} Bild ${idx + 1}`} 
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" 
+                                  />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 )}
               </div>

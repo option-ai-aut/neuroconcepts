@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, use, useRef } from 'react';
-import { getProperty, Property, updateProperty, deleteProperty, getExposes, Expose, downloadExposePdf, getExposeTemplates, ExposeTemplate, getAuthHeaders, uploadPropertyDocuments, deletePropertyDocument, DocumentFile, getMe } from '@/lib/api';
+import { getProperty, Property, updateProperty, deleteProperty, getExposeTemplates, ExposeTemplate, getAuthHeaders, uploadPropertyDocuments, deletePropertyDocument, DocumentFile, getMe } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { Building, MapPin, Euro, Maximize, Home, FileText, ArrowLeft, MoreVertical, Trash2, Save, FileImage, Plus, Upload, X, Image as ImageIcon, Globe, Check, Download, File, FileSpreadsheet, FileType, Users, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
@@ -27,7 +27,6 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const userId = currentUser?.id || '';
   const tenantId = currentUser?.tenantId || '';
   const [property, setProperty] = useState<Property | null>(null);
-  const [exposes, setExposes] = useState<Expose[]>([]);
   const [exposeTemplates, setExposeTemplates] = useState<ExposeTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -50,8 +49,6 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const [selectedPortals, setSelectedPortals] = useState<string[]>([]);
   const [syncing, setSyncing] = useState(false);
   
-  // PDF Download State
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
   
   // Document Upload State
   const [uploadingDocs, setUploadingDocs] = useState(false);
@@ -64,7 +61,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
 
   const router = useRouter();
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { openDrawer, updateExposeEditor, aiActionPerformed } = useGlobalState();
+  const { aiActionPerformed } = useGlobalState();
 
   useEffect(() => {
     loadProperty();
@@ -152,14 +149,12 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   };
 
   const loadProperty = async () => {
-    const [propertyData, exposesData, templatesData] = await Promise.all([
+    const [propertyData, templatesData] = await Promise.all([
       getProperty(id),
-      getExposes(id).catch(() => []),
       getExposeTemplates().catch(() => [])
     ]);
     setProperty(propertyData);
     setFormData(propertyData || {});
-    setExposes(exposesData);
     setExposeTemplates(templatesData);
     
     // Load published portals
@@ -222,26 +217,6 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
     }
   };
 
-  const handleOpenExposeEditor = (exposeId?: string) => {
-    updateExposeEditor({ 
-      propertyId: id, 
-      exposeId: exposeId,
-      isTemplate: false 
-    });
-    openDrawer('EXPOSE_EDITOR');
-  };
-
-  const handleDownloadPdf = async (exposeId: string) => {
-    setDownloadingPdf(true);
-    try {
-      await downloadExposePdf(exposeId);
-    } catch (error) {
-      console.error('PDF download failed:', error);
-      alert('PDF-Generierung fehlgeschlagen');
-    } finally {
-      setDownloadingPdf(false);
-    }
-  };
 
   const handleInputChange = (field: keyof Property, value: string | number) => {
     setFormData(prev => {
@@ -843,7 +818,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               <select
                 value={formData.defaultExposeTemplateId || ''}
                 onChange={(e) => handleInputChange('defaultExposeTemplateId', e.target.value || '')}
-                className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
+                className="w-full px-4 py-3 pr-10 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEgMS41TDYgNi41TDExIDEuNSIgc3Ryb2tlPSIjOUI5QkEyIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==')] bg-[length:12px] bg-[right_12px_center] bg-no-repeat"
               >
                 <option value="">Keine automatische Erstellung</option>
                 {exposeTemplates.map((template) => (
@@ -854,63 +829,6 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               </select>
             </div>
 
-            {/* Existing Exposes */}
-            <h3 className="text-lg font-semibold text-gray-700 mb-4">Erstellte Exposés</h3>
-
-            {exposes.length > 0 ? (
-              <div className="space-y-3">
-                {exposes.map((expose) => (
-                  <div
-                    key={expose.id}
-                    className="flex items-center justify-between p-4 bg-gray-100 rounded-md hover:bg-gray-50 transition-colors"
-                  >
-                    <div 
-                      className="flex items-center gap-4 flex-1 cursor-pointer"
-                      onClick={() => handleOpenExposeEditor(expose.id)}
-                    >
-                      <div className="w-12 h-12 bg-gray-100 rounded-md flex items-center justify-center">
-                        <FileImage className="w-6 h-6 text-gray-600" />
-                      </div>
-                      <div>
-                        <p className="text-base font-medium text-gray-900">
-                          {expose.template?.name || 'Individuelles Exposé'}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {expose.blocks?.length || 0} Blöcke • {expose.status === 'PUBLISHED' ? 'Veröffentlicht' : 'Entwurf'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDownloadPdf(expose.id); }}
-                        disabled={downloadingPdf}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors disabled:opacity-50"
-                        title="Als PDF herunterladen"
-                      >
-                        {downloadingPdf ? (
-                          <div className="w-5 h-5 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
-                        ) : (
-                          <Download className="w-5 h-5" />
-                        )}
-                      </button>
-                      <span className={`text-xs px-3 py-1 rounded-full font-medium ${
-                        expose.status === 'PUBLISHED' 
-                          ? 'bg-green-50 text-green-700' 
-                          : 'bg-amber-50 text-amber-700'
-                      }`}>
-                        {expose.status === 'PUBLISHED' ? 'Live' : 'Entwurf'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-gray-400 bg-gray-50 rounded-lg">
-                <FileImage className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                <p className="text-base">Noch kein Exposé erstellt</p>
-                <p className="text-sm mt-1">Klicke auf "Erstellen" um loszulegen</p>
-              </div>
-            )}
           </div>
 
           {/* Bilder */}
