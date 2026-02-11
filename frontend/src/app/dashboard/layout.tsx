@@ -11,6 +11,7 @@ import PageHeader from '@/components/PageHeader';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { useAuthConfigured } from '@/components/AuthProvider';
+import { DarkModeProvider, useDarkMode } from '@/context/DarkModeContext';
 import { Loader2, Monitor } from 'lucide-react';
 import Image from 'next/image';
 
@@ -41,12 +42,12 @@ function MobileRouteGuard({ children, pathname }: { children: React.ReactNode; p
 
   if (isMobile && !isMobileAllowedRoute(pathname)) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-white px-8 text-center pb-20">
-        <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-5">
-          <Monitor className="w-8 h-8 text-gray-400" />
+      <div className="h-full flex flex-col items-center justify-center px-8 text-center pb-20">
+        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-2xl flex items-center justify-center mb-5">
+          <Monitor className="w-8 h-8 text-gray-400 dark:text-gray-500" />
         </div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">Desktop-Funktion</h2>
-        <p className="text-sm text-gray-500 leading-relaxed max-w-xs">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Desktop-Funktion</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed max-w-xs">
           Diese Seite ist nur in der Desktop-Version verfügbar. Öffne Immivo auf deinem Computer für vollen Zugriff.
         </p>
       </div>
@@ -58,6 +59,7 @@ function MobileRouteGuard({ children, pathname }: { children: React.ReactNode; p
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { drawerOpen, drawerType, exposeEditorData, closeDrawer, mobileJarvisOpen, setMobileJarvisOpen } = useGlobalState();
+  const { isDark } = useDarkMode();
   const pathname = usePathname();
   const [jarvisClosing, setJarvisClosing] = useState(false);
 
@@ -70,9 +72,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   }, [setMobileJarvisOpen]);
 
   return (
-    <div className="flex h-screen bg-white font-sans">
-      {/* Safe area top fill — ensures white behind iPhone notch/status bar */}
-      <div className="fixed top-0 left-0 right-0 bg-white z-[60] lg:hidden" style={{ height: 'env(safe-area-inset-top, 0px)' }} />
+    <div className={`flex h-screen font-sans transition-colors duration-300 ${isDark ? 'dark bg-[#111111]' : 'bg-white'}`}>
+      {/* Safe area top fill — ensures correct bg behind iPhone notch/status bar */}
+      <div className={`fixed top-0 left-0 right-0 z-[60] lg:hidden transition-colors ${isDark ? 'bg-[#111111]' : 'bg-white'}`} style={{ height: 'env(safe-area-inset-top, 0px)' }} />
       
       {/* Main Navigation Sidebar (Left) - Desktop only */}
       <Sidebar />
@@ -82,7 +84,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         {/* Top Header Bar */}
         <PageHeader />
         {/* Scrollable Content - extra bottom padding on mobile for nav bar */}
-        <main className="flex-1 overflow-y-auto bg-white overflow-x-visible pb-16 lg:pb-0">
+        <main className="flex-1 overflow-y-auto bg-white dark:bg-[#111111] overflow-x-visible pb-16 lg:pb-0 transition-colors">
           <MobileRouteGuard pathname={pathname}>
             {children}
           </MobileRouteGuard>
@@ -98,17 +100,17 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       {!mobileJarvisOpen && !jarvisClosing && (
         <button
           onClick={() => setMobileJarvisOpen(true)}
-          className="lg:hidden fixed bottom-[72px] right-4 z-40 w-14 h-14 bg-gray-900 rounded-full flex items-center justify-center shadow-lg animate-fab-pulse active:scale-95 transition-transform safe-bottom"
+          className="lg:hidden fixed bottom-[72px] right-4 z-40 active:scale-95 transition-transform safe-bottom"
           style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
           aria-label="Jarvis KI-Chat öffnen"
         >
-          <Image src="/logo-icon-only.png" alt="Jarvis" width={28} height={28} />
+          <Image src="/logo-icon-only.png" alt="Jarvis" width={52} height={52} className="shadow-lg rounded-2xl" />
         </button>
       )}
 
       {/* Mobile: Jarvis Full-Screen Chat Overlay */}
       {(mobileJarvisOpen || jarvisClosing) && (
-        <div className={`lg:hidden fixed inset-0 z-50 bg-white ${jarvisClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
+        <div className={`lg:hidden fixed inset-0 z-50 ${isDark ? 'bg-[#111111]' : 'bg-white'} ${jarvisClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
           <AiChatSidebar mobile onClose={handleCloseJarvis} />
         </div>
       )}
@@ -178,5 +180,9 @@ export default function DashboardLayout({
   }
 
   // Authenticated - show dashboard
-  return <DashboardContent>{children}</DashboardContent>;
+  return (
+    <DarkModeProvider>
+      <DashboardContent>{children}</DashboardContent>
+    </DarkModeProvider>
+  );
 }

@@ -12,8 +12,6 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* Force light mode on all devices — no dark mode */
-
 html {
   background-color: #ffffff;
 }
@@ -23,6 +21,195 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+
+/* ========================================
+   DARK MODE — Applied via .dark class on dashboard root
+   Comprehensive color overrides for all UI elements.
+   ======================================== */
+
+/* Base backgrounds */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #f5f5f5;
+  color-scheme: dark;
+}
+
+/* White backgrounds → dark */
+.dark .bg-white { background-color: #111111 !important; }
+.dark .bg-gray-50 { background-color: #151515 !important; }
+.dark .bg-gray-100 { background-color: #1a1a1a !important; }
+
+/* Text colors → inverted */
+.dark .text-gray-900 { color: #f5f5f5 !important; }
+.dark .text-gray-800 { color: #e5e5e5 !important; }
+.dark .text-gray-700 { color: #d4d4d4 !important; }
+.dark .text-gray-600 { color: #a3a3a3 !important; }
+.dark .text-gray-500 { color: #737373 !important; }
+.dark .text-gray-400 { color: #525252 !important; }
+
+/* Borders → dark borders */
+.dark .border-gray-100 { border-color: #262626 !important; }
+.dark .border-gray-200 { border-color: #2a2a2a !important; }
+.dark .border-gray-300 { border-color: #333333 !important; }
+
+/* Hover states */
+.dark .hover\:bg-gray-50:hover { background-color: #1a1a1a !important; }
+.dark .hover\:bg-gray-100:hover { background-color: #222222 !important; }
+.dark .hover\:bg-gray-800:hover { background-color: #262626 !important; }
+.dark .hover\:text-gray-600:hover { color: #d4d4d4 !important; }
+.dark .hover\:text-gray-900:hover { color: #f5f5f5 !important; }
+
+/* Focus rings */
+.dark .focus\:ring-blue-500:focus { --tw-ring-color: #3b82f6 !important; }
+.dark .focus\:border-blue-500:focus { border-color: #3b82f6 !important; }
+
+/* Inputs, textareas, selects */
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: #1a1a1a !important;
+  color: #f5f5f5 !important;
+  border-color: #333333 !important;
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #525252 !important;
+}
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  border-color: #3b82f6 !important;
+  --tw-ring-color: #3b82f6 !important;
+}
+
+/* Dark gray backgrounds → slightly lighter in dark mode */
+/* Note: bg-gray-900 used for buttons is handled via .dark-btn-invert class */
+.dark .bg-gray-800 { background-color: #1f1f1f !important; }
+
+/* Explicit button inversion for dark mode */
+.dark button.bg-gray-900,
+.dark a.bg-gray-900,
+.dark [type="submit"].bg-gray-900 {
+  background-color: #f5f5f5 !important;
+  color: #111111 !important;
+}
+.dark button.bg-gray-900:hover,
+.dark a.bg-gray-900:hover {
+  background-color: #e5e5e5 !important;
+}
+
+/* Blue accents stay but adjust slightly */
+.dark .text-blue-600 { color: #60a5fa !important; }
+.dark .text-blue-500 { color: #60a5fa !important; }
+.dark .bg-blue-50 { background-color: #1e293b !important; }
+.dark .bg-blue-600 { background-color: #2563eb !important; }
+
+/* Green status colors */
+.dark .text-green-600 { color: #4ade80 !important; }
+.dark .bg-green-50 { background-color: #14532d33 !important; }
+.dark .bg-green-100 { background-color: #14532d55 !important; }
+
+/* Red/warning colors */
+.dark .text-red-600 { color: #f87171 !important; }
+.dark .bg-red-50 { background-color: #7f1d1d33 !important; }
+.dark .text-red-500 { color: #f87171 !important; }
+
+/* Amber/yellow */
+.dark .text-amber-600 { color: #fbbf24 !important; }
+.dark .bg-amber-50 { background-color: #78350f33 !important; }
+
+/* Gradients in dark mode */
+.dark .from-gray-50 { --tw-gradient-from: #151515 !important; }
+.dark .to-white { --tw-gradient-to: #111111 !important; }
+.dark .from-white { --tw-gradient-from: #111111 !important; }
+.dark .to-gray-50 { --tw-gradient-to: #151515 !important; }
+
+/* Shadow adjustments */
+.dark .shadow-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3) !important; }
+.dark .shadow { box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.4) !important; }
+.dark .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4) !important; }
+.dark .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4) !important; }
+.dark .shadow-xl { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5) !important; }
+
+/* Scrollbar in dark mode */
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #404040 !important;
+}
+.dark .scrollbar-thin:hover::-webkit-scrollbar-thumb {
+  background: #525252 !important;
+}
+
+/* Dividers */
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #262626 !important;
+}
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #2a2a2a !important;
+}
+
+/* Ring colors */
+.dark .ring-gray-100 { --tw-ring-color: #262626 !important; }
+.dark .ring-gray-200 { --tw-ring-color: #2a2a2a !important; }
+
+/* Tables */
+.dark table thead { background-color: #151515 !important; }
+.dark table th { color: #a3a3a3 !important; border-color: #262626 !important; }
+.dark table td { color: #d4d4d4 !important; border-color: #1a1a1a !important; }
+.dark table tr:hover { background-color: #1a1a1a !important; }
+
+/* Specific component overrides */
+
+/* Mobile safe area top fill */
+.dark .safe-area-top-fill {
+  background-color: #111111 !important;
+}
+
+/* iframes (email content) — inject dark background */
+.dark iframe {
+  filter: invert(0.88) hue-rotate(180deg);
+}
+
+/* Badges / pills */
+.dark .bg-gray-50.border { background-color: #1a1a1a !important; }
+
+/* Dropdown menus */
+.dark [role="menu"],
+.dark [role="listbox"] {
+  background-color: #1a1a1a !important;
+  border-color: #333333 !important;
+}
+
+/* Sticky / fixed elements */
+.dark .bg-white\/80 { background-color: rgba(17, 17, 17, 0.8) !important; }
+.dark .bg-white\/90 { background-color: rgba(17, 17, 17, 0.9) !important; }
+
+/* Calendar event cards */
+.dark .bg-gray-50\/80 { background-color: rgba(21, 21, 21, 0.8) !important; }
+
+/* Tab navigation */
+.dark .border-b-2.border-gray-300 { border-color: #525252 !important; }
+.dark .border-b-2.border-gray-800 { border-color: #f5f5f5 !important; }
+.dark .border-transparent { border-color: transparent !important; }
+
+/* Active tab underline */
+.dark .shadow-\[0_4px_6px_-1px_rgba\(0\,0\,0\,0\.1\)\] {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Placeholder text */
+.dark .placeholder-gray-400::placeholder,
+.dark .placeholder-gray-500::placeholder {
+  color: #525252 !important;
+}
+
+/* Skeleton/loading animations */
+.dark .animate-pulse { background-color: #1a1a1a !important; }
+
+/* Empty state illustrations */
+.dark .bg-gradient-to-br.from-gray-50 { background: #151515 !important; }
+.dark .bg-gradient-to-br.from-gray-100 { background: #1a1a1a !important; }
+
+/* --- END DARK MODE --- */
 
 /* Prevent Safari auto-zoom on input focus (requires font-size >= 16px) */
 /* Use 1023px to match Tailwind lg: breakpoint (1024px) — covers iPhone landscape */

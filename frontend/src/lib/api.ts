@@ -443,9 +443,38 @@ export async function getChannels() {
   return res.json();
 }
 
-export async function getChannelMessages(channelId: string) {
+export async function createChannel(data: { name: string; description?: string; type?: string }) {
   const headers = await getAuthHeaders();
-  const res = await fetch(`${getApiUrl()}/channels/${channelId}/messages`, { headers });
+  const res = await fetch(`${getApiUrl()}/channels`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to create channel');
+  }
+  return res.json();
+}
+
+export async function deleteChannel(channelId: string) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/channels/${channelId}`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to delete channel');
+  }
+  return res.json();
+}
+
+export async function getChannelMessages(channelId: string, before?: string, limit: number = 30) {
+  const headers = await getAuthHeaders();
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (before) params.set('before', before);
+  const res = await fetch(`${getApiUrl()}/channels/${channelId}/messages?${params}`, { headers });
   if (!res.ok) throw new Error('Failed to fetch messages');
   return res.json();
 }
@@ -458,6 +487,34 @@ export async function sendChannelMessage(channelId: string, content: string) {
     body: JSON.stringify({ content }),
   });
   if (!res.ok) throw new Error('Failed to send message');
+  return res.json();
+}
+
+export async function editChannelMessage(channelId: string, messageId: string, content: string) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/channels/${channelId}/messages/${messageId}`, {
+    method: 'PATCH',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) throw new Error('Failed to edit message');
+  return res.json();
+}
+
+export async function deleteChannelMessage(channelId: string, messageId: string) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/channels/${channelId}/messages/${messageId}`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!res.ok) throw new Error('Failed to delete message');
+  return res.json();
+}
+
+export async function getChannelMembers(channelId: string) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/channels/${channelId}/members`, { headers });
+  if (!res.ok) throw new Error('Failed to fetch members');
   return res.json();
 }
 

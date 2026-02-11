@@ -9,6 +9,7 @@ import {
   MessageSquare, Brain, Rocket, Target, Award, Globe, Image,
   Wand2, Server
 } from 'lucide-react';
+import NextImage from 'next/image';
 import PublicNavigation from '@/components/PublicNavigation';
 import PublicFooter from '@/components/PublicFooter';
 
@@ -286,9 +287,7 @@ export default function LandingPage() {
                     {/* Jarvis Chat Preview */}
                     <div className="bg-gradient-to-br from-gray-800/50 to-gray-700/50 rounded-xl p-4 border border-gray-600/30">
                       <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 bg-gray-800 rounded-xl flex items-center justify-center flex-shrink-0 animate-pulse-glow">
-                          <Bot className="w-5 h-5 text-white" />
-                        </div>
+                        <NextImage src="/logo-icon.png" alt="Jarvis" width={40} height={40} className="flex-shrink-0 animate-pulse-glow rounded-xl" />
                         <div>
                           <p className="text-xs text-gray-400 mb-1">Jarvis • Gerade eben</p>
                           <p className="text-sm text-white">
@@ -487,8 +486,8 @@ export default function LandingPage() {
 
               {/* Desktop: Orbit Visualization */}
               <div className="hidden lg:flex relative items-center justify-center">
-                <div className="w-40 h-40 bg-gray-800 rounded-full flex items-center justify-center animate-pulse-glow z-10">
-                  <Bot className="w-20 h-20 text-white" />
+                <div className="w-40 h-40 flex items-center justify-center animate-pulse-glow z-10">
+                  <NextImage src="/logo-icon.png" alt="Jarvis" width={140} height={140} className="rounded-3xl" />
                 </div>
                 
                 {/* Orbiting Capabilities - pre-calculated positions to avoid hydration mismatch */}
@@ -928,6 +927,8 @@ export default function LandingPage() {
           ref={section6.ref}
           className={`max-w-4xl mx-auto px-4 text-center relative z-10 ${section6.isInView ? 'animate-scale-in' : 'opacity-0'}`}
         >
+          <NextImage src="/logo-icon.png" alt="Immivo" width={64} height={64} className="rounded-2xl mx-auto mb-6 shadow-lg" />
+
           <div className="inline-flex items-center px-4 py-2 rounded-full bg-white/20 text-white text-sm font-medium mb-8 border border-white/20">
             <Star className="w-4 h-4 mr-2 text-yellow-300" />
             14 Tage kostenlos • Keine Kreditkarte

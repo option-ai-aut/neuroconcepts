@@ -764,7 +764,7 @@ export default function CalendarPage() {
       {/* New Event Modal */}
       {showNewEventModal && (
         <div className="fixed inset-0 bg-black/50 flex items-end lg:items-center justify-center z-50">
-          <div className="bg-white rounded-t-2xl lg:rounded-xl shadow-xl w-full lg:max-w-md lg:mx-4 max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-t-2xl lg:rounded-xl shadow-xl w-full lg:max-w-md lg:mx-4 max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between px-4 lg:px-6 py-3 lg:py-4 border-b border-gray-100 shrink-0">
               <h2 className="text-base lg:text-lg font-semibold text-gray-900">Neuer Termin</h2>
               <button 
@@ -864,7 +864,7 @@ export default function CalendarPage() {
       {/* Event Detail/Edit Modal */}
       {selectedEvent && (
         <div className="fixed inset-0 bg-black/50 flex items-end lg:items-center justify-center z-50" onClick={() => { setSelectedEvent(null); setIsEditing(false); }}>
-          <div className="bg-white rounded-t-2xl lg:rounded-xl shadow-xl w-full lg:max-w-lg lg:mx-4 max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-t-2xl lg:rounded-xl shadow-xl w-full lg:max-w-lg lg:mx-4 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 lg:px-6 py-3 lg:py-4 border-b border-gray-100 shrink-0">
               <h2 className="text-base lg:text-lg font-semibold text-gray-900">
                 {isEditing ? 'Termin bearbeiten' : 'Termindetails'}

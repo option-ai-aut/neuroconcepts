@@ -364,9 +364,8 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-40" />
         
         <div className="relative z-20 flex flex-col justify-between h-full p-12 text-white">
-          <div className="flex items-center">
-            <Image src="/logo-icon-only.png" alt="Immivo" width={32} height={32} className="mr-3" />
-            <Image src="/logo-white.png" alt="Immivo" width={110} height={30} className="h-7 w-auto" />
+          <div>
+            <Image src="/logo-white.png" alt="Immivo" width={140} height={38} className="h-9 w-auto" />
           </div>
           
           <div className="max-w-md">
@@ -395,9 +394,8 @@ export default function LoginPage() {
 
         <div className="flex-1 flex flex-col pt-2 sm:pt-4 lg:pt-8">
           {/* Mobile Logo */}
-          <div className="mb-4 sm:mb-6 lg:hidden flex flex-col items-center">
-            <Image src="/logo-icon-only.png" alt="Immivo" width={44} height={44} />
-            <Image src="/logo-black.png" alt="Immivo" width={120} height={32} className="h-7 w-auto mt-3" />
+          <div className="mb-4 sm:mb-6 lg:hidden flex justify-center">
+            <Image src="/logo-black.png" alt="Immivo" width={140} height={38} className="h-9 w-auto" />
           </div>
 
           <div className="mx-auto w-full max-w-md">

@@ -11,8 +11,7 @@ export default function PublicFooter() {
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="flex items-center mb-4 md:mb-6">
-              <Image src="/logo-icon-only.png" alt="Immivo" width={36} height={36} className="mr-2" />
-              <Image src="/logo-white.png" alt="Immivo" width={100} height={28} className="h-6 w-auto" />
+              <Image src="/logo-icon.png" alt="Immivo" width={40} height={40} />
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed">
               Das KI-gesteuerte Betriebssystem für moderne Immobilienmakler. 

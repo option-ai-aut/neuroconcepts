@@ -42,18 +42,18 @@ export default function Sidebar() {
 
   return (
     <div 
-      className={`hidden lg:flex flex-col bg-gray-950 h-screen relative z-20 transition-all duration-300 ease-in-out ${
+      className={`hidden lg:flex flex-col bg-gray-950 dark:bg-[#0a0a0a] h-screen relative z-20 transition-all duration-300 ease-in-out ${
         isHovered ? 'w-64' : 'w-20'
       }`}
       onMouseEnter={() => { setIsHovered(true); setSidebarExpanded(true); }}
       onMouseLeave={() => { setIsHovered(false); setSidebarExpanded(false); }}
     >
       {/* Logo */}
-      <div className="flex items-center h-16 px-6 shrink-0 overflow-hidden">
-        <Image src="/logo-icon-only.png" alt="Immivo" width={32} height={32} className="shrink-0" />
+      <div className="flex items-center h-16 px-5 shrink-0 overflow-hidden relative">
+        <Image src="/logo-icon-only.png" alt="Immivo" width={32} height={32} className={`shrink-0 transition-opacity duration-300 ${isHovered ? 'opacity-0' : 'opacity-100'} absolute left-6`} />
         <Image 
-          src="/logo-white.png" alt="Immivo" width={90} height={24} 
-          className={`h-6 w-auto ml-3 whitespace-nowrap transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}
+          src="/logo-white.png" alt="Immivo" width={130} height={34} 
+          className={`h-7 w-auto transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}
         />
       </div>
       

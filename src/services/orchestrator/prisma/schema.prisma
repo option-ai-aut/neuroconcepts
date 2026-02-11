@@ -487,14 +487,18 @@ model Channel {
   tenantId  String
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
   
-  name      String   // "General", "Sales", or "DM-User1-User2"
-  type      ChannelType
+  name        String   // "General", "Sales", or "DM-User1-User2"
+  description String?
+  type        ChannelType
+  isDefault   Boolean  @default(false) // Auto-created company channel
   
   messages  ChannelMessage[]
   members   ChannelMember[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  @@index([tenantId])
 }
 
 enum ChannelType {
@@ -506,27 +510,43 @@ enum ChannelType {
 model ChannelMember {
   id        String   @id @default(uuid())
   channelId String
-  channel   Channel  @relation(fields: [channelId], references: [id])
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
   
   userId    String
   user      User     @relation(fields: [userId], references: [id])
+  
+  role      ChannelRole @default(MEMBER)
   
   joinedAt  DateTime @default(now())
   
   @@unique([channelId, userId])
 }
 
+enum ChannelRole {
+  ADMIN
+  MEMBER
+}
+
 model ChannelMessage {
   id        String   @id @default(uuid())
   channelId String
-  channel   Channel  @relation(fields: [channelId], references: [id])
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
   
   userId    String
   user      User     @relation(fields: [userId], references: [id])
   
   content   String   @db.Text
+  isJarvis  Boolean  @default(false) // Sent by Jarvis AI
+  
+  // Mentions (stored as JSON array of user IDs)
+  mentions  Json?    // ["userId1", "userId2"]
+  
+  // Edit tracking
+  editedAt  DateTime?
   
   createdAt DateTime @default(now())
+  
+  @@index([channelId, createdAt])
 }
 
 // --- Orchestrator & Templates ---

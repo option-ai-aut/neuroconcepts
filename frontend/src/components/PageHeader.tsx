@@ -5,10 +5,12 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, Users, Inbox, Calendar, FileText, 
-  MessageSquare, Wand2, Activity, Settings, RefreshCw
+  MessageSquare, Wand2, Activity, Settings, RefreshCw,
+  Sun, Moon
 } from 'lucide-react';
 import NotificationBell from '@/components/NotificationBell';
 import { useGlobalState } from '@/context/GlobalStateContext';
+import { useDarkMode } from '@/context/DarkModeContext';
 import { useSWRConfig } from 'swr';
 import useSWR from 'swr';
 import { getMe } from '@/lib/api';
@@ -45,6 +47,7 @@ export default function PageHeader() {
   const { mutate } = useSWRConfig();
   const { data: user } = useSWR('/me', getMe);
   const { headerActions } = useGlobalState();
+  const { isDark, toggleDarkMode } = useDarkMode();
   const { title, icon: Icon } = getPageInfo(pathname);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -56,13 +59,13 @@ export default function PageHeader() {
   };
 
   return (
-    <div className="h-12 px-4 lg:px-6 flex items-center justify-between bg-white border-b border-gray-100 shrink-0 z-10">
+    <div className="h-12 px-4 lg:px-6 flex items-center justify-between bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 shrink-0 z-10 transition-colors">
       {/* Left: Brand (mobile) + Page Title */}
       <div className="flex items-center gap-2.5">
         {/* Mobile brand logo */}
         <Image src="/logo-icon-only.png" alt="Immivo" width={28} height={28} className="lg:hidden shrink-0" />
-        <Icon className="w-4 h-4 text-gray-400 hidden lg:block" />
-        <h1 className="text-sm font-semibold text-gray-800">{title}</h1>
+        <Icon className="w-4 h-4 text-gray-400 dark:text-gray-500 hidden lg:block" />
+        <h1 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{title}</h1>
       </div>
 
       {/* Right: Actions */}
@@ -72,11 +75,20 @@ export default function PageHeader() {
           {headerActions}
         </div>
 
+        {/* Dark Mode Toggle */}
+        <button
+          onClick={toggleDarkMode}
+          className="p-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all"
+          title={isDark ? 'Lichtmodus' : 'Nachtansicht'}
+        >
+          {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
+
         {/* Refresh */}
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className={`p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all ${refreshing ? 'animate-spin' : ''}`}
+          className={`p-1.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all ${refreshing ? 'animate-spin' : ''}`}
           title="Aktualisieren"
         >
           <RefreshCw className="w-4 h-4" />
@@ -88,7 +100,7 @@ export default function PageHeader() {
         {/* User Avatar (desktop only) */}
         {user && (
           <div 
-            className="hidden lg:flex w-7 h-7 bg-gray-100 rounded-full items-center justify-center text-gray-600 text-xs font-semibold cursor-default"
+            className="hidden lg:flex w-7 h-7 bg-gray-100 dark:bg-gray-800 rounded-full items-center justify-center text-gray-600 dark:text-gray-300 text-xs font-semibold cursor-default"
             title={`${user.firstName} ${user.lastName}`}
           >
             {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}

@@ -510,7 +510,7 @@ export default function InboxPage() {
               {syncing ? 'Synchronisiere...' : 'E-Mails abrufen'}
             </button>
           </div>
-        </div>
+      </div>
 
         {/* Email List */}
         <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
@@ -588,11 +588,11 @@ export default function InboxPage() {
                 <button onClick={() => handleReply(selectedEmail)}
                   className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors">
                   <Reply className="w-4 h-4" /> Antworten
-                </button>
+                              </button>
                 <button onClick={() => handleForward(selectedEmail)}
                   className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
                   <Forward className="w-4 h-4" /> Weiterleiten
-                </button>
+                    </button>
               </div>
             </>
           ) : (

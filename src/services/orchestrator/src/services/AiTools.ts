@@ -537,6 +537,28 @@ export const CRM_TOOLS = {
     }
   },
   
+  // === TEAM CHAT TOOLS ===
+  send_team_message: {
+    name: "send_team_message",
+    description: "Sends a message to a team chat channel on behalf of Jarvis (the AI assistant). Use this when the user asks you to post something in the team chat, notify the team, or share information with colleagues. The message will be clearly marked as sent by Jarvis AI.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        channelId: { type: SchemaType.STRING, description: "ID of the channel to post in. If not provided, posts to the default channel." } as FunctionDeclarationSchema,
+        content: { type: SchemaType.STRING, description: "The message content to send. Can include @mentions in format @[Name](userId)." } as FunctionDeclarationSchema,
+      },
+      required: ["content"]
+    }
+  },
+  get_team_channels: {
+    name: "get_team_channels",
+    description: "Gets all available team chat channels for this tenant. Use this to find the right channel to post messages to.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {}
+    }
+  },
+
   // === EXPOSÉ TOOLS (non-editor) ===
   get_exposes: {
     name: "get_exposes",
@@ -983,7 +1005,7 @@ export class AiToolExecutor {
     switch (toolName) {
       // === MEMORY & CONTEXT TOOLS ===
       case 'search_chat_history': {
-        if (!userId) return { error: 'User ID required for chat history search' };
+        if (!userId) return { error: 'Kein Benutzer-Kontext verfügbar.' };
         const { query, includeArchived = true } = args;
         
         const results = await ConversationMemory.searchChatHistory(userId, query, {
@@ -1007,7 +1029,7 @@ export class AiToolExecutor {
       }
 
       case 'get_conversation_context': {
-        if (!userId) return { error: 'User ID required for context search' };
+        if (!userId) return { error: 'Kein Benutzer-Kontext verfügbar.' };
         const { topic } = args;
         
         const contexts = await ConversationMemory.getContextAroundTopic(userId, topic, 5);
@@ -1029,7 +1051,7 @@ export class AiToolExecutor {
       }
 
       case 'get_memory_summary': {
-        if (!userId) return { error: 'User ID required for memory summary' };
+        if (!userId) return { error: 'Kein Benutzer-Kontext verfügbar.' };
         
         const summary = await ConversationMemory.getLongTermMemory(userId);
 
@@ -1044,7 +1066,7 @@ export class AiToolExecutor {
       }
 
       case 'get_last_conversation': {
-        if (!userId) return { error: 'User ID required' };
+        if (!userId) return { error: 'Kein Benutzer-Kontext verfügbar.' };
         const { limit = 20 } = args;
         
         const messages = await ConversationMemory.getLastArchivedConversation(userId, limit);
@@ -1240,7 +1262,7 @@ export class AiToolExecutor {
       case 'delete_lead': {
         const { leadId } = args;
         await getPrisma().lead.delete({ where: { id: leadId } });
-        return `Lead ${leadId} wurde gelöscht.`;
+        return `Der Lead wurde gelöscht.`;
       }
 
       case 'delete_all_leads': {
@@ -1288,7 +1310,7 @@ export class AiToolExecutor {
           data: { propertyId: null }
         });
         await getPrisma().property.delete({ where: { id: propertyId } });
-        return `Objekt ${propertyId} wurde gelöscht.`;
+        return `Das Objekt wurde gelöscht.`;
       }
 
       case 'delete_all_properties': {
@@ -1332,7 +1354,7 @@ export class AiToolExecutor {
         });
         
         if (!property) {
-          return `Objekt mit ID ${propertyId} nicht gefunden.`;
+          return `Das Objekt wurde nicht gefunden.`;
         }
         
         // Add uploaded files to property
@@ -1362,7 +1384,7 @@ export class AiToolExecutor {
         });
         
         if (!lead) {
-          return `Lead mit ID ${leadId} nicht gefunden.`;
+          return `Der Lead wurde nicht gefunden.`;
         }
         
         // Build document entries
@@ -1397,7 +1419,7 @@ export class AiToolExecutor {
         });
         
         if (!property) {
-          return `Objekt mit ID ${propertyId} nicht gefunden.`;
+          return `Das Objekt wurde nicht gefunden.`;
         }
         
         return {
@@ -1418,7 +1440,7 @@ export class AiToolExecutor {
         });
         
         if (!property) {
-          return `Objekt mit ID ${propertyId} nicht gefunden.`;
+          return `Das Objekt wurde nicht gefunden.`;
         }
         
         const arrayField = isFloorplan ? 'floorplans' : 'images';
@@ -1451,7 +1473,7 @@ export class AiToolExecutor {
         });
         
         if (!property) {
-          return `Objekt mit ID ${propertyId} nicht gefunden.`;
+          return `Das Objekt wurde nicht gefunden.`;
         }
         
         const arrayField = isFloorplan ? 'floorplans' : 'images';
@@ -1474,7 +1496,7 @@ export class AiToolExecutor {
         });
         
         if (!property) {
-          return `Objekt mit ID ${propertyId} nicht gefunden.`;
+          return `Das Objekt wurde nicht gefunden.`;
         }
         
         const sourceArray = toFloorplan ? property.images : property.floorplans;
@@ -1661,7 +1683,7 @@ export class AiToolExecutor {
           where: { id: emailId, tenantId }
         });
         if (!email) {
-          return { error: "Email nicht gefunden" };
+          return { error: "Diese Email wurde nicht gefunden." };
         }
         return {
           id: email.id,
@@ -1756,7 +1778,7 @@ export class AiToolExecutor {
         }
         
         if (!settings?.gmailConfig && !settings?.smtpConfig) {
-          return { error: "Kein Email-Provider konfiguriert. Bitte Gmail oder SMTP in den Einstellungen verbinden." };
+          return { error: "Kein E-Mail-Konto verbunden. Bitte verbinde dein Postfach unter Einstellungen." };
         }
         
         // Try Gmail first
@@ -1847,7 +1869,7 @@ export class AiToolExecutor {
             };
           } catch (gmailError: any) {
             console.error('Gmail send error:', gmailError);
-            return { error: `Fehler beim Senden via Gmail: ${gmailError.message}` };
+            return { error: `Die Email konnte leider nicht gesendet werden. Versuche es nochmal.` };
           }
         }
         
@@ -1899,7 +1921,7 @@ export class AiToolExecutor {
         });
         
         if (!settings?.googleCalendarConfig && !settings?.outlookCalendarConfig) {
-          return { error: "Kein Kalender verbunden. Bitte verbinde zuerst Google Calendar oder Outlook unter Einstellungen > Kalender." };
+          return { error: "Kein Kalender verbunden. Bitte verbinde zuerst deinen Kalender unter Einstellungen." };
         }
         
         const events: any[] = [];
@@ -1922,7 +1944,7 @@ export class AiToolExecutor {
             events.push(...googleEvents);
           } catch (error: any) {
             console.error('Error fetching Google Calendar events:', error);
-            return { error: "Fehler beim Abrufen der Google Calendar Events. Möglicherweise muss der Kalender neu verbunden werden." };
+            return { error: "Die Termine konnten nicht geladen werden. Verbinde deinen Kalender ggf. neu unter Einstellungen." };
           }
         }
         
@@ -1940,7 +1962,7 @@ export class AiToolExecutor {
             events.push(...outlookEvents);
           } catch (error: any) {
             console.error('Error fetching Outlook Calendar events:', error);
-            return { error: "Fehler beim Abrufen der Outlook Calendar Events. Möglicherweise muss der Kalender neu verbunden werden." };
+            return { error: "Die Termine konnten nicht geladen werden. Verbinde deinen Kalender ggf. neu unter Einstellungen." };
           }
         }
         
@@ -1963,7 +1985,7 @@ export class AiToolExecutor {
         });
         
         if (!settings?.googleCalendarConfig && !settings?.outlookCalendarConfig) {
-          return { error: "Kein Kalender verbunden. Bitte verbinde zuerst Google Calendar oder Outlook unter Einstellungen > Kalender." };
+          return { error: "Kein Kalender verbunden. Bitte verbinde zuerst deinen Kalender unter Einstellungen." };
         }
         
         let createdEvent = null;
@@ -1987,7 +2009,7 @@ export class AiToolExecutor {
             });
           } catch (error: any) {
             console.error('Error creating Google Calendar event:', error);
-            return { error: "Fehler beim Erstellen des Termins in Google Calendar." };
+            return { error: "Der Termin konnte leider nicht erstellt werden. Versuche es nochmal." };
           }
         }
         // Create in Outlook Calendar
@@ -2008,7 +2030,7 @@ export class AiToolExecutor {
             });
           } catch (error: any) {
             console.error('Error creating Outlook Calendar event:', error);
-            return { error: "Fehler beim Erstellen des Termins in Outlook Calendar." };
+            return { error: "Der Termin konnte leider nicht erstellt werden. Versuche es nochmal." };
           }
         }
         
@@ -2024,7 +2046,7 @@ export class AiToolExecutor {
         const { eventId, title, start, end, location, description } = args;
         
         if (!eventId) {
-          return { error: "Event-ID ist erforderlich." };
+          return { error: "Bitte gib an, welchen Termin du meinst." };
         }
         
         const settings = await getPrisma().tenantSettings.findUnique({
@@ -2057,7 +2079,7 @@ export class AiToolExecutor {
             return { success: true, message: `Termin wurde erfolgreich aktualisiert.` };
           } catch (error: any) {
             console.error('Error updating Google Calendar event:', error);
-            return { error: "Fehler beim Aktualisieren des Termins in Google Calendar." };
+            return { error: "Der Termin konnte leider nicht aktualisiert werden. Versuche es nochmal." };
           }
         }
         // Update in Outlook Calendar
@@ -2079,7 +2101,7 @@ export class AiToolExecutor {
             return { success: true, message: `Termin wurde erfolgreich aktualisiert.` };
           } catch (error: any) {
             console.error('Error updating Outlook Calendar event:', error);
-            return { error: "Fehler beim Aktualisieren des Termins in Outlook Calendar." };
+            return { error: "Der Termin konnte leider nicht aktualisiert werden. Versuche es nochmal." };
           }
         }
         
@@ -2090,7 +2112,7 @@ export class AiToolExecutor {
         const { eventId } = args;
         
         if (!eventId) {
-          return { error: "Event-ID ist erforderlich." };
+          return { error: "Bitte gib an, welchen Termin du meinst." };
         }
         
         const settings = await getPrisma().tenantSettings.findUnique({
@@ -2118,7 +2140,7 @@ export class AiToolExecutor {
             return { success: true, message: `Termin wurde erfolgreich gelöscht.` };
           } catch (error: any) {
             console.error('Error deleting Google Calendar event:', error);
-            return { error: "Fehler beim Löschen des Termins aus Google Calendar." };
+            return { error: "Der Termin konnte leider nicht gelöscht werden. Versuche es nochmal." };
           }
         }
         // Delete from Outlook Calendar
@@ -2135,7 +2157,7 @@ export class AiToolExecutor {
             return { success: true, message: `Termin wurde erfolgreich gelöscht.` };
           } catch (error: any) {
             console.error('Error deleting Outlook Calendar event:', error);
-            return { error: "Fehler beim Löschen des Termins aus Outlook Calendar." };
+            return { error: "Der Termin konnte leider nicht gelöscht werden. Versuche es nochmal." };
           }
         }
         
@@ -2151,7 +2173,7 @@ export class AiToolExecutor {
         });
         
         if (!settings?.googleCalendarConfig && !settings?.outlookCalendarConfig) {
-          return { error: "Kein Kalender verbunden. Bitte verbinde zuerst Google Calendar oder Outlook unter Einstellungen > Kalender." };
+          return { error: "Kein Kalender verbunden. Bitte verbinde zuerst deinen Kalender unter Einstellungen." };
         }
         
         const events: any[] = [];
@@ -2231,12 +2253,12 @@ export class AiToolExecutor {
         const template = await getPrisma().exposeTemplate.findFirst({
           where: { id: templateId, tenantId }
         });
-        if (!template) return { error: "Template nicht gefunden" };
+        if (!template) return { error: "Die Vorlage wurde nicht gefunden." };
 
         const property = await getPrisma().property.findFirst({
           where: { id: propertyId, tenantId }
         });
-        if (!property) return { error: "Property nicht gefunden" };
+        if (!property) return { error: "Das Objekt wurde nicht gefunden." };
 
         const expose = await getPrisma().expose.create({
           data: {
@@ -2247,7 +2269,7 @@ export class AiToolExecutor {
             status: 'DRAFT'
           }
         });
-        return `Exposé erstellt (ID: ${expose.id}) für Property "${property.title}".`;
+        return `Exposé für "${property.title}" wurde erfolgreich erstellt.`;
       }
 
       case 'create_expose_template': {
@@ -2293,7 +2315,7 @@ export class AiToolExecutor {
       case 'delete_expose': {
         const { exposeId } = args;
         await getPrisma().expose.delete({ where: { id: exposeId } });
-        return `Exposé ${exposeId} wurde gelöscht.`;
+        return `Das Exposé wurde gelöscht.`;
       }
 
       case 'delete_all_exposes': {
@@ -2307,7 +2329,7 @@ export class AiToolExecutor {
 
       case 'generate_expose_pdf': {
         const { exposeId } = args;
-        return { message: `PDF-Generierung für Exposé ${exposeId} würde gestartet. Nutze /exposes/${exposeId}/pdf Endpoint.` };
+        return { message: `Die PDF-Generierung für das Exposé wurde gestartet.` };
       }
 
       // === TEAM CHAT TOOLS ===
@@ -2330,18 +2352,40 @@ export class AiToolExecutor {
         });
       }
 
-      case 'send_channel_message': {
-        const { channelId, content } = args;
-        // TODO: Get actual userId from context
-        const userId = 'jarvis-bot-id'; // Placeholder
-        const message = await getPrisma().channelMessage.create({
+      case 'send_channel_message':
+      case 'send_team_message': {
+        let { channelId, content } = args;
+        if (!userId) return 'Fehler: Kein Benutzer-Kontext verfügbar.';
+
+        // If no channelId, find default channel for this tenant
+        if (!channelId) {
+          const defaultChannel = await getPrisma().channel.findFirst({
+            where: { tenantId, isDefault: true }
+          });
+          if (!defaultChannel) {
+            return 'Kein Standard-Channel gefunden. Bitte Channel-ID angeben.';
+          }
+          channelId = defaultChannel.id;
+        }
+
+        await getPrisma().channelMessage.create({
           data: {
             channelId,
             userId,
-            content
+            content,
+            isJarvis: true
           }
         });
-        return `Nachricht gesendet in Channel ${channelId}.`;
+        return `Nachricht als Jarvis gesendet in Channel.`;
+      }
+
+      case 'get_team_channels': {
+        const channels = await getPrisma().channel.findMany({
+          where: { tenantId },
+          include: { _count: { select: { members: true, messages: true } } },
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }]
+        });
+        return channels;
       }
 
       // === DASHBOARD / STATS TOOLS ===
@@ -3261,6 +3305,6 @@ async function executeCreateProperty(args: any, tenantId: string) {
     }
   });
   
-  return `Objekt "${property.title}" wurde erfolgreich angelegt (ID: ${property.id}).`;
+  return `Objekt "${property.title}" wurde erfolgreich angelegt.`;
 }
 

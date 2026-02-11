@@ -22,14 +22,14 @@ export default function MobileBottomNav() {
   };
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 safe-bottom">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-[#111111] border-t border-gray-200 dark:border-gray-800 z-40 safe-bottom transition-colors">
       <div className="flex items-center justify-around h-14 px-1">
         {NAV_ITEMS.map((item) => (
           <Link
             key={item.name}
             href={item.href}
             className={`flex flex-col items-center justify-center flex-1 h-full gap-0.5 transition-colors ${
-              isActive(item.href) ? 'text-gray-900' : 'text-gray-400 active:text-gray-600'
+              isActive(item.href) ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-600 active:text-gray-600'
             }`}
           >
             <item.icon className={`w-5 h-5 ${isActive(item.href) ? 'stroke-[2.5]' : ''}`} />

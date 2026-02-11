@@ -400,6 +400,20 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
       await prisma.tenantSettings.create({
         data: { tenantId: newTenant.id }
       });
+
+      // Create default team chat channel with company name
+      await prisma.channel.create({
+        data: {
+          name: companyName || 'Team',
+          description: 'Standard-Channel für das gesamte Team',
+          type: 'PUBLIC',
+          isDefault: true,
+          tenantId: newTenant.id,
+          members: {
+            create: [{ userId: user.id }]
+          }
+        }
+      });
     } else {
       // Existing user - check if this is an invited user (Pending)
       const isPendingInvite = user.firstName === 'Pending' && user.lastName === 'Invite';
@@ -2886,30 +2900,79 @@ app.post('/properties/:id/generate-text', authMiddleware, async (req, res) => {
 
 // --- Team Chat ---
 
-// Create Channel
+// ========== TEAM CHAT (Encrypted, Paginated, Mentions) ==========
+
+// Helper: Ensure default channel exists for tenant
+async function ensureDefaultChannel(tenantId: string, tenantName: string) {
+  const existing = await prisma.channel.findFirst({
+    where: { tenantId, isDefault: true }
+  });
+  if (existing) return existing;
+
+  // Create default channel with all tenant users as members
+  const tenantUsers = await prisma.user.findMany({
+    where: { tenantId },
+    select: { id: true }
+  });
+
+  const channel = await prisma.channel.create({
+    data: {
+      name: tenantName,
+      description: 'Standard-Channel für das gesamte Team',
+      type: 'PUBLIC',
+      isDefault: true,
+      tenantId,
+      members: {
+        create: tenantUsers.map(u => ({ userId: u.id }))
+      }
+    }
+  });
+  return channel;
+}
+
+// Create Channel (Admin only for PUBLIC channels)
 app.post('/channels', authMiddleware, async (req, res) => {
   try {
-    const { name, type, members } = req.body; // members = array of userIds
-    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
-    
+    const { name, description, type, members } = req.body;
+    const currentUser = await prisma.user.findUnique({
+      where: { email: req.user!.email },
+      include: { tenant: true }
+    });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Channel-Name ist erforderlich' });
+    }
 
     // Only Admins can create public channels
     if (type === 'PUBLIC' && currentUser.role !== 'ADMIN' && currentUser.role !== 'SUPER_ADMIN') {
-      return res.status(403).json({ error: 'Only Admins can create public channels' });
+      return res.status(403).json({ error: 'Nur Admins können öffentliche Channels erstellen' });
+    }
+
+    // For PUBLIC channels, auto-add all tenant users
+    let memberIds: string[] = [];
+    if (type === 'PUBLIC') {
+      const allUsers = await prisma.user.findMany({
+        where: { tenantId: currentUser.tenantId },
+        select: { id: true }
+      });
+      memberIds = allUsers.map(u => u.id);
+    } else {
+      memberIds = [currentUser.id, ...(members || [])];
     }
 
     const channel = await prisma.channel.create({
       data: {
-        name,
-        type,
+        name: name.trim(),
+        description: description || null,
+        type: type || 'PUBLIC',
         tenantId: currentUser.tenantId,
         members: {
-          create: [
-            { userId: currentUser.id }, // Creator is always a member
-            ...(members || []).map((userId: string) => ({ userId }))
-          ]
+          create: [...new Set(memberIds)].map(uid => ({ userId: uid }))
         }
+      },
+      include: {
+        _count: { select: { members: true, messages: true } }
       }
     });
 
@@ -2920,13 +2983,58 @@ app.post('/channels', authMiddleware, async (req, res) => {
   }
 });
 
-// Get Channels for User
-app.get('/channels', authMiddleware, async (req, res) => {
+// Delete Channel (Admin only, cannot delete default)
+app.delete('/channels/:channelId', authMiddleware, async (req, res) => {
   try {
+    const { channelId } = req.params;
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
 
-    // Fetch public channels + private channels where user is member
+    if (currentUser.role !== 'ADMIN' && currentUser.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ error: 'Nur Admins können Channels löschen' });
+    }
+
+    const channel = await prisma.channel.findUnique({ where: { id: channelId } });
+    if (!channel || channel.tenantId !== currentUser.tenantId) {
+      return res.status(404).json({ error: 'Channel nicht gefunden' });
+    }
+    if (channel.isDefault) {
+      return res.status(400).json({ error: 'Standard-Channel kann nicht gelöscht werden' });
+    }
+
+    await prisma.channel.delete({ where: { id: channelId } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete channel error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Get Channels for User (ensures default channel exists)
+app.get('/channels', authMiddleware, async (req, res) => {
+  try {
+    const currentUser = await prisma.user.findUnique({
+      where: { email: req.user!.email },
+      include: { tenant: true }
+    });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Ensure default channel exists
+    await ensureDefaultChannel(currentUser.tenantId, currentUser.tenant.name);
+
+    // Ensure user is member of all PUBLIC channels
+    const publicChannels = await prisma.channel.findMany({
+      where: { tenantId: currentUser.tenantId, type: 'PUBLIC' },
+      select: { id: true }
+    });
+    for (const ch of publicChannels) {
+      await prisma.channelMember.upsert({
+        where: { channelId_userId: { channelId: ch.id, userId: currentUser.id } },
+        create: { channelId: ch.id, userId: currentUser.id },
+        update: {}
+      });
+    }
+
     const channels = await prisma.channel.findMany({
       where: {
         tenantId: currentUser.tenantId,
@@ -2936,10 +3044,9 @@ app.get('/channels', authMiddleware, async (req, res) => {
         ]
       },
       include: {
-        _count: {
-          select: { members: true }
-        }
-      }
+        _count: { select: { members: true, messages: true } }
+      },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }]
     });
 
     res.json(channels);
@@ -2949,44 +3056,64 @@ app.get('/channels', authMiddleware, async (req, res) => {
   }
 });
 
-// Get Messages for Channel
+// Get Messages for Channel (PAGINATED — last N, cursor-based)
 app.get('/channels/:channelId/messages', authMiddleware, async (req, res) => {
   try {
     const { channelId } = req.params;
+    const limit = Math.min(parseInt(req.query.limit as string) || 30, 100);
+    const before = req.query.before as string | undefined; // cursor: message ID
+
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
 
     // Check access
-    const membership = await prisma.channelMember.findUnique({
-      where: {
-        channelId_userId: { channelId, userId: currentUser.id }
-      }
-    });
-
     const channel = await prisma.channel.findUnique({ where: { id: channelId } });
+    if (!channel || channel.tenantId !== currentUser.tenantId) {
+      return res.status(404).json({ error: 'Channel nicht gefunden' });
+    }
 
-    if (channel?.type !== 'PUBLIC' && !membership) {
-      return res.status(403).json({ error: 'Not a member of this channel' });
+    if (channel.type !== 'PUBLIC') {
+      const membership = await prisma.channelMember.findUnique({
+        where: { channelId_userId: { channelId, userId: currentUser.id } }
+      });
+      if (!membership) return res.status(403).json({ error: 'Kein Zugriff auf diesen Channel' });
+    }
+
+    // Build cursor-based query
+    const whereClause: any = { channelId };
+    if (before) {
+      const cursorMsg = await prisma.channelMessage.findUnique({ where: { id: before } });
+      if (cursorMsg) {
+        whereClause.createdAt = { lt: cursorMsg.createdAt };
+      }
     }
 
     const messages = await prisma.channelMessage.findMany({
-      where: { channelId },
-      orderBy: { createdAt: 'asc' },
+      where: whereClause,
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1, // Fetch one extra to check if there are more
       include: {
         user: {
-          select: { id: true, firstName: true, lastName: true, email: true }
+          select: { id: true, firstName: true, lastName: true, email: true, role: true }
         }
       }
     });
 
-    res.json(messages);
+    const hasMore = messages.length > limit;
+    const result = messages.slice(0, limit).reverse(); // Return in chronological order
+
+    res.json({
+      messages: result,
+      hasMore,
+      oldestId: result.length > 0 ? result[0].id : null
+    });
   } catch (error) {
     console.error('Get messages error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
-// Send Message
+// Send Message (with mentions parsing)
 app.post('/channels/:channelId/messages', authMiddleware, async (req, res) => {
   try {
     const { channelId } = req.params;
@@ -2994,27 +3121,41 @@ app.post('/channels/:channelId/messages', authMiddleware, async (req, res) => {
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
 
-    // Check access (same logic as above)
-    const membership = await prisma.channelMember.findUnique({
-      where: {
-        channelId_userId: { channelId, userId: currentUser.id }
-      }
-    });
-    const channel = await prisma.channel.findUnique({ where: { id: channelId } });
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Nachricht darf nicht leer sein' });
+    }
 
-    if (channel?.type !== 'PUBLIC' && !membership) {
-      return res.status(403).json({ error: 'Not a member of this channel' });
+    const channel = await prisma.channel.findUnique({ where: { id: channelId } });
+    if (!channel || channel.tenantId !== currentUser.tenantId) {
+      return res.status(404).json({ error: 'Channel nicht gefunden' });
+    }
+
+    if (channel.type !== 'PUBLIC') {
+      const membership = await prisma.channelMember.findUnique({
+        where: { channelId_userId: { channelId, userId: currentUser.id } }
+      });
+      if (!membership) return res.status(403).json({ error: 'Kein Zugriff' });
+    }
+
+    // Parse @mentions from content (format: @[Name](userId))
+    const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
+    const mentions: string[] = [];
+    let match;
+    while ((match = mentionRegex.exec(content)) !== null) {
+      mentions.push(match[2]); // userId
     }
 
     const message = await prisma.channelMessage.create({
       data: {
         channelId,
         userId: currentUser.id,
-        content
+        content,
+        mentions: mentions.length > 0 ? mentions : undefined,
+        isJarvis: false
       },
       include: {
         user: {
-          select: { id: true, firstName: true, lastName: true, email: true }
+          select: { id: true, firstName: true, lastName: true, email: true, role: true }
         }
       }
     });
@@ -3022,6 +3163,77 @@ app.post('/channels/:channelId/messages', authMiddleware, async (req, res) => {
     res.json(message);
   } catch (error) {
     console.error('Send message error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Edit Message (own messages only)
+app.patch('/channels/:channelId/messages/:messageId', authMiddleware, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { content } = req.body;
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const msg = await prisma.channelMessage.findUnique({ where: { id: messageId } });
+    if (!msg || msg.userId !== currentUser.id) {
+      return res.status(403).json({ error: 'Nur eigene Nachrichten bearbeiten' });
+    }
+
+    const updated = await prisma.channelMessage.update({
+      where: { id: messageId },
+      data: { content, editedAt: new Date() },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, email: true, role: true } }
+      }
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Edit message error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Delete Message (own or admin)
+app.delete('/channels/:channelId/messages/:messageId', authMiddleware, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const msg = await prisma.channelMessage.findUnique({ where: { id: messageId } });
+    if (!msg) return res.status(404).json({ error: 'Nachricht nicht gefunden' });
+
+    if (msg.userId !== currentUser.id && currentUser.role !== 'ADMIN' && currentUser.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ error: 'Keine Berechtigung' });
+    }
+
+    await prisma.channelMessage.delete({ where: { id: messageId } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete message error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Get Channel Members
+app.get('/channels/:channelId/members', authMiddleware, async (req, res) => {
+  try {
+    const { channelId } = req.params;
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const members = await prisma.channelMember.findMany({
+      where: { channelId },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, email: true, role: true } }
+      }
+    });
+
+    res.json(members.map(m => m.user));
+  } catch (error) {
+    console.error('Get members error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });

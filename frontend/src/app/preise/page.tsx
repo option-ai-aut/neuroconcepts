@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { CheckCircle2, ArrowRight, Zap, Building2, Users } from 'lucide-react';
 import PublicNavigation from '@/components/PublicNavigation';
 import PublicFooter from '@/components/PublicFooter';
@@ -70,6 +71,7 @@ export default function PreisePage() {
       {/* Hero */}
       <section className="pt-24 sm:pt-32 pb-12 sm:pb-16 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <Image src="/logo-icon.png" alt="Immivo" width={56} height={56} className="rounded-2xl mx-auto mb-6 shadow-lg" />
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-4 sm:mb-6">
             Einfache, transparente Preise
           </h1>

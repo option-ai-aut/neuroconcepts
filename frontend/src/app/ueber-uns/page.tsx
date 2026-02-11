@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Target, Heart, Zap, Users, ArrowRight } from 'lucide-react';
 import PublicNavigation from '@/components/PublicNavigation';
 import PublicFooter from '@/components/PublicFooter';
@@ -13,6 +14,7 @@ export default function UeberUnsPage() {
       {/* Hero */}
       <section className="pt-24 sm:pt-32 pb-12 sm:pb-16 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <Image src="/logo-icon.png" alt="Immivo" width={56} height={56} className="rounded-2xl mx-auto mb-6 shadow-lg" />
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-4 sm:mb-6">
             Über Immivo
           </h1>
@@ -81,6 +83,7 @@ export default function UeberUnsPage() {
       {/* CTA */}
       <section className="py-12 sm:py-16">
         <div className="max-w-4xl mx-auto px-4 text-center">
+          <Image src="/logo-icon.png" alt="Immivo" width={48} height={48} className="rounded-xl mx-auto mb-5 shadow-md" />
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">
             Bereit, uns kennenzulernen?
           </h2>
