@@ -162,6 +162,67 @@ app.use(helmet());
 
 // Protected database migration endpoint - creates tables if they don't exist
 // This is the only way to run migrations on Aurora in a private VPC
+// Seed portals into the database (for production where seed.ts can't run)
+app.post('/admin/seed-portals', express.json({ limit: '1mb' }), async (req, res) => {
+  const secret = req.headers['x-admin-secret'];
+  if (!secret || secret !== process.env.ENCRYPTION_KEY) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const db = prisma || (await initializePrisma());
+
+    const portals = [
+      // Deutschland (13)
+      { name: 'ImmobilienScout24', slug: 'immoscout24-de', country: 'DE', websiteUrl: 'https://www.immobilienscout24.de', connectionType: 'REST_API', isPremium: true, defaultFtpHost: null },
+      { name: 'Immowelt', slug: 'immowelt', country: 'DE', websiteUrl: 'https://www.immowelt.de', connectionType: 'OPENIMMO_FTP', isPremium: false, defaultFtpHost: 'ftp2.immowelt.net' },
+      { name: 'Immonet', slug: 'immonet', country: 'DE', websiteUrl: 'https://www.immonet.de', connectionType: 'OPENIMMO_FTP', isPremium: false, defaultFtpHost: 'ftp.immonet.de' },
+      { name: 'Kleinanzeigen', slug: 'kleinanzeigen', country: 'DE', websiteUrl: 'https://www.kleinanzeigen.de', connectionType: 'OPENIMMO_FTP', isPremium: false, defaultFtpHost: null },
+      { name: 'Kalaydo', slug: 'kalaydo', country: 'DE', websiteUrl: 'https://www.kalaydo.de', connectionType: 'OPENIMMO_FTP', isPremium: false, defaultFtpHost: null },
+      { name: 'Immozentral', slug: 'immozentral', country: 'DE', websiteUrl: 'https://www.immozentral.com', connectionType: 'OPENIMMO_FTP', isPremium: false, defaultFtpHost: null },
+      { name: 'Immopool', slug: 'immopool', country: 'DE', websiteUrl: 'https://www.immopool.de', connectionType: 'OPENIMMO_FTP', isPremium: false, defaultFtpHost: null },
+      { name: '1A Immobilien', slug: '1a-immobilien', country: 'DE', websiteUrl: 'https://www.1a-immobilienmarkt.de', connectionType: 'OPENIMMO_FTP', isPremium: false, defaultFtpHost: null },
+      { name: 'IVD24', slug: 'ivd24', country: 'DE', websiteUrl: 'https://www.ivd24immobilien.de', connectionType: 'OPENIMMO_FTP', isPremium: false, defaultFtpHost: null },
+      { name: 'Neubau Kompass', slug: 'neubau-kompass', country: 'DE', websiteUrl: 'https://www.neubaukompass.de', connectionType: 'OPENIMMO_FTP', isPremium: false, defaultFtpHost: null },
+      { name: 'Süddeutsche Zeitung', slug: 'sz-immo', country: 'DE', websiteUrl: 'https://immobilienmarkt.sueddeutsche.de', connectionType: 'OPENIMMO_FTP', isPremium: false, defaultFtpHost: null },
+      { name: 'FAZ Immobilien', slug: 'faz-immo', country: 'DE', websiteUrl: 'https://fazimmo.faz.net', connectionType: 'OPENIMMO_FTP', isPremium: false, defaultFtpHost: null },
+      { name: 'Welt Immobilien', slug: 'welt-immo', country: 'DE', websiteUrl: 'https://www.welt.de/immobilien', connectionType: 'OPENIMMO_FTP', isPremium: false, defaultFtpHost: null },
+      // Österreich (5)
+      { name: 'Willhaben', slug: 'willhaben', country: 'AT', websiteUrl: 'https://www.willhaben.at', connectionType: 'OPENIMMO_FTP', isPremium: false, defaultFtpHost: null },
+      { name: 'ImmobilienScout24 AT', slug: 'immoscout24-at', country: 'AT', websiteUrl: 'https://www.immobilienscout24.at', connectionType: 'OPENIMMO_FTP', isPremium: false, defaultFtpHost: null },
+      { name: 'Immmo.at', slug: 'immmo-at', country: 'AT', websiteUrl: 'https://www.immmo.at', connectionType: 'OPENIMMO_FTP', isPremium: false, defaultFtpHost: null },
+      { name: 'FindMyHome', slug: 'findmyhome', country: 'AT', websiteUrl: 'https://www.findmyhome.at', connectionType: 'OPENIMMO_FTP', isPremium: false, defaultFtpHost: null },
+      { name: 'Der Standard Immobilien', slug: 'derstandard-immo', country: 'AT', websiteUrl: 'https://immobilien.derstandard.at', connectionType: 'OPENIMMO_FTP', isPremium: false, defaultFtpHost: null },
+      // Schweiz (6)
+      { name: 'Homegate', slug: 'homegate', country: 'CH', websiteUrl: 'https://www.homegate.ch', connectionType: 'IDX', isPremium: false, defaultFtpHost: null },
+      { name: 'ImmoScout24 CH', slug: 'immoscout24-ch', country: 'CH', websiteUrl: 'https://www.immoscout24.ch', connectionType: 'IDX', isPremium: false, defaultFtpHost: null },
+      { name: 'Comparis', slug: 'comparis', country: 'CH', websiteUrl: 'https://www.comparis.ch/immobilien', connectionType: 'IDX', isPremium: false, defaultFtpHost: null },
+      { name: 'Newhome', slug: 'newhome', country: 'CH', websiteUrl: 'https://www.newhome.ch', connectionType: 'IDX', isPremium: false, defaultFtpHost: null },
+      { name: 'ImmoStreet', slug: 'immostreet', country: 'CH', websiteUrl: 'https://www.immostreet.ch', connectionType: 'IDX', isPremium: false, defaultFtpHost: null },
+      { name: 'Flatfox', slug: 'flatfox', country: 'CH', websiteUrl: 'https://flatfox.ch', connectionType: 'REST_API', isPremium: false, defaultFtpHost: null },
+    ];
+
+    let created = 0;
+    let updated = 0;
+
+    for (const portal of portals) {
+      const existing = await db.portal.findUnique({ where: { slug: portal.slug } });
+      if (existing) {
+        await db.portal.update({ where: { slug: portal.slug }, data: portal });
+        updated++;
+      } else {
+        await db.portal.create({ data: portal });
+        created++;
+      }
+    }
+
+    res.json({ success: true, created, updated, total: portals.length });
+  } catch (error: any) {
+    console.error('Error seeding portals:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/admin/db-migrate', express.json({ limit: '1mb' }), async (req, res) => {
   const secret = req.headers['x-admin-secret'];
   if (!secret || secret !== process.env.ENCRYPTION_KEY) {
