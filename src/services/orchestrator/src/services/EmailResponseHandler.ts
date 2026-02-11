@@ -10,10 +10,14 @@ import OpenAI from 'openai';
 
 const prisma = new PrismaClient();
 
-// Simple OpenAI client for email analysis
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// Lazy-init to avoid crash before secrets are loaded
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
+  }
+  return _openai;
+}
 
 // Intent types for email responses
 export type EmailIntent = 'INTERESTED' | 'QUESTION' | 'NOT_INTERESTED' | 'UNCLEAR';
@@ -185,7 +189,7 @@ Antworte im folgenden JSON-Format:
 }`;
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: 'Du bist ein präziser E-Mail-Analyse-Assistent. Antworte nur mit validem JSON.' },

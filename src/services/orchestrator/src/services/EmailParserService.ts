@@ -7,9 +7,14 @@
 
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-});
+// Lazy-init to avoid crash before secrets are loaded
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
+  }
+  return _openai;
+}
 
 export interface ParsedLeadData {
   firstName?: string;
@@ -112,7 +117,7 @@ Inhalt:
 ${content}
 `.trim();
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: PARSE_PROMPT },
