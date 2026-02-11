@@ -427,7 +427,7 @@ export default function LandingPage() {
             <div>
               <div className="inline-flex items-center px-3 sm:px-4 py-2 rounded-full bg-white/10 text-indigo-300 text-xs sm:text-sm font-medium mb-4 sm:mb-6 border border-white/10">
                 <Brain className="w-4 h-4 mr-2" />
-                Powered by Google Gemini 3
+                Powered by OpenAI GPT-5
               </div>
               
               <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6 leading-tight">

@@ -1,5 +1,22 @@
 import { PrismaClient } from '@prisma/client';
-import { SchemaType, FunctionDeclarationSchema } from '@google/generative-ai';
+
+// Local schema type definitions (replaces @google/generative-ai dependency)
+enum SchemaType {
+  STRING = 'STRING',
+  NUMBER = 'NUMBER',
+  INTEGER = 'INTEGER',
+  BOOLEAN = 'BOOLEAN',
+  ARRAY = 'ARRAY',
+  OBJECT = 'OBJECT',
+}
+type FunctionDeclarationSchema = {
+  type: SchemaType;
+  description?: string;
+  items?: FunctionDeclarationSchema;
+  properties?: Record<string, FunctionDeclarationSchema>;
+  required?: string[];
+  enum?: string[];
+};
 import { randomUUID } from 'crypto';
 import { ConversationMemory } from './ConversationMemory';
 import { CalendarService } from './CalendarService';

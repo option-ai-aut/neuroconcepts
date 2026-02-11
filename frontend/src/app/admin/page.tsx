@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 export default function AdminPage() {
   // TODO: Fetch from API (protected by SUPER_ADMIN role)
-  const [model, setModel] = useState('gemini-1.5-flash');
+  const [model, setModel] = useState('gpt-5-mini');
   const [apiKey, setApiKey] = useState('');
 
   const handleSave = () => {
@@ -30,10 +30,10 @@ export default function AdminPage() {
               value={model}
               onChange={(e) => setModel(e.target.value)}
             >
-              <option value="gemini-1.5-flash">Gemini 1.5 Flash (Standard)</option>
-              <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-              <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
-              <option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
+              <option value="gpt-5-mini">GPT-5 Mini (Standard)</option>
+              <option value="gpt-5">GPT-5</option>
+              <option value="gpt-4o">GPT-4o</option>
+              <option value="gpt-4o-mini">GPT-4o Mini</option>
             </select>
           </div>
           

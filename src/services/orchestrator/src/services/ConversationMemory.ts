@@ -1,9 +1,12 @@
 import { PrismaClient, MessageRole } from '@prisma/client';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 
 // Prisma client will be injected from index.ts
 let prisma: PrismaClient;
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '');
+
+// Use OpenAI GPT-5-mini for all AI operations
+const getOpenAI = () => new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
+const MODEL = 'gpt-5-mini';
 
 export function setPrismaClient(client: PrismaClient) {
   prisma = client;
@@ -105,11 +108,11 @@ export class ConversationMemory {
 
   /**
    * Generate a concise summary of conversation history
-   * Has a timeout to prevent hanging if Gemini is slow
+   * Has a timeout to prevent hanging if the AI API is slow
    */
   private static async generateSummary(messages: Message[]): Promise<string> {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const openai = getOpenAI();
       
       // Only use last 100 messages for summary to avoid token limits
       const relevantMessages = messages.slice(-100);
@@ -117,25 +120,21 @@ export class ConversationMemory {
         .map(m => `${m.role}: ${m.content.substring(0, 500)}`) // Truncate long messages
         .join('\n');
 
-      const prompt = `Fasse diese Konversation zwischen einem User und Jarvis (KI-Assistent für Immobilien-CRM) zusammen.
-Fokussiere auf:
-- Wichtige Informationen (Namen, Objekte, Präferenzen)
-- Offene Aufgaben oder Fragen
-- Kontext der benötigt wird um das Gespräch fortzusetzen
-
-Sei sehr präzise und kurz (max. 200 Wörter).
-
-Konversation:
-${conversationText}
-
-Zusammenfassung:`;
-
       // Timeout after 15 seconds to prevent hanging
       const timeoutPromise = new Promise<string>((_, reject) => 
         setTimeout(() => reject(new Error('Summary generation timed out')), 15000)
       );
       
-      const resultPromise = model.generateContent(prompt).then(r => r.response.text());
+      const resultPromise = openai.chat.completions.create({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: 'Du bist ein Zusammenfassungs-Assistent für ein Immobilien-CRM. Sei präzise und kurz (max. 200 Wörter).' },
+          { role: 'user', content: `Fasse diese Konversation zusammen. Fokussiere auf: Wichtige Informationen (Namen, Objekte, Präferenzen), offene Aufgaben, und Kontext für die Fortsetzung.\n\n${conversationText}` }
+        ],
+        max_tokens: 500,
+        temperature: 0.3,
+      }).then(r => r.choices[0]?.message?.content || '');
+      
       return await Promise.race([resultPromise, timeoutPromise]);
     } catch (error) {
       console.error('❌ Summary generation failed, using fallback:', error);
@@ -181,7 +180,7 @@ Zusammenfassung:`;
   /**
    * @deprecated Use formatForOpenAI instead
    */
-  static formatForGemini(recentMessages: Message[], summary: string | null): any[] {
+  static formatForAI(recentMessages: Message[], summary: string | null): any[] {
     return this.formatForOpenAI(recentMessages, summary);
   }
 
@@ -382,34 +381,30 @@ Zusammenfassung:`;
     // Generate updated summary with timeout
     let newSummary: string;
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const openai = getOpenAI();
       
       const conversationText = recentMessages
         .reverse()
         .map(m => `${m.role}: ${m.content.substring(0, 500)}`) // Truncate long messages
         .join('\n');
 
-      const prompt = `Du bist ein Gedächtnis-Assistent. Aktualisiere die Langzeit-Zusammenfassung basierend auf neuen Gesprächen.
-
-${currentSummary ? `BISHERIGE ZUSAMMENFASSUNG:\n${currentSummary}\n\n` : ''}NEUE GESPRÄCHE:
-${conversationText}
-
-Erstelle eine aktualisierte Zusammenfassung die enthält:
-- Wichtige Fakten über den User (Präferenzen, häufige Anfragen)
-- Wiederkehrende Themen und Muster
-- Wichtige Objekte, Leads oder Kontakte die erwähnt wurden
-- Offene Aufgaben oder Wünsche
-
-Sei präzise und strukturiert (max. 300 Wörter). Behalte wichtige Informationen aus der bisherigen Zusammenfassung bei.
-
-AKTUALISIERTE ZUSAMMENFASSUNG:`;
+      const userContent = `${currentSummary ? `BISHERIGE ZUSAMMENFASSUNG:\n${currentSummary}\n\n` : ''}NEUE GESPRÄCHE:\n${conversationText}\n\nErstelle eine aktualisierte Zusammenfassung die enthält:\n- Wichtige Fakten über den User (Präferenzen, häufige Anfragen)\n- Wiederkehrende Themen und Muster\n- Wichtige Objekte, Leads oder Kontakte die erwähnt wurden\n- Offene Aufgaben oder Wünsche\n\nSei präzise und strukturiert (max. 300 Wörter). Behalte wichtige Informationen aus der bisherigen Zusammenfassung bei.`;
 
       // Timeout after 20 seconds
       const timeoutPromise = new Promise<string>((_, reject) => 
         setTimeout(() => reject(new Error('Long-term memory update timed out')), 20000)
       );
       
-      const resultPromise = model.generateContent(prompt).then(r => r.response.text());
+      const resultPromise = openai.chat.completions.create({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: 'Du bist ein Gedächtnis-Assistent für ein Immobilien-CRM. Aktualisiere die Langzeit-Zusammenfassung basierend auf neuen Gesprächen.' },
+          { role: 'user', content: userContent }
+        ],
+        max_tokens: 700,
+        temperature: 0.3,
+      }).then(r => r.choices[0]?.message?.content || '');
+      
       newSummary = await Promise.race([resultPromise, timeoutPromise]);
     } catch (error) {
       console.error('❌ Long-term memory update failed:', error);

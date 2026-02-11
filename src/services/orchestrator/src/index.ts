@@ -57,7 +57,6 @@ async function loadAppSecrets() {
         const keysToLoad = [
           'DATABASE_URL',
           'OPENAI_API_KEY',
-          'GEMINI_API_KEY',
           'ENCRYPTION_KEY',
           'FRONTEND_URL',
           'GOOGLE_CALENDAR_CLIENT_ID',
@@ -303,7 +302,7 @@ app.use(cors({
 }));
 
 app.use(morgan('combined'));
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 
 // Multer setup for file uploads
 // In Lambda, use /tmp (the only writable directory)
@@ -2606,13 +2605,19 @@ Die Signatur sollte:
 
 Antworte NUR mit dem HTML-Code, ohne Erklärungen.`;
 
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const OpenAILib = require('openai');
+    const openaiClient = new OpenAILib.default({ apiKey: process.env.OPENAI_API_KEY });
     
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    let signature = response.text();
+    const result = await openaiClient.chat.completions.create({
+      model: 'gpt-5-mini',
+      messages: [
+        { role: 'system', content: 'Du generierst professionelle HTML-E-Mail-Signaturen. Antworte NUR mit dem HTML-Code, ohne Erklärungen.' },
+        { role: 'user', content: prompt }
+      ],
+      max_tokens: 1000,
+      temperature: 0.5,
+    });
+    let signature = result.choices[0]?.message?.content || '';
     
     // Clean up response
     signature = signature.replace(/```html\n?/g, '').replace(/```\n?/g, '').trim();
@@ -2796,8 +2801,8 @@ app.post('/exposes/:id/chat',
       });
       if (!expose) return res.status(404).json({ error: 'Exposé not found' });
 
-      const gemini = new OpenAIService();
-      const result = await gemini.exposeChat(message, currentUser.tenantId, exposeId, null, expose.blocks as any[], history || []);
+      const aiService = new OpenAIService();
+      const result = await aiService.exposeChat(message, currentUser.tenantId, exposeId, null, expose.blocks as any[], history || []);
       
       // Sanitize response
       const sanitizedResponse = wrapAiResponse(result.text);
@@ -2833,8 +2838,8 @@ app.post('/templates/:id/chat',
       });
       if (!template) return res.status(404).json({ error: 'Template not found' });
 
-      const gemini = new OpenAIService();
-      const result = await gemini.exposeChat(message, currentUser.tenantId, null, templateId, template.blocks as any[], history || []);
+      const aiService = new OpenAIService();
+      const result = await aiService.exposeChat(message, currentUser.tenantId, null, templateId, template.blocks as any[], history || []);
       
       // Sanitize response
       const sanitizedResponse = wrapAiResponse(result.text);
@@ -2865,8 +2870,8 @@ app.post('/properties/:id/generate-text', authMiddleware, async (req, res) => {
     });
     if (!property) return res.status(404).json({ error: 'Property not found' });
 
-    const gemini = new OpenAIService();
-    const result = await gemini.generatePropertyText(propertyId, textType || 'description', currentUser.tenantId, {
+    const aiService = new OpenAIService();
+    const result = await aiService.generatePropertyText(propertyId, textType || 'description', currentUser.tenantId, {
       tone: tone || 'professional',
       maxLength: maxLength || 500
     });
@@ -4697,8 +4702,8 @@ app.get('/email/status', authMiddleware, async (req, res) => {
 
 // --- AI Image Editing (Virtual Staging) ---
 
-// POST /ai/image-edit - Edit image with Gemini 3 Pro Image
-app.post('/ai/image-edit', authMiddleware, async (req, res) => {
+// POST /ai/image-edit - Edit image with OpenAI GPT-Image
+app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, async (req, res) => {
   try {
     const { image, prompt, style, roomType } = req.body;
     
@@ -4711,7 +4716,7 @@ app.post('/ai/image-edit', authMiddleware, async (req, res) => {
 
     // Extract base64 data from data URL if needed
     let imageData = image;
-    let mimeType = 'image/jpeg';
+    let mimeType = 'image/png';
     
     if (image.startsWith('data:')) {
       const matches = image.match(/^data:([^;]+);base64,(.+)$/);
@@ -4721,18 +4726,8 @@ app.post('/ai/image-edit', authMiddleware, async (req, res) => {
       }
     }
 
-    // Call Gemini 3 Pro Image API
-    const { GoogleGenerativeAI } = await import('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    
-    // Use gemini-3-pro-image-preview model for image editing
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-3-pro-image-preview',
-      generationConfig: {
-        // @ts-ignore - responseModalities is valid for image models
-        responseModalities: ['TEXT', 'IMAGE']
-      }
-    });
+    // Convert base64 to buffer for OpenAI
+    const imageBuffer = Buffer.from(imageData, 'base64');
 
     // Create the prompt for virtual staging
     const stagingPrompt = `You are an expert interior designer and virtual staging specialist. 
@@ -4749,26 +4744,34 @@ Important guidelines:
 - The furniture should match the ${style} aesthetic perfectly
 - Ensure the final image looks natural and inviting`;
 
-    const result = await model.generateContent([
-      stagingPrompt,
-      {
-        inlineData: {
-          mimeType,
-          data: imageData
-        }
-      }
-    ]);
+    // Use OpenAI image editing API (gpt-image-1)
+    const OpenAILib = require('openai');
+    const openaiClient = new OpenAILib.default({ apiKey: process.env.OPENAI_API_KEY });
+    const { toFile } = require('openai');
+    
+    const inputFile = await toFile(imageBuffer, 'input.png', { type: mimeType });
 
-    const response = result.response;
+    const result = await openaiClient.images.edit({
+      model: 'gpt-image-1',
+      image: inputFile,
+      prompt: stagingPrompt,
+      size: '1024x1024',
+    });
+
+    // Get the generated image
+    const imageB64 = result.data?.[0]?.b64_json;
+    const imageUrl = result.data?.[0]?.url;
     
-    // Extract the generated image from the response
-    let generatedImage = null;
+    let generatedImage: string | null = null;
     
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        generatedImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-        break;
-      }
+    if (imageB64) {
+      generatedImage = `data:image/png;base64,${imageB64}`;
+    } else if (imageUrl) {
+      // Fetch the image from URL and convert to base64 (native fetch in Node 18+)
+      const imgResponse = await fetch(imageUrl);
+      const imgArrayBuffer = await imgResponse.arrayBuffer();
+      const imgBase64 = Buffer.from(imgArrayBuffer).toString('base64');
+      generatedImage = `data:image/png;base64,${imgBase64}`;
     }
 
     if (!generatedImage) {

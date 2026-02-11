@@ -39,16 +39,28 @@ export default function LoginPage() {
 
   const [checkingSession, setCheckingSession] = useState(true);
   const [view, setView] = useState<AuthView>('signIn');
+
+  // Helper: get redirect target from URL params
+  const getRedirectTarget = () => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('redirect') || '/dashboard';
+    }
+    return '/dashboard';
+  };
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Check if already authenticated - redirect to dashboard
+  // Check if already authenticated - redirect to dashboard or original URL
   useEffect(() => {
     const checkExisting = async () => {
       try {
         const session = await fetchAuthSession();
         if (session.tokens?.idToken) {
-          router.replace('/dashboard');
+          // Redirect to original page if provided, otherwise dashboard
+          const params = new URLSearchParams(window.location.search);
+          const redirectTo = params.get('redirect') || '/dashboard';
+          router.replace(redirectTo);
           return;
         }
       } catch {
@@ -90,7 +102,7 @@ export default function LoginPage() {
       try {
         const session = await fetchAuthSession();
         if (session.tokens) {
-          router.push('/dashboard');
+          router.push(getRedirectTarget());
         }
       } catch {
         // Not authenticated
@@ -120,7 +132,7 @@ export default function LoginPage() {
       if (syncResult.needsOnboarding) {
         setView('onboarding');
       } else {
-        router.push('/dashboard');
+        router.push(getRedirectTarget());
       }
     } catch (err: any) {
       if (err.name === 'UserNotConfirmedException') {
@@ -188,7 +200,7 @@ export default function LoginPage() {
         })
       });
       
-      router.push('/dashboard');
+      router.push(getRedirectTarget());
     } catch (err: any) {
       setError(err.message || 'Fehler beim Setzen des Passworts');
     } finally {
@@ -227,7 +239,7 @@ export default function LoginPage() {
         throw new Error('Profil konnte nicht aktualisiert werden');
       }
       
-      router.push('/dashboard');
+      router.push(getRedirectTarget());
     } catch (err: any) {
       setError(err.message || 'Fehler beim Speichern');
     } finally {
@@ -290,7 +302,7 @@ export default function LoginPage() {
       // Auto sign in after confirmation
       await signIn({ username: email, password });
       await syncUser();
-      router.push('/dashboard');
+      router.push(getRedirectTarget());
     } catch (err: any) {
       setError(err.message || 'Bestätigung fehlgeschlagen');
     } finally {
