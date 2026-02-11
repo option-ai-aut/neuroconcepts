@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { fetchAuthSession, signOut } from 'aws-amplify/auth';
+import { Amplify } from 'aws-amplify';
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
+import { useRuntimeConfig } from '@/components/RuntimeConfigProvider';
 
 function AdminSidebar() {
   const pathname = usePathname();
@@ -39,7 +41,10 @@ function AdminSidebar() {
       </div>
       <div className="p-4 border-t border-gray-800">
         <button
-          onClick={() => signOut()}
+          onClick={async () => {
+            await signOut();
+            window.location.href = '/admin/login';
+          }}
           className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-900 hover:bg-red-800 focus:outline-none"
         >
           Logout
@@ -55,31 +60,64 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const config = useRuntimeConfig();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
+  // Configure Amplify with Admin User Pool
   useEffect(() => {
+    if (config.adminUserPoolId && config.adminUserPoolClientId) {
+      Amplify.configure({
+        Auth: {
+          Cognito: {
+            userPoolId: config.adminUserPoolId,
+            userPoolClientId: config.adminUserPoolClientId,
+          }
+        }
+      });
+    }
+  }, [config]);
+
+  // Skip auth check on the login page itself
+  const isLoginPage = pathname === '/admin/login';
+
+  useEffect(() => {
+    if (isLoginPage) {
+      setIsAuthenticated(true); // Let login page render without redirect
+      return;
+    }
+
     const checkAuth = async () => {
       try {
         const session = await fetchAuthSession();
         if (session.tokens) {
           setIsAuthenticated(true);
         } else {
-          router.replace('/login');
+          router.replace('/admin/login');
         }
       } catch {
-        router.replace('/login');
+        router.replace('/admin/login');
       }
     };
-    checkAuth();
-  }, [router]);
+
+    // Wait for Amplify to be configured
+    if (config.adminUserPoolId) {
+      checkAuth();
+    }
+  }, [router, config, isLoginPage]);
+
+  // Login page - render without sidebar
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
 
   // Loading state
   if (isAuthenticated === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
-          <p className="mt-4 text-gray-600">Wird geladen...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-red-500 mx-auto" />
+          <p className="mt-4 text-gray-400">Wird geladen...</p>
         </div>
       </div>
     );

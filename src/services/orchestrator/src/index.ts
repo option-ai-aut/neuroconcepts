@@ -17,7 +17,7 @@ import { encryptionService } from './services/EncryptionService';
 import { ConversationMemory, setPrismaClient as setConversationPrisma } from './services/ConversationMemory';
 import { CalendarService } from './services/CalendarService';
 import { setPrismaClient as setAiToolsPrisma } from './services/AiTools';
-import { authMiddleware } from './middleware/auth';
+import { authMiddleware, adminAuthMiddleware } from './middleware/auth';
 import { AiSafetyMiddleware, wrapAiResponse } from './middleware/aiSafety';
 import * as AWS from 'aws-sdk';
 import multer from 'multer';

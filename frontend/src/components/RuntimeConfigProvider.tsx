@@ -6,6 +6,8 @@ interface RuntimeConfig {
   apiUrl: string;
   userPoolId: string;
   userPoolClientId: string;
+  adminUserPoolId: string;
+  adminUserPoolClientId: string;
   awsRegion: string;
 }
 
@@ -101,6 +103,8 @@ export function getRuntimeConfig(): RuntimeConfig {
     apiUrl: '',
     userPoolId: '',
     userPoolClientId: '',
+    adminUserPoolId: '',
+    adminUserPoolClientId: '',
     awsRegion: 'eu-central-1',
   };
 }

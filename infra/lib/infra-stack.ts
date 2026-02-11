@@ -24,6 +24,8 @@ export class ImmivoStack extends cdk.Stack {
   public readonly dbEndpoint: string;
   public readonly userPool: cognito.UserPool;
   public readonly userPoolClient: cognito.UserPoolClient;
+  public readonly adminUserPool: cognito.UserPool;
+  public readonly adminUserPoolClient: cognito.UserPoolClient;
 
   constructor(scope: Construct, id: string, props: ImmivoStackProps) {
     super(scope, id, props);
@@ -140,6 +142,37 @@ export class ImmivoStack extends cdk.Stack {
       },
     });
 
+    // --- 3b. Admin Authentication (Separate Cognito User Pool) ---
+    // Completely separate from Makler accounts - no self-sign-up
+    this.adminUserPool = new cognito.UserPool(this, 'ImmivoAdminUserPool', {
+      userPoolName: `Immivo-Admins-${props.stageName}`,
+      selfSignUpEnabled: false, // Only manually created admin accounts
+      signInAliases: { email: true },
+      autoVerify: { email: true },
+      passwordPolicy: {
+        minLength: 12,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireDigits: true,
+        requireSymbols: true,
+      },
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      standardAttributes: {
+        givenName: { required: true, mutable: true },
+        familyName: { required: true, mutable: true },
+      },
+      removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
+    });
+
+    this.adminUserPoolClient = this.adminUserPool.addClient('ImmivoAdminClient', {
+      userPoolClientName: `Immivo-Admin-Client-${props.stageName}`,
+      generateSecret: false,
+      authFlows: {
+        userSrp: true,
+        adminUserPassword: true, // Allow admin-created users to set password on first login
+      },
+    });
+
     // --- 4. Orchestrator Service (Lambda + API Gateway) ---
     
     const lambdaVpc = props.stageName === 'dev' ? undefined : this.vpc;
@@ -172,6 +205,8 @@ export class ImmivoStack extends cdk.Stack {
         DB_ENDPOINT: this.dbEndpoint,
         USER_POOL_ID: this.userPool.userPoolId,
         CLIENT_ID: this.userPoolClient.userPoolClientId,
+        ADMIN_USER_POOL_ID: this.adminUserPool.userPoolId,
+        ADMIN_CLIENT_ID: this.adminUserPoolClient.userPoolClientId,
         APP_SECRET_ARN: appSecret.secretArn,
       },
       bundling: { 
@@ -261,6 +296,8 @@ export class ImmivoStack extends cdk.Stack {
         RUNTIME_API_URL: api.url,
         RUNTIME_USER_POOL_ID: this.userPool.userPoolId,
         RUNTIME_USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
+        RUNTIME_ADMIN_USER_POOL_ID: this.adminUserPool.userPoolId,
+        RUNTIME_ADMIN_USER_POOL_CLIENT_ID: this.adminUserPoolClient.userPoolClientId,
         RUNTIME_AWS_REGION: this.region,
         // Keep NEXT_PUBLIC_ for backwards compatibility (baked in at build time)
         NEXT_PUBLIC_API_URL: api.url,
@@ -289,5 +326,7 @@ export class ImmivoStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'FrontendUrl', { value: frontendUrl.url });
     new cdk.CfnOutput(this, 'UserPoolId', { value: this.userPool.userPoolId });
     new cdk.CfnOutput(this, 'UserPoolClientId', { value: this.userPoolClient.userPoolClientId });
+    new cdk.CfnOutput(this, 'AdminUserPoolId', { value: this.adminUserPool.userPoolId });
+    new cdk.CfnOutput(this, 'AdminUserPoolClientId', { value: this.adminUserPoolClient.userPoolClientId });
   }
 }

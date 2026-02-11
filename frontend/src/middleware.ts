@@ -36,10 +36,14 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // On admin.immivo.ai: redirect to /admin if on root
+  // On admin.immivo.ai: redirect to /admin/login if on root, block non-admin paths
   if (isAdminDomain) {
     if (pathname === '/') {
-      return NextResponse.redirect(new URL('/admin', request.url));
+      return NextResponse.redirect(new URL('/admin/login', request.url));
+    }
+    // Only allow /admin/* paths on admin domain
+    if (!pathname.startsWith('/admin')) {
+      return NextResponse.redirect(new URL('/admin/login', request.url));
     }
   }
 
