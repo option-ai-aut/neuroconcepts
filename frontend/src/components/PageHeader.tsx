@@ -1,14 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { 
   LayoutDashboard, Users, Inbox, Calendar, FileText, 
-  MessageSquare, Wand2, Activity, Settings, RefreshCw 
+  MessageSquare, Wand2, Activity, Settings
 } from 'lucide-react';
 import NotificationBell from '@/components/NotificationBell';
 import { useGlobalState } from '@/context/GlobalStateContext';
-import { useSWRConfig } from 'swr';
 import useSWR from 'swr';
 import { getMe } from '@/lib/api';
 
@@ -40,20 +38,9 @@ function getPageInfo(pathname: string) {
 
 export default function PageHeader() {
   const pathname = usePathname();
-  const router = useRouter();
-  const { mutate } = useSWRConfig();
   const { data: user } = useSWR('/me', getMe);
   const { headerActions } = useGlobalState();
   const { title, icon: Icon } = getPageInfo(pathname);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    // Revalidate all SWR caches and refresh the route
-    await mutate(() => true, undefined, { revalidate: true });
-    router.refresh();
-    setTimeout(() => setRefreshing(false), 600);
-  };
 
   return (
     <div className="h-12 px-6 flex items-center justify-between bg-white border-b border-gray-100 shrink-0 z-10">
@@ -67,16 +54,6 @@ export default function PageHeader() {
       <div className="flex items-center gap-2">
         {/* Page-specific actions injected by child pages */}
         {headerActions}
-
-        {/* Refresh */}
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className={`p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all ${refreshing ? 'animate-spin' : ''}`}
-          title="Aktualisieren"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </button>
 
         {/* Notifications */}
         <NotificationBell />
