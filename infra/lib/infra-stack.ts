@@ -15,7 +15,7 @@ import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as path from 'path';
 
 export interface ImmivoStackProps extends cdk.StackProps {
-  stageName: 'dev' | 'stage' | 'prod';
+  stageName: 'dev' | 'test' | 'prod';
 }
 
 export class ImmivoStack extends cdk.Stack {
@@ -76,7 +76,7 @@ export class ImmivoStack extends cdk.Stack {
       dbSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(5432), 'Allow public access to DB in Dev');
     }
 
-    if (props.stageName === 'dev' || props.stageName === 'stage') {
+    if (props.stageName === 'dev' || props.stageName === 'test') {
       const instance = new rds.DatabaseInstance(this, 'PostgresInstance', {
         engine: rds.DatabaseInstanceEngine.postgres({ version: rds.PostgresEngineVersion.VER_16 }),
         vpc: this.vpc,

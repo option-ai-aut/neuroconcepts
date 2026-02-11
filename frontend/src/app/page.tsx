@@ -491,53 +491,50 @@ export default function LandingPage() {
                   <Bot className="w-20 h-20 text-white" />
                 </div>
                 
-                {/* Orbiting Capabilities */}
+                {/* Orbiting Capabilities - pre-calculated positions to avoid hydration mismatch */}
                 {[
-                  { icon: Mail, label: 'E-Mails', angle: 0 },
-                  { icon: Calendar, label: 'Termine', angle: 60 },
-                  { icon: FileText, label: 'Exposés', angle: 120 },
-                  { icon: Users, label: 'Leads', angle: 180 },
-                  { icon: Building2, label: 'Objekte', angle: 240 },
-                  { icon: MessageSquare, label: 'Chat', angle: 300 },
-                ].map((item, i) => {
-                  const radius = 140;
-                  const x = Math.cos((item.angle * Math.PI) / 180) * radius;
-                  const y = Math.sin((item.angle * Math.PI) / 180) * radius;
-                  return (
-                    <div
-                      key={i}
-                      className="absolute w-16 h-16 bg-white/10 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center border border-white/20 hover:bg-white/20 transition-all cursor-pointer group"
-                      style={{ 
-                        transform: `translate(${x}px, ${y}px)`,
-                        animation: `float ${3 + i * 0.5}s ease-in-out infinite`,
-                        animationDelay: `${i * 0.3}s`
-                      }}
-                    >
-                      <item.icon className="w-6 h-6 text-white mb-1 group-hover:scale-110 transition-transform" />
-                      <span className="text-[10px] text-gray-300">{item.label}</span>
-                    </div>
-                  );
-                })}
+                  { icon: Mail, label: 'E-Mails', x: 140, y: 0 },
+                  { icon: Calendar, label: 'Termine', x: 70, y: 121 },
+                  { icon: FileText, label: 'Exposés', x: -70, y: 121 },
+                  { icon: Users, label: 'Leads', x: -140, y: 0 },
+                  { icon: Building2, label: 'Objekte', x: -70, y: -121 },
+                  { icon: MessageSquare, label: 'Chat', x: 70, y: -121 },
+                ].map((item, i) => (
+                  <div
+                    key={i}
+                    className={`absolute w-16 h-16 bg-white/10 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center border border-white/20 hover:bg-white/20 transition-all cursor-pointer group animate-float`}
+                    style={{ 
+                      transform: `translate(${item.x}px, ${item.y}px)`,
+                      animationDuration: `${3 + i * 0.5}s`,
+                      animationDelay: `${i * 0.3}s`,
+                    }}
+                  >
+                    <item.icon className="w-6 h-6 text-white mb-1 group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] text-gray-300">{item.label}</span>
+                  </div>
+                ))}
 
                 {/* Connection Lines */}
                 <svg className="absolute inset-0 w-full h-full" style={{ transform: 'translate(50%, 50%)' }}>
-                  {[0, 60, 120, 180, 240, 300].map((angle, i) => {
-                    const radius = 140;
-                    const x = Math.cos((angle * Math.PI) / 180) * radius;
-                    const y = Math.sin((angle * Math.PI) / 180) * radius;
-                    return (
-                      <line
-                        key={i}
-                        x1="0"
-                        y1="0"
-                        x2={x}
-                        y2={y}
-                        stroke="rgba(255,255,255,0.1)"
-                        strokeWidth="1"
-                        strokeDasharray="4 4"
-                      />
-                    );
-                  })}
+                  {[
+                    { x: 140, y: 0 },
+                    { x: 70, y: 121 },
+                    { x: -70, y: 121 },
+                    { x: -140, y: 0 },
+                    { x: -70, y: -121 },
+                    { x: 70, y: -121 },
+                  ].map((pos, i) => (
+                    <line
+                      key={i}
+                      x1="0"
+                      y1="0"
+                      x2={pos.x}
+                      y2={pos.y}
+                      stroke="rgba(255,255,255,0.1)"
+                      strokeWidth="1"
+                      strokeDasharray="4 4"
+                    />
+                  ))}
                 </svg>
               </div>
             </div>

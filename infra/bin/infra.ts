@@ -17,11 +17,11 @@ new ImmivoStack(app, 'Immivo-Dev', {
   description: 'Development environment for Immivo AI',
 });
 
-// 2. Stage Environment (Pre-production mirror)
-new ImmivoStack(app, 'Immivo-Stage', {
+// 2. Test Environment (Pre-production testing)
+new ImmivoStack(app, 'Immivo-Test', {
   env: defaultEnv,
-  stageName: 'stage',
-  description: 'Staging environment for final testing',
+  stageName: 'test',
+  description: 'Testing environment for QA',
 });
 
 // 3. Prod Environment (Live)

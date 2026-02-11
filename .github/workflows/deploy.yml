@@ -3,17 +3,19 @@ name: Deploy to AWS
 on:
   push:
     branches:
+      - dev
+      - test
       - main
   workflow_dispatch:
     inputs:
       environment:
         description: 'Environment to deploy'
         required: true
-        default: 'stage'
+        default: 'dev'
         type: choice
         options:
           - dev
-          - stage
+          - test
           - prod
 
 jobs:
@@ -46,25 +48,47 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-central-1
 
-      # 1. AUTOMATIC: Deploy to Dev on Push
-      - name: Deploy to Dev (Automatic)
+      # ========================================
+      # AUTOMATIC: Branch-based deployment
+      # dev branch    -> Immivo-Dev
+      # test branch   -> Immivo-Test
+      # main branch   -> Immivo-Prod
+      # ========================================
+
+      - name: Deploy to Dev (dev branch)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        run: |
+          cd infra
+          echo "Deploying to Immivo-Dev..."
+          npx cdk deploy Immivo-Dev --require-approval never
+
+      - name: Deploy to Test (test branch)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/test'
+        run: |
+          cd infra
+          echo "Deploying to Immivo-Test..."
+          npx cdk deploy Immivo-Test --require-approval never
+
+      - name: Deploy to Prod (main branch)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           cd infra
-          echo "🚀 Auto-deploying to Immivo-Dev..."
-          npx cdk deploy Immivo-Dev --require-approval never
+          echo "Deploying to Immivo-Prod..."
+          npx cdk deploy Immivo-Prod --require-approval never
 
-      # 2. MANUAL: Deploy to Selected Environment
+      # ========================================
+      # MANUAL: Deploy to selected environment
+      # ========================================
+
       - name: Deploy to Selected Environment (Manual)
         if: github.event_name == 'workflow_dispatch'
         run: |
           cd infra
           ENV_NAME="${{ inputs.environment }}"
           
-          # Convert input (dev/stage/prod) to Stack Name (Immivo-Dev/Stage/Prod)
-          # Capitalize first letter: dev -> Dev
+          # Map input to stack name: dev -> Dev, test -> Test, prod -> Prod
           STACK_SUFFIX="$(tr '[:lower:]' '[:upper:]' <<< ${ENV_NAME:0:1})${ENV_NAME:1}"
           STACK_NAME="Immivo-$STACK_SUFFIX"
           
-          echo "🚀 Manually deploying to $STACK_NAME..."
+          echo "Manually deploying to $STACK_NAME..."
           npx cdk deploy $STACK_NAME --require-approval never
