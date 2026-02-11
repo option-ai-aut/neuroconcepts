@@ -12,7 +12,9 @@ const ADMIN_DOMAIN = 'admin.immivo.ai';
 const MARKETING_DOMAIN = 'immivo.ai';
 
 export function middleware(request: NextRequest) {
-  const hostname = request.headers.get('host') || '';
+  // CloudFront sets X-Forwarded-Host as a custom origin header with the real domain.
+  // The regular 'host' header gets replaced by CloudFront with the Lambda Function URL.
+  const hostname = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
   const pathname = request.nextUrl.pathname;
 
   // Skip API routes, static files, and Next.js internals
