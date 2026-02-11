@@ -55,17 +55,23 @@ export default function PageHeader() {
   };
 
   return (
-    <div className="h-12 px-6 flex items-center justify-between bg-white border-b border-gray-100 shrink-0 z-10">
-      {/* Left: Page Title */}
+    <div className="h-12 px-4 md:px-6 flex items-center justify-between bg-white border-b border-gray-100 shrink-0 z-10">
+      {/* Left: Brand (mobile) + Page Title */}
       <div className="flex items-center gap-2.5">
-        <Icon className="w-4 h-4 text-gray-400" />
+        {/* Mobile brand logo */}
+        <div className="md:hidden w-7 h-7 bg-indigo-600 rounded-md flex items-center justify-center shrink-0 shadow-sm">
+          <span className="text-white font-bold text-sm">N</span>
+        </div>
+        <Icon className="w-4 h-4 text-gray-400 hidden md:block" />
         <h1 className="text-sm font-semibold text-gray-800">{title}</h1>
       </div>
 
       {/* Right: Actions */}
-      <div className="flex items-center gap-2">
-        {/* Page-specific actions injected by child pages */}
-        {headerActions}
+      <div className="flex items-center gap-1.5 md:gap-2">
+        {/* Page-specific actions (desktop only) */}
+        <div className="hidden md:flex items-center gap-2">
+          {headerActions}
+        </div>
 
         {/* Refresh */}
         <button
@@ -80,10 +86,10 @@ export default function PageHeader() {
         {/* Notifications */}
         <NotificationBell />
 
-        {/* User Avatar */}
+        {/* User Avatar (desktop only) */}
         {user && (
           <div 
-            className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 text-xs font-semibold cursor-default"
+            className="hidden md:flex w-7 h-7 bg-indigo-100 rounded-full items-center justify-center text-indigo-600 text-xs font-semibold cursor-default"
             title={`${user.firstName} ${user.lastName}`}
           >
             {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}

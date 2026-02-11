@@ -171,55 +171,55 @@ export default function DashboardPage() {
   return (
     <div className="h-full flex flex-col bg-white">
       {/* Header */}
-      <div className="pt-6 px-8 pb-4">
-        <div className="flex items-end justify-between">
+      <div className="pt-4 md:pt-6 px-4 md:px-8 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900">
               Guten {new Date().getHours() < 12 ? 'Morgen' : new Date().getHours() < 18 ? 'Tag' : 'Abend'}, {stats.user.firstName}
             </h2>
-            <p className="text-gray-500 text-sm mt-0.5">
+            <p className="text-gray-500 text-xs md:text-sm mt-0.5">
               {stats.leads.newToday > 0 
                 ? `${stats.leads.newToday} neue${stats.leads.newToday === 1 ? 'r' : ''} Lead${stats.leads.newToday === 1 ? '' : 's'} heute`
                 : 'Keine neuen Leads heute'}
               {stats.leads.byStatus.NEW > 0 && ` · ${stats.leads.byStatus.NEW} warten auf Kontakt`}
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2 md:gap-3">
             <button
               onClick={() => openDrawer('LEAD')}
-              className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
+              className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-xs md:text-sm font-medium"
             >
               <Plus className="w-4 h-4" />
-              Neuer Lead
+              <span className="hidden sm:inline">Neuer</span> Lead
             </button>
             <button
               onClick={() => openDrawer('PROPERTY')}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+              className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-xs md:text-sm font-medium"
             >
               <Plus className="w-4 h-4" />
-              Neues Objekt
+              <span className="hidden sm:inline">Neues</span> Objekt
             </button>
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto px-8 pb-8">
+      <div className="flex-1 overflow-auto px-4 md:px-8 pb-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
           {/* Active Leads */}
           <Link 
             href="/dashboard/crm/leads"
-            className="bg-white rounded-xl border border-gray-100 p-6 hover:shadow-md transition-all group"
+            className="bg-white rounded-xl border border-gray-100 p-4 md:p-6 hover:shadow-md transition-all group"
           >
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-indigo-50 rounded-lg">
-                <Users className="w-5 h-5 text-indigo-600" />
+            <div className="flex items-center justify-between mb-3 md:mb-4">
+              <div className="p-2 md:p-3 bg-indigo-50 rounded-lg">
+                <Users className="w-4 md:w-5 h-4 md:h-5 text-indigo-600" />
               </div>
               <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-indigo-500 transition-colors" />
             </div>
-            <div className="text-3xl font-bold text-gray-900">{activeLeads}</div>
-            <div className="text-sm text-gray-500 mt-1">Aktive Leads</div>
+            <div className="text-2xl md:text-3xl font-bold text-gray-900">{activeLeads}</div>
+            <div className="text-xs md:text-sm text-gray-500 mt-1">Aktive Leads</div>
             {stats.leads.newThisWeek > 0 && (
               <div className="text-xs text-green-600 mt-2 flex items-center gap-1">
                 <TrendingUp className="w-3 h-3" />
@@ -231,16 +231,16 @@ export default function DashboardPage() {
           {/* Properties */}
           <Link 
             href="/dashboard/crm/properties"
-            className="bg-white rounded-xl border border-gray-100 p-6 hover:shadow-md transition-all group"
+            className="bg-white rounded-xl border border-gray-100 p-4 md:p-6 hover:shadow-md transition-all group"
           >
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-purple-50 rounded-lg">
-                <Building2 className="w-5 h-5 text-purple-600" />
+            <div className="flex items-center justify-between mb-3 md:mb-4">
+              <div className="p-2 md:p-3 bg-purple-50 rounded-lg">
+                <Building2 className="w-4 md:w-5 h-4 md:h-5 text-purple-600" />
               </div>
               <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-purple-500 transition-colors" />
             </div>
-            <div className="text-3xl font-bold text-gray-900">{stats.properties.active}</div>
-            <div className="text-sm text-gray-500 mt-1">Aktive Objekte</div>
+            <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats.properties.active}</div>
+            <div className="text-xs md:text-sm text-gray-500 mt-1">Aktive Objekte</div>
             {stats.properties.reserved > 0 && (
               <div className="text-xs text-orange-600 mt-2">
                 {stats.properties.reserved} reserviert
@@ -249,28 +249,28 @@ export default function DashboardPage() {
           </Link>
 
           {/* Conversion Rate */}
-          <div className="bg-white rounded-xl border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-green-50 rounded-lg">
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
+          <div className="bg-white rounded-xl border border-gray-100 p-4 md:p-6">
+            <div className="flex items-center justify-between mb-3 md:mb-4">
+              <div className="p-2 md:p-3 bg-green-50 rounded-lg">
+                <CheckCircle2 className="w-4 md:w-5 h-4 md:h-5 text-green-600" />
               </div>
             </div>
-            <div className="text-3xl font-bold text-gray-900">{conversionRate}%</div>
-            <div className="text-sm text-gray-500 mt-1">Abschlussrate</div>
+            <div className="text-2xl md:text-3xl font-bold text-gray-900">{conversionRate}%</div>
+            <div className="text-xs md:text-sm text-gray-500 mt-1">Abschlussrate</div>
             <div className="text-xs text-gray-400 mt-2">
               {stats.leads.byStatus.BOOKED} von {stats.leads.total} Leads
             </div>
           </div>
 
           {/* Needs Attention */}
-          <div className="bg-white rounded-xl border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className={`p-3 rounded-lg ${stats.leads.byStatus.NEW > 0 ? 'bg-amber-50' : 'bg-gray-50'}`}>
-                <AlertCircle className={`w-5 h-5 ${stats.leads.byStatus.NEW > 0 ? 'text-amber-600' : 'text-gray-400'}`} />
+          <div className="bg-white rounded-xl border border-gray-100 p-4 md:p-6">
+            <div className="flex items-center justify-between mb-3 md:mb-4">
+              <div className={`p-2 md:p-3 rounded-lg ${stats.leads.byStatus.NEW > 0 ? 'bg-amber-50' : 'bg-gray-50'}`}>
+                <AlertCircle className={`w-4 md:w-5 h-4 md:h-5 ${stats.leads.byStatus.NEW > 0 ? 'text-amber-600' : 'text-gray-400'}`} />
               </div>
             </div>
-            <div className="text-3xl font-bold text-gray-900">{stats.leads.byStatus.NEW}</div>
-            <div className="text-sm text-gray-500 mt-1">Warten auf Kontakt</div>
+            <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats.leads.byStatus.NEW}</div>
+            <div className="text-xs md:text-sm text-gray-500 mt-1">Warten auf Kontakt</div>
             {stats.leads.needingAttention.length > 0 && stats.leads.needingAttention[0].daysSinceCreated > 0 && (
               <div className="text-xs text-amber-600 mt-2">
                 Ältester: {stats.leads.needingAttention[0].daysSinceCreated} Tag{stats.leads.needingAttention[0].daysSinceCreated !== 1 ? 'e' : ''}
@@ -280,9 +280,9 @@ export default function DashboardPage() {
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Leads needing attention */}
-          <div className="col-span-2 bg-white rounded-xl border border-gray-100 p-6">
+          <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 p-4 md:p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold text-gray-900">Leads - Handlungsbedarf</h2>
               <Link 
@@ -367,7 +367,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Pipeline Overview */}
-        <div className="mt-6 bg-white rounded-xl border border-gray-100 p-6">
+        <div className="mt-4 md:mt-6 bg-white rounded-xl border border-gray-100 p-4 md:p-6">
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-lg font-semibold text-gray-900">Lead-Pipeline</h2>
             <Link 
@@ -422,7 +422,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick Stats Footer */}
-        <div className="mt-6 grid grid-cols-4 gap-4">
+        <div className="mt-4 md:mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           <div className="bg-gray-50 rounded-lg p-4 text-center">
             <div className="text-2xl font-bold text-gray-900">{stats.leads.newThisMonth}</div>
             <div className="text-xs text-gray-500 mt-1">Leads diesen Monat</div>

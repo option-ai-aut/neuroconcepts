@@ -42,6 +42,10 @@ interface GlobalState {
   headerActions: React.ReactNode;
   setHeaderActions: (actions: React.ReactNode) => void;
 
+  // Mobile Jarvis Chat
+  mobileJarvisOpen: boolean;
+  setMobileJarvisOpen: (open: boolean) => void;
+
   // Actions
   openDrawer: (type: DrawerType) => void;
   closeDrawer: () => void;
@@ -75,6 +79,7 @@ export function GlobalStateProvider({ children }: { children: ReactNode }) {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [aiActionPerformed, setAiActionPerformed] = useState(0);
   const [headerActions, setHeaderActions] = useState<React.ReactNode>(null);
+  const [mobileJarvisOpen, setMobileJarvisOpen] = useState(false);
 
   const openDrawer = (type: DrawerType) => {
     setDrawerType(type);
@@ -140,6 +145,8 @@ export function GlobalStateProvider({ children }: { children: ReactNode }) {
         aiActionPerformed,
         headerActions,
         setHeaderActions,
+        mobileJarvisOpen,
+        setMobileJarvisOpen,
         openDrawer,
         closeDrawer,
         minimizeDrawer,

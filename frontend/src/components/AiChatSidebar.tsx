@@ -161,7 +161,12 @@ const CONTEXT_TIPS: ContextTip[] = [
   { id: 'inbox', context: 'inbox', message: 'Ich kann E-Mails zusammenfassen, beantworten oder Leads daraus erstellen.' },
 ];
 
-export default function AiChatSidebar() {
+interface AiChatSidebarProps {
+  mobile?: boolean;
+  onClose?: () => void;
+}
+
+export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const { aiChatDraft, setAiChatDraft, activeExposeContext, triggerExposeRefresh, notifyAiAction, aiActionPerformed } = useGlobalState();
   const [isLoading, setIsLoading] = useState(false);
@@ -684,7 +689,11 @@ export default function AiChatSidebar() {
 
   return (
     <div 
-      className="flex flex-col h-full bg-white w-80 z-20 relative shadow-[-10px_0_20px_-5px_rgba(0,0,0,0.1)]"
+      className={`flex flex-col h-full bg-white relative ${
+        mobile 
+          ? 'w-full' 
+          : 'w-80 z-20 shadow-[-10px_0_20px_-5px_rgba(0,0,0,0.1)]'
+      }`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -700,7 +709,7 @@ export default function AiChatSidebar() {
           </div>
         </div>
       )}
-      <div className="h-16 px-4 flex items-center justify-between bg-white shrink-0">
+      <div className={`px-4 flex items-center justify-between bg-white shrink-0 border-b border-gray-100 ${mobile ? 'h-14 pt-[env(safe-area-inset-top)]' : 'h-16'}`}>
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-indigo-600 rounded-md flex items-center justify-center shadow-md shadow-indigo-900/50">
             <Bot className="w-5 h-5 text-white" />
@@ -716,6 +725,14 @@ export default function AiChatSidebar() {
           >
             <RotateCcw className="w-4 h-4" />
           </button>
+          {mobile && onClose && (
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
 

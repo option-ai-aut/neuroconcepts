@@ -58,7 +58,7 @@ export default function Sidebar() {
 
   return (
     <div 
-      className={`flex flex-col bg-slate-900 h-screen relative z-20 transition-all duration-300 ease-in-out ${
+      className={`hidden md:flex flex-col bg-slate-900 h-screen relative z-20 transition-all duration-300 ease-in-out ${
         isHovered ? 'w-64' : 'w-20'
       }`}
       onMouseEnter={() => {

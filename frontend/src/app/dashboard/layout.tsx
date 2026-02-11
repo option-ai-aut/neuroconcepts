@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import Sidebar from '@/components/Sidebar';
@@ -8,30 +8,109 @@ import AiChatSidebar from '@/components/AiChatSidebar';
 import GlobalDrawer from '@/components/GlobalDrawer';
 import ExposeEditor from '@/components/ExposeEditor';
 import PageHeader from '@/components/PageHeader';
+import MobileBottomNav from '@/components/MobileBottomNav';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { useAuthConfigured } from '@/components/AuthProvider';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Bot, Monitor } from 'lucide-react';
+
+// Routes allowed on mobile devices
+const MOBILE_ALLOWED_PREFIXES = [
+  '/dashboard/activities',
+  '/dashboard/inbox',
+  '/dashboard/crm',
+  '/dashboard/calendar',
+  '/dashboard/assistant',
+];
+
+function isMobileAllowedRoute(pathname: string): boolean {
+  if (pathname === '/dashboard') return true;
+  return MOBILE_ALLOWED_PREFIXES.some(prefix => pathname.startsWith(prefix));
+}
+
+// Mobile route guard component
+function MobileRouteGuard({ children, pathname }: { children: React.ReactNode; pathname: string }) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  if (isMobile && !isMobileAllowedRoute(pathname)) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center bg-white px-8 text-center pb-20">
+        <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-5">
+          <Monitor className="w-8 h-8 text-gray-400" />
+        </div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">Desktop-Funktion</h2>
+        <p className="text-sm text-gray-500 leading-relaxed max-w-xs">
+          Diese Seite ist nur in der Desktop-Version verfügbar. Öffne Immivo auf deinem Computer für vollen Zugriff.
+        </p>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
-  const { drawerOpen, drawerType, exposeEditorData, closeDrawer } = useGlobalState();
+  const { drawerOpen, drawerType, exposeEditorData, closeDrawer, mobileJarvisOpen, setMobileJarvisOpen } = useGlobalState();
+  const pathname = usePathname();
+  const [jarvisClosing, setJarvisClosing] = useState(false);
+
+  const handleCloseJarvis = useCallback(() => {
+    setJarvisClosing(true);
+    setTimeout(() => {
+      setMobileJarvisOpen(false);
+      setJarvisClosing(false);
+    }, 250);
+  }, [setMobileJarvisOpen]);
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans">
-      {/* Main Navigation Sidebar (Left) */}
+      {/* Main Navigation Sidebar (Left) - Desktop only */}
       <Sidebar />
       
       {/* Main Content Area (Center) */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
         {/* Top Header Bar */}
         <PageHeader />
-        {/* Scrollable Content */}
-        <main className="flex-1 overflow-y-auto bg-white overflow-x-visible">
-          {children}
+        {/* Scrollable Content - extra bottom padding on mobile for nav bar */}
+        <main className="flex-1 overflow-y-auto bg-white overflow-x-visible pb-16 md:pb-0">
+          <MobileRouteGuard pathname={pathname}>
+            {children}
+          </MobileRouteGuard>
         </main>
       </div>
 
-      {/* AI Chat Sidebar (Right) */}
-      <AiChatSidebar />
+      {/* AI Chat Sidebar (Right) - Desktop only */}
+      <div className="hidden md:block">
+        <AiChatSidebar />
+      </div>
+
+      {/* Mobile: Jarvis Floating Action Button */}
+      {!mobileJarvisOpen && !jarvisClosing && (
+        <button
+          onClick={() => setMobileJarvisOpen(true)}
+          className="md:hidden fixed bottom-[72px] right-4 z-40 w-14 h-14 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg animate-fab-pulse active:scale-95 transition-transform safe-bottom"
+          style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
+          aria-label="Jarvis KI-Chat öffnen"
+        >
+          <Bot className="w-6 h-6 text-white" />
+        </button>
+      )}
+
+      {/* Mobile: Jarvis Full-Screen Chat Overlay */}
+      {(mobileJarvisOpen || jarvisClosing) && (
+        <div className={`md:hidden fixed inset-0 z-50 bg-white ${jarvisClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
+          <AiChatSidebar mobile onClose={handleCloseJarvis} />
+        </div>
+      )}
+
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav />
       
       {/* Conditional rendering based on drawer type */}
       {drawerOpen && drawerType === 'EXPOSE_EDITOR' ? (
