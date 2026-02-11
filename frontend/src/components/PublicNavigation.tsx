@@ -96,11 +96,11 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center space-x-4">
-            <Link href="/login" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+            <Link href="https://app.immivo.ai/login" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
               Anmelden
             </Link>
             <Link 
-              href="/login" 
+              href="https://app.immivo.ai/login" 
               className="bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/30 transition-all hover:-translate-y-0.5"
             >
               Kostenlos starten
@@ -170,14 +170,14 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
             {/* Mobile CTA */}
             <div className="border-t border-gray-100 pt-4 space-y-3">
               <Link 
-                href="/login" 
+                href="https://app.immivo.ai/login" 
                 className="block w-full text-center py-3 text-gray-600 font-medium border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Anmelden
               </Link>
               <Link 
-                href="/login" 
+                href="https://app.immivo.ai/login" 
                 className="block w-full text-center py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-medium rounded-xl hover:shadow-lg transition-all"
                 onClick={() => setMobileMenuOpen(false)}
               >

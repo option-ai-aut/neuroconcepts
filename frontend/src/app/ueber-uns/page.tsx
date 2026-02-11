@@ -88,7 +88,7 @@ export default function UeberUnsPage() {
             Teste Immivo 14 Tage kostenlos und überzeuge dich selbst.
           </p>
           <Link 
-            href="/login"
+            href="https://app.immivo.ai/login"
             className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-full font-semibold hover:shadow-lg hover:shadow-indigo-500/30 transition-all"
           >
             Jetzt kostenlos starten
