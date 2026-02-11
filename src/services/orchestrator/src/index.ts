@@ -161,8 +161,10 @@ const allowedOrigins = [
   'http://localhost:3001',  // Local backend dev
   process.env.FRONTEND_URL, // Production frontend
   'https://dev.immivo.ai',
+  'https://app.immivo.ai',  // Production app subdomain
   'https://immivo.ai',
   'https://www.immivo.ai',
+  'https://admin.immivo.ai', // Admin subdomain
 ].filter(Boolean);
 
 app.use(cors({
