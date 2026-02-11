@@ -158,7 +158,9 @@ app.use(async (req, res, next) => {
   }
 });
 
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 
 // Protected database migration endpoint - creates tables if they don't exist
 // This is the only way to run migrations on Aurora in a private VPC
@@ -340,7 +342,8 @@ async function uploadToS3(buffer: Buffer, filename: string, contentType: string,
   }
   
   // Fallback for local dev without S3: save to disk
-  const uploadDir = path.join(__dirname, '../uploads', folder);
+  const baseDir = isLambda ? '/tmp/uploads' : path.join(__dirname, '../uploads');
+  const uploadDir = path.join(baseDir, folder);
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
@@ -349,11 +352,13 @@ async function uploadToS3(buffer: Buffer, filename: string, contentType: string,
 }
 
 // Serve uploaded files (local dev fallback only)
-const localUploadDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(localUploadDir)) {
-  fs.mkdirSync(localUploadDir, { recursive: true });
+if (!isLambda) {
+  const localUploadDir = path.join(__dirname, '../uploads');
+  if (!fs.existsSync(localUploadDir)) {
+    fs.mkdirSync(localUploadDir, { recursive: true });
+  }
+  app.use('/uploads', express.static(localUploadDir));
 }
-app.use('/uploads', express.static(localUploadDir));
 
 // --- Auth & User Management ---
 
