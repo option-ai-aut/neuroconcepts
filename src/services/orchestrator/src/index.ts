@@ -162,7 +162,7 @@ app.use(helmet());
 
 // Protected database migration endpoint - creates tables if they don't exist
 // This is the only way to run migrations on Aurora in a private VPC
-app.post('/admin/db-migrate', async (req, res) => {
+app.post('/admin/db-migrate', express.json({ limit: '1mb' }), async (req, res) => {
   const secret = req.headers['x-admin-secret'];
   if (!secret || secret !== process.env.ENCRYPTION_KEY) {
     return res.status(403).json({ error: 'Forbidden' });
