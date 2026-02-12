@@ -2,7 +2,7 @@
 
 ## 🧠 Core Principles
 
-Wir nutzen **Google Gemini 2.0 Flash** als Herzstück unserer Automatisierung. Jarvis agiert als **Assistenz des Maklers**, nicht als der Makler selbst.
+Wir nutzen **OpenAI GPT-5-mini** für Chat und Tools sowie **Google Gemini** für Bildbearbeitung (Virtual Staging). Jarvis agiert als **Assistenz des Maklers**, nicht als der Makler selbst.
 
 ### Die "Persona"
 - **Rolle:** Persönliche Assistenz des Immobilienmaklers.
@@ -43,7 +43,7 @@ Wann übergibt Jarvis an den Menschen?
 | **Confidence Score < 80%** | Erstellt Entwurf, sendet nicht | `Draft` |
 | **Expliziter Wunsch nach Mensch** | "Gerne, mein Kollege ruft Sie an." | `Call Scheduled` |
 
-## 🗣 Prompting-Strategie (Gemini)
+## 🗣 Prompting-Strategie (GPT-5-mini)
 
 Wir nutzen einen **System-Prompt**, der bei jeder Interaktion mit Kontext angereichert wird (RAG).
 
@@ -58,7 +58,7 @@ Wir nutzen einen **System-Prompt**, der bei jeder Interaktion mit Kontext angere
 5.  **Output Format:** JSON (Text + Sentiment + Intent).
 
 ### Multi-Language Support
-Gemini erkennt die Sprache der eingehenden E-Mail automatisch. Wir instruieren das Modell explizit:
+Das Modell erkennt die Sprache der eingehenden E-Mail automatisch. Wir instruieren es explizit:
 > "Answer in the same language as the lead's last message. If the language is ambiguous, default to German."
 
 ## 🔄 Feedback Loop

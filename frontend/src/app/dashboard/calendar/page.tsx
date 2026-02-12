@@ -51,38 +51,11 @@ export default function CalendarPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        const apiUrl = getApiUrl();
-        const headers = await getAuthHeaders();
-        const response = await fetch(`${apiUrl}/calendar/status`, { headers });
-        
-        if (response.ok) {
-          const data = await response.json();
-          const googleConnected = data.google?.connected;
-          const outlookConnected = data.outlook?.connected;
-          
-          setIsConnected(googleConnected || outlookConnected);
-          
-          if (googleConnected) {
-            setConnectedEmail(data.google.email);
-          } else if (outlookConnected) {
-            setConnectedEmail(data.outlook.email);
-          }
-          
-          // Load events if connected
-          if (googleConnected || outlookConnected) {
-            loadEvents();
-          }
-        }
-      } catch (error) {
-        console.error('Error checking calendar connection:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    checkConnection();
+    // WorkMail calendar is always connected via backend EWS
+    setIsConnected(true);
+    setConnectedEmail('WorkMail');
+    loadEvents();
+    setLoading(false);
   }, []);
 
   const loadEvents = async () => {
@@ -127,7 +100,17 @@ export default function CalendarPage() {
         }
         
         setNeedsReconnect(false);
-        setEvents(data.events || []);
+        // Map WorkMail events (subject -> title)
+        const mapped = (data.events || []).map((e: any) => ({
+          id: e.id,
+          title: e.subject || e.title || '',
+          start: e.start,
+          end: e.end,
+          location: e.location || '',
+          attendees: e.attendees || [],
+          description: e.body || e.description || '',
+        }));
+        setEvents(mapped);
       }
     } catch (error) {
       console.error('Error loading events:', error);
@@ -247,11 +230,11 @@ export default function CalendarPage() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          title: newEvent.title,
+          subject: newEvent.title,
           start: startDateTime.toISOString(),
           end: endDateTime.toISOString(),
           location: newEvent.location || undefined,
-          description: newEvent.description || undefined
+          body: newEvent.description || undefined
         })
       });
       
@@ -763,8 +746,8 @@ export default function CalendarPage() {
 
       {/* New Event Modal */}
       {showNewEventModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-end lg:items-center justify-center z-50">
-          <div className="bg-white rounded-t-2xl lg:rounded-xl shadow-xl w-full lg:max-w-md lg:mx-4 max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[min(90vh,600px)] flex flex-col">
             <div className="flex items-center justify-between px-4 lg:px-6 py-3 lg:py-4 border-b border-gray-100 shrink-0">
               <h2 className="text-base lg:text-lg font-semibold text-gray-900">Neuer Termin</h2>
               <button 
@@ -841,17 +824,17 @@ export default function CalendarPage() {
               </div>
             </div>
             
-            <div className="flex gap-3 px-4 lg:px-6 py-3 lg:py-4 border-t border-gray-100 shrink-0 safe-bottom">
+            <div className="flex gap-3 px-4 lg:px-6 py-3 lg:py-4 border-t border-gray-100 shrink-0">
               <button
                 onClick={() => setShowNewEventModal(false)}
-                className="flex-1 px-4 py-2.5 lg:py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 Abbrechen
               </button>
               <button
                 onClick={handleCreateEvent}
                 disabled={!newEvent.title || !newEvent.date || creatingEvent}
-                className="flex-1 px-4 py-2.5 lg:py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {creatingEvent && <Loader2 className="w-4 h-4 animate-spin" />}
                 Erstellen
@@ -863,8 +846,8 @@ export default function CalendarPage() {
 
       {/* Event Detail/Edit Modal */}
       {selectedEvent && (
-        <div className="fixed inset-0 bg-black/50 flex items-end lg:items-center justify-center z-50" onClick={() => { setSelectedEvent(null); setIsEditing(false); }}>
-          <div className="bg-white rounded-t-2xl lg:rounded-xl shadow-xl w-full lg:max-w-lg lg:mx-4 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => { setSelectedEvent(null); setIsEditing(false); }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[min(90vh,600px)] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 lg:px-6 py-3 lg:py-4 border-b border-gray-100 shrink-0">
               <h2 className="text-base lg:text-lg font-semibold text-gray-900">
                 {isEditing ? 'Termin bearbeiten' : 'Termindetails'}
@@ -1016,7 +999,7 @@ export default function CalendarPage() {
               )}
             </div>
             
-            <div className="flex gap-3 px-4 lg:px-6 py-3 lg:py-4 border-t border-gray-100 shrink-0 safe-bottom">
+            <div className="flex gap-3 px-4 lg:px-6 py-3 lg:py-4 border-t border-gray-100 shrink-0">
               {isEditing ? (
                 <>
                   <button

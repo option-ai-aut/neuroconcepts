@@ -52,6 +52,15 @@ PORT=3001
 # Diese Werte müssen mit dem Frontend übereinstimmen:
 USER_POOL_ID=eu-central-1_NEUE_ID_HIER
 CLIENT_ID=NEUE_CLIENT_ID_HIER
+
+# AI
+OPENAI_API_KEY=sk-...
+GEMINI_API_KEY=AIza...
+
+# E-Mail (System-Mails via Resend)
+RESEND_API_KEY=re_...
+RESEND_FROM_EMAIL=noreply@immivo.ai
+# Zum Deaktivieren in Dev: RESEND_ENABLED=false
 ```
 
 ### Datei: `src/services/orchestrator/.env.local` (Optional)
@@ -101,7 +110,28 @@ DATABASE_URL="postgresql://..." npx prisma migrate dev
 npx prisma generate
 ```
 
-## 7. Manuelles Lambda-Deployment
+## 7. AWS Secrets Manager (Production)
+
+In Production werden Secrets nicht über `.env` geladen, sondern aus dem **AWS Secrets Manager** (`Immivo-App-Secret-prod`). Der Orchestrator liest diese automatisch beim Lambda-Start.
+
+Folgende Keys müssen im Secret hinterlegt sein:
+- `DATABASE_URL`
+- `OPENAI_API_KEY`
+- `GEMINI_API_KEY`
+- `RESEND_API_KEY`
+- `ENCRYPTION_KEY`
+- `FRONTEND_URL`
+- Google/Microsoft OAuth Keys (wenn benötigt)
+
+**Hinzufügen:** AWS Console → Secrets Manager → `Immivo-App-Secret-prod` → Retrieve secret value → Edit → Add row.
+
+## 8. Medien-Uploads
+
+- **Production:** AWS S3 Bucket (automatisch via CDK erstellt)
+- **Lokal:** Fallback auf `./uploads` Ordner (wird automatisch erstellt)
+- Bilder werden über den `/uploads/...` Endpunkt oder direkte S3-URLs ausgeliefert
+
+## 9. Manuelles Lambda-Deployment
 
 Falls GitHub Actions nicht funktioniert, kannst du direkt deployen:
 

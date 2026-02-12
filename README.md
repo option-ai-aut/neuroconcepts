@@ -12,10 +12,13 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 
 ### Hauptfunktionen (Ticket 1 - MVP)
 - **Lead Intake:** Automatische Erfassung aus E-Mail-Weiterleitungen (ImmoScout, Willhaben) und Web-Formularen.
-- **Jarvis-Kommunikation:** Google Gemini 3 Flash erstellt personalisierte Exposés und beantwortet Rückfragen in Echtzeit (DE/EN/FR/ES).
+- **Jarvis-Kommunikation:** OpenAI GPT-5-mini erstellt personalisierte Exposés und beantwortet Rückfragen in Echtzeit (DE/EN/FR/ES).
+- **KI-Bildstudio:** Virtual Staging mit Google Gemini (Möblierung, Renovierung, Umgestaltung).
 - **E-Mail Thread Intelligence:** Ordnet Antworten korrekt zu und führt den Dialog kontextbezogen fort.
-- **Kalender-Sync:** Bidirektionale Synchronisation (Google/Outlook) für automatische Terminbuchung.
-- **White-Labeling:** Versand über die SMTP-Server des Maklers (eigene Domain).
+- **Kalender:** AWS WorkMail Kalender via CalDAV mit Google Meet Integration (geplant).
+- **White-Labeling:** Versand über OAuth (Gmail/Outlook) mit Makler-Domain.
+- **System-Mails:** Benachrichtigungen via Resend API.
+- **Bug Reports:** In-App Bug-Reporting mit automatischem Screenshot und Console-Log-Capture.
 - **Auth:** Login & Registrierung via AWS Cognito.
 
 ## 🛠 Tech Stack
@@ -28,13 +31,18 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 - **IaC:** AWS CDK
 
 ### AI & Intelligence
-- **Model:** Google Gemini 3 Flash Preview
+- **Chat & Tools:** OpenAI GPT-5-mini (Jarvis Assistent)
+- **Image Editing:** Google Gemini (gemini-2.5-flash-image) — Virtual Staging
 - **Features:** Multi-Language Support, Context-Awareness, Sentiment Analysis
 
 ### Integrations
 - **Payment:** Stripe (Subscriptions, Invoicing)
-- **Email:** SMTP/IMAP (User Credentials), AWS SES (System Notifications)
-- **Calendar:** Google Calendar API, Microsoft Graph API
+- **Email Inbound:** AWS SES → Email-Parser Lambda
+- **Email Outbound (Leads):** Gmail/Outlook via OAuth
+- **Email Outbound (System):** Resend API
+- **Email Postfächer:** AWS WorkMail (4 Seats)
+- **Calendar:** AWS WorkMail CalDAV (geplant: Google Meet)
+- **Media Storage:** AWS S3
 
 ### Frontend
 - **Framework:** Next.js 15 (App Router)
@@ -59,20 +67,27 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 
 ## 🚀 Roadmap
 
-### Phase 1: MVP (Wochen 1–8) - ✅ COMPLETED
-- [x] AWS Infrastruktur Setup (VPC, RDS, Lambda)
+### Phase 1: MVP - ✅ COMPLETED
+- [x] AWS Infrastruktur Setup (VPC, RDS, Lambda, S3)
 - [x] E-Mail Inbound Parser & DB Schema
-- [x] Jarvis-Engine Integration (Gemini 3)
-- [x] SMTP Outbound & Kalender Sync
-- [x] Dashboard & Stripe Integration
+- [x] Jarvis-Engine Integration (OpenAI GPT-5-mini)
+- [x] KI-Bildstudio (Google Gemini Virtual Staging)
+- [x] Exposé-Editor mit KI-Unterstützung
+- [x] CRM (Leads, Objekte, Bildupload zu S3)
+- [x] Dashboard & Admin Panel (real data)
 - [x] Frontend Deployment (AWS Lambda + Docker)
 - [x] Authentication (Cognito)
+- [x] System-E-Mails via Resend
+- [x] Bug Reports mit Screenshot + Console-Log-Capture
+- [x] Dark Mode
 
-### Phase 2: Post-Termin (Monate 3–6)
+### Phase 2: Kalender & Automatisierung
+- [ ] AWS WorkMail CalDAV Integration
+- [ ] Demo-Buchung auf Landing Page (öffentlich)
+- [ ] Google Meet Integration für Videocalls
 - [ ] Follow-up Automatisierung
-- [ ] Dokumenten-Management (Uploads)
+- [ ] Dokumenten-Management
 - [ ] Mietanbot & Digitale Unterschrift
-- [ ] Mieter-Ticketing System
 
 ## 🔐 Sicherheit & Datenschutz
 

@@ -1,6 +1,31 @@
 # Calendar Integration Setup
 
-Diese Anleitung erklärt, wie Sie Google Calendar und Outlook Calendar OAuth-Integration einrichten.
+> **Status:** Die Kalender-Integration wird auf **AWS WorkMail CalDAV** umgestellt. Google/Outlook OAuth bleibt als optionale Integration für Tenant-Kalender bestehen. Für die interne Terminplanung und Demo-Buchung wird der AWS WorkMail Kalender genutzt.
+
+## AWS WorkMail Kalender (Primär)
+
+### Postfächer
+- `dennis.kral@immivo.ai`
+- `josef.leutgeb@immivo.ai`
+- `office@immivo.ai`
+- `support@immivo.ai`
+
+### Zugriff
+- **Webmail:** https://immivo.awsapps.com/mail
+- **CalDAV:** Wird im Backend via CalDAV-Protokoll angebunden
+- **Videocalls:** Google Meet Links werden automatisch bei Terminerstellung generiert
+
+### Geplante Features
+- Dashboard-Kalender zeigt WorkMail Events
+- Admin kann alle Mitarbeiter-Kalender einsehen
+- Öffentliche Demo-Buchungsseite auf der Landing Page
+- Automatische Google Meet Links bei neuen Terminen
+
+---
+
+## Google/Outlook OAuth (Optional für Tenants)
+
+Diese Anleitung erklärt, wie Tenants ihre eigenen Google Calendar und Outlook Calendar OAuth-Integrationen einrichten können.
 
 ## Google Calendar Setup
 

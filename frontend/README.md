@@ -49,6 +49,15 @@ The `Dockerfile` is a multi-stage build optimized for production:
 
 ## 🛠 Tech Stack
 - **Framework:** Next.js 15 (App Router)
-- **Styling:** Tailwind CSS
+- **Styling:** Tailwind CSS (Dark Mode support)
 - **Auth:** AWS Amplify (Cognito)
 - **Icons:** Lucide React
+- **State:** Global State Context (Drawer, Sidebar, AI Chat)
+- **Features:**
+  - Dashboard mit KPIs
+  - CRM (Leads, Objekte, Bildupload zu S3)
+  - Exposé-Editor mit KI-Unterstützung
+  - KI-Bildstudio (Virtual Staging mit Gemini)
+  - Jarvis AI Chat (GPT-5-mini)
+  - Bug Reports mit Screenshot + Console-Log-Capture
+  - Admin Panel (Stats, Tenants, Users, Audit, Health, Bug Reports)

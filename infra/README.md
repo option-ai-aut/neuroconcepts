@@ -12,17 +12,20 @@ The stack (`lib/infra-stack.ts`) provisions the following resources:
 2.  **Database (RDS):**
     - **Dev:** PostgreSQL `t4g.micro` instance.
     - **Prod:** Aurora Serverless v2 (PostgreSQL compatible).
-3.  **Authentication:** AWS Cognito User Pool & Client.
+3.  **Authentication:** AWS Cognito User Pool (Users) + Admin User Pool (Platform Admins).
 4.  **Backend API:** AWS Lambda (Node.js) + API Gateway.
 5.  **Email Ingest:** S3 Bucket + Lambda Trigger (Email Parser).
-6.  **Frontend:** AWS Lambda (Docker) with Function URL.
+6.  **Media Storage:** S3 Bucket (Property images, floorplans, bug report screenshots).
+7.  **Frontend:** AWS Lambda (Docker) with Function URL.
 
 ## 🚀 Deployment
 
 We use **GitHub Actions** for CI/CD (`.github/workflows/deploy.yml`).
 
 ### Automatic Deployment
-- Pushing to the `main` branch automatically deploys to the **Dev** environment (`Immivo-Dev`).
+- Pushing to `main` → deploys **Prod** (`Immivo-Prod`)
+- Pushing to `dev` → deploys **Dev** (`Immivo-Dev`)
+- Pushing to `test` → deploys **Test** (`Immivo-Test`)
 
 ### Manual Deployment
 - You can manually trigger a deployment to **Stage** or **Prod** via the GitHub Actions "Run workflow" button.

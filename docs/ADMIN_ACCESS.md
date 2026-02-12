@@ -6,9 +6,22 @@ Der Admin-Bereich ist das Herzstück der Plattform für dich als Founder und dei
 
 ### Wie komme ich hin?
 
-**Frontend URL (Dev):** `https://LAMBDA-URL.lambda-url.eu-central-1.on.aws/admin`
+**Production:** `https://app.immivo.ai/admin`  
+**Dev:** `https://LAMBDA-URL.lambda-url.eu-central-1.on.aws/admin`
 
-Der Admin-Bereich ist über `/admin` erreichbar und durch eine Middleware geschützt, die prüft ob `user.role === 'SUPER_ADMIN'` ist.
+Der Admin-Bereich ist über `/admin` erreichbar und durch einen separaten **Admin Cognito User Pool** geschützt.
+
+### Admin-Seiten (alle mit echten Daten)
+
+| Seite | Beschreibung |
+|-------|-------------|
+| **Dashboard** | Plattform-KPIs (Tenants, Users, Leads, Properties, Exposés, E-Mails) + letzte Aktivitäten |
+| **Bug Reports** | Alle Bug-Reports der User mit Status-Pipeline (Offen → In Bearbeitung → Gelöst → Geschlossen), Prioritäten, Screenshots, Console-Logs, Admin-Notizen |
+| **Tenants** | Tenant-Verwaltung (erstellen, löschen), Statistiken pro Tenant |
+| **Users** | Alle User über alle Tenants, gruppiert nach Tenant, mit Rollen-Filter |
+| **Audit Log** | KI-Interaktions-Protokoll, Filter für geflaggte Einträge, Detail-Ansicht |
+| **Operations** | System-Health-Checks (DB, Cognito, S3, OpenAI, Gemini, Resend, Lambda) |
+| **Settings** | Plattform-Konfiguration (AI Keys, Auth, E-Mail, Storage) |
 
 ### Admin-User erstellen (Manuell)
 

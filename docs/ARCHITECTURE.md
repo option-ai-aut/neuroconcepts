@@ -2,7 +2,7 @@
 
 ## 🏗 High-Level Übersicht
 
-Die Plattform basiert auf einer **AWS-Serverless-Architektur**, die auf Skalierbarkeit, Sicherheit und Wartungsarmut ausgelegt ist. Die Kernlogik ist in Node.js/TypeScript geschrieben und orchestriert die Kommunikation zwischen E-Mail-Providern, der KI-Engine (Gemini) und der Datenbank.
+Die Plattform basiert auf einer **AWS-Serverless-Architektur**, die auf Skalierbarkeit, Sicherheit und Wartungsarmut ausgelegt ist. Die Kernlogik ist in Node.js/TypeScript geschrieben und orchestriert die Kommunikation zwischen E-Mail-Providern, der KI-Engine und der Datenbank.
 
 ```mermaid
 graph TD
@@ -28,14 +28,16 @@ graph TD
     end
 
     subgraph "AI Engine"
-        Orchestrator -->|Context| Gemini[Google Gemini 2.0 Flash]
-        Gemini -->|Response| Orchestrator
+        Orchestrator -->|Chat| OpenAI[OpenAI GPT-5-mini]
+        Orchestrator -->|Image Editing| Gemini[Google Gemini]
+        OpenAI -->|Response| Orchestrator
+        Gemini -->|Staged Image| Orchestrator
     end
 
     subgraph "Integration Layer"
-        Orchestrator -->|SMTP/OAuth| UserSMTP[User Email Server]
-        Orchestrator -->|Sync| Cal[Google/MS Calendar]
-        Orchestrator -->|Sync| Mail[Google/MS Mail]
+        Orchestrator -->|OAuth| UserSMTP[User Email Server]
+        Orchestrator -->|System Mail| Resend[Resend API]
+        Orchestrator -->|CalDAV| WorkMail[AWS WorkMail Calendar]
         Billing -->|Events| Stripe[Stripe API]
     end
 
@@ -71,20 +73,25 @@ graph TD
     *   **Prod:** Aurora Serverless v2 für Skalierbarkeit und HA.
 *   **pgvector:** Speichert Embeddings von Exposés und vergangenen Konversationen, um der KI ein "Langzeitgedächtnis" zu geben (RAG - Retrieval Augmented Generation).
 
-### 4. AI Engine (Google Gemini 2.0 Flash)
-*   **Modell:** Gemini 2.0 Flash.
-*   **Aufgabe:**
+### 4. AI Engine
+*   **Chat & Tools:** OpenAI GPT-5-mini — Jarvis-Assistent für Lead-Kommunikation, CRM-Aktionen, Exposé-Erstellung.
+*   **Image Editing:** Google Gemini (gemini-2.5-flash-image) — Virtual Staging im KI-Bildstudio.
+*   **Aufgaben:**
     *   **Intent Recognition:** Was will der Lead? (Besichtigung, Frage, Absage?)
     *   **Response Generation:** Erstellen von natürlichen, mehrsprachigen Antworten.
     *   **Extraction:** Strukturierte Daten aus Freitext ziehen (z.B. Terminwunsch "nächsten Dienstag").
     *   **Exposé-Erstellung:** Live-Bearbeitung von Exposés im Editor via Tool-Calls.
+    *   **Virtual Staging:** KI-basierte Bildbearbeitung (Möblierung, Renovierung) im Bildstudio.
     *   **Datei-Verarbeitung:** CSV/Excel-Import, PDF-Analyse, Bild-Erkennung.
 
 ### 5. Integration Layer
 *   **E-Mail Outbound:**
-    *   **Option 1 (OAuth):** Gmail oder Outlook Mail über OAuth-Integration.
-    *   **Option 2 (SMTP):** Direkter Versand über die SMTP-Credentials des Maklers für 100% White-Labeling.
-*   **Kalender:** Direkte Integration via Google Calendar API und Microsoft Graph API. Wir nutzen Refresh Tokens für dauerhaften Zugriff.
+    *   **Lead-Kommunikation (OAuth):** Gmail oder Outlook Mail über OAuth-Integration (White-Labeling über Makler-Domain).
+    *   **System-E-Mails (Resend):** Benachrichtigungen, Erinnerungen, Eskalationen via Resend API (Absender: noreply@immivo.ai).
+*   **E-Mail Inbound:** AWS SES empfängt E-Mails (Portal-Weiterleitungen) → Email-Parser Lambda extrahiert Lead-Daten.
+*   **E-Mail Postfächer:** AWS WorkMail (dennis.kral@immivo.ai, josef.leutgeb@immivo.ai, office@immivo.ai, support@immivo.ai).
+*   **Kalender:** AWS WorkMail Kalender via CalDAV (geplant: Google Meet Integration für Videocalls).
+*   **Medien:** AWS S3 für Bildupload (Objekt-Fotos, Grundrisse, Bug-Report-Screenshots).
 *   **Stripe:** Abwicklung von Subscriptions. Webhooks von Stripe aktualisieren den Lizenz-Status im `Tenant Manager`.
 
 ### 6. Frontend (AWS Lambda)
@@ -131,4 +138,4 @@ Wir nutzen **AWS CDK (Cloud Development Kit)**, um die gesamte Infrastruktur im 
 *   **Frontend:** `npm run dev` auf Port 3000
 *   **Backend:** `npm run dev` auf Port 3001 (mit nodemon)
 *   **Datenbank:** Neon.tech (kostenlose serverless Postgres)
-*   **Uploads:** Lokal in `./uploads`, auf Lambda in `/tmp/uploads`
+*   **Uploads:** AWS S3 (Production), lokal in `./uploads` als Fallback (Development)

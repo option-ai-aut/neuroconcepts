@@ -109,15 +109,16 @@ Folgende Unterauftragsverarbeiter werden eingesetzt:
 
 | Anbieter | Zweck | Standort | Garantien |
 |----------|-------|----------|-----------|
-| Amazon Web Services (AWS) | Hosting, DB, E-Mail (SES), Storage (S3) | Frankfurt, DE (eu-central-1) | EU-Rechenzentrum |
-| OpenAI, Inc. | KI-Textverarbeitung (Jarvis) | USA | EU-Standardvertragsklauseln (SCCs) |
-| Google LLC | Kalender-Integration (optional) | USA | EU-Standardvertragsklauseln (SCCs) |
+| Amazon Web Services (AWS) | Hosting, DB, E-Mail-Empfang (SES), Storage (S3), WorkMail | Frankfurt, DE (eu-central-1) | EU-Rechenzentrum |
+| OpenAI, Inc. | KI-Chat & Tools (Jarvis, GPT-5-mini) | USA | EU-Standardvertragsklauseln (SCCs) |
+| Google LLC | KI-Bildbearbeitung (Gemini), Kalender-Integration (optional) | USA | EU-Standardvertragsklauseln (SCCs) |
+| Resend, Inc. | System-E-Mail-Versand (Benachrichtigungen) | USA | EU-Standardvertragsklauseln (SCCs) |
 
 Änderungen bei Unterauftragsverarbeitern werden dem Verantwortlichen vorab mitgeteilt (Widerspruchsrecht innerhalb von 14 Tagen).
 
 ## 9. Datenübermittlung in Drittländer
 
-Datenübermittlungen in die USA (OpenAI, Google) erfolgen auf Basis von:
+Datenübermittlungen in die USA (OpenAI, Google, Resend) erfolgen auf Basis von:
 - EU-Standardvertragsklauseln (SCCs) gemäß Art. 46 Abs. 2 lit. c DSGVO
 - Zusätzliche Schutzmaßnahmen (Verschlüsselung, Pseudonymisierung wo möglich)
 

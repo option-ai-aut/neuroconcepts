@@ -2,7 +2,7 @@
 
 ## Übersicht
 
-Jarvis ist der zentrale KI-Assistent für Immivo mit Zugriff auf das **gesamte System**.
+Jarvis ist der zentrale KI-Assistent für Immivo, basierend auf **OpenAI GPT-5-mini**, mit Zugriff auf das **gesamte System**. Für Bildbearbeitung (Virtual Staging) wird **Google Gemini** verwendet.
 
 ## Vollständige Tool-Liste
 

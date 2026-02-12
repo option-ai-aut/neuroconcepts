@@ -2,7 +2,7 @@
 
 ## Übersicht
 
-Dieses Dokument beschreibt die Sicherheitsmaßnahmen für Jarvis (unseren KI-Assistenten) in der Immivo-Plattform.
+Dieses Dokument beschreibt die Sicherheitsmaßnahmen für Jarvis (unseren KI-Assistenten, basierend auf OpenAI GPT-5-mini) und die Bildbearbeitung (Google Gemini) in der Immivo-Plattform.
 
 ## Sicherheitsebenen
 
@@ -151,9 +151,13 @@ function sanitizeResponse(text: string): string {
 }
 ```
 
-## Gemini API Safety Settings
+## AI Provider Safety Settings
 
-Google Gemini hat eingebaute Safety-Filter:
+### OpenAI (Chat & Tools)
+OpenAI GPT-5-mini wird für Jarvis-Chat und Tool-Aufrufe verwendet. OpenAI hat eingebaute Content-Moderation.
+
+### Google Gemini (Bildbearbeitung)
+Google Gemini wird für Virtual Staging im KI-Bildstudio verwendet. Gemini hat eingebaute Safety-Filter:
 
 - **HARM_CATEGORY_HARASSMENT**: Blockiert Belästigung
 - **HARM_CATEGORY_HATE_SPEECH**: Blockiert Hassrede
@@ -170,7 +174,7 @@ Diese sind standardmäßig aktiviert und können nicht deaktiviert werden.
 - ✅ User kann Chat-Historie löschen lassen
 
 ### Datenminimierung
-- ✅ Nur notwendige Daten werden an Gemini API gesendet
+- ✅ Nur notwendige Daten werden an OpenAI/Gemini API gesendet
 - ✅ Keine persönlichen Daten in System Instructions
 - ✅ History wird auf letzte 10 Nachrichten limitiert
 

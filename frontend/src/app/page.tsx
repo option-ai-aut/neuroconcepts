@@ -12,6 +12,7 @@ import {
 import NextImage from 'next/image';
 import PublicNavigation from '@/components/PublicNavigation';
 import PublicFooter from '@/components/PublicFooter';
+import DemoBooking from '@/components/DemoBooking';
 
 // Intersection Observer Hook for scroll animations
 function useInView(options = {}) {
@@ -893,25 +894,8 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Calendar Placeholder */}
-            <div className="bg-gray-50 rounded-2xl p-8 border border-gray-200">
-              <h3 className="text-xl font-bold text-gray-900 mb-6 text-center">
-                Wähle einen Termin
-              </h3>
-              <div className="bg-white rounded-xl p-6 border border-gray-100 text-center">
-                <Calendar className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                <p className="text-gray-600 mb-6">
-                  Unser Kalender wird in Kürze hier eingebunden.
-                </p>
-                <a 
-                  href="mailto:hello@immivo.ai?subject=Demo-Anfrage"
-                  className="inline-flex items-center px-6 py-3 bg-gray-900 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-gray-500/20 transition-all"
-                >
-                  Per E-Mail anfragen
-                  <ArrowRight className="ml-2 w-5 h-5" />
-                </a>
-              </div>
-            </div>
+            {/* Live Demo Booking Calendar */}
+            <DemoBooking />
           </div>
         </div>
       </section>

@@ -69,6 +69,9 @@ async function loadAppSecrets() {
           'MICROSOFT_EMAIL_REDIRECT_URI',
           'GEMINI_API_KEY',
           'RESEND_API_KEY',
+          'WORKMAIL_EMAIL',
+          'WORKMAIL_PASSWORD',
+          'WORKMAIL_EWS_URL',
         ];
         for (const key of keysToLoad) {
           if (secrets[key]) process.env[key] = secrets[key];
@@ -6234,6 +6237,169 @@ app.get('/admin/platform/settings', adminAuthMiddleware, async (_req, res) => {
       region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'eu-central-1',
     });
   } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// WorkMail Calendar API
+// ============================================
+
+import {
+  getCalendarEvents,
+  createCalendarEvent,
+  deleteCalendarEvent,
+  getBusySlots,
+  getMultipleCalendars,
+  WorkMailCredentials,
+} from './services/WorkMailCalendarService';
+
+function getWorkMailCreds(): WorkMailCredentials {
+  return {
+    email: process.env.WORKMAIL_EMAIL || '',
+    password: process.env.WORKMAIL_PASSWORD || '',
+  };
+}
+
+// Get calendar events for current user or a specific email
+app.get('/calendar/events', authMiddleware, async (req: any, res) => {
+  try {
+    const creds = getWorkMailCreds();
+    if (!creds.email || !creds.password) {
+      return res.status(500).json({ error: 'WorkMail not configured' });
+    }
+    const start = new Date(req.query.start as string || new Date().toISOString());
+    const end = new Date(req.query.end as string || new Date(Date.now() + 30 * 86400000).toISOString());
+    const targetEmail = req.query.email as string | undefined;
+
+    const events = await getCalendarEvents(creds, start, end, targetEmail);
+    res.json({ events });
+  } catch (error: any) {
+    console.error('Calendar events error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create a calendar event
+app.post('/calendar/events', authMiddleware, async (req: any, res) => {
+  try {
+    const creds = getWorkMailCreds();
+    if (!creds.email || !creds.password) {
+      return res.status(500).json({ error: 'WorkMail not configured' });
+    }
+    const { subject, body, start, end, location, attendees, meetLink, isAllDay } = req.body;
+    if (!subject || !start || !end) {
+      return res.status(400).json({ error: 'subject, start, end required' });
+    }
+
+    const result = await createCalendarEvent(creds, {
+      subject,
+      body,
+      start: new Date(start),
+      end: new Date(end),
+      location,
+      attendees,
+      meetLink,
+      isAllDay,
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('Calendar create error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete a calendar event
+app.delete('/calendar/events/:id', authMiddleware, async (req: any, res) => {
+  try {
+    const creds = getWorkMailCreds();
+    if (!creds.email || !creds.password) {
+      return res.status(500).json({ error: 'WorkMail not configured' });
+    }
+    const success = await deleteCalendarEvent(creds, req.params.id);
+    res.json({ success });
+  } catch (error: any) {
+    console.error('Calendar delete error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get busy slots (for public booking page)
+app.get('/calendar/busy', async (req, res) => {
+  try {
+    const creds = getWorkMailCreds();
+    if (!creds.email || !creds.password) {
+      return res.status(500).json({ error: 'WorkMail not configured' });
+    }
+    const email = req.query.email as string || creds.email;
+    const start = new Date(req.query.start as string || new Date().toISOString());
+    const end = new Date(req.query.end as string || new Date(Date.now() + 14 * 86400000).toISOString());
+
+    const slots = await getBusySlots(creds, email, start, end);
+    res.json({ slots });
+  } catch (error: any) {
+    console.error('Calendar busy error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Public: Book a demo (no auth required)
+app.post('/calendar/book-demo', async (req, res) => {
+  try {
+    const creds = getWorkMailCreds();
+    if (!creds.email || !creds.password) {
+      return res.status(500).json({ error: 'WorkMail not configured' });
+    }
+    const { name, email, company, message, start, end } = req.body;
+    if (!name || !email || !start || !end) {
+      return res.status(400).json({ error: 'name, email, start, end required' });
+    }
+
+    const subject = `Demo Call – ${name}${company ? ` (${company})` : ''}`;
+    const meetLink = 'https://meet.google.com/new';
+    const body = [
+      `Demo-Termin mit ${name}`,
+      `E-Mail: ${email}`,
+      company ? `Unternehmen: ${company}` : '',
+      message ? `Nachricht: ${message}` : '',
+      '',
+      `Google Meet: ${meetLink}`,
+    ].filter(Boolean).join('\n');
+
+    const result = await createCalendarEvent(creds, {
+      subject,
+      body,
+      start: new Date(start),
+      end: new Date(end),
+      attendees: [email],
+      meetLink,
+    });
+    res.json({ success: true, eventId: result?.id });
+  } catch (error: any) {
+    console.error('Demo booking error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Get all employee calendars
+app.get('/admin/platform/calendars', adminAuthMiddleware, async (req, res) => {
+  try {
+    const creds = getWorkMailCreds();
+    if (!creds.email || !creds.password) {
+      return res.status(500).json({ error: 'WorkMail not configured' });
+    }
+    const emails = (req.query.emails as string || '').split(',').filter(Boolean);
+    if (emails.length === 0) {
+      return res.status(400).json({ error: 'emails parameter required' });
+    }
+    const start = new Date(req.query.start as string || new Date().toISOString());
+    const end = new Date(req.query.end as string || new Date(Date.now() + 7 * 86400000).toISOString());
+
+    const calendars = await getMultipleCalendars(creds, emails, start, end);
+    res.json({ calendars });
+  } catch (error: any) {
+    console.error('Admin calendars error:', error);
     res.status(500).json({ error: error.message });
   }
 });
