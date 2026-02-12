@@ -72,7 +72,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   }, [setMobileJarvisOpen]);
 
   return (
-    <div className={`flex h-screen font-sans transition-colors duration-300 ${isDark ? 'dark bg-[#111111]' : 'bg-white'}`}>
+    <div className={`flex h-[100dvh] font-sans transition-colors duration-300 ${isDark ? 'dark bg-[#111111]' : 'bg-white'}`}>
       {/* Safe area top fill — ensures correct bg behind iPhone notch/status bar */}
       <div className={`fixed top-0 left-0 right-0 z-[60] lg:hidden transition-colors ${isDark ? 'bg-[#111111]' : 'bg-white'}`} style={{ height: 'env(safe-area-inset-top, 0px)' }} />
       
@@ -84,7 +84,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         {/* Top Header Bar */}
         <PageHeader />
         {/* Scrollable Content - extra bottom padding on mobile for nav bar */}
-        <main className="flex-1 overflow-y-auto bg-white dark:bg-[#111111] overflow-x-visible pb-16 lg:pb-0 transition-colors">
+        <main className={`flex-1 overflow-y-auto bg-white dark:bg-[#111111] overflow-x-hidden pb-16 lg:pb-0 transition-colors ${mobileJarvisOpen ? 'overflow-hidden' : ''}`} style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}>
           <MobileRouteGuard pathname={pathname}>
             {children}
           </MobileRouteGuard>
@@ -110,7 +110,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
       {/* Mobile: Jarvis Full-Screen Chat Overlay */}
       {(mobileJarvisOpen || jarvisClosing) && (
-        <div className={`lg:hidden fixed inset-0 z-50 ${isDark ? 'bg-[#111111]' : 'bg-white'} ${jarvisClosing ? 'animate-slide-down' : 'animate-slide-up'}`}>
+        <div
+          className={`lg:hidden fixed inset-0 z-50 ${isDark ? 'bg-[#111111]' : 'bg-white'} ${jarvisClosing ? 'animate-slide-down' : 'animate-slide-up'}`}
+          style={{ overscrollBehavior: 'none' }}
+        >
           <AiChatSidebar mobile onClose={handleCloseJarvis} />
         </div>
       )}

@@ -735,7 +735,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white" style={{ overscrollBehavior: 'contain' }}>
         {/* Pending Jarvis Actions */}
         {pendingActions.length > 0 && (
           <div className="space-y-3 mb-4">

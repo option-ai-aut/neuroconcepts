@@ -14,12 +14,21 @@
 
 html {
   background-color: #ffffff;
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
   background: #ffffff;
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  height: 100%;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  /* Prevent iOS overscroll/bounce on the body */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ========================================
@@ -331,12 +340,8 @@ body {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Prevent overscroll bounce on mobile */
-@media (max-width: 1023px) {
-  body {
-    overscroll-behavior: none;
-  }
-}
+/* Prevent overscroll bounce on mobile — applied globally via body above */
+/* Scrollable content areas should use overscroll-behavior: contain */
 
 /* Image Studio staging animation */
 @keyframes staging-pop {
