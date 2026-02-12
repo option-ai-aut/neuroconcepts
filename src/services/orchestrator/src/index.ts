@@ -341,8 +341,9 @@ async function uploadToS3(buffer: Buffer, filename: string, contentType: string,
       ContentType: contentType,
     }).promise();
     
-    // Return public S3 URL
-    return `https://${MEDIA_BUCKET}.s3.amazonaws.com/${key}`;
+    // Return public S3 URL (with region for non-us-east-1 buckets)
+    const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'eu-central-1';
+    return `https://${MEDIA_BUCKET}.s3.${region}.amazonaws.com/${key}`;
   }
   
   // Fallback for local dev without S3: save to disk

@@ -17,7 +17,7 @@ import {
   Wand2,
 } from 'lucide-react';
 import useSWR from 'swr';
-import { getProperties } from '@/lib/api';
+import { getProperties, getImageUrl } from '@/lib/api';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 
 interface Property {
@@ -26,18 +26,6 @@ interface Property {
   address?: string;
   images?: string[];
 }
-
-// Helper to resolve image URLs (handles relative /uploads/ paths and S3 URLs)
-const getImageUrl = (url: string): string => {
-  if (!url) return '';
-  if (url.startsWith('http')) return url;
-  if (url.startsWith('/uploads/')) {
-    const config = getRuntimeConfig();
-    const apiUrl = config.apiUrl || process.env.NEXT_PUBLIC_API_URL || '';
-    return apiUrl ? `${apiUrl}${url}` : url;
-  }
-  return url;
-};
 
 const STYLES = [
   { id: 'modern', name: 'Modern', desc: 'Klar & minimalistisch' },
@@ -443,7 +431,12 @@ export default function ImageStudioPage() {
                                   <img 
                                     src={resolvedUrl} 
                                     alt={`${property.title} Bild ${idx + 1}`} 
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" 
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200 bg-gray-200" 
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.onerror = null;
+                                      target.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150" viewBox="0 0 200 150"><rect fill="%23e5e7eb" width="200" height="150"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%239ca3af" font-size="12" font-family="sans-serif">Bild nicht verfügbar</text></svg>');
+                                    }}
                                   />
                                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                                 </button>

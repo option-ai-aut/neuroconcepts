@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { FileText, Plus, Search, Edit2, Trash2, Sparkles, Calendar, Eye, ImageIcon, ChevronDown } from 'lucide-react';
-import { getExposeTemplates, deleteExposeTemplate, createExposeTemplate, updateExposeTemplate, ExposeTemplate, API_ENDPOINTS, getProperties, Property } from '@/lib/api';
+import { getExposeTemplates, deleteExposeTemplate, createExposeTemplate, updateExposeTemplate, ExposeTemplate, API_ENDPOINTS, getProperties, Property, getImageUrl } from '@/lib/api';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import useSWR from 'swr';
 
@@ -302,7 +302,7 @@ export default function ExposesPage() {
         return (
           <div className="relative h-64 bg-gray-900 overflow-hidden">
             {block.imageUrl ? (
-              <img src={block.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              <img src={getImageUrl(block.imageUrl || '')} alt="" className="absolute inset-0 w-full h-full object-cover" />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-white/30">
                 <ImageIcon className="w-16 h-16" />
@@ -439,7 +439,7 @@ export default function ExposesPage() {
             <div className={`grid gap-2 ${block.columns === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
               {images.length > 0 ? images.map((img: string, i: number) => (
                 <div key={i} className="aspect-video bg-gray-200 rounded overflow-hidden">
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <img src={getImageUrl(img)} alt="" className="w-full h-full object-cover" />
                 </div>
               )) : (
                 <div className="aspect-video bg-gray-200 rounded flex items-center justify-center text-gray-400 col-span-2">
@@ -455,7 +455,7 @@ export default function ExposesPage() {
           <div className="p-6">
             {block.title && <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>{rv(block.title)}</h3>}
             {block.imageUrl ? (
-              <img src={block.imageUrl} alt="Grundriss" className="w-full" />
+              <img src={getImageUrl(block.imageUrl || '')} alt="Grundriss" className="w-full" />
             ) : (
               <div className="aspect-video bg-gray-200 rounded flex items-center justify-center text-gray-400">
                 <ImageIcon className="w-12 h-12" />

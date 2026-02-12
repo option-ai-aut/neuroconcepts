@@ -2,11 +2,16 @@
 
 ## Problem
 
-Cursor (Electron-basiert) stürzt wiederholt ab mit `Code 5` (renderer process crashed). Ursache sind `OTLPExporterError: Bad Request`-Fehler aus dem internen OpenTelemetry SDK, die den Extension Host fluten und den Renderer-Prozess zum Absturz bringen.
+Cursor (Electron-basiert) stürzt wiederholt ab mit `Code 5` (renderer process crashed).
+
+**Zwei Ursachen identifiziert:**
+
+1. `OTLPExporterError: Bad Request` — OpenTelemetry SDK flutet den Extension Host
+2. **Renderer-Prozess Memory Explosion** — Renderer wächst auf 1.8+ GB RAM bei 139% CPU, macOS killt den Prozess (jetsam/OOM)
 
 ## Lösung (Stand: Februar 2026, Cursor 2.4.31)
 
-### 1. OTEL-Umgebungsvariablen (wichtigster Fix)
+### 1. OTEL-Umgebungsvariablen
 
 Fünf Umgebungsvariablen deaktivieren das OpenTelemetry SDK und alle Exporter komplett:
 
@@ -49,39 +54,52 @@ launchctl unload ~/Library/LaunchAgents/com.cursor.env.plist 2>/dev/null
 launchctl load ~/Library/LaunchAgents/com.cursor.env.plist
 ```
 
-### 2. Cursor argv.json
+### 2. Cursor argv.json (Memory-Begrenzung — kritisch!)
 
 **Datei:** `~/Library/Application Support/Cursor/argv.json`
 
 ```json
 {
     "disable-hardware-acceleration": true,
-    "js-flags": "--max-old-space-size=4096"
+    "js-flags": "--max-old-space-size=2048 --optimize-for-size --gc-interval=100",
+    "disable-gpu-compositing": true
 }
 ```
 
-- `disable-hardware-acceleration` — Verhindert GPU-bezogene Crashes
-- `max-old-space-size=4096` — Gibt dem Electron-Prozess mehr Heap-Speicher
+| Flag | Beschreibung |
+|------|-------------|
+| `disable-hardware-acceleration` | Verhindert GPU-bezogene Crashes |
+| `max-old-space-size=2048` | **Begrenzt V8 Heap auf 2 GB** (vorher 4096 — erlaubte unkontrolliertes Wachstum bis zum Crash!) |
+| `optimize-for-size` | V8 optimiert für weniger Speicherverbrauch statt Geschwindigkeit |
+| `gc-interval=100` | Garbage Collector läuft häufiger (alle 100 Allokationen) |
+| `disable-gpu-compositing` | Deaktiviert GPU-basiertes Compositing komplett |
 
-### 3. Cursor settings.json
+> **Wichtig:** `max-old-space-size=4096` war die FALSCHE Einstellung — sie ließ den Renderer auf 1.8+ GB wachsen bis macOS ihn killte. Der Wert 2048 erzwingt früheres GC.
+
+### 3. Cursor settings.json (Memory-Reduktion)
 
 **Datei:** `~/Library/Application Support/Cursor/User/settings.json`
 
-Relevante Einstellungen:
-
 ```json
 {
+    "window.commandCenter": true,
     "telemetry.telemetryLevel": "off",
     "gpu_compositing": "disabled",
     "cursor.general.disableHttp2": true,
+
     "files.watcherExclude": {
         "**/node_modules/**": true,
         "**/.git/objects/**": true,
         "**/.git/subtree-cache/**": true,
+        "**/.git/lfs/**": true,
         "**/dist/**": true,
         "**/.next/**": true,
-        "**/cdk.out/**": true
+        "**/cdk.out/**": true,
+        "**/package-lock.json": true,
+        "**/.prisma/**": true,
+        "**/infra/cdk.out/**": true
     },
+    "files.maxMemoryForLargeFilesMB": 128,
     "search.exclude": {
         "**/node_modules": true,
         "**/dist": true,
@@ -89,13 +107,57 @@ Relevante Einstellungen:
         "**/cdk.out": true,
         "**/package-lock.json": true
     },
-    "typescript.tsserver.maxTsServerMemory": 2048
+
+    "extensions.autoUpdate": false,
+    "git.autorefresh": false,
+    "git.autofetch": false,
+    "update.mode": "manual",
+
+    "typescript.tsserver.maxTsServerMemory": 1536,
+
+    "editor.minimap.enabled": false,
+    "editor.bracketPairColorization.enabled": false,
+    "editor.semanticHighlighting.enabled": false,
+    "editor.suggest.preview": false,
+    "editor.hover.delay": 500,
+    "editor.quickSuggestions": { "other": false, "comments": false, "strings": false },
+    "editor.parameterHints.enabled": false,
+    "editor.codeLens": false,
+    "editor.occurrencesHighlight": "off",
+    "editor.renderWhitespace": "none",
+    "editor.cursorBlinking": "solid",
+    "editor.smoothScrolling": false,
+    "editor.cursorSmoothCaretAnimation": "off",
+
+    "workbench.editor.limit.enabled": true,
+    "workbench.editor.limit.value": 5,
+    "workbench.editor.enablePreview": true,
+    "workbench.list.smoothScrolling": false,
+    "workbench.tree.renderIndentGuides": "none",
+
+    "terminal.integrated.gpuAcceleration": "off",
+    "terminal.integrated.scrollback": 500,
+
+    "debug.console.wordWrap": false
 }
 ```
 
+**Memory-Reduktions-Einstellungen im Detail:**
+
+| Setting | Spart | Beschreibung |
+|---------|-------|-------------|
+| `editor.minimap.enabled: false` | ~50-100 MB | Minimap rendert gesamte Datei als Bild |
+| `editor.semanticHighlighting.enabled: false` | ~30-80 MB | Spart Language Server Kommunikation |
+| `editor.bracketPairColorization.enabled: false` | ~10-20 MB | Spart AST-Parsing |
+| `editor.codeLens: false` | ~20-50 MB | Keine Code-Annotationen über Funktionen |
+| `editor.quickSuggestions: false` | ~30-50 MB | Keine Live-Autocomplete |
+| `workbench.editor.limit.value: 5` | ~50-200 MB | Max 5 Tabs offen (jeder Tab = Renderer-Memory) |
+| `terminal.integrated.scrollback: 500` | ~10-30 MB | Weniger Terminal-Buffer |
+| `typescript.tsserver.maxTsServerMemory: 1536` | ~500 MB | tsserver von 2048 auf 1536 MB begrenzt |
+
 ### 4. Launcher-Script (Garantie-Variante)
 
-Falls die `launchctl`-Variablen nicht bis zum Extension Host durchkommen, kann Cursor direkt mit den Variablen gestartet werden:
+Falls die `launchctl`-Variablen nicht bis zum Extension Host durchkommen:
 
 **Datei:** `~/launch-cursor.sh`
 
@@ -113,45 +175,9 @@ disown
 
 Ausführbar machen: `chmod +x ~/launch-cursor.sh`
 
-## Diagnose
+### 5. OTEL-Transport direkt neutralisieren
 
-### Crash-Logs prüfen
-
-```bash
-# Neueste Log-Session finden
-ls -lt ~/Library/Application\ Support/Cursor/logs/ | head -5
-
-# Main-Log auf Crashes prüfen
-tail -50 ~/Library/Application\ Support/Cursor/logs/<SESSION>/main.log
-
-# Renderer-Log auf OTEL-Fehler prüfen
-cat ~/Library/Application\ Support/Cursor/logs/<SESSION>/window*/renderer.log
-
-# Extension-Host-Log
-tail -50 ~/Library/Application\ Support/Cursor/logs/<SESSION>/window*/exthost/exthost.log
-```
-
-### Umgebungsvariablen verifizieren
-
-```bash
-launchctl getenv OTEL_SDK_DISABLED          # → true
-launchctl getenv OTEL_TRACES_EXPORTER       # → none
-launchctl getenv OTEL_METRICS_EXPORTER      # → none
-launchctl getenv OTEL_LOGS_EXPORTER         # → none
-launchctl getenv OTEL_EXPORTER_OTLP_ENDPOINT # → http://localhost:1
-```
-
-### Cache zurücksetzen (bei Bedarf)
-
-```bash
-rm -rf ~/Library/Application\ Support/Cursor/GPUCache/
-rm -rf ~/Library/Application\ Support/Cursor/Cache/
-rm -rf ~/Library/Application\ Support/Cursor/CachedData/
-```
-
-## 5. OTEL-Transport direkt neutralisieren (effektivster Fix)
-
-Da die Umgebungsvariablen vom Extension Host nicht zuverlässig geerbt werden, wurde die `sendWithHttp`-Funktion in der Cursor-App direkt gepatcht. Alle 3 Build-Varianten:
+Die `sendWithHttp`-Funktion in der Cursor-App direkt gepatcht. Alle 3 Build-Varianten:
 
 ```
 /Applications/Cursor.app/Contents/Resources/app/node_modules/@opentelemetry/otlp-exporter-base/build/src/transport/http-transport-utils.js
@@ -168,27 +194,51 @@ function sendWithHttp(request, url, headers, compression, userAgent, agent, data
 }
 ```
 
-Ein Backup der Originaldatei liegt unter:
-```
-.../http-transport-utils.js.backup
-```
-
 ### Nach einem Cursor-Update erneut patchen
 
 ```bash
 # Prüfen ob Patch noch aktiv ist
 grep -l "PATCHED" "/Applications/Cursor.app/Contents/Resources/app/node_modules/@opentelemetry/otlp-exporter-base/build/src/transport/http-transport-utils.js"
+```
 
-# Falls nicht: alle 3 Dateien erneut patchen (gleicher Inhalt)
-for f in src esm esnext; do
-  FILE="/Applications/Cursor.app/Contents/Resources/app/node_modules/@opentelemetry/otlp-exporter-base/build/$f/transport/http-transport-utils.js"
-  # Nur die sendWithHttp-Funktion ersetzen
-done
+## Diagnose
+
+### Crash-Logs prüfen
+
+```bash
+# Neueste Log-Session finden
+ls -lt ~/Library/Application\ Support/Cursor/logs/ | head -5
+
+# Main-Log auf Crashes prüfen
+tail -50 ~/Library/Application\ Support/Cursor/logs/<SESSION>/main.log
+
+# Renderer-Log
+cat ~/Library/Application\ Support/Cursor/logs/<SESSION>/window*/renderer.log
+```
+
+### Memory-Verbrauch der Cursor-Prozesse prüfen
+
+```bash
+# Alle Cursor-Prozesse mit Memory-Verbrauch anzeigen
+ps aux | grep -i "[C]ursor" | awk '{printf "%6s MB  %s\n", int($6/1024), $11}'
+
+# WARNUNG wenn Renderer > 1 GB: Cursor neustarten!
+```
+
+### Cache zurücksetzen
+
+```bash
+rm -rf ~/Library/Application\ Support/Cursor/GPUCache/
+rm -rf ~/Library/Application\ Support/Cursor/Cache/
+rm -rf ~/Library/Application\ Support/Cursor/CachedData/
+rm -rf ~/Library/Application\ Support/Cursor/Code\ Cache/
+rm -rf ~/Library/Application\ Support/Cursor/blob_storage/
 ```
 
 ## Hinweise
 
-- Die `launchctl setenv`-Variablen gelten systemweit für alle GUI-Apps. `OTEL_*`-Variablen sind aber nur für OpenTelemetry-SDKs relevant und haben keine Auswirkung auf andere Apps.
-- Nach einem macOS-Neustart werden die Variablen automatisch vom Launch Agent gesetzt.
-- Bei einem **Cursor-Update** werden `argv.json` und die OTEL-Patches überschrieben — erneut anwenden!
-- Der OTEL-Patch (Punkt 5) ist der zuverlässigste Fix, da er direkt an der Fehlerquelle ansetzt.
+- `max-old-space-size=4096` war **kontraproduktiv** — es erlaubte dem Renderer auf 1.8+ GB zu wachsen. Der Wert 2048 mit `--optimize-for-size` erzwingt aggressiveres GC.
+- Die `launchctl setenv`-Variablen gelten systemweit. `OTEL_*`-Variablen betreffen nur OpenTelemetry.
+- Nach einem macOS-Neustart setzt der Launch Agent die Variablen automatisch.
+- Bei einem **Cursor-Update** werden `argv.json` und OTEL-Patches überschrieben — erneut anwenden!
+- **Max 5 offene Tabs** ist der effektivste einzelne Memory-Fix (jeder Tab belegt 50-200 MB im Renderer).

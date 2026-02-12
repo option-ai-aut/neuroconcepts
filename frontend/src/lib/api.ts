@@ -8,6 +8,26 @@ export const getApiUrl = () => {
   return url.replace(/\/+$/, '');
 };
 
+/**
+ * Resolves image URLs for display:
+ * - S3 URLs (http) with missing region -> fix region
+ * - /uploads/ paths (local dev) -> prepend API base URL
+ * - Other URLs -> return as-is
+ */
+export const getImageUrl = (url: string): string => {
+  if (!url) return '';
+  // Fix S3 URLs missing region (legacy: .s3.amazonaws.com -> .s3.eu-central-1.amazonaws.com)
+  if (url.includes('.s3.amazonaws.com/') && !url.includes('.s3.eu-central-1.amazonaws.com/')) {
+    return url.replace('.s3.amazonaws.com/', '.s3.eu-central-1.amazonaws.com/');
+  }
+  if (url.startsWith('http')) return url;
+  if (url.startsWith('/uploads/')) {
+    const base = getApiUrl();
+    return `${base}${url}`;
+  }
+  return url;
+};
+
 export const getAuthHeaders = async (): Promise<HeadersInit> => {
   try {
     const session = await fetchAuthSession();

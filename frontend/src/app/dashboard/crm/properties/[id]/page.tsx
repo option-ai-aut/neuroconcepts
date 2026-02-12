@@ -1,25 +1,13 @@
 'use client';
 
 import { useEffect, useState, use, useRef } from 'react';
-import { getProperty, Property, updateProperty, deleteProperty, getExposeTemplates, ExposeTemplate, getAuthHeaders, uploadPropertyDocuments, deletePropertyDocument, DocumentFile, getMe } from '@/lib/api';
+import { getProperty, Property, updateProperty, deleteProperty, getExposeTemplates, ExposeTemplate, getAuthHeaders, uploadPropertyDocuments, deletePropertyDocument, DocumentFile, getMe, getImageUrl } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { Building, MapPin, Euro, Maximize, Home, FileText, ArrowLeft, MoreVertical, Trash2, Save, FileImage, Plus, Upload, X, Image as ImageIcon, Globe, Check, Download, File, FileSpreadsheet, FileType, Users, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { getRuntimeConfig } from '@/components/EnvProvider';
-
-// Helper to get full image URL (handles relative /uploads/ paths and S3 URLs)
-const getImageUrl = (url: string): string => {
-  if (!url) return '';
-  if (url.startsWith('http')) return url;
-  if (url.startsWith('/uploads/')) {
-    const config = getRuntimeConfig();
-    const apiUrl = config.apiUrl || process.env.NEXT_PUBLIC_API_URL || '';
-    return apiUrl ? `${apiUrl}${url}` : url;
-  }
-  return url;
-};
 
 export default function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -862,7 +850,12 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                       <img 
                         src={getImageUrl(img)} 
                         alt={`Bild ${idx + 1}`}
-                        className="w-full h-full object-cover rounded-lg"
+                        className="w-full h-full object-cover rounded-lg bg-gray-200"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.onerror = null;
+                          target.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect fill="%23e5e7eb" width="200" height="200"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%239ca3af" font-size="14" font-family="sans-serif">Bild nicht verfügbar</text></svg>');
+                        }}
                       />
                       <button
                         onClick={(e) => { e.stopPropagation(); removeImage(img, false); }}
@@ -927,7 +920,12 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                       <img 
                         src={getImageUrl(fp)} 
                         alt={`Grundriss ${idx + 1}`}
-                        className="w-full h-full object-cover rounded-lg"
+                        className="w-full h-full object-cover rounded-lg bg-gray-200"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.onerror = null;
+                          target.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect fill="%23e5e7eb" width="200" height="200"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%239ca3af" font-size="14" font-family="sans-serif">Bild nicht verfügbar</text></svg>');
+                        }}
                       />
                       <button
                         onClick={(e) => { e.stopPropagation(); removeImage(fp, true); }}

@@ -14,7 +14,8 @@ import {
   getExpose, updateExpose, regenerateExpose, 
   getExposeTemplates, getExposeTemplate, updateExposeTemplate, 
   createExpose, ExposeBlock, Expose, ExposeTemplate, Property,
-  downloadExposePdf, downloadTemplatePdf, getProperty, getProperties
+  downloadExposePdf, downloadTemplatePdf, getProperty, getProperties,
+  getImageUrl
 } from '@/lib/api';
 
 // ============================================
@@ -973,7 +974,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         return (
           <div className="relative h-64 overflow-hidden" style={{ backgroundColor: blockBg || '#312E81' }}>
             {block.imageUrl ? (
-              <img src={block.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              <img src={getImageUrl(block.imageUrl || '')} alt="" className="absolute inset-0 w-full h-full object-cover" />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-white/30">
                 <ImageIcon className="w-16 h-16" />
@@ -1018,7 +1019,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
             <div className={`grid gap-2 ${block.columns === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
               {images.length > 0 ? images.slice(0, 4).map((img: string, i: number) => (
                 <div key={i} className="aspect-video bg-gray-200 rounded overflow-hidden">
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <img src={getImageUrl(img)} alt="" className="w-full h-full object-cover" />
                 </div>
               )) : (
                 <>
@@ -1147,7 +1148,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
           <div className="p-6" style={{ backgroundColor: blockBg }}>
             {block.title && <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{pv(block.title)}</h3>}
             {block.imageUrl ? (
-              <img src={block.imageUrl} alt="Grundriss" className="w-full" />
+              <img src={getImageUrl(block.imageUrl || '')} alt="Grundriss" className="w-full" />
             ) : (
               <div className="aspect-video bg-gray-200 rounded flex items-center justify-center text-gray-400">
                 <Home className="w-12 h-12" />
@@ -1586,7 +1587,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               <label className="block text-xs font-medium text-gray-700 mb-1">Hero-Bild</label>
               {block.imageUrl ? (
                 <div className="relative group">
-                  <img src={block.imageUrl} alt="" className="w-full h-24 object-cover rounded-md" />
+                  <img src={getImageUrl(block.imageUrl || '')} alt="" className="w-full h-24 object-cover rounded-md" />
                   <button
                     onClick={() => updateBlock(selectedBlockIndex, { imageUrl: '' })}
                     className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
@@ -1825,7 +1826,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
             <label className="block text-xs font-medium text-gray-700 mb-1">Grundriss</label>
             {block.imageUrl ? (
               <div className="relative group">
-                <img src={block.imageUrl} alt="" className="w-full h-32 object-contain rounded-md bg-gray-100" />
+                <img src={getImageUrl(block.imageUrl || '')} alt="" className="w-full h-32 object-contain rounded-md bg-gray-100" />
                 <button
                   onClick={() => updateBlock(selectedBlockIndex, { imageUrl: '' })}
                   className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
@@ -2254,7 +2255,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                     <div className="grid grid-cols-2 gap-2 mb-2">
                       {(block.images || []).map((img: string, idx: number) => (
                         <div key={idx} className="relative group">
-                          <img src={img} alt="" className="w-full h-16 object-cover rounded" />
+                          <img src={getImageUrl(img)} alt="" className="w-full h-16 object-cover rounded" />
                           <button
                             onClick={() => {
                               const newImages = [...(block.images || [])];
@@ -2890,7 +2891,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                         }}
                         className="aspect-video rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 transition-colors"
                       >
-                        <img src={img} alt="" className="w-full h-full object-cover" />
+                        <img src={getImageUrl(img)} alt="" className="w-full h-full object-cover" />
                       </button>
                     ))}
                   </div>
@@ -2914,7 +2915,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                         }}
                         className="aspect-[4/3] rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 transition-colors bg-gray-50"
                       >
-                        <img src={img} alt="" className="w-full h-full object-contain" />
+                        <img src={getImageUrl(img)} alt="" className="w-full h-full object-contain" />
                       </button>
                     ))}
                   </div>
