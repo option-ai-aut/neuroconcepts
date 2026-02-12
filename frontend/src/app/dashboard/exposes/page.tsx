@@ -520,8 +520,6 @@ export default function ExposesPage() {
 
   return (
     <div className="h-full flex flex-col relative">
-      <div className="pt-2" />
-
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar List */}
         <div className="w-96 flex flex-col bg-white">
