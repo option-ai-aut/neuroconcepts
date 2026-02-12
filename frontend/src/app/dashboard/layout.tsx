@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import Sidebar from '@/components/Sidebar';
@@ -12,6 +12,7 @@ import MobileBottomNav from '@/components/MobileBottomNav';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { useAuthConfigured } from '@/components/AuthProvider';
 import { DarkModeProvider, useDarkMode } from '@/context/DarkModeContext';
+import { sendPresenceHeartbeat } from '@/lib/api';
 import { Loader2, Monitor } from 'lucide-react';
 import Image from 'next/image';
 
@@ -62,6 +63,14 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const { isDark } = useDarkMode();
   const pathname = usePathname();
   const [jarvisClosing, setJarvisClosing] = useState(false);
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Presence heartbeat — send every 60 seconds
+  useEffect(() => {
+    sendPresenceHeartbeat(); // Send immediately on mount
+    heartbeatRef.current = setInterval(() => sendPresenceHeartbeat(), 60_000);
+    return () => { if (heartbeatRef.current) clearInterval(heartbeatRef.current); };
+  }, []);
 
   const handleCloseJarvis = useCallback(() => {
     setJarvisClosing(true);

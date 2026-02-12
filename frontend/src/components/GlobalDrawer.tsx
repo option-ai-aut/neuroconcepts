@@ -109,6 +109,8 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
   const [showBcc, setShowBcc] = useState(!!emailFormData.bcc);
   const [signature, setSignature] = useState<string | null>(null);
   const [signatureLoaded, setSignatureLoaded] = useState(false);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const initializedRef = useRef(false);
 
   // Load user signature
   useEffect(() => {
@@ -128,54 +130,116 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
     loadSignature();
   }, [apiUrl, signatureLoaded]);
 
-  // Apply formatting
-  const applyFormat = (format: string) => {
-    const textarea = document.getElementById('email-body') as HTMLTextAreaElement;
-    if (!textarea) return;
+  // Initialize editor with existing content (e.g. when editing a draft)
+  useEffect(() => {
+    if (editorRef.current && !initializedRef.current) {
+      initializedRef.current = true;
+      if (emailFormData.bodyHtml) {
+        editorRef.current.innerHTML = emailFormData.bodyHtml;
+      } else if (emailFormData.body) {
+        editorRef.current.innerHTML = emailFormData.body.replace(/\n/g, '<br>');
+      }
+    }
+  }, [emailFormData.bodyHtml, emailFormData.body]);
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = emailFormData.body?.substring(start, end) || '';
-    
-    let formattedText = '';
+  // Sync editor content to form data
+  const syncContent = () => {
+    if (!editorRef.current) return;
+    const html = editorRef.current.innerHTML;
+    const text = editorRef.current.innerText || '';
+    updateEmailForm({ body: text, bodyHtml: html === '<br>' ? '' : html });
+  };
+
+  // Apply formatting using execCommand (works natively with contentEditable)
+  const applyFormat = (format: string) => {
+    editorRef.current?.focus();
     switch (format) {
       case 'bold':
-        formattedText = `**${selectedText}**`;
+        document.execCommand('bold');
         break;
       case 'italic':
-        formattedText = `*${selectedText}*`;
+        document.execCommand('italic');
         break;
       case 'underline':
-        formattedText = `<u>${selectedText}</u>`;
+        document.execCommand('underline');
         break;
       case 'list':
-        formattedText = selectedText.split('\n').map((line: string) => `• ${line}`).join('\n');
+        document.execCommand('insertUnorderedList');
         break;
       case 'numbered':
-        formattedText = selectedText.split('\n').map((line: string, i: number) => `${i + 1}. ${line}`).join('\n');
+        document.execCommand('insertOrderedList');
         break;
-      case 'link':
+      case 'link': {
         const url = prompt('URL eingeben:', 'https://');
         if (url) {
-          formattedText = `[${selectedText || 'Link'}](${url})`;
-        } else {
-          return;
+          document.execCommand('createLink', false, url);
         }
         break;
-      default:
-        return;
+      }
     }
+    syncContent();
+  };
 
-    const newBody = (emailFormData.body || '').substring(0, start) + formattedText + (emailFormData.body || '').substring(end);
-    updateEmailForm({ body: newBody });
+  // Handle Enter key in lists — double-Enter exits the list
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter') {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+
+      // Check if we're inside a list item
+      let node: Node | null = sel.anchorNode;
+      let listItem: HTMLLIElement | null = null;
+      while (node && node !== editorRef.current) {
+        if (node.nodeName === 'LI') {
+          listItem = node as HTMLLIElement;
+          break;
+        }
+        node = node.parentNode;
+      }
+
+      // If in an empty list item, exit the list on Enter
+      if (listItem && (listItem.textContent || '').trim() === '') {
+        e.preventDefault();
+        const list = listItem.parentElement;
+        if (list && (list.nodeName === 'UL' || list.nodeName === 'OL')) {
+          // Remove the empty li
+          list.removeChild(listItem);
+          // If list is now empty, remove it
+          if (list.children.length === 0 && list.parentNode) {
+            const br = document.createElement('br');
+            list.parentNode.insertBefore(br, list.nextSibling);
+            list.parentNode.removeChild(list);
+            // Place cursor after the br
+            const range = document.createRange();
+            range.setStartAfter(br);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+          } else {
+            // Place cursor after the list
+            const p = document.createElement('div');
+            p.innerHTML = '<br>';
+            if (list.parentNode) {
+              list.parentNode.insertBefore(p, list.nextSibling);
+              const range = document.createRange();
+              range.setStart(p, 0);
+              range.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(range);
+            }
+          }
+          syncContent();
+        }
+      }
+    }
   };
 
   // Insert signature
   const insertSignature = () => {
-    if (signature) {
-      const currentBody = emailFormData.body || '';
-      const newBody = currentBody + '\n\n' + signature;
-      updateEmailForm({ body: newBody });
+    if (signature && editorRef.current) {
+      editorRef.current.focus();
+      document.execCommand('insertHTML', false, '<br><br>' + signature.replace(/\n/g, '<br>'));
+      syncContent();
     }
   };
 
@@ -341,16 +405,29 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
         )}
       </div>
 
-      {/* Email Body */}
-      <div className="flex-1 min-h-0">
-        <textarea
+      {/* Email Body — Rich Text Editor */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div
+          ref={editorRef}
           id="email-body"
-          value={emailFormData.body || ''}
-          onChange={(e) => updateEmailForm({ body: e.target.value })}
-          className="w-full h-full rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm py-3 px-4 transition-all outline-none resize-none leading-relaxed"
-          placeholder="Schreiben Sie Ihre Nachricht..."
+          contentEditable
+          suppressContentEditableWarning
+          onInput={syncContent}
+          onKeyDown={handleKeyDown}
+          className="w-full h-full rounded-lg border border-gray-200 bg-white text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm py-3 px-4 transition-all outline-none leading-relaxed"
           style={{ minHeight: '280px' }}
+          data-placeholder="Schreiben Sie Ihre Nachricht..."
         />
+        <style>{`
+          #email-body:empty::before {
+            content: attr(data-placeholder);
+            color: #9ca3af;
+            pointer-events: none;
+          }
+          #email-body ul, #email-body ol { padding-left: 24px; margin: 4px 0; }
+          #email-body li { margin: 2px 0; }
+          #email-body a { color: #2563eb; text-decoration: underline; }
+        `}</style>
       </div>
 
       {/* Actions */}

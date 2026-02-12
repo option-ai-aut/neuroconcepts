@@ -1051,6 +1051,24 @@ app.delete('/account', authMiddleware, async (req, res) => {
 });
 
 // Get Seats (Team Members)
+// Presence heartbeat — updates lastSeenAt for the current user
+app.post('/presence/heartbeat', authMiddleware, async (req, res) => {
+  try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    await prisma.user.update({
+      where: { id: currentUser.id },
+      data: { lastSeenAt: new Date() }
+    });
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Heartbeat error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 app.get('/seats', authMiddleware, async (req, res) => {
   try {
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
@@ -1058,7 +1076,7 @@ app.get('/seats', authMiddleware, async (req, res) => {
 
     const seats = await prisma.user.findMany({
       where: { tenantId: currentUser.tenantId },
-      select: { id: true, email: true, firstName: true, lastName: true, role: true }
+      select: { id: true, email: true, firstName: true, lastName: true, role: true, lastSeenAt: true }
     });
     res.json(seats);
   } catch (error) {
@@ -2841,6 +2859,7 @@ app.post('/chat/stream',
     try {
       // Handle both JSON and FormData
       const message = req.body.message || '';
+      const pageContext = req.body.pageContext || '';
       const files = req.files as Express.Multer.File[] | undefined;
       
       // Get user from auth - CRITICAL: tenantId comes from authenticated user, not request!
@@ -2908,6 +2927,7 @@ app.post('/chat/stream',
         name: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email,
         email: currentUser.email,
         role: currentUser.role,
+        pageContext: pageContext || undefined,
       };
       for await (const result of openai.chatStream(fullMessage, tenantId, optimizedHistory, uploadedFileUrls, currentUser.id, userContext)) {
         fullResponse += result.chunk;
@@ -2953,7 +2973,7 @@ app.post('/exposes/:id/chat',
   async (req, res) => {
     try {
       const { id: exposeId } = req.params;
-      const { message, history } = req.body;
+      const { message, history, pageContext } = req.body;
       
       const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
       if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
@@ -2966,7 +2986,7 @@ app.post('/exposes/:id/chat',
       if (!expose) return res.status(404).json({ error: 'Exposé not found' });
 
       const aiService = new OpenAIService();
-      const result = await aiService.exposeChat(message, currentUser.tenantId, exposeId, null, expose.blocks as any[], history || []);
+      const result = await aiService.exposeChat(message, currentUser.tenantId, exposeId, null, expose.blocks as any[], history || [], pageContext);
       
       // Sanitize response
       const sanitizedResponse = wrapAiResponse(result.text);
@@ -2991,7 +3011,7 @@ app.post('/templates/:id/chat',
   async (req, res) => {
     try {
       const { id: templateId } = req.params;
-      const { message, history } = req.body;
+      const { message, history, pageContext } = req.body;
       
       const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
       if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
@@ -3003,7 +3023,7 @@ app.post('/templates/:id/chat',
       if (!template) return res.status(404).json({ error: 'Template not found' });
 
       const aiService = new OpenAIService();
-      const result = await aiService.exposeChat(message, currentUser.tenantId, null, templateId, template.blocks as any[], history || []);
+      const result = await aiService.exposeChat(message, currentUser.tenantId, null, templateId, template.blocks as any[], history || [], pageContext);
       
       // Sanitize response
       const sanitizedResponse = wrapAiResponse(result.text);
@@ -3132,6 +3152,72 @@ app.post('/channels', authMiddleware, async (req, res) => {
   }
 });
 
+// Get or Create DM Channel between current user and another user
+app.post('/channels/dm', authMiddleware, async (req, res) => {
+  try {
+    const { userId: targetUserId } = req.body;
+    if (!targetUserId) return res.status(400).json({ error: 'userId is required' });
+
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    if (currentUser.id === targetUserId) {
+      return res.status(400).json({ error: 'Kann keine DM mit dir selbst erstellen' });
+    }
+
+    // Verify target user is in same tenant
+    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!targetUser || targetUser.tenantId !== currentUser.tenantId) {
+      return res.status(404).json({ error: 'Benutzer nicht gefunden' });
+    }
+
+    // Look for existing DM channel between these two users
+    const existingDm = await prisma.channel.findFirst({
+      where: {
+        tenantId: currentUser.tenantId,
+        type: 'DM',
+        AND: [
+          { members: { some: { userId: currentUser.id } } },
+          { members: { some: { userId: targetUserId } } }
+        ]
+      },
+      include: {
+        _count: { select: { members: true, messages: true } },
+        members: { include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } } }
+      }
+    });
+
+    if (existingDm) {
+      return res.json(existingDm);
+    }
+
+    // Create new DM channel
+    const dmName = `DM-${currentUser.id}-${targetUserId}`;
+    const channel = await prisma.channel.create({
+      data: {
+        name: dmName,
+        type: 'DM',
+        tenantId: currentUser.tenantId,
+        members: {
+          create: [
+            { userId: currentUser.id },
+            { userId: targetUserId }
+          ]
+        }
+      },
+      include: {
+        _count: { select: { members: true, messages: true } },
+        members: { include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } } }
+      }
+    });
+
+    res.json(channel);
+  } catch (error) {
+    console.error('DM channel error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 // Delete Channel (Admin only, cannot delete default)
 app.delete('/channels/:channelId', authMiddleware, async (req, res) => {
   try {
@@ -3193,7 +3279,12 @@ app.get('/channels', authMiddleware, async (req, res) => {
         ]
       },
       include: {
-        _count: { select: { members: true, messages: true } }
+        _count: { select: { members: true, messages: true } },
+        members: {
+          include: {
+            user: { select: { id: true, firstName: true, lastName: true, email: true } }
+          }
+        }
       },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }]
     });
@@ -3309,7 +3400,59 @@ app.post('/channels/:channelId/messages', authMiddleware, async (req, res) => {
       }
     });
 
+    // Respond immediately — then handle @jarvis in the background
     res.json(message);
+
+    // Check if @jarvis was mentioned (either as @[Jarvis](jarvis) or plain @jarvis)
+    const jarvisMentioned = /(@jarvis|@\[jarvis\])/i.test(content);
+    if (jarvisMentioned) {
+      // Fire-and-forget: generate Jarvis response asynchronously
+      (async () => {
+        try {
+          // Fetch recent channel messages for context (last 20)
+          const recentMessages = await prisma.channelMessage.findMany({
+            where: { channelId },
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+            include: {
+              user: { select: { firstName: true, lastName: true } }
+            }
+          });
+
+          const history = recentMessages.reverse().map(m => ({
+            role: m.isJarvis ? 'assistant' : 'user',
+            content: `${m.isJarvis ? 'Jarvis' : `${m.user.firstName || ''} ${m.user.lastName || ''}`.trim()}: ${m.content}`,
+          }));
+
+          // Strip the @jarvis mention from the actual question
+          const cleanContent = content.replace(/@\[Jarvis\]\([^)]*\)/gi, '').replace(/@jarvis/gi, '').trim();
+
+          const openai = new OpenAIService();
+          const jarvisResponse = await openai.chat(
+            `Du bist Jarvis, der KI-Assistent im Team Chat. Antworte wie TARS aus Interstellar — kurz, prägnant, mit einem Hauch trockenem Humor. Keine Semikolons (;), keine Floskeln, keine Emojis. Deutsch, du-Form, locker und menschlich. Beantworte die Frage basierend auf dem Kontext der bisherigen Unterhaltung.\n\nFrage von ${currentUser.firstName || ''} ${currentUser.lastName || ''}: ${cleanContent}`,
+            currentUser.tenantId,
+            history,
+            {
+              name: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email,
+              email: currentUser.email,
+              role: currentUser.role,
+            }
+          );
+
+          // Save Jarvis response as a channel message
+          await prisma.channelMessage.create({
+            data: {
+              channelId,
+              userId: currentUser.id, // Use the invoking user's ID (Jarvis doesn't have its own)
+              content: jarvisResponse,
+              isJarvis: true,
+            }
+          });
+        } catch (err) {
+          console.error('Jarvis team chat response error:', err);
+        }
+      })();
+    }
   } catch (error) {
     console.error('Send message error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -5580,7 +5723,8 @@ app.post('/emails/send', authMiddleware, async (req: any, res) => {
 
     // Prepare email body with signature if available
     let finalBody = body || '';
-    let finalHtml = bodyHtml;
+    // Auto-generate HTML from plain text if no HTML body was provided
+    let finalHtml = bodyHtml || (finalBody ? finalBody.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') : undefined);
     
     const userSettings = user.settings as any;
     if (userSettings?.emailSignature && !finalBody.includes(userSettings.emailSignature)) {
@@ -5648,18 +5792,18 @@ app.post('/emails/send', authMiddleware, async (req: any, res) => {
         ? `"${senderName}" <${user.email}>`
         : user.email;
 
-      // Build email message
+      // Build email message (the blank line between headers and body is required by RFC 2822)
       const emailLines = [
         `From: ${fromHeader}`,
         `To: ${to}`,
-        cc ? `Cc: ${cc}` : '',
-        bcc ? `Bcc: ${bcc}` : '',
+        ...(cc ? [`Cc: ${cc}`] : []),
+        ...(bcc ? [`Bcc: ${bcc}`] : []),
         `Subject: ${subject}`,
         'MIME-Version: 1.0',
         'Content-Type: text/html; charset=utf-8',
         '',
         finalHtml || finalBody.replace(/\n/g, '<br>')
-      ].filter(Boolean);
+      ];
 
       const rawMessage = Buffer.from(emailLines.join('\r\n'))
         .toString('base64')

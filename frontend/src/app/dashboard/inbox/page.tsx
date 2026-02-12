@@ -12,13 +12,12 @@ import {
 import useSWR from 'swr';
 import { useGlobalState } from '@/context/GlobalStateContext';
 
-// Sanitize and normalize HTML email content
+// Sanitize HTML email content — keep <style> tags since they render inside a sandboxed iframe
 function sanitizeEmailHtml(html: string): string {
   let clean = html
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
     .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
     .replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, '')
-    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
     .replace(/on\w+="[^"]*"/gi, '')
     .replace(/on\w+='[^']*'/gi, '');
   return clean;
@@ -64,71 +63,77 @@ function EmailBodyViewer({ email, onContentClick }: { email: Email; onContentCli
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [iframeHeight, setIframeHeight] = useState(400);
 
+  const hasBody = !!(email.bodyHtml || email.bodyText);
+
   useEffect(() => {
     const iframe = iframeRef.current;
-    if (!iframe) return;
+    if (!iframe || !hasBody) return;
 
-    const content = email.bodyHtml 
-      ? sanitizeEmailHtml(email.bodyHtml)
-      : `<pre style="white-space: pre-wrap; font-family: inherit; margin: 0;">${email.bodyText || ''}</pre>`;
+    let content: string;
+    const isHtml = !!email.bodyHtml;
+
+    if (isHtml) {
+      content = sanitizeEmailHtml(email.bodyHtml!);
+    } else {
+      const escaped = (email.bodyText || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>');
+      content = `<div>${escaped}</div>`;
+    }
 
     const doc = iframe.contentDocument;
     if (!doc) return;
 
+    // Base styles — only applied as defaults; email's own <style> tags take precedence
+    const baseStyles = `
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        font-size: 14px; line-height: 1.6; color: #1f2937; background: white;
+        overflow-x: hidden;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+      }
+      body { padding: 24px 28px; }
+      img { max-width: 100% !important; height: auto !important; }
+      a { color: #2563eb; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      pre, code { font-family: 'SF Mono', Monaco, 'Courier New', monospace; font-size: 13px; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
+      pre { padding: 12px; overflow-x: auto; }
+      blockquote { margin: 16px 0; padding-left: 16px; border-left: 3px solid #e5e7eb; color: #6b7280; }
+      p { margin: 8px 0; }
+      hr { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+      * { -webkit-font-smoothing: antialiased; }
+    `;
+
     doc.open();
-    doc.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <style>
-            * { box-sizing: border-box; }
-            html, body {
-              margin: 0; padding: 0;
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-              font-size: 14px; line-height: 1.6; color: #374151; background: white;
-              overflow-x: hidden;
-              max-width: 100vw;
-              word-wrap: break-word;
-              overflow-wrap: break-word;
-            }
-            body { padding: 16px; max-width: 100%; }
-            img { max-width: 100% !important; height: auto !important; }
-            a { color: #2563eb; text-decoration: none; word-break: break-all; }
-            a:hover { text-decoration: underline; }
-            table { max-width: 100% !important; width: 100% !important; border-collapse: collapse; table-layout: fixed; }
-            td, th { padding: 8px; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; }
-            div, span, p { max-width: 100%; }
-            pre, code { font-family: 'SF Mono', Monaco, 'Courier New', monospace; font-size: 13px; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
-            pre { padding: 12px; overflow-x: auto; max-width: 100%; }
-            blockquote { margin: 16px 0; padding-left: 16px; border-left: 3px solid #e5e7eb; color: #6b7280; }
-            h1, h2, h3 { color: #111827; margin-top: 24px; margin-bottom: 12px; font-weight: 600; }
-            p { margin: 12px 0; }
-            ul, ol { padding-left: 24px; margin: 12px 0; }
-            hr { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
-            * { -webkit-font-smoothing: antialiased; }
-            [width] { max-width: 100% !important; }
-            [style*="width"] { max-width: 100% !important; }
-          </style>
-        </head>
-        <body>${content}</body>
-      </html>
-    `);
+    doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${baseStyles}</style></head><body>${content}</body></html>`);
     doc.close();
 
     const checkHeight = () => {
       const body = iframe.contentDocument?.body;
       if (body) {
-        setIframeHeight(Math.min(Math.max(200, body.scrollHeight + 32), 800));
+        const h = body.scrollHeight + 20;
+        setIframeHeight(Math.max(100, h));
       }
     };
 
     const resizeObserver = new ResizeObserver(checkHeight);
     if (iframe.contentDocument?.body) resizeObserver.observe(iframe.contentDocument.body);
+
+    // Images inside the email may load async — recalculate after they load
+    const images = iframe.contentDocument?.querySelectorAll('img') || [];
+    images.forEach((img) => {
+      if (!img.complete) img.addEventListener('load', checkHeight);
+    });
+
     iframe.contentWindow?.addEventListener('load', checkHeight);
     setTimeout(checkHeight, 100);
     setTimeout(checkHeight, 500);
+    setTimeout(checkHeight, 1500);
 
     iframe.contentDocument?.addEventListener('click', () => onContentClick?.());
 
@@ -136,13 +141,21 @@ function EmailBodyViewer({ email, onContentClick }: { email: Email; onContentCli
       resizeObserver.disconnect();
       iframe.contentWindow?.removeEventListener('load', checkHeight);
     };
-  }, [email.bodyHtml, email.bodyText, onContentClick]);
+  }, [email.bodyHtml, email.bodyText, hasBody, onContentClick]);
+
+  if (!hasBody) {
+    return (
+      <div className="p-6 text-center text-gray-400 text-sm italic">
+        Kein Inhalt vorhanden
+      </div>
+    );
+  }
 
   return (
     <iframe
       ref={iframeRef}
       className="w-full border-0"
-      style={{ height: iframeHeight, minHeight: 200 }}
+      style={{ height: iframeHeight, minHeight: 100 }}
       sandbox="allow-same-origin"
       title="Email content"
     />
@@ -173,14 +186,45 @@ export default function InboxPage() {
     { revalidateOnFocus: false }
   );
 
-  // Auto-sync on first load
-  const hasSyncedRef = useRef(false);
+  // Auto-sync: pull new emails from Gmail every 15s while page is visible
+  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const syncingRef = useRef(false); // avoid overlapping syncs
+
   useEffect(() => {
-    if (apiUrl && !syncing && !hasSyncedRef.current) {
-      hasSyncedRef.current = true;
-      handleSync();
-    }
-  }, [apiUrl]);
+    if (!apiUrl) return;
+
+    const doSync = async () => {
+      if (syncingRef.current || document.visibilityState !== 'visible') return;
+      syncingRef.current = true;
+      setSyncing(true);
+      try {
+        await fetchWithAuth(`${apiUrl}/emails/sync`, { method: 'POST' });
+        mutate();
+      } catch (error) {
+        console.error('Auto-sync error:', error);
+      } finally {
+        syncingRef.current = false;
+        setSyncing(false);
+      }
+    };
+
+    // Initial sync on mount
+    doSync();
+
+    // Then sync every 15 seconds (only when page is visible)
+    syncIntervalRef.current = setInterval(doSync, 15_000);
+
+    const onVisibility = () => {
+      // Sync immediately when returning to the tab
+      if (document.visibilityState === 'visible') doSync();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [apiUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const emails = emailsData?.emails || [];
   const unreadCounts = emailsData?.unreadCounts || {};
@@ -285,6 +329,24 @@ export default function InboxPage() {
       handleEditDraft(email);
     } else {
       setSelectedEmailId(email.id);
+      // Mark as read immediately in the UI (backend does this on GET /emails/:id too)
+      if (!email.isRead) {
+        // Optimistically update the list, then revalidate
+        mutate(
+          (prev: EmailsResponse | undefined) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              emails: prev.emails.map(e => e.id === email.id ? { ...e, isRead: true } : e),
+              unreadCounts: {
+                ...prev.unreadCounts,
+                [selectedFolder]: Math.max(0, (prev.unreadCounts[selectedFolder] || 0) - 1)
+              }
+            };
+          },
+          { revalidate: false }
+        );
+      }
     }
   };
 
@@ -440,13 +502,13 @@ export default function InboxPage() {
             </div>
           </div>
 
-          {/* Body */}
+          {/* Body — direct rendering, no card */}
           <div className="flex-1 overflow-y-auto bg-white">
             <EmailBodyViewer email={selectedEmail} />
           </div>
 
           {/* Actions */}
-          <div className="px-4 py-3 border-t border-gray-100 flex gap-2 safe-bottom">
+          <div className="px-4 py-3 border-t border-gray-100 flex gap-2 safe-bottom bg-white">
             <button
               onClick={() => handleReply(selectedEmail)}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg"
@@ -459,6 +521,7 @@ export default function InboxPage() {
               className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg"
             >
               <Forward className="w-4 h-4" />
+              Weiterleiten
             </button>
           </div>
         </div>
@@ -537,62 +600,69 @@ export default function InboxPage() {
         <div className="flex-1 flex flex-col bg-white" onClick={() => setContextMenu(null)}>
           {selectedEmail ? (
             <>
-              <div className="p-6 border-b border-gray-100 bg-white">
-                <div className="flex items-start justify-between mb-5">
-                  <h2 className="text-lg font-semibold text-gray-900 leading-tight pr-4">
+              {/* Header: Subject + Actions */}
+              <div className="px-6 pt-5 pb-4 border-b border-gray-100 bg-white">
+                <div className="flex items-start justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-gray-900 leading-snug pr-4">
                     {selectedEmail.subject || '(Kein Betreff)'}
                   </h2>
                   <div className="flex items-center gap-1 shrink-0">
                     <button onClick={() => toggleStar(selectedEmail.id, selectedEmail.isStarred)}
-                      className={`p-2 rounded-lg transition-colors ${selectedEmail.isStarred ? 'text-yellow-500 hover:bg-yellow-50' : 'text-gray-400 hover:text-yellow-500 hover:bg-yellow-50'}`}>
+                      className={`p-1.5 rounded-lg transition-colors ${selectedEmail.isStarred ? 'text-yellow-500 hover:bg-yellow-50' : 'text-gray-400 hover:text-yellow-500 hover:bg-yellow-50'}`}>
                       <Star className={`w-4 h-4 ${selectedEmail.isStarred ? 'fill-current' : ''}`} />
                     </button>
                     <button onClick={() => toggleRead(selectedEmail.id, selectedEmail.isRead)}
-                      className={`p-2 rounded-lg transition-colors ${selectedEmail.isRead ? 'text-gray-400 hover:text-blue-600 hover:bg-gray-50' : 'text-blue-600 hover:bg-gray-50'}`}>
+                      className={`p-1.5 rounded-lg transition-colors ${selectedEmail.isRead ? 'text-gray-400 hover:text-blue-600 hover:bg-gray-50' : 'text-blue-600 hover:bg-gray-50'}`}>
                       {selectedEmail.isRead ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                     <button onClick={() => moveToFolder(selectedEmail.id, selectedFolder === 'TRASH' ? 'INBOX' : 'TRASH')}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 rounded-full bg-gray-800 flex items-center justify-center text-white font-semibold text-sm shadow-sm">
+                {/* Sender info */}
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-white font-semibold text-sm shrink-0">
                     {(selectedEmail.fromName || selectedEmail.from).charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-gray-900">{selectedEmail.fromName || selectedEmail.from.split('@')[0]}</span>
+                      <span className="font-semibold text-gray-900 text-sm">{selectedEmail.fromName || selectedEmail.from.split('@')[0]}</span>
                       <span className="text-sm text-gray-400">&lt;{selectedEmail.from}&gt;</span>
                       {selectedEmail.leadId && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Lead</span>}
                       {selectedEmail.providerData?.aiGenerated && (
                         <span className="text-xs bg-gray-50 text-blue-600 border border-gray-200 px-2 py-0.5 rounded-full font-medium">KI-generiert</span>
                       )}
                     </div>
-                    <div className="text-sm text-gray-500 mt-0.5">An: {selectedEmail.to.join(', ')}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      An: {selectedEmail.to.join(', ')}
+                      {selectedEmail.cc && selectedEmail.cc.length > 0 && (
+                        <span className="ml-3">CC: {selectedEmail.cc.join(', ')}</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-400 tabular-nums shrink-0">
+                  <div className="text-xs text-gray-400 tabular-nums shrink-0">
                     {new Date(selectedEmail.receivedAt || selectedEmail.sentAt || '').toLocaleString('de-DE', {
                       day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
                     })}
                   </div>
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                  <EmailBodyViewer email={selectedEmail} onContentClick={() => setContextMenu(null)} />
-                </div>
+              {/* Email body — no card wrapper, direct rendering like Apple Mail */}
+              <div className="flex-1 overflow-y-auto bg-white">
+                <EmailBodyViewer email={selectedEmail} onContentClick={() => setContextMenu(null)} />
               </div>
-              <div className="p-4 border-t border-gray-200 flex gap-2">
+              {/* Actions */}
+              <div className="px-5 py-3 border-t border-gray-100 flex gap-2 bg-white">
                 <button onClick={() => handleReply(selectedEmail)}
                   className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors">
                   <Reply className="w-4 h-4" /> Antworten
-                              </button>
+                </button>
                 <button onClick={() => handleForward(selectedEmail)}
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
                   <Forward className="w-4 h-4" /> Weiterleiten
-                    </button>
+                </button>
               </div>
             </>
           ) : (

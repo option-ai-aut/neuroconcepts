@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   X, Minus, Maximize2, Save, Download, RefreshCw, 
   Plus, Trash2, GripVertical, ChevronUp, ChevronDown,
@@ -287,6 +288,8 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
   const [showColorManager, setShowColorManager] = useState(false);
   const [colorPickerValue, setColorPickerValue] = useState('#4F46E5');
   const colorManagerRef = useRef<HTMLDivElement>(null);
+  const colorButtonRef = useRef<HTMLButtonElement>(null);
+  const [colorPopupPos, setColorPopupPos] = useState({ top: 0, left: 0 });
   const [dragState, setDragState] = useState<{
     isDragging: boolean;
     dragIndex: number | null;
@@ -307,7 +310,9 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
   const propertySelectorRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
-  const [showFieldsSidebar, setShowFieldsSidebar] = useState(true);
+  const [showFieldsSidebar, setShowFieldsSidebar] = useState(false);
+  const [templateFieldFocused, setTemplateFieldFocused] = useState(false);
+  const fieldsButtonRef = useRef<HTMLButtonElement>(null);
   
   // @-Mention state
   const [mentionState, setMentionState] = useState<{
@@ -406,19 +411,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     }
   }, [showThemeSelector]);
 
-  // Close color manager on click outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (colorManagerRef.current && !colorManagerRef.current.contains(event.target as Node)) {
-        setShowColorManager(false);
-      }
-    };
-
-    if (showColorManager) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [showColorManager]);
+  // Color manager closing is handled by the portal backdrop's onClick
 
   // Close property selector on click outside
   useEffect(() => {
@@ -1365,16 +1358,32 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                         e.preventDefault(); // Prevent blur
                       }}
                       onClick={() => {
-                        const input = document.querySelector(`[data-field-id="${fieldId}"]`) as HTMLInputElement | HTMLTextAreaElement;
-                        if (input) {
+                        const el = document.querySelector(`[data-field-id="${fieldId}"]`) as HTMLElement;
+                        if (!el) return;
+
+                        if (el.getAttribute('contenteditable') === 'true') {
+                          // contentEditable mode: replace @search with the tag
+                          const rawValue = tagHtmlToValue(el);
+                          const atIdx = rawValue.lastIndexOf('@');
+                          if (atIdx !== -1) {
+                            const before = rawValue.substring(0, atIdx);
+                            const after = rawValue.substring(atIdx + 1 + mentionState.searchTerm.length);
+                            const newValue = before + field.variable + after;
+                            // Find the onChange from the block editor
+                            el.innerHTML = valueToTagHtml(newValue);
+                            el.dispatchEvent(new Event('input', { bubbles: true }));
+                          }
+                        } else {
+                          // Plain input mode (fallback)
+                          const input = el as HTMLInputElement | HTMLTextAreaElement;
                           insertFieldAtCursor(field, input.value, mentionState.cursorPosition, (v) => {
-                            // Trigger change event
-                            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set 
+                            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
                               || Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
                             nativeInputValueSetter?.call(input, v);
                             input.dispatchEvent(new Event('input', { bubbles: true }));
                           });
                         }
+                        setMentionState({ isOpen: false, searchTerm: '', activeField: null, cursorPosition: 0, filteredFields: [] });
                       }}
                     >
                       <span className="text-sm">{field.icon}</span>
@@ -1390,18 +1399,38 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     );
   };
 
-  // Convert variable syntax to visual chip display
-  const renderFieldChip = (variable: string) => {
-    const field = TEMPLATE_FIELDS.find(f => f.variable === variable);
-    if (!field) return variable;
-    return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
-        {field.icon} {field.label}
-      </span>
-    );
+  // Convert a raw value (with {{variable}} syntax) to HTML with visual tag chips
+  const valueToTagHtml = (value: string): string => {
+    if (!value) return '';
+    return value.replace(/\{\{([^}]+)\}\}/g, (match) => {
+      const field = TEMPLATE_FIELDS.find(f => f.variable === match);
+      if (!field) return match;
+      return `<span contenteditable="false" data-variable="${match}" style="display:inline-flex;align-items:center;gap:2px;padding:1px 6px;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;border-radius:4px;font-size:11px;font-weight:500;cursor:default;user-select:all;vertical-align:baseline;line-height:1.4;margin:0 1px;">${field.icon} ${field.label}</span>`;
+    });
   };
 
-  // Render a template-aware input field with @-mention support
+  // Convert HTML from contentEditable back to raw value with {{variable}} syntax
+  const tagHtmlToValue = (el: HTMLElement): string => {
+    let result = '';
+    el.childNodes.forEach(node => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        result += node.textContent || '';
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        const elem = node as HTMLElement;
+        const variable = elem.getAttribute('data-variable');
+        if (variable) {
+          result += variable;
+        } else if (elem.tagName === 'BR') {
+          result += '\n';
+        } else {
+          result += tagHtmlToValue(elem);
+        }
+      }
+    });
+    return result;
+  };
+
+  // Render a template-aware input field with @-mention support and visual tags
   const renderTemplateInput = (
     fieldId: string,
     value: string,
@@ -1409,62 +1438,159 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     placeholder: string,
     multiline: boolean = false
   ) => {
-    const commonProps = {
-      'data-field-id': fieldId,
-      value: value || '',
-      placeholder: isTemplate ? `${placeholder} (tippe @ für Felder)` : placeholder,
-      className: "w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" + (multiline ? " resize-none" : ""),
-      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        if (isTemplate) {
-          handleMentionInput(e, fieldId, value, onChange);
-        } else {
-          onChange(e.target.value);
-        }
-      },
-      onKeyDown: (e: React.KeyboardEvent) => {
-        if (isTemplate) {
-          handleMentionKeyDown(e, value, onChange);
-        }
-      },
-      onBlur: () => {
-        // Delay to allow click on dropdown
-        setTimeout(() => {
-          if (mentionState.activeField === fieldId) {
-            setMentionState(prev => ({ ...prev, isOpen: false }));
-          }
-        }, 200);
-      },
-      onDrop: isTemplate ? (e: React.DragEvent) => {
-        e.preventDefault();
-        const droppedText = e.dataTransfer.getData('text/plain');
-        if (droppedText.startsWith('{{')) {
-          const target = e.target as HTMLInputElement | HTMLTextAreaElement;
-          const start = target.selectionStart || value.length;
-          const newValue = value.substring(0, start) + droppedText + value.substring(start);
-          onChange(newValue);
-        }
-      } : undefined,
-      onDragOver: isTemplate ? (e: React.DragEvent) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'copy';
-      } : undefined,
-    };
+    // For non-template mode, use plain inputs
+    if (!isTemplate) {
+      const plainProps = {
+        value: value || '',
+        placeholder,
+        className: "w-full px-2.5 py-1.5 2xl:px-3 2xl:py-2 border border-gray-200 rounded-md text-xs 2xl:text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" + (multiline ? " resize-none" : ""),
+        onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange(e.target.value),
+      };
+      return multiline ? <textarea {...plainProps} rows={6} /> : <input type="text" {...plainProps} />;
+    }
 
+    // For template mode: contentEditable with visual tag chips
     return (
       <div className="relative">
-        {multiline ? (
-          <textarea {...commonProps} rows={6} />
-        ) : (
-          <input type="text" {...commonProps} />
-        )}
-        {isTemplate && renderMentionDropdown(fieldId)}
+        <div
+          data-field-id={fieldId}
+          contentEditable
+          suppressContentEditableWarning
+          className={`w-full px-2.5 border border-gray-200 rounded-md text-xs 2xl:text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 focus:outline-none ${multiline ? 'min-h-[120px] py-1.5 2xl:py-2' : 'overflow-hidden whitespace-nowrap'}`}
+          style={multiline ? undefined : { lineHeight: '34px', paddingTop: 0, paddingBottom: 0 }}
+          dangerouslySetInnerHTML={{ __html: valueToTagHtml(value) || '' }}
+          onFocus={() => setTemplateFieldFocused(true)}
+          data-placeholder={`${placeholder} (tippe @ für Felder)`}
+          onInput={(e) => {
+            const el = e.currentTarget;
+            const rawValue = tagHtmlToValue(el);
+            onChange(rawValue);
+
+            // Check for @-mention trigger
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0) {
+              const range = sel.getRangeAt(0);
+              // Get text content before cursor
+              const preRange = document.createRange();
+              preRange.setStart(el, 0);
+              preRange.setEnd(range.startContainer, range.startOffset);
+              const textBefore = preRange.toString();
+              const atIndex = textBefore.lastIndexOf('@');
+
+              if (atIndex !== -1 && (atIndex === 0 || textBefore[atIndex - 1] === ' ' || textBefore[atIndex - 1] === '\n')) {
+                const searchTerm = textBefore.substring(atIndex + 1).toLowerCase();
+                const filtered = searchTerm
+                  ? TEMPLATE_FIELDS.filter(f =>
+                      f.label.toLowerCase().includes(searchTerm) ||
+                      f.id.toLowerCase().includes(searchTerm)
+                    )
+                  : TEMPLATE_FIELDS;
+                setMentionState({
+                  isOpen: true,
+                  searchTerm,
+                  activeField: fieldId,
+                  cursorPosition: atIndex,
+                  filteredFields: filtered,
+                });
+              } else {
+                setMentionState(prev => ({ ...prev, isOpen: false }));
+              }
+            }
+          }}
+          onKeyDown={(e) => {
+            if (mentionState.isOpen && mentionState.activeField === fieldId) {
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                setMentionState(prev => ({ ...prev, isOpen: false }));
+              } else if (e.key === 'Enter' && mentionState.filteredFields.length > 0) {
+                e.preventDefault();
+                // Insert the first matching field as a tag
+                const field = mentionState.filteredFields[0];
+                const el = e.currentTarget;
+                const rawValue = tagHtmlToValue(el);
+                const atIdx = rawValue.lastIndexOf('@');
+                if (atIdx !== -1) {
+                  const newValue = rawValue.substring(0, atIdx) + field.variable + rawValue.substring(rawValue.indexOf(' ', atIdx) === -1 ? rawValue.length : rawValue.length);
+                  // Find where the @ and search term end
+                  const beforeAt = rawValue.substring(0, atIdx);
+                  const afterSearch = rawValue.substring(atIdx + 1 + mentionState.searchTerm.length);
+                  onChange(beforeAt + field.variable + afterSearch);
+                  // Re-render will update the contentEditable
+                  setTimeout(() => {
+                    el.innerHTML = valueToTagHtml(beforeAt + field.variable + afterSearch);
+                    // Place cursor at end
+                    const range = document.createRange();
+                    range.selectNodeContents(el);
+                    range.collapse(false);
+                    const sel = window.getSelection();
+                    sel?.removeAllRanges();
+                    sel?.addRange(range);
+                  }, 0);
+                }
+                setMentionState({ isOpen: false, searchTerm: '', activeField: null, cursorPosition: 0, filteredFields: [] });
+              }
+            }
+            // Prevent Enter in single-line mode
+            if (!multiline && e.key === 'Enter') {
+              e.preventDefault();
+            }
+          }}
+          onBlur={() => {
+            setTemplateFieldFocused(false);
+            setTimeout(() => {
+              if (mentionState.activeField === fieldId) {
+                setMentionState(prev => ({ ...prev, isOpen: false }));
+              }
+            }, 200);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            const droppedText = e.dataTransfer.getData('text/plain');
+            if (droppedText.startsWith('{{')) {
+              const el = e.currentTarget;
+              const rawValue = tagHtmlToValue(el);
+              const newValue = rawValue + droppedText;
+              onChange(newValue);
+              setTimeout(() => {
+                el.innerHTML = valueToTagHtml(newValue);
+              }, 0);
+            }
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+          }}
+        />
+        <style>{`
+          [data-field-id="${fieldId}"]:empty::before {
+            content: attr(data-placeholder);
+            color: #9ca3af;
+            pointer-events: none;
+          }
+        `}</style>
+        {renderMentionDropdown(fieldId)}
       </div>
     );
   };
 
-  // Render template fields sidebar (collapsible - icons stay fixed, only text disappears)
+  // Render template fields as a floating overlay panel (for drag & drop into block editor)
   const renderFieldsSidebar = () => {
     if (!isTemplate) return null;
+
+    // Floating toggle button (always visible, anchored to the right edge of the preview area)
+    if (!showFieldsSidebar) {
+      return (
+        <button
+          ref={fieldsButtonRef}
+          onClick={() => setShowFieldsSidebar(true)}
+          className={`absolute right-[calc(theme(spacing.60)+1px)] 2xl:right-[calc(theme(spacing.72)+1px)] top-14 z-30 bg-white border border-gray-200 shadow-md rounded-l-lg px-2 py-6 text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-all duration-300 fields-toggle-btn ${templateFieldFocused ? 'fields-btn-spark' : ''}`}
+          title="Felder-Panel öffnen"
+          style={{ writingMode: 'vertical-lr' }}
+        >
+          <span className="text-[10px] font-medium tracking-wider uppercase">Felder @</span>
+        </button>
+      );
+    }
 
     const groupedFields = TEMPLATE_FIELDS.reduce((acc, field) => {
       if (!acc[field.category]) acc[field.category] = [];
@@ -1473,36 +1599,32 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     }, {} as Record<string, TemplateField[]>);
 
     return (
-      <div className={`${showFieldsSidebar ? 'w-48' : 'w-12'} border-l border-gray-100 bg-gray-50 flex flex-col transition-all duration-200 shrink-0 overflow-hidden`}>
-        {/* Header - Tip text or just toggle */}
-        <div className={`py-2 border-b border-gray-100 flex items-center shrink-0 h-10 ${showFieldsSidebar ? 'px-2 justify-start gap-2' : 'justify-center'}`}>
+      <div className="absolute right-[calc(theme(spacing.60)+1px)] 2xl:right-[calc(theme(spacing.72)+1px)] top-14 bottom-4 z-30 w-44 2xl:w-48 bg-white border border-gray-200 rounded-l-xl shadow-lg flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="px-2.5 py-2 border-b border-gray-100 flex items-center justify-between shrink-0">
+          <span className="text-xs font-medium text-gray-700">
+            Felder <span className="font-mono text-[10px] bg-gray-100 px-1 rounded">@</span>
+          </span>
           <button
-            onClick={() => setShowFieldsSidebar(!showFieldsSidebar)}
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors shrink-0"
-            title={showFieldsSidebar ? 'Einklappen' : 'Ausklappen'}
+            onClick={() => setShowFieldsSidebar(false)}
+            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            title="Felder-Panel schließen"
           >
-            {showFieldsSidebar ? (
-              <ChevronDown className="w-4 h-4 rotate-90" />
-            ) : (
-              <ChevronUp className="w-4 h-4 -rotate-90" />
-            )}
+            <X className="w-3.5 h-3.5" />
           </button>
-          {showFieldsSidebar && (
-            <span className="text-xs text-gray-500 whitespace-nowrap">
-              Tippe <span className="font-mono bg-gray-200 px-0.5 rounded">@</span>
-            </span>
-          )}
         </div>
 
-        {/* Fields list - icons always visible and centered when collapsed */}
-        <div className={`flex-1 overflow-y-auto py-2 space-y-2 scrollbar-thin ${showFieldsSidebar ? 'px-2' : 'px-1'}`}>
+        <p className="px-2.5 py-1.5 text-[10px] text-gray-400 border-b border-gray-50 shrink-0">
+          Felder per Drag & Drop in die Eingabefelder rechts ziehen
+        </p>
+
+        {/* Fields list */}
+        <div className="flex-1 overflow-y-auto py-2 px-2 space-y-2 scrollbar-thin">
           {Object.entries(groupedFields).map(([category, fields]) => (
             <div key={category}>
-              {showFieldsSidebar && (
-                <div className="text-xs font-medium text-gray-400 mb-1 px-1">
-                  {FIELD_CATEGORY_LABELS[category]}
-                </div>
-              )}
+              <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 px-0.5">
+                {FIELD_CATEGORY_LABELS[category]}
+              </div>
               <div className="space-y-0.5">
                 {fields.map(field => (
                   <div
@@ -1512,17 +1634,11 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                       e.dataTransfer.setData('text/plain', field.variable);
                       e.dataTransfer.effectAllowed = 'copy';
                     }}
-                    className={`flex items-center py-1.5 bg-white rounded border border-gray-200 cursor-grab hover:border-gray-300 hover:bg-gray-50 transition-colors ${
-                      showFieldsSidebar ? 'px-2 gap-2' : 'justify-center w-9 mx-auto'
-                    }`}
+                    className="flex items-center gap-2 px-2 py-1.5 bg-gray-50 rounded border border-gray-200 cursor-grab hover:border-blue-300 hover:bg-blue-50 hover:shadow-sm transition-colors"
                     title={field.label}
                   >
-                    <span className="text-sm flex-shrink-0 leading-none">{field.icon}</span>
-                    {showFieldsSidebar && (
-                      <span className="text-xs text-gray-700 truncate">
-                        {field.label}
-                      </span>
-                    )}
+                    <span className="text-xs flex-shrink-0 leading-none">{field.icon}</span>
+                    <span className="text-xs text-gray-700 truncate">{field.label}</span>
                   </div>
                 ))}
               </div>
@@ -1532,6 +1648,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
       </div>
     );
   };
+
 
   // ============================================
   // RENDER BLOCK EDITOR (Right Panel)
@@ -1553,16 +1670,16 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     const blockDef = BLOCK_TYPES.find(b => b.type === block.type);
 
     return (
-      <div className="p-4 space-y-4">
-        <div className="flex items-center gap-2 pb-3 border-b">
-          {blockDef && <blockDef.icon className="w-5 h-5 text-gray-700" />}
-          <span className="font-semibold text-gray-900">{blockDef?.label || block.type}</span>
+      <div className="p-3 2xl:p-4 space-y-3 2xl:space-y-4">
+        <div className="flex items-center gap-2 pb-2 2xl:pb-3 border-b">
+          {blockDef && <blockDef.icon className="w-4 h-4 2xl:w-5 2xl:h-5 text-gray-700" />}
+          <span className="font-semibold text-gray-900 text-sm 2xl:text-base">{blockDef?.label || block.type}</span>
         </div>
 
         {/* Common fields based on block type */}
         {(block.type === 'hero' || block.type === 'text' || block.type === 'location' || block.type === 'contact' || block.type === 'priceTable' || block.type === 'features' || block.type === 'highlights' || block.type === 'cta' || block.type === 'floorplan') && (
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Titel</label>
+            <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Titel</label>
             {renderTemplateInput(
               `block-${selectedBlockIndex}-title`,
               block.title || '',
@@ -1575,7 +1692,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         {block.type === 'hero' && (
           <>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Untertitel</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Untertitel</label>
               {renderTemplateInput(
                 `block-${selectedBlockIndex}-subtitle`,
                 block.subtitle || '',
@@ -1584,7 +1701,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               )}
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Hero-Bild</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Hero-Bild</label>
               {block.imageUrl ? (
                 <div className="relative group">
                   <img src={getImageUrl(block.imageUrl || '')} alt="" className="w-full h-24 object-cover rounded-md" />
@@ -1620,7 +1737,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         {block.type === 'text' && (
           <>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Inhalt</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Inhalt</label>
               {renderTemplateInput(
                 `block-${selectedBlockIndex}-content`,
                 block.content || '',
@@ -1630,7 +1747,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               )}
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Stil</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Stil</label>
               <select
                 value={block.style || 'normal'}
                 onChange={(e) => updateBlock(selectedBlockIndex, { style: e.target.value })}
@@ -1647,7 +1764,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         {block.type === 'quote' && (
           <>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Zitat</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Zitat</label>
               {renderTemplateInput(
                 `block-${selectedBlockIndex}-text`,
                 block.text || '',
@@ -1657,7 +1774,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               )}
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Autor</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Autor</label>
               {renderTemplateInput(
                 `block-${selectedBlockIndex}-author`,
                 block.author || '',
@@ -1671,7 +1788,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         {block.type === 'location' && (
           <>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Adresse</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Adresse</label>
               {renderTemplateInput(
                 `block-${selectedBlockIndex}-address`,
                 block.address || '',
@@ -1680,7 +1797,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               )}
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Beschreibung</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Beschreibung</label>
               {renderTemplateInput(
                 `block-${selectedBlockIndex}-description`,
                 block.description || '',
@@ -1695,7 +1812,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         {block.type === 'contact' && (
           <>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Name</label>
               {renderTemplateInput(
                 `block-${selectedBlockIndex}-name`,
                 block.name || '',
@@ -1704,7 +1821,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               )}
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">E-Mail</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">E-Mail</label>
               {renderTemplateInput(
                 `block-${selectedBlockIndex}-email`,
                 block.email || '',
@@ -1713,7 +1830,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               )}
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Telefon</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Telefon</label>
               {renderTemplateInput(
                 `block-${selectedBlockIndex}-phone`,
                 block.phone || '',
@@ -1727,7 +1844,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         {block.type === 'leadInfo' && (
           <>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Lead Name</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Lead Name</label>
               {renderTemplateInput(
                 `block-${selectedBlockIndex}-leadName`,
                 block.leadName || '',
@@ -1736,7 +1853,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               )}
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Lead E-Mail</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Lead E-Mail</label>
               {renderTemplateInput(
                 `block-${selectedBlockIndex}-leadEmail`,
                 block.leadEmail || '',
@@ -1745,7 +1862,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               )}
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Lead Telefon</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Lead Telefon</label>
               {renderTemplateInput(
                 `block-${selectedBlockIndex}-leadPhone`,
                 block.leadPhone || '',
@@ -1771,7 +1888,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         {block.type === 'cta' && (
           <>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Button Text</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Button Text</label>
               <input
                 type="text"
                 value={block.buttonText || ''}
@@ -1781,7 +1898,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Button URL</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Button URL</label>
               <input
                 type="text"
                 value={block.buttonUrl || ''}
@@ -1796,7 +1913,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         {block.type === 'energyCertificate' && (
           <>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Energieeffizienzklasse</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Energieeffizienzklasse</label>
               <select
                 value={block.energyClass || ''}
                 onChange={(e) => updateBlock(selectedBlockIndex, { energyClass: e.target.value })}
@@ -1809,7 +1926,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Verbrauch</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Verbrauch</label>
               <input
                 type="text"
                 value={block.consumption || ''}
@@ -1823,7 +1940,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
 
         {block.type === 'floorplan' && (
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Grundriss</label>
+            <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Grundriss</label>
             {block.imageUrl ? (
               <div className="relative group">
                 <img src={getImageUrl(block.imageUrl || '')} alt="" className="w-full h-32 object-contain rounded-md bg-gray-100" />
@@ -1857,7 +1974,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
 
         {block.type === 'video' && (
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Video-URL</label>
+            <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Video-URL</label>
             <input
               type="text"
               value={block.videoUrl || ''}
@@ -1871,7 +1988,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
 
         {block.type === 'virtualTour' && (
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">360° Tour URL</label>
+            <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">360° Tour URL</label>
             <input
               type="text"
               value={block.tourUrl || ''}
@@ -1886,7 +2003,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         {block.type === 'twoColumn' && (
           <>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Linke Spalte</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Linke Spalte</label>
               <textarea
                 value={block.leftContent || ''}
                 onChange={(e) => updateBlock(selectedBlockIndex, { leftContent: e.target.value })}
@@ -1896,7 +2013,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Rechte Spalte</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Rechte Spalte</label>
               <textarea
                 value={block.rightContent || ''}
                 onChange={(e) => updateBlock(selectedBlockIndex, { rightContent: e.target.value })}
@@ -2231,7 +2348,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         {block.type === 'gallery' && (
           <>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Spalten</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Spalten</label>
               <select
                 value={block.columns || 2}
                 onChange={(e) => updateBlock(selectedBlockIndex, { columns: parseInt(e.target.value) })}
@@ -2242,7 +2359,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Bilder</label>
+              <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Bilder</label>
               {isTemplate ? (
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-700">
                   <ImageIcon className="w-4 h-4 inline mr-1" />
@@ -2376,10 +2493,15 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         transition: 'all 0.3s ease-in-out'
       }}
     >
-      {/* Header */}
+      {/* Header — only minimize when clicking the header itself, not buttons inside */}
       <div 
         className="flex items-center justify-between px-4 h-12 border-b border-gray-100 rounded-t-xl cursor-pointer hover:bg-gray-50 transition-colors"
-        onClick={() => setMinimized(!minimized)}
+        onClick={(e) => {
+          // Only minimize if the click target is the header div or its direct text children, not buttons/inputs inside
+          const target = e.target as HTMLElement;
+          if (target.closest('button') || target.closest('input') || target.closest('select') || target.closest('[role="menu"]')) return;
+          setMinimized(!minimized);
+        }}
       >
         <div className="flex items-center space-x-3">
           <div className="w-2 h-2 rounded-full bg-gray-800" />
@@ -2475,7 +2597,18 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               {/* Custom Colors Manager */}
               <div className="relative" ref={colorManagerRef}>
                 <button
-                  onClick={(e) => { e.stopPropagation(); setShowColorManager(!showColorManager); }}
+                  ref={colorButtonRef}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (colorButtonRef.current) {
+                      const rect = colorButtonRef.current.getBoundingClientRect();
+                      setColorPopupPos({
+                        top: rect.bottom + 4,
+                        left: Math.max(8, rect.right - 280),
+                      });
+                    }
+                    setShowColorManager(!showColorManager);
+                  }}
                   className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md"
                 >
                   <Palette className="w-4 h-4" />
@@ -2486,73 +2619,45 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                     </span>
                   )}
                 </button>
-                {showColorManager && (
-                  <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 z-50 w-[280px]" onClick={e => e.stopPropagation()}>
-                    <div className="px-4 py-2.5 border-b border-gray-100">
-                      <span className="text-xs font-medium text-gray-500">Eigene Farben</span>
-                    </div>
-                    
-                    {/* Saved custom colors */}
-                    {customColors.length > 0 && (
-                      <div className="px-4 py-3 border-b border-gray-100">
-                        <div className="flex flex-wrap gap-1.5">
-                          {customColors.map((color) => (
-                            <div key={color} className="relative group">
-                              <div
-                                className="w-7 h-7 rounded-md border-2 border-gray-200 cursor-pointer transition-transform hover:scale-110"
-                                style={{ backgroundColor: color }}
-                                title={color}
-                              />
-                              <button
-                                onClick={() => removeCustomColor(color)}
-                                className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 text-white rounded-full hidden group-hover:flex items-center justify-center"
-                              >
-                                <X className="w-2 h-2" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
+                {showColorManager && typeof document !== 'undefined' && createPortal(
+                  <>
+                    <div className="fixed inset-0 z-[9998]" onClick={(e) => { e.stopPropagation(); setShowColorManager(false); }} />
+                    <div
+                      className="fixed bg-white rounded-xl shadow-2xl border border-gray-200 z-[9999] w-[260px] overflow-hidden"
+                      style={{ top: colorPopupPos.top, left: colorPopupPos.left }}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {/* Header */}
+                      <div className="flex items-center gap-2 px-3.5 py-2.5 border-b border-gray-100">
+                        <Palette className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="text-xs font-semibold text-gray-600">Eigene Farben</span>
                       </div>
-                    )}
-
-                    {/* Color picker */}
-                    <div className="px-4 py-3 space-y-3">
-                      <div className="flex flex-col gap-2">
-                        <label className="text-xs text-gray-500">Farbe wählen</label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={colorPickerValue}
-                            onChange={(e) => setColorPickerValue(e.target.value)}
-                            className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer bg-transparent p-0.5"
-                          />
-                          <input
-                            type="text"
-                            value={colorPickerValue}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) setColorPickerValue(v);
-                            }}
-                            className="flex-1 px-2 py-1.5 text-sm border border-gray-200 rounded-md font-mono uppercase"
-                            placeholder="#000000"
-                            maxLength={7}
-                          />
-                          <button
-                            onClick={() => {
-                              if (/^#[0-9A-Fa-f]{6}$/.test(colorPickerValue)) {
-                                addCustomColor(colorPickerValue);
-                              }
-                            }}
-                            className="px-3 py-1.5 bg-gray-900 text-white text-xs rounded-md hover:bg-gray-800 transition-colors whitespace-nowrap"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
+                      
+                      {/* Saved custom colors */}
+                      {customColors.length > 0 && (
+                        <div className="px-3.5 py-3 border-b border-gray-100">
+                          <div className="flex flex-wrap gap-1.5">
+                            {customColors.map((color) => (
+                              <div key={color} className="relative group">
+                                <div
+                                  className="w-7 h-7 rounded-md border-2 border-gray-200 cursor-pointer transition-transform hover:scale-110"
+                                  style={{ backgroundColor: color }}
+                                  title={color}
+                                />
+                                <button
+                                  onClick={() => removeCustomColor(color)}
+                                  className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 text-white rounded-full hidden group-hover:flex items-center justify-center"
+                                >
+                                  <X className="w-2 h-2" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* Quick palette presets */}
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1.5 block">Schnellauswahl</label>
+                      <div className="px-3.5 py-3 space-y-2">
                         <div className="flex flex-wrap gap-1">
                           {[
                             '#EF4444', '#F97316', '#F59E0B', '#EAB308', '#84CC16',
@@ -2565,8 +2670,8 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                               key={c}
                               onClick={() => setColorPickerValue(c)}
                               onDoubleClick={() => addCustomColor(c)}
-                              className={`w-5 h-5 rounded border transition-all ${
-                                colorPickerValue === c ? 'border-blue-500 scale-110' : 'border-gray-200 hover:border-gray-400'
+                              className={`w-5.5 h-5.5 rounded-md border-2 transition-all ${
+                                colorPickerValue === c ? 'border-blue-500 scale-110 shadow-sm' : 'border-gray-200 hover:border-gray-400 hover:scale-105'
                               }`}
                               style={{ backgroundColor: c }}
                               title={`${c} — Doppelklick zum Hinzufügen`}
@@ -2574,14 +2679,58 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                           ))}
                         </div>
                       </div>
-                    </div>
 
-                    {customColors.length > 0 && (
-                      <div className="px-4 py-2 border-t border-gray-100">
-                        <p className="text-[10px] text-gray-400">Farben erscheinen bei den Blockoptionen markiert mit <Pipette className="w-2.5 h-2.5 inline" /></p>
+                      {/* Color input row */}
+                      <div className="px-3.5 pb-2 pt-0">
+                        <div className="flex items-center gap-2">
+                          <label className="relative flex-shrink-0 cursor-pointer" title="Farbpalette öffnen">
+                            <input
+                              type="color"
+                              value={colorPickerValue}
+                              onChange={(e) => setColorPickerValue(e.target.value)}
+                              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                            />
+                            <div className="w-8 h-8 rounded-lg border-2 border-gray-200 flex items-center justify-center hover:border-gray-400 transition-colors" style={{ backgroundColor: colorPickerValue }}>
+                              <Pipette className="w-3.5 h-3.5 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" />
+                            </div>
+                          </label>
+                          <input
+                            type="text"
+                            value={colorPickerValue}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) setColorPickerValue(v);
+                            }}
+                            className="flex-1 px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg font-mono uppercase bg-gray-50 focus:bg-white focus:border-blue-400 focus:outline-none transition-colors"
+                            placeholder="#000000"
+                            maxLength={7}
+                          />
+                        </div>
                       </div>
-                    )}
-                  </div>
+
+                      {/* Save button - full width at bottom */}
+                      <div className="px-3.5 pb-3">
+                        <button
+                          onClick={() => {
+                            if (/^#[0-9A-Fa-f]{6}$/.test(colorPickerValue)) {
+                              addCustomColor(colorPickerValue);
+                            }
+                          }}
+                          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-900 text-white text-xs font-medium rounded-lg hover:bg-gray-800 active:bg-gray-950 transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Farbe speichern</span>
+                        </button>
+                      </div>
+
+                      {customColors.length > 0 && (
+                        <div className="px-3.5 py-2 border-t border-gray-100 bg-gray-50/50">
+                          <p className="text-[10px] text-gray-400">Gespeicherte Farben erscheinen bei den Blockoptionen unter Farben.</p>
+                        </div>
+                      )}
+                    </div>
+                  </>,
+                  document.body
                 )}
               </div>
 
@@ -2648,40 +2797,40 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
 
       {/* Body */}
       {!minimized && (
-        <div className="flex h-[calc(100%-48px)]">
+        <div className="flex h-[calc(100%-48px)] relative">
           {/* Left: Block Library */}
-          <div className={`${showBlockLibrary ? 'w-48' : 'w-14'} border-r border-gray-100 bg-gray-50 transition-all duration-300 ease-in-out flex flex-col overflow-hidden`}>
+          <div className={`${showBlockLibrary ? 'w-36 2xl:w-48' : 'w-12 2xl:w-14'} border-r border-gray-100 bg-gray-50 transition-all duration-300 ease-in-out flex flex-col overflow-hidden`}>
             <button
               onClick={() => setShowBlockLibrary(!showBlockLibrary)}
-              className="flex items-center pl-[14px] pr-3 py-3 hover:bg-gray-100 shrink-0"
+              className="flex items-center pl-3 pr-2 py-2.5 2xl:pl-[14px] 2xl:pr-3 2xl:py-3 hover:bg-gray-100 shrink-0"
               title={showBlockLibrary ? 'Blöcke ausblenden' : 'Blöcke einblenden'}
             >
-              <Plus className="w-5 h-5 text-gray-500 shrink-0" />
-              <span className={`ml-3 text-sm font-medium text-gray-700 whitespace-nowrap transition-opacity duration-300 ${
+              <Plus className="w-4 h-4 2xl:w-5 2xl:h-5 text-gray-500 shrink-0" />
+              <span className={`ml-2 2xl:ml-3 text-xs 2xl:text-sm font-medium text-gray-700 whitespace-nowrap transition-opacity duration-300 ${
                 showBlockLibrary ? 'opacity-100' : 'opacity-0'
               }`}>
                 Blöcke
               </span>
             </button>
             
-            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 px-2 pb-2">
+            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 px-1.5 2xl:px-2 pb-2">
               {Object.entries(CATEGORY_LABELS).map(([category, label]) => (
-                <div key={category} className="mb-3">
-                  <h4 className={`text-xs font-semibold text-gray-400 uppercase tracking-wider px-2 mb-2 whitespace-nowrap transition-opacity duration-300 ${
+                <div key={category} className="mb-2 2xl:mb-3">
+                  <h4 className={`text-[10px] 2xl:text-xs font-semibold text-gray-400 uppercase tracking-wider px-1.5 2xl:px-2 mb-1 2xl:mb-2 whitespace-nowrap transition-opacity duration-300 ${
                     showBlockLibrary ? 'opacity-100' : 'opacity-0'
                   }`}>
                     {label}
                   </h4>
-                  <div className="space-y-1">
+                  <div className="space-y-0.5 2xl:space-y-1">
                     {BLOCK_TYPES.filter(b => b.category === category).map((blockType) => (
                       <button
                         key={blockType.type}
                         onClick={() => addBlock(blockType.type)}
-                        className="w-full flex items-center pl-2 pr-3 py-1.5 text-sm text-gray-600 hover:bg-white hover:text-blue-600 hover:shadow-sm rounded-md transition-colors"
+                        className="w-full flex items-center pl-1.5 pr-2 py-1 2xl:pl-2 2xl:pr-3 2xl:py-1.5 text-xs 2xl:text-sm text-gray-600 hover:bg-white hover:text-blue-600 hover:shadow-sm rounded-md transition-colors"
                         title={blockType.label}
                       >
-                        <blockType.icon className="w-4 h-4 shrink-0" />
-                        <span className={`ml-2 whitespace-nowrap transition-opacity duration-300 ${
+                        <blockType.icon className="w-3.5 h-3.5 2xl:w-4 2xl:h-4 shrink-0" />
+                        <span className={`ml-1.5 2xl:ml-2 whitespace-nowrap transition-opacity duration-300 ${
                           showBlockLibrary ? 'opacity-100' : 'opacity-0'
                         }`}>
                           {blockType.label}
@@ -2846,7 +2995,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
           </div>
 
           {/* Right: Block Editor */}
-          <div className="w-72 border-l border-gray-100 bg-white overflow-y-auto">
+          <div className="w-60 2xl:w-72 border-l border-gray-100 bg-white overflow-y-auto">
             {renderBlockEditor()}
           </div>
 

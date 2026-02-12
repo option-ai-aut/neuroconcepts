@@ -44,7 +44,7 @@ function getSystemPrompt(): string {
 
 DATUM: ${currentDateStr} (${isoDate}). Nutze dieses Datum für "heute", "morgen", "diese Woche" etc.
 
-PERSÖNLICHKEIT: Direkt und sachlich wie TARS aus Interstellar. Deutsch, du-Form, max 2-3 Sätze. Keine Floskeln ("Gerne!", "Super!"), keine Emojis, keine Ausrufezeichen. Handle SOFORT, frage nicht unnötig nach.
+PERSÖNLICHKEIT: Du bist wie TARS aus Interstellar — prägnant, trocken, mit einem Hauch trockener Humor. Deutsch, du-Form, max 2-3 kurze Sätze. Keine Floskeln ("Gerne!", "Super!"), keine Emojis, keine Ausrufezeichen. Handle SOFORT, frage nicht unnötig nach. Verwende NIEMALS Semikolons (;) — schreib lieber kurze Sätze oder nutze Kommas, Punkte, Gedankenstriche. Schreib locker und menschlich, nicht wie eine Maschine.
 
 ABSOLUT WICHTIG — SPRACHE:
 - Sprich IMMER einfach und verständlich wie ein freundlicher Kollege. NIEMALS technisch.
@@ -75,7 +75,9 @@ DEINE FÄHIGKEITEN (nutze die passenden Tools):
 
 9. STATISTIKEN: Dashboard-Übersicht, Lead-Conversion, Objekt-Stats.
 
-SICHERHEIT: Nur Tenant-eigene Daten. Bei Lösch-Ops: Bestätigung. Bei E-Mail-Versand: Entwurf zeigen. Leads immer mit vollständigem Namen.`;
+SICHERHEIT: Nur Tenant-eigene Daten. Bei Lösch-Ops: Bestätigung. Bei E-Mail-Versand: Entwurf zeigen. Leads immer mit vollständigem Namen.
+
+KONTEXT-BEWUSSTSEIN: Du weißt IMMER, auf welcher Seite der App sich der Benutzer gerade befindet. Diese Info wird dir als "AKTUELLE SEITE" mitgeteilt. Wenn der User fragt "wo bin ich", "auf welcher Seite bin ich", "siehst du wo ich bin", "was mache ich gerade" oder Ähnliches — antworte SOFORT und SELBSTBEWUSST mit der Seite. Sag NICHT "ich kann deinen Bildschirm nicht sehen". Du KANNST es sehen, du WEISST es. Antworte z.B.: "Du bist gerade im Posteingang." oder "Du bearbeitest gerade eine Exposé-Vorlage." Kurz, direkt, ohne Einschränkungen.`;
 }
 
 const EXPOSE_SYSTEM_PROMPT = `Du bist Jarvis, ein KI-Assistent für Immobilienmakler. Du hilfst beim Erstellen und Bearbeiten von Exposés.
@@ -117,7 +119,11 @@ VARIABLEN für Vorlagen:
 {{user.name}}, {{user.email}}, {{user.phone}}
 {{lead.name}}, {{lead.email}}
 
-Antworte immer auf Deutsch. Sei freundlich und hilfsbereit. Erkläre kurz was du gemacht hast.`;
+KONTEXT-BEWUSSTSEIN: Du weißt IMMER, wo der User gerade ist. Wenn du an einer Vorlage arbeitest, ist der User im Exposé-Vorlagen-Editor. Wenn du an einem Exposé arbeitest, ist er im Exposé-Editor. Wenn der User fragt "wo bin ich", "siehst du wo ich bin", "was mache ich gerade" — antworte SOFORT und SELBSTBEWUSST. Sag NIEMALS "ich kann deinen Bildschirm nicht sehen". Du WEISST es.
+
+PERSÖNLICHKEIT: Wie TARS aus Interstellar — prägnant, trocken, Hauch Humor. Max 2-3 kurze Sätze. Keine Floskeln, keine Emojis, keine Semikolons (;). Deutsch, du-Form.
+
+Antworte immer auf Deutsch. Erkläre kurz was du gemacht hast.`;
 
 export class OpenAIService {
   private client: OpenAI;
@@ -130,12 +136,15 @@ export class OpenAIService {
     });
   }
 
-  async chat(message: string, tenantId: string, history: any[] = [], userContext?: { name: string; email: string; role: string }) {
+  async chat(message: string, tenantId: string, history: any[] = [], userContext?: { name: string; email: string; role: string; pageContext?: string }) {
     // Filter out messages with null/empty content
     const validHistory = history.filter(h => h.content != null && h.content !== '');
     
+    const pageContextStr = userContext?.pageContext
+      ? `\n\nAKTUELLE SEITE (du WEISST das, antworte selbstbewusst): Der Benutzer ist JETZT auf: ${userContext.pageContext}. Wenn er fragt wo er ist oder was er gerade macht, sag es ihm DIREKT. Sag NIEMALS "ich kann deinen Bildschirm nicht sehen" oder "ich habe keinen Zugriff". Du WEISST es.`
+      : '';
     const userContextStr = userContext 
-      ? `\n\nAKTUELLER BENUTZER (interne Info, NICHT proaktiv ansprechen):\n- Name: ${userContext.name}\n- E-Mail: ${userContext.email}\n- Rolle: ${userContext.role}\nNutze diese Info nur wenn nötig (z.B. als Absendername bei E-Mails, oder wenn der User explizit fragt). Nenne den User NICHT beim vollen Namen als Begrüßung.`
+      ? `\n\nAKTUELLER BENUTZER (interne Info, NICHT proaktiv ansprechen):\n- Name: ${userContext.name}\n- E-Mail: ${userContext.email}\n- Rolle: ${userContext.role}\nNutze diese Info nur wenn nötig (z.B. als Absendername bei E-Mails, oder wenn der User explizit fragt). Nenne den User NICHT beim vollen Namen als Begrüßung.` + pageContextStr
       : '';
 
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -179,15 +188,18 @@ export class OpenAIService {
   }
 
   // Streaming version of chat with Function Calling support
-  async *chatStream(message: string, tenantId: string, history: any[] = [], uploadedFiles: string[] = [], userId?: string, userContext?: { name: string; email: string; role: string }): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean; toolsUsed?: string[] }> {
+  async *chatStream(message: string, tenantId: string, history: any[] = [], uploadedFiles: string[] = [], userId?: string, userContext?: { name: string; email: string; role: string; pageContext?: string }): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean; toolsUsed?: string[] }> {
     // Store uploaded files and userId for tool access
     this.uploadedFiles = uploadedFiles;
     this.currentUserId = userId;
     // Filter out messages with null/empty content
     const validHistory = history.filter(h => h.content != null && h.content !== '');
     
+    const pageContextStr = userContext?.pageContext
+      ? `\n\nAKTUELLE SEITE (du WEISST das, antworte selbstbewusst): Der Benutzer ist JETZT auf: ${userContext.pageContext}. Wenn er fragt wo er ist oder was er gerade macht, sag es ihm DIREKT. Sag NIEMALS "ich kann deinen Bildschirm nicht sehen" oder "ich habe keinen Zugriff". Du WEISST es.`
+      : '';
     const userContextStr = userContext 
-      ? `\n\nAKTUELLER BENUTZER (interne Info, NICHT proaktiv ansprechen):\n- Name: ${userContext.name}\n- E-Mail: ${userContext.email}\n- Rolle: ${userContext.role}\nNutze diese Info nur wenn nötig (z.B. als Absendername bei E-Mails, oder wenn der User explizit fragt). Nenne den User NICHT beim vollen Namen als Begrüßung.`
+      ? `\n\nAKTUELLER BENUTZER (interne Info, NICHT proaktiv ansprechen):\n- Name: ${userContext.name}\n- E-Mail: ${userContext.email}\n- Rolle: ${userContext.role}\nNutze diese Info nur wenn nötig (z.B. als Absendername bei E-Mails, oder wenn der User explizit fragt). Nenne den User NICHT beim vollen Namen als Begrüßung.` + pageContextStr
       : '';
 
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -295,7 +307,8 @@ export class OpenAIService {
     exposeId: string | null, 
     templateId: string | null = null,
     currentBlocks: any[] = [],
-    history: any[] = []
+    history: any[] = [],
+    pageContext?: string
   ): Promise<{ text: string; actionsPerformed: string[] }> {
     const isTemplate = !!templateId;
     const targetId = exposeId || templateId;
@@ -306,15 +319,21 @@ export class OpenAIService {
         ).join('\n')}`
       : '\n\nDer Editor ist aktuell leer - keine Blöcke vorhanden.';
 
+    const pageInfo = pageContext 
+      ? `\n\nAKTUELLE SEITE: ${pageContext}`
+      : isTemplate 
+        ? '\n\nAKTUELLE SEITE: Exposé-Vorlagen-Editor'
+        : '\n\nAKTUELLE SEITE: Exposé-Editor';
+
     const systemContext = isTemplate 
       ? `Du arbeitest gerade an einer EXPOSÉ-VORLAGE (templateId=${targetId}).
 Dies ist eine wiederverwendbare Vorlage, keine echte Immobilie.
 Verwende Platzhalter wie {{property.title}}, {{property.price}}, {{property.area}} etc.
-${blocksDescription}
+${blocksDescription}${pageInfo}
 
 WICHTIG: Nutze IMMER templateId="${targetId}" bei allen Tool-Aufrufen, NICHT exposeId!`
       : `Du arbeitest gerade an einem EXPOSÉ für eine echte Immobilie (exposeId=${targetId}).
-${blocksDescription}
+${blocksDescription}${pageInfo}
 
 WICHTIG: Nutze IMMER exposeId="${targetId}" bei allen Tool-Aufrufen!`;
 

@@ -3,14 +3,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Hash, Plus, Search, User, Send, Menu, X, ChevronRight, 
-  Shield, Lock, Loader2, MoreHorizontal, Pencil, Trash2,
-  ChevronUp, AtSign, Bot
+  Shield, Loader2, MoreHorizontal, Pencil, Trash2,
+  ChevronUp, AtSign, Bot, Paperclip, FileText
 } from 'lucide-react';
 import Image from 'next/image';
 import { 
   getChannels, getChannelMessages, sendChannelMessage, getMe, getSeats,
   createChannel, deleteChannel, editChannelMessage, deleteChannelMessage,
-  getChannelMembers
+  getChannelMembers, getOrCreateDM
 } from '@/lib/api';
 import useSWR from 'swr';
 
@@ -33,6 +33,11 @@ interface ChannelMessage {
   };
 }
 
+interface ChannelMember {
+  userId: string;
+  user: { id: string; firstName: string; lastName: string; email: string };
+}
+
 interface Channel {
   id: string;
   name: string;
@@ -40,6 +45,7 @@ interface Channel {
   type: string;
   isDefault: boolean;
   _count: { members: number; messages: number };
+  members?: ChannelMember[];
 }
 
 interface Seat {
@@ -48,6 +54,32 @@ interface Seat {
   lastName: string;
   email: string;
   role: string;
+  lastSeenAt: string | null;
+}
+
+// ==========================================
+// Presence helpers
+// ==========================================
+type PresenceStatus = 'online' | 'away' | 'offline';
+
+function getPresenceStatus(lastSeenAt: string | null): PresenceStatus {
+  if (!lastSeenAt) return 'offline';
+  const diff = Date.now() - new Date(lastSeenAt).getTime();
+  const minutes = diff / 60_000;
+  if (minutes < 5) return 'online';
+  if (minutes < 30) return 'away';
+  return 'offline';
+}
+
+function PresenceDot({ status }: { status: PresenceStatus }) {
+  const colors: Record<PresenceStatus, string> = {
+    online: 'bg-green-500',
+    away: 'bg-yellow-400',
+    offline: 'bg-gray-300 dark:bg-gray-600',
+  };
+  return (
+    <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${colors[status]}`} />
+  );
 }
 
 // ==========================================
@@ -125,9 +157,13 @@ export default function TeamChatPage() {
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionIndex, setMentionIndex] = useState(0);
 
+  // File uploads
+  const [uploadedFiles, setUploadedFiles] = useState<{ id: string; file: File; name: string; type: string; preview?: string }[]>([]);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
@@ -291,11 +327,18 @@ export default function TeamChatPage() {
     }
   };
 
-  const filteredMentionSeats = seats.filter((s: Seat) => {
-    if (s.id === user?.id) return false;
-    const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
-    return fullName.includes(mentionQuery) || s.email.toLowerCase().includes(mentionQuery);
-  }).slice(0, 6);
+  // Jarvis virtual seat for mentions
+  const jarvisSeat: Seat = { id: 'jarvis', firstName: 'Jarvis', lastName: '', email: 'ki-assistent', role: 'BOT', lastSeenAt: new Date().toISOString() };
+
+  const filteredMentionSeats = [
+    // Always show Jarvis if it matches the query
+    ...( 'jarvis'.includes(mentionQuery) || 'ki'.includes(mentionQuery) ? [jarvisSeat] : []),
+    ...seats.filter((s: Seat) => {
+      if (s.id === user?.id) return false;
+      const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
+      return fullName.includes(mentionQuery) || s.email.toLowerCase().includes(mentionQuery);
+    })
+  ].slice(0, 6);
 
   const insertMention = (seat: Seat) => {
     const cursorPos = textareaRef.current?.selectionStart || message.length;
@@ -303,7 +346,7 @@ export default function TeamChatPage() {
     const atIndex = textBeforeCursor.lastIndexOf('@');
     const before = message.slice(0, atIndex);
     const after = message.slice(cursorPos);
-    const mention = `@[${seat.firstName} ${seat.lastName}](${seat.id}) `;
+    const mention = `@[${seat.firstName}${seat.lastName ? ' ' + seat.lastName : ''}](${seat.id}) `;
     setMessage(before + mention + after);
     setShowMentions(false);
     textareaRef.current?.focus();
@@ -342,6 +385,34 @@ export default function TeamChatPage() {
     }
   };
 
+  // File upload handlers
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    const newFiles = Array.from(files).map(file => {
+      const id = Math.random().toString(36).slice(2);
+      const isImage = file.type.startsWith('image/');
+      return {
+        id,
+        file,
+        name: file.name,
+        type: file.type,
+        preview: isImage ? URL.createObjectURL(file) : undefined,
+      };
+    });
+    setUploadedFiles(prev => [...prev, ...newFiles]);
+    // Reset file input so same file can be selected again
+    e.target.value = '';
+  };
+
+  const removeFile = (fileId: string) => {
+    setUploadedFiles(prev => {
+      const file = prev.find(f => f.id === fileId);
+      if (file?.preview) URL.revokeObjectURL(file.preview);
+      return prev.filter(f => f.id !== fileId);
+    });
+  };
+
   // Close menus on click outside
   useEffect(() => {
     const handler = () => setMenuMessageId(null);
@@ -349,9 +420,41 @@ export default function TeamChatPage() {
     return () => document.removeEventListener('click', handler);
   }, []);
 
+  // Open or create DM with a team member
+  const handleOpenDM = async (targetUserId: string) => {
+    try {
+      const dmChannel = await getOrCreateDM(targetUserId);
+      // Refresh channels list to include the new/existing DM
+      await mutateChannels();
+      setActiveChannelId(dmChannel.id);
+      setMobileDrawerOpen(false);
+    } catch (error) {
+      console.error('Failed to open DM:', error);
+    }
+  };
+
+  // Helper: get display name for a DM channel (show the other user's name)
+  const getDmDisplayName = (channel: Channel): string => {
+    if (channel.type !== 'DM' || !channel.members) return channel.name;
+    const other = channel.members.find((m: ChannelMember) => m.userId !== user?.id);
+    if (other) return `${other.user.firstName} ${other.user.lastName}`;
+    return channel.name;
+  };
+
+  // Helper: get initials for DM partner
+  const getDmInitials = (channel: Channel): string => {
+    if (channel.type !== 'DM' || !channel.members) return '';
+    const other = channel.members.find((m: ChannelMember) => m.userId !== user?.id);
+    if (other) return `${other.user.firstName?.charAt(0) || ''}${other.user.lastName?.charAt(0) || ''}`;
+    return '';
+  };
+
   const activeChannel = channels.find((c: Channel) => c.id === activeChannelId);
-  const filteredChannels = channels.filter((c: Channel) => 
-    !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const publicChannels = channels.filter((c: Channel) => 
+    c.type !== 'DM' && (!searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+  const dmChannels = channels.filter((c: Channel) =>
+    c.type === 'DM' && (!searchQuery || getDmDisplayName(c).toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   // ==========================================
@@ -362,22 +465,23 @@ export default function TeamChatPage() {
       <div className="pt-1 shrink-0" />
 
       {/* Mobile: Channel Header */}
-      <div className="lg:hidden flex items-center justify-between px-4 py-2 border-b border-gray-100 dark:border-gray-800">
+      <div className="lg:hidden flex h-11 items-center justify-between px-4 border-b border-gray-100 dark:border-gray-800">
         <button onClick={() => setMobileDrawerOpen(true)} className="p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
           <Menu className="w-5 h-5 text-gray-600 dark:text-gray-400" />
         </button>
         <div className="flex items-center gap-1.5">
-          <Hash className="w-4 h-4 text-gray-400" />
+          {activeChannel?.type === 'DM' ? (
+            <div className="w-4 h-4 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[8px] font-bold">
+              {activeChannel && getDmInitials(activeChannel)}
+            </div>
+          ) : (
+            <Hash className="w-4 h-4 text-gray-400" />
+          )}
           <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate max-w-[200px]">
-            {activeChannel?.name || 'Channel wählen'}
+            {activeChannel ? (activeChannel.type === 'DM' ? getDmDisplayName(activeChannel) : activeChannel.name) : 'Channel wählen'}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 text-[10px] text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-1.5 py-0.5 rounded-full">
-            <Lock className="w-2.5 h-2.5" />
-            <span>E2E</span>
-          </div>
-        </div>
+        <div className="w-9" /> {/* Spacer for centering */}
       </div>
 
       {/* Mobile Drawer */}
@@ -398,32 +502,84 @@ export default function TeamChatPage() {
                   className="w-full pl-9 pr-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm" />
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-3 pb-8">
-              <div className="flex items-center justify-between px-2 mb-2">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Channels</h3>
-                {isAdmin && (
-                  <button onClick={() => { setShowCreateChannel(true); setMobileDrawerOpen(false); }} className="text-gray-400 hover:text-gray-600">
-                    <Plus className="w-4 h-4" />
-                  </button>
-                )}
+            <div className="flex-1 overflow-y-auto px-3 pb-8 space-y-5">
+              {/* Channels */}
+              <div>
+                <div className="flex items-center justify-between px-2 mb-2">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Channels</h3>
+                  {isAdmin && (
+                    <button onClick={() => { setShowCreateChannel(true); setMobileDrawerOpen(false); }} className="text-gray-400 hover:text-gray-600">
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-0.5">
+                  {publicChannels.map((channel: Channel) => (
+                    <button
+                      key={channel.id}
+                      onClick={() => { setActiveChannelId(channel.id); setMobileDrawerOpen(false); }}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg ${
+                        activeChannelId === channel.id ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center min-w-0">
+                        <Hash className={`w-4 h-4 mr-2 shrink-0 ${activeChannelId === channel.id ? 'text-blue-600' : 'text-gray-400'}`} />
+                        <span className="truncate">{channel.name}</span>
+                        {channel.isDefault && <span className="ml-1.5 text-[9px] bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1 rounded">Standard</span>}
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-0.5">
-                {filteredChannels.map((channel: Channel) => (
-                  <button
-                    key={channel.id}
-                    onClick={() => { setActiveChannelId(channel.id); setMobileDrawerOpen(false); }}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg ${
-                      activeChannelId === channel.id ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50'
-                    }`}
-                  >
-                    <div className="flex items-center min-w-0">
-                      <Hash className={`w-4 h-4 mr-2 shrink-0 ${activeChannelId === channel.id ? 'text-blue-600' : 'text-gray-400'}`} />
-                      <span className="truncate">{channel.name}</span>
-                      {channel.isDefault && <span className="ml-1.5 text-[9px] bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1 rounded">Standard</span>}
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
-                  </button>
-                ))}
+
+              {/* DMs */}
+              {dmChannels.length > 0 && (
+                <div>
+                  <div className="px-2 mb-2">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Direktnachrichten</h3>
+                  </div>
+                  <div className="space-y-0.5">
+                    {dmChannels.map((channel: Channel) => (
+                      <button
+                        key={channel.id}
+                        onClick={() => { setActiveChannelId(channel.id); setMobileDrawerOpen(false); }}
+                        className={`w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-lg ${
+                          activeChannelId === channel.id ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                        }`}
+                      >
+                        <div className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[10px] font-bold mr-2 shrink-0">
+                          {getDmInitials(channel)}
+                        </div>
+                        <span className="truncate">{getDmDisplayName(channel)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Team Members */}
+              <div>
+                <div className="px-2 mb-2">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Team</h3>
+                </div>
+                <div className="space-y-0.5">
+                  {seats.filter((s: Seat) => s.id !== user?.id).map((seat: Seat) => (
+                    <button
+                      key={seat.id}
+                      onClick={() => handleOpenDM(seat.id)}
+                      className="w-full flex items-center px-3 py-2.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg transition-colors"
+                    >
+                      <div className="relative mr-2 shrink-0">
+                        <div className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[10px] font-bold">
+                          {seat.firstName?.charAt(0)}{seat.lastName?.charAt(0)}
+                        </div>
+                        <span className="absolute -bottom-0.5 -right-0.5"><PresenceDot status={getPresenceStatus(seat.lastSeenAt)} /></span>
+                      </div>
+                      <span className="truncate">{seat.firstName} {seat.lastName}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -442,6 +598,7 @@ export default function TeamChatPage() {
           </div>
 
           <div className="flex-1 overflow-y-auto px-3 space-y-5">
+            {/* Channels */}
             <div>
               <div className="flex items-center justify-between px-2 mb-2">
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Channels</h3>
@@ -452,7 +609,7 @@ export default function TeamChatPage() {
                 )}
               </div>
               <div className="space-y-0.5">
-                {filteredChannels.map((channel: Channel) => (
+                {publicChannels.map((channel: Channel) => (
                   <button
                     key={channel.id}
                     onClick={() => setActiveChannelId(channel.id)}
@@ -470,6 +627,33 @@ export default function TeamChatPage() {
               </div>
             </div>
 
+            {/* Direct Messages */}
+            {dmChannels.length > 0 && (
+              <div>
+                <div className="px-2 mb-2">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Direktnachrichten</h3>
+                </div>
+                <div className="space-y-0.5">
+                  {dmChannels.map((channel: Channel) => (
+                    <button
+                      key={channel.id}
+                      onClick={() => setActiveChannelId(channel.id)}
+                      className={`w-full flex items-center px-2 py-1.5 text-sm font-medium rounded-md group ${
+                        activeChannelId === channel.id
+                          ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white'
+                          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50'
+                      }`}
+                    >
+                      <div className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[10px] font-bold mr-2 shrink-0">
+                        {getDmInitials(channel)}
+                      </div>
+                      <span className="truncate">{getDmDisplayName(channel)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Team Members */}
             <div>
               <div className="flex items-center justify-between px-2 mb-2">
@@ -477,12 +661,19 @@ export default function TeamChatPage() {
               </div>
               <div className="space-y-0.5">
                 {seats.filter((s: Seat) => s.id !== user?.id).map((seat: Seat) => (
-                  <div key={seat.id} className="flex items-center px-2 py-1.5 text-sm text-gray-600 dark:text-gray-400 rounded-md">
-                    <div className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[10px] font-bold mr-2 shrink-0">
-                      {seat.firstName?.charAt(0)}{seat.lastName?.charAt(0)}
+                  <button
+                    key={seat.id}
+                    onClick={() => handleOpenDM(seat.id)}
+                    className="w-full flex items-center px-2 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 rounded-md cursor-pointer transition-colors"
+                  >
+                    <div className="relative mr-2 shrink-0">
+                      <div className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[10px] font-bold">
+                        {seat.firstName?.charAt(0)}{seat.lastName?.charAt(0)}
+                      </div>
+                      <span className="absolute -bottom-0.5 -right-0.5"><PresenceDot status={getPresenceStatus(seat.lastSeenAt)} /></span>
                     </div>
                     <span className="truncate">{seat.firstName} {seat.lastName}</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -505,25 +696,27 @@ export default function TeamChatPage() {
           {activeChannel ? (
             <>
               {/* Desktop Header */}
-              <div className="hidden lg:flex px-6 py-2.5 items-center justify-between border-b border-gray-100 dark:border-gray-800 shrink-0">
+              <div className="hidden lg:flex h-11 px-6 items-center justify-between border-b border-gray-100 dark:border-gray-800 shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center">
-                    <Hash className="w-5 h-5 text-gray-400 mr-2" />
-                    <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">{activeChannel.name}</h2>
+                    {activeChannel.type === 'DM' ? (
+                      <div className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[9px] font-bold mr-2 text-gray-600 dark:text-gray-300">
+                        {getDmInitials(activeChannel)}
+                      </div>
+                    ) : (
+                      <Hash className="w-5 h-5 text-gray-400 mr-2" />
+                    )}
+                    <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">
+                      {activeChannel.type === 'DM' ? getDmDisplayName(activeChannel) : activeChannel.name}
+                    </h2>
                   </div>
-                  {activeChannel.description && (
+                  {activeChannel.description && activeChannel.type !== 'DM' && (
                     <span className="text-xs text-gray-400 border-l border-gray-200 dark:border-gray-700 pl-3">{activeChannel.description}</span>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1 text-[10px] text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-full">
-                    <Lock className="w-3 h-3" />
-                    <span>E2E verschlüsselt</span>
-                  </div>
-                  <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                    <User className="w-4 h-4 mr-1" />
-                    {activeChannel._count?.members || 0}
-                  </div>
+                <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                  <User className="w-4 h-4 mr-1" />
+                  {activeChannel._count?.members || 0}
                 </div>
               </div>
 
@@ -552,10 +745,24 @@ export default function TeamChatPage() {
                 {!loadingMessages && messages.length === 0 && (
                   <div className="flex-1 flex flex-col items-center justify-center text-center py-16">
                     <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center mb-3">
-                      <Hash className="w-6 h-6 text-gray-400" />
+                      {activeChannel.type === 'DM' ? (
+                        <User className="w-6 h-6 text-gray-400" />
+                      ) : (
+                        <Hash className="w-6 h-6 text-gray-400" />
+                      )}
                     </div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Willkommen in #{activeChannel.name}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Schreibe die erste Nachricht in diesem Channel.</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                      {activeChannel.type === 'DM'
+                        ? `Konversation mit ${getDmDisplayName(activeChannel)}`
+                        : `Willkommen in #${activeChannel.name}`
+                      }
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {activeChannel.type === 'DM'
+                        ? 'Schreibe die erste Nachricht.'
+                        : 'Schreibe die erste Nachricht in diesem Channel.'
+                      }
+                    </p>
                   </div>
                 )}
 
@@ -655,58 +862,128 @@ export default function TeamChatPage() {
               </div>
 
               {/* Input Area */}
-              <div className="p-3 lg:p-4 safe-bottom relative">
+              <div className="px-3 pt-3 pb-5 lg:px-5 lg:pt-4 lg:pb-6 safe-bottom relative border-t border-gray-100 dark:border-gray-800">
                 {/* Mention autocomplete popup */}
                 {showMentions && filteredMentionSeats.length > 0 && (
-                  <div className="absolute bottom-full left-3 right-3 lg:left-4 lg:right-4 mb-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
+                  <div className="absolute bottom-full left-3 right-3 lg:left-5 lg:right-5 mb-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
                     {filteredMentionSeats.map((seat: Seat, i: number) => (
                       <button
                         key={seat.id}
                         onClick={() => insertMention(seat)}
                         className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 ${i === mentionIndex ? 'bg-gray-50 dark:bg-gray-700' : ''}`}
                       >
-                        <div className="w-6 h-6 rounded bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-[10px] font-bold">
-                          {seat.firstName?.charAt(0)}{seat.lastName?.charAt(0)}
-                        </div>
-                        <span className="text-gray-900 dark:text-gray-100 font-medium">{seat.firstName} {seat.lastName}</span>
-                        <span className="text-gray-400 text-xs ml-auto">{seat.email}</span>
+                        {seat.id === 'jarvis' ? (
+                          <Image src="/logo-icon-only.png" alt="Jarvis" width={24} height={24} className="w-6 h-6 shrink-0" />
+                        ) : (
+                          <div className="w-6 h-6 rounded bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-[10px] font-bold">
+                            {seat.firstName?.charAt(0)}{seat.lastName?.charAt(0)}
+                          </div>
+                        )}
+                        <span className={`font-medium ${seat.id === 'jarvis' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                          {seat.firstName}{seat.lastName ? ` ${seat.lastName}` : ''}
+                        </span>
+                        <span className="text-gray-400 text-xs ml-auto">
+                          {seat.id === 'jarvis' ? 'KI-Assistent' : seat.email}
+                        </span>
                       </button>
                     ))}
                   </div>
                 )}
 
-                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-1.5 lg:p-2 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
-                  <textarea
-                    ref={textareaRef}
-                    rows={1}
-                    className="w-full bg-transparent border-none focus:ring-0 resize-none text-[16px] lg:text-sm p-2 text-gray-900 dark:text-gray-100 placeholder-gray-400"
-                    placeholder={`Nachricht an #${activeChannel.name}... (@ für Erwähnungen)`}
-                    value={message}
-                    onChange={e => handleMessageChange(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                  />
-                  <div className="flex justify-between items-center px-2 pb-1">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => { setShowMentions(!showMentions); setMentionQuery(''); }}
-                        className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded transition-colors"
-                        title="Erwähnen"
-                      >
-                        <AtSign className="w-4 h-4" />
-                      </button>
-                    </div>
+                {/* File Upload Preview */}
+                {uploadedFiles.length > 0 && (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {uploadedFiles.map((file) => (
+                      <div key={file.id} className="relative group">
+                        {file.preview ? (
+                          <div className="w-20 h-20 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                            <img src={file.preview} alt={file.name} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="w-20 h-20 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex flex-col items-center justify-center">
+                            <FileText className="w-7 h-7 text-gray-400" />
+                            <span className="text-[9px] text-gray-500 dark:text-gray-400 mt-1 truncate max-w-[68px] px-1">{file.name}</span>
+                          </div>
+                        )}
+                        <button
+                          onClick={() => removeFile(file.id)}
+                          className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Hidden file input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf,.doc,.docx,.txt"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+
+                {/* Textarea */}
+                <textarea
+                  ref={textareaRef}
+                  rows={1}
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl text-[16px] lg:text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-800 transition-all placeholder-gray-400 resize-none overflow-y-auto"
+                  style={{ maxHeight: '8rem', minHeight: '2.75rem' }}
+                  placeholder={activeChannel.type === 'DM' ? `Nachricht an ${getDmDisplayName(activeChannel)}...` : `Nachricht an #${activeChannel.name}... (@ für Erwähnungen)`}
+                  value={message}
+                  onChange={e => handleMessageChange(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onInput={(e) => {
+                    const target = e.target as HTMLTextAreaElement;
+                    target.style.height = 'auto';
+                    target.style.height = Math.min(target.scrollHeight, 128) + 'px';
+                  }}
+                />
+
+                {/* Action bar */}
+                <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center gap-1">
                     <button
-                      onClick={handleSendMessage}
-                      className={`p-2 rounded-lg transition-colors ${
-                        message.trim() && !sending
-                          ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200'
-                          : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                      }`}
-                      disabled={!message.trim() || sending}
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                      title="Dateien anhängen"
                     >
-                      {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      <Paperclip className="w-5 h-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowMentions(!showMentions); setMentionQuery(''); }}
+                      className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                      title="Erwähnen (@)"
+                    >
+                      <AtSign className="w-5 h-5" />
                     </button>
                   </div>
+                  <button
+                    onClick={handleSendMessage}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      message.trim() && !sending
+                        ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                    }`}
+                    disabled={!message.trim() || sending}
+                  >
+                    {sending ? (
+                      <>
+                        Senden
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      </>
+                    ) : (
+                      <>
+                        Senden
+                        <Send className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </>

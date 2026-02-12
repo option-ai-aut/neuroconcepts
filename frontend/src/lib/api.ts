@@ -430,6 +430,18 @@ export async function getSeats() {
   return res.json();
 }
 
+export async function sendPresenceHeartbeat() {
+  try {
+    const headers = await getAuthHeaders();
+    await fetch(`${getApiUrl()}/presence/heartbeat`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+    });
+  } catch {
+    // Silently ignore heartbeat failures
+  }
+}
+
 export async function inviteSeat(email: string, role: string) {
   const headers = await getAuthHeaders();
   const res = await fetch(`${getApiUrl()}/seats/invite`, {
@@ -473,6 +485,20 @@ export async function createChannel(data: { name: string; description?: string; 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || 'Failed to create channel');
+  }
+  return res.json();
+}
+
+export async function getOrCreateDM(userId: string) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/channels/dm`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to open DM');
   }
   return res.json();
 }

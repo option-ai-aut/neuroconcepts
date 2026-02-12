@@ -59,7 +59,7 @@ export default function PageHeader() {
   };
 
   return (
-    <div className="h-12 px-4 lg:px-6 flex items-center justify-between bg-white shrink-0 z-10" style={{ touchAction: 'none' }}>
+    <div className="h-12 px-4 lg:px-6 flex items-center justify-between bg-white shrink-0 z-10 border-b border-gray-100 dark:border-gray-800" style={{ touchAction: 'none' }}>
       {/* Left: Brand (mobile) + Page Title */}
       <div className="flex items-center gap-2.5">
         {/* Mobile brand logo */}

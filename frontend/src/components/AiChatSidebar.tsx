@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Bot, Paperclip, FileText, RotateCcw, X, Image as ImageIcon, AlertCircle, Loader2, Square } from 'lucide-react';
 import NextImage from 'next/image';
+import { usePathname } from 'next/navigation';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 import { fetchAuthSession } from 'aws-amplify/auth';
@@ -162,6 +163,29 @@ const CONTEXT_TIPS: ContextTip[] = [
   { id: 'inbox', context: 'inbox', message: 'Ich kann E-Mails zusammenfassen, beantworten oder Leads daraus erstellen.' },
 ];
 
+// Map pathname to human-readable page context for Jarvis
+function getPageContext(pathname: string, exposeCtx?: { isTemplate?: boolean; templateId?: string; exposeId?: string } | null): string {
+  const parts: string[] = [];
+
+  if (pathname.startsWith('/dashboard/inbox')) parts.push('Posteingang (E-Mails)');
+  else if (pathname.startsWith('/dashboard/crm/leads/') && pathname.split('/').length > 4) parts.push(`Lead-Detailseite (Lead-ID: ${pathname.split('/')[4]})`);
+  else if (pathname.startsWith('/dashboard/crm/leads')) parts.push('CRM – Leads-Übersicht');
+  else if (pathname.startsWith('/dashboard/crm/properties/') && pathname.split('/').length > 4) parts.push(`Objekt-Detailseite (Objekt-ID: ${pathname.split('/')[4]})`);
+  else if (pathname.startsWith('/dashboard/crm/properties')) parts.push('CRM – Objekte-Übersicht');
+  else if (pathname.startsWith('/dashboard/calendar')) parts.push('Kalender');
+  else if (pathname.startsWith('/dashboard/exposes')) parts.push('Exposés & Vorlagen');
+  else if (pathname.startsWith('/dashboard/assistant')) parts.push('Team Chat');
+  else if (pathname.startsWith('/dashboard/image-studio')) parts.push('KI-Bildstudio');
+  else if (pathname.startsWith('/dashboard/settings')) parts.push('Einstellungen');
+  else if (pathname.startsWith('/dashboard/activities')) parts.push('Aktivitäten');
+  else if (pathname === '/dashboard') parts.push('Dashboard-Übersicht');
+
+  if (exposeCtx?.isTemplate && exposeCtx.templateId) parts.push('Exposé-Vorlage wird gerade im Editor bearbeitet');
+  else if (!exposeCtx?.isTemplate && exposeCtx?.exposeId) parts.push('Exposé wird gerade im Editor bearbeitet');
+
+  return parts.join(' – ');
+}
+
 interface AiChatSidebarProps {
   mobile?: boolean;
   onClose?: () => void;
@@ -169,6 +193,7 @@ interface AiChatSidebarProps {
 
 export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const pathname = usePathname();
   const { aiChatDraft, setAiChatDraft, activeExposeContext, triggerExposeRefresh, notifyAiAction, aiActionPerformed } = useGlobalState();
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -508,12 +533,14 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           : `${apiUrl}/exposes/${activeExposeContext.exposeId}/chat`;
         
         const authHeaders = await getAuthHeaders();
+        const exposePageContext = getPageContext(pathname, activeExposeContext);
         const res = await fetch(endpoint, {
           method: 'POST',
           headers: authHeaders,
           body: JSON.stringify({
             message: userMsg.content,
             history: messages.filter(m => !m.isAction).slice(-10),
+            pageContext: exposePageContext || undefined,
           }),
           signal: abortController.signal,
         });
@@ -539,6 +566,8 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         if (filesToUpload.length > 0) {
           const formData = new FormData();
           formData.append('message', userMsg.content);
+          const pageContext = getPageContext(pathname, activeExposeContext);
+          if (pageContext) formData.append('pageContext', pageContext);
           filesToUpload.forEach((f, idx) => {
             formData.append('files', f.file);
           });
@@ -552,11 +581,13 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
             signal: abortController.signal,
           });
         } else {
+          const pageContext = getPageContext(pathname, activeExposeContext);
           res = await fetch(`${apiUrl}/chat/stream`, {
             method: 'POST',
             headers: authHeaders,
             body: JSON.stringify({
               message: userMsg.content,
+              pageContext: pageContext || undefined,
             }),
             signal: abortController.signal,
           });
