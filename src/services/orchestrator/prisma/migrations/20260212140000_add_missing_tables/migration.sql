@@ -12,13 +12,13 @@ END $$;
 
 -- CreateEnum PendingActionType
 DO $$ BEGIN
-  CREATE TYPE "PendingActionType" AS ENUM ('ASSIGN_PROPERTY', 'CONFIRM_SEND', 'SELECT_TEMPLATE', 'CLARIFY_REQUEST', 'REVIEW_EXPOSE', 'SCHEDULE_VIEWING', 'OTHER');
+  CREATE TYPE "PendingActionType" AS ENUM ('SEND_EXPOSE', 'SCHEDULE_VIEWING', 'ANSWER_QUESTION', 'ESCALATION', 'ASSIGN_PROPERTY', 'LINK_CLICK_REQUIRED', 'CLARIFICATION');
 EXCEPTION WHEN duplicate_object THEN null;
 END $$;
 
 -- CreateEnum PendingActionStatus
 DO $$ BEGIN
-  CREATE TYPE "PendingActionStatus" AS ENUM ('PENDING', 'RESOLVED', 'EXPIRED', 'ESCALATED', 'AUTO_RESOLVED');
+  CREATE TYPE "PendingActionStatus" AS ENUM ('PENDING', 'REMINDED', 'ESCALATED', 'RESOLVED', 'CANCELLED');
 EXCEPTION WHEN duplicate_object THEN null;
 END $$;
 
@@ -30,13 +30,13 @@ END $$;
 
 -- CreateEnum EmailFolder
 DO $$ BEGIN
-  CREATE TYPE "EmailFolder" AS ENUM ('INBOX', 'SENT', 'DRAFT', 'TRASH', 'SPAM', 'ARCHIVE');
+  CREATE TYPE "EmailFolder" AS ENUM ('INBOX', 'SENT', 'DRAFTS', 'TRASH', 'SPAM');
 EXCEPTION WHEN duplicate_object THEN null;
 END $$;
 
 -- CreateEnum EmailProvider
 DO $$ BEGIN
-  CREATE TYPE "EmailProvider" AS ENUM ('SES', 'GMAIL', 'OUTLOOK');
+  CREATE TYPE "EmailProvider" AS ENUM ('GMAIL', 'OUTLOOK', 'SMTP');
 EXCEPTION WHEN duplicate_object THEN null;
 END $$;
 
@@ -130,9 +130,9 @@ CREATE TABLE IF NOT EXISTS "Email" (
     "inReplyTo" TEXT,
     "from" TEXT NOT NULL,
     "fromName" TEXT,
-    "to" TEXT[] DEFAULT ARRAY[]::TEXT[],
-    "cc" TEXT[] DEFAULT ARRAY[]::TEXT[],
-    "bcc" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "to" TEXT[],
+    "cc" TEXT[],
+    "bcc" TEXT[],
     "subject" TEXT NOT NULL,
     "bodyHtml" TEXT,
     "bodyText" TEXT,
@@ -146,11 +146,14 @@ CREATE TABLE IF NOT EXISTS "Email" (
     "providerData" JSONB,
     "receivedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "Email_pkey" PRIMARY KEY ("id")
 );
 CREATE INDEX IF NOT EXISTS "Email_tenantId_folder_idx" ON "Email"("tenantId", "folder");
+CREATE INDEX IF NOT EXISTS "Email_tenantId_leadId_idx" ON "Email"("tenantId", "leadId");
 CREATE INDEX IF NOT EXISTS "Email_tenantId_receivedAt_idx" ON "Email"("tenantId", "receivedAt");
-CREATE INDEX IF NOT EXISTS "Email_leadId_idx" ON "Email"("leadId");
+CREATE INDEX IF NOT EXISTS "Email_messageId_idx" ON "Email"("messageId");
+CREATE INDEX IF NOT EXISTS "Email_threadId_idx" ON "Email"("threadId");
 
 -- CreateTable BugReport
 CREATE TABLE IF NOT EXISTS "BugReport" (
