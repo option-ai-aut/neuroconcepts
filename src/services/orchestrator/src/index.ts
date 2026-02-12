@@ -360,14 +360,42 @@ async function uploadToS3(buffer: Buffer, filename: string, contentType: string,
     return `https://${MEDIA_BUCKET}.s3.${region}.amazonaws.com/${key}`;
   }
   
+  // On Lambda, MEDIA_BUCKET must be set — local disk is ephemeral and will be lost
+  if (isLambda) {
+    throw new Error('MEDIA_BUCKET_NAME is not configured. Cannot upload files on Lambda without S3.');
+  }
+  
   // Fallback for local dev without S3: save to disk
-  const baseDir = isLambda ? '/tmp/uploads' : path.join(__dirname, '../uploads');
-  const uploadDir = path.join(baseDir, folder);
+  const localBaseDir = path.join(__dirname, '../uploads');
+  const uploadDir = path.join(localBaseDir, folder);
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
   fs.writeFileSync(path.join(uploadDir, filename), buffer);
   return `/uploads/${folder}/${filename}`;
+}
+
+/**
+ * Normalize image/file URLs stored in the DB.
+ * Converts legacy /uploads/... paths to full S3 URLs so they load in production.
+ */
+function normalizeFileUrl(url: string, tenantId: string, propertyId: string, type: 'images' | 'floorplans' = 'images'): string {
+  if (!url) return '';
+  // Already a full URL — return as-is
+  if (url.startsWith('http')) return url;
+  // Legacy /uploads/ path — convert to S3 URL
+  if (url.startsWith('/uploads/') && MEDIA_BUCKET) {
+    const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'eu-central-1';
+    const stripped = url.replace(/^\/uploads\//, '');
+    // If path already contains the full folder structure, use it directly
+    if (stripped.startsWith('properties/')) {
+      return `https://${MEDIA_BUCKET}.s3.${region}.amazonaws.com/${stripped}`;
+    }
+    // Otherwise, reconstruct the S3 key from just the filename
+    const filename = stripped.split('/').pop() || stripped;
+    return `https://${MEDIA_BUCKET}.s3.${region}.amazonaws.com/properties/${tenantId}/${propertyId}/${type}/${filename}`;
+  }
+  return url;
 }
 
 // Serve uploaded files
@@ -378,21 +406,37 @@ if (!isLambda) {
     fs.mkdirSync(localUploadDir, { recursive: true });
   }
   app.use('/uploads', express.static(localUploadDir));
-} else if (MEDIA_BUCKET) {
-  // Lambda: proxy /uploads/* to S3 (for legacy /uploads/ URLs in DB)
+} else {
+  // Lambda: redirect /uploads/* to S3 (handles legacy /uploads/ URLs still in DB)
   app.get('/uploads/*', async (req, res) => {
-    try {
-      const key = req.path.replace(/^\/uploads\//, '');
-      const obj = await s3Client.getObject({ Bucket: MEDIA_BUCKET, Key: key }).promise();
-      res.set('Content-Type', obj.ContentType || 'image/jpeg');
-      res.set('Cache-Control', 'public, max-age=86400');
-      res.send(obj.Body);
-    } catch {
-      // Return 1x1 transparent PNG for missing files
-      const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAAlwSFlzAAAWJQAAFiUBSVIk8AAAAA0lEQVQI12P4z8BQDwAEgAF/QualzQAAAABJRU5ErkJggg==', 'base64');
-      res.set('Content-Type', 'image/png');
-      res.status(404).send(pixel);
+    const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'eu-central-1';
+    const rawPath = req.path.replace(/^\/uploads\//, '');
+
+    if (!MEDIA_BUCKET) {
+      return res.status(404).json({ error: 'Storage not configured' });
     }
+
+    // Try direct key first (e.g. /uploads/properties/tenant/prop/images/file.jpg)
+    try {
+      await s3Client.headObject({ Bucket: MEDIA_BUCKET, Key: rawPath }).promise();
+      return res.redirect(301, `https://${MEDIA_BUCKET}.s3.${region}.amazonaws.com/${rawPath}`);
+    } catch { /* not found at this key, try filename search */ }
+
+    // Try searching by filename across common prefixes
+    const filename = rawPath.split('/').pop() || rawPath;
+    try {
+      const result = await s3Client.listObjectsV2({
+        Bucket: MEDIA_BUCKET,
+        MaxKeys: 5,
+      }).promise();
+      const match = result.Contents?.find(obj => obj.Key?.endsWith(`/${filename}`));
+      if (match?.Key) {
+        return res.redirect(301, `https://${MEDIA_BUCKET}.s3.${region}.amazonaws.com/${match.Key}`);
+      }
+    } catch { /* search failed */ }
+
+    // File truly not found — return 404
+    res.status(404).json({ error: 'File not found' });
   });
 }
 
@@ -1234,6 +1278,15 @@ app.get('/properties', authMiddleware, async (req, res) => {
       where: { tenantId: currentUser.tenantId },
       orderBy: { createdAt: 'desc' }
     });
+
+    // Normalize legacy /uploads/ URLs to S3 URLs
+    if (isLambda && MEDIA_BUCKET) {
+      for (const p of properties) {
+        p.images = p.images.map(url => normalizeFileUrl(url, p.tenantId, p.id, 'images'));
+        p.floorplans = p.floorplans.map(url => normalizeFileUrl(url, p.tenantId, p.id, 'floorplans'));
+      }
+    }
+
     res.json(properties);
   } catch (error) {
     console.error('Error fetching properties:', error);
@@ -1253,6 +1306,13 @@ app.get('/properties/:id', authMiddleware, async (req, res) => {
     });
     
     if (!property) return res.status(404).json({ error: 'Property not found' });
+
+    // Normalize legacy /uploads/ URLs to S3 URLs
+    if (isLambda && MEDIA_BUCKET) {
+      property.images = property.images.map(url => normalizeFileUrl(url, property.tenantId, property.id, 'images'));
+      property.floorplans = property.floorplans.map(url => normalizeFileUrl(url, property.tenantId, property.id, 'floorplans'));
+    }
+
     res.json(property);
   } catch (error) {
     console.error('Error fetching property:', error);
