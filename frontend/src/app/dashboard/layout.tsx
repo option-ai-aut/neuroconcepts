@@ -72,9 +72,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   }, [setMobileJarvisOpen]);
 
   return (
-    <div className={`flex h-[100dvh] font-sans transition-colors duration-300 ${isDark ? 'dark bg-[#111111]' : 'bg-white'}`}>
+    <div className={`app-shell flex h-full overflow-hidden font-sans transition-colors duration-300 ${isDark ? 'dark bg-[#111111]' : 'bg-white'}`} style={{ overscrollBehavior: 'none' }}>
       {/* Safe area top fill — ensures correct bg behind iPhone notch/status bar */}
-      <div className={`fixed top-0 left-0 right-0 z-[60] lg:hidden transition-colors ${isDark ? 'bg-[#111111]' : 'bg-white'}`} style={{ height: 'env(safe-area-inset-top, 0px)' }} />
+      <div className={`fixed top-0 left-0 right-0 z-[60] lg:hidden transition-colors ${isDark ? 'bg-[#111111]' : 'bg-white'}`} style={{ height: 'env(safe-area-inset-top, 0px)', touchAction: 'none' }} />
       
       {/* Main Navigation Sidebar (Left) - Desktop only */}
       <Sidebar />
@@ -84,7 +84,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         {/* Top Header Bar */}
         <PageHeader />
         {/* Scrollable Content - extra bottom padding on mobile for nav bar */}
-        <main className={`flex-1 overflow-y-auto bg-white dark:bg-[#111111] overflow-x-hidden pb-16 lg:pb-0 transition-colors ${mobileJarvisOpen ? 'overflow-hidden' : ''}`} style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}>
+        <main className={`flex-1 overflow-y-auto bg-white dark:bg-[#111111] overflow-x-hidden pb-16 lg:pb-0 transition-colors ${mobileJarvisOpen ? 'overflow-hidden' : ''}`} style={{ overscrollBehavior: 'none' }}>
           <MobileRouteGuard pathname={pathname}>
             {children}
           </MobileRouteGuard>

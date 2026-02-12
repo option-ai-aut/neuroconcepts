@@ -219,7 +219,7 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="app-shell flex h-screen bg-gray-50">
       <AdminSidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${sidebarCollapsed ? 'ml-[68px]' : 'ml-64'}`}>
         <AdminTopBar />
