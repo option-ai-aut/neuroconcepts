@@ -633,7 +633,7 @@ export default function ExposesPage() {
               {/* Stats Bar - moved to top */}
               {(selectedTemplate.blocks || []).length > 0 && (
                 <div className="px-6 py-3 bg-white shrink-0">
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-500">Blöcke:</span>
                       <span className="text-sm font-semibold text-gray-900">{(selectedTemplate.blocks || []).length}</span>
@@ -646,21 +646,21 @@ export default function ExposesPage() {
                       <span className="text-sm text-gray-500">Theme:</span>
                       <span className="text-sm font-semibold text-gray-900 capitalize">{selectedTemplate.theme || 'Standard'}</span>
                     </div>
-                    <div className="flex items-center gap-2 ml-auto text-xs text-gray-400">
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
                       <Calendar className="w-3 h-3" />
                       {formatDate(selectedTemplate.updatedAt)}
                     </div>
                     
                     {/* Preview Property Selector */}
-                    <div className="flex items-center gap-2">
-                      <Eye className="w-3 h-3 text-gray-400" />
+                    <div className="flex items-center gap-2 ml-auto">
+                      <Eye className="w-3 h-3 text-gray-400 shrink-0" />
                       <select
                         value={previewProperty?.id || ''}
                         onChange={(e) => {
                           const prop = properties.find(p => p.id === e.target.value);
                           setPreviewProperty(prop || null);
                         }}
-                        className="text-xs border border-gray-200 rounded px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="text-xs border border-gray-200 rounded px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500 max-w-[180px] truncate"
                       >
                         <option value="">Variablen anzeigen</option>
                         {properties.map(p => (

@@ -320,6 +320,9 @@ model Property {
   buildingType  BuildingType?
   totalFloors   Int?
   
+  // Heating
+  heatingType   String? // z.B. Fernwärme, Gas, Öl, Wärmepumpe, Pellets, etc.
+  
   // Energy Certificate (GEG §87)
   energyCertificateType EnergyCertificateType?
   energyEfficiencyClass EnergyEfficiencyClass?

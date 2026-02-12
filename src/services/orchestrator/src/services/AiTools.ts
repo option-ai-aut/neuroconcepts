@@ -123,28 +123,51 @@ export const CRM_TOOLS = {
   },
   create_property: {
     name: "create_property",
-    description: "Creates a new property/real estate object in the CRM with all details.",
+    description: "Creates a new property/real estate object in the CRM with all details. Supports ALL property fields.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         title: { type: SchemaType.STRING, description: "Property title (e.g., 'Moderne Wohnung in Berlin-Mitte')" } as FunctionDeclarationSchema,
         description: { type: SchemaType.STRING, description: "Detailed description of the property" } as FunctionDeclarationSchema,
-        address: { type: SchemaType.STRING, description: "Street address" } as FunctionDeclarationSchema,
+        address: { type: SchemaType.STRING, description: "Full street address" } as FunctionDeclarationSchema,
+        street: { type: SchemaType.STRING, description: "Street name" } as FunctionDeclarationSchema,
+        houseNumber: { type: SchemaType.STRING, description: "House number" } as FunctionDeclarationSchema,
+        floor: { type: SchemaType.INTEGER, description: "Floor number" } as FunctionDeclarationSchema,
         zipCode: { type: SchemaType.STRING, description: "Postal code" } as FunctionDeclarationSchema,
         city: { type: SchemaType.STRING, description: "City" } as FunctionDeclarationSchema,
+        district: { type: SchemaType.STRING, description: "District/Bezirk" } as FunctionDeclarationSchema,
+        state: { type: SchemaType.STRING, description: "State/Bundesland" } as FunctionDeclarationSchema,
+        country: { type: SchemaType.STRING, description: "Country (default: Deutschland)" } as FunctionDeclarationSchema,
         propertyType: { type: SchemaType.STRING, description: "Type: APARTMENT, HOUSE, COMMERCIAL, LAND, GARAGE, OTHER" } as FunctionDeclarationSchema,
         marketingType: { type: SchemaType.STRING, description: "Marketing type: SALE, RENT, LEASE" } as FunctionDeclarationSchema,
         salePrice: { type: SchemaType.NUMBER, description: "Sale price in EUR (for SALE)" } as FunctionDeclarationSchema,
         rentCold: { type: SchemaType.NUMBER, description: "Cold rent in EUR/month (for RENT)" } as FunctionDeclarationSchema,
+        rentWarm: { type: SchemaType.NUMBER, description: "Warm rent in EUR/month" } as FunctionDeclarationSchema,
         additionalCosts: { type: SchemaType.NUMBER, description: "Additional costs in EUR/month" } as FunctionDeclarationSchema,
+        deposit: { type: SchemaType.STRING, description: "Deposit (e.g., '3 Monatsmieten')" } as FunctionDeclarationSchema,
+        commission: { type: SchemaType.STRING, description: "Commission (e.g., '3,57% inkl. MwSt.')" } as FunctionDeclarationSchema,
         livingArea: { type: SchemaType.NUMBER, description: "Living area in m²" } as FunctionDeclarationSchema,
+        usableArea: { type: SchemaType.NUMBER, description: "Usable area in m²" } as FunctionDeclarationSchema,
+        plotArea: { type: SchemaType.NUMBER, description: "Plot area in m²" } as FunctionDeclarationSchema,
         rooms: { type: SchemaType.NUMBER, description: "Number of rooms" } as FunctionDeclarationSchema,
         bedrooms: { type: SchemaType.NUMBER, description: "Number of bedrooms" } as FunctionDeclarationSchema,
         bathrooms: { type: SchemaType.NUMBER, description: "Number of bathrooms" } as FunctionDeclarationSchema,
         yearBuilt: { type: SchemaType.NUMBER, description: "Year built (YYYY)" } as FunctionDeclarationSchema,
+        yearRenovated: { type: SchemaType.NUMBER, description: "Year last renovated (YYYY)" } as FunctionDeclarationSchema,
         condition: { type: SchemaType.STRING, description: "Condition: FIRST_OCCUPANCY, NEW, RENOVATED, REFURBISHED, WELL_MAINTAINED, MODERNIZED, NEEDS_RENOVATION" } as FunctionDeclarationSchema,
+        buildingType: { type: SchemaType.STRING, description: "Building type: MULTI_FAMILY, SINGLE_FAMILY, SEMI_DETACHED, TERRACED, BUNGALOW, VILLA, HIGH_RISE, OTHER" } as FunctionDeclarationSchema,
+        totalFloors: { type: SchemaType.INTEGER, description: "Total number of floors in the building" } as FunctionDeclarationSchema,
+        heatingType: { type: SchemaType.STRING, description: "Heating type (e.g., 'Fernwärme', 'Gas', 'Wärmepumpe')" } as FunctionDeclarationSchema,
+        energyCertificateType: { type: SchemaType.STRING, description: "Energy certificate type: DEMAND, CONSUMPTION" } as FunctionDeclarationSchema,
         energyEfficiencyClass: { type: SchemaType.STRING, description: "Energy efficiency class: A_PLUS, A, B, C, D, E, F, G, H" } as FunctionDeclarationSchema,
+        energyConsumption: { type: SchemaType.NUMBER, description: "Energy consumption in kWh/(m²·a)" } as FunctionDeclarationSchema,
         primaryEnergySource: { type: SchemaType.STRING, description: "Primary energy source (e.g., Gas, Fernwärme)" } as FunctionDeclarationSchema,
+        features: { type: SchemaType.ARRAY, description: "List of features/equipment (e.g., ['Einbauküche', 'Balkon', 'Aufzug'])", items: { type: SchemaType.STRING } } as FunctionDeclarationSchema,
+        locationDescription: { type: SchemaType.STRING, description: "Description of location, surroundings, infrastructure" } as FunctionDeclarationSchema,
+        equipmentDescription: { type: SchemaType.STRING, description: "Detailed description of equipment/Ausstattung" } as FunctionDeclarationSchema,
+        virtualTour: { type: SchemaType.STRING, description: "URL to virtual tour (e.g., Matterport)" } as FunctionDeclarationSchema,
+        status: { type: SchemaType.STRING, description: "Status: ACTIVE, RESERVED, SOLD, RENTED, ARCHIVED" } as FunctionDeclarationSchema,
+        priority: { type: SchemaType.STRING, description: "Priority: LOW, MEDIUM, HIGH" } as FunctionDeclarationSchema,
       },
       required: ["title", "address"]
     }
@@ -256,30 +279,54 @@ export const CRM_TOOLS = {
   },
   update_property: {
     name: "update_property",
-    description: "Updates an existing property's information including all new fields.",
+    description: "Updates an existing property. Supports ALL property fields — address details, prices, areas, rooms, building info, energy certificate, features, descriptions, media links, status, and more.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         propertyId: { type: SchemaType.STRING, description: "ID of the property to update" } as FunctionDeclarationSchema,
         title: { type: SchemaType.STRING, description: "Property title" } as FunctionDeclarationSchema,
-        description: { type: SchemaType.STRING, description: "Description" } as FunctionDeclarationSchema,
-        address: { type: SchemaType.STRING, description: "Street address" } as FunctionDeclarationSchema,
+        description: { type: SchemaType.STRING, description: "Detailed description" } as FunctionDeclarationSchema,
+        address: { type: SchemaType.STRING, description: "Full street address" } as FunctionDeclarationSchema,
+        street: { type: SchemaType.STRING, description: "Street name" } as FunctionDeclarationSchema,
+        houseNumber: { type: SchemaType.STRING, description: "House number" } as FunctionDeclarationSchema,
+        floor: { type: SchemaType.INTEGER, description: "Floor number" } as FunctionDeclarationSchema,
         zipCode: { type: SchemaType.STRING, description: "Postal code" } as FunctionDeclarationSchema,
         city: { type: SchemaType.STRING, description: "City" } as FunctionDeclarationSchema,
+        district: { type: SchemaType.STRING, description: "District/Bezirk" } as FunctionDeclarationSchema,
+        state: { type: SchemaType.STRING, description: "State/Bundesland" } as FunctionDeclarationSchema,
+        country: { type: SchemaType.STRING, description: "Country" } as FunctionDeclarationSchema,
         propertyType: { type: SchemaType.STRING, description: "Type: APARTMENT, HOUSE, COMMERCIAL, LAND, GARAGE, OTHER" } as FunctionDeclarationSchema,
         marketingType: { type: SchemaType.STRING, description: "Marketing type: SALE, RENT, LEASE" } as FunctionDeclarationSchema,
         salePrice: { type: SchemaType.NUMBER, description: "Sale price in EUR" } as FunctionDeclarationSchema,
         rentCold: { type: SchemaType.NUMBER, description: "Cold rent in EUR/month" } as FunctionDeclarationSchema,
+        rentWarm: { type: SchemaType.NUMBER, description: "Warm rent in EUR/month" } as FunctionDeclarationSchema,
         additionalCosts: { type: SchemaType.NUMBER, description: "Additional costs in EUR/month" } as FunctionDeclarationSchema,
+        deposit: { type: SchemaType.STRING, description: "Deposit (e.g., '3 Monatsmieten')" } as FunctionDeclarationSchema,
+        commission: { type: SchemaType.STRING, description: "Commission (e.g., '3,57% inkl. MwSt.')" } as FunctionDeclarationSchema,
         livingArea: { type: SchemaType.NUMBER, description: "Living area in m²" } as FunctionDeclarationSchema,
+        usableArea: { type: SchemaType.NUMBER, description: "Usable area in m²" } as FunctionDeclarationSchema,
+        plotArea: { type: SchemaType.NUMBER, description: "Plot area in m²" } as FunctionDeclarationSchema,
         rooms: { type: SchemaType.NUMBER, description: "Number of rooms" } as FunctionDeclarationSchema,
         bedrooms: { type: SchemaType.NUMBER, description: "Number of bedrooms" } as FunctionDeclarationSchema,
         bathrooms: { type: SchemaType.NUMBER, description: "Number of bathrooms" } as FunctionDeclarationSchema,
         yearBuilt: { type: SchemaType.NUMBER, description: "Year built (YYYY)" } as FunctionDeclarationSchema,
+        yearRenovated: { type: SchemaType.NUMBER, description: "Year last renovated (YYYY)" } as FunctionDeclarationSchema,
         condition: { type: SchemaType.STRING, description: "Condition: FIRST_OCCUPANCY, NEW, RENOVATED, REFURBISHED, WELL_MAINTAINED, MODERNIZED, NEEDS_RENOVATION" } as FunctionDeclarationSchema,
+        buildingType: { type: SchemaType.STRING, description: "Building type: MULTI_FAMILY, SINGLE_FAMILY, SEMI_DETACHED, TERRACED, BUNGALOW, VILLA, HIGH_RISE, OTHER" } as FunctionDeclarationSchema,
+        totalFloors: { type: SchemaType.INTEGER, description: "Total number of floors in the building" } as FunctionDeclarationSchema,
+        heatingType: { type: SchemaType.STRING, description: "Heating type (e.g., 'Fernwärme', 'Gas', 'Wärmepumpe')" } as FunctionDeclarationSchema,
+        energyCertificateType: { type: SchemaType.STRING, description: "Energy certificate type: DEMAND, CONSUMPTION" } as FunctionDeclarationSchema,
         energyEfficiencyClass: { type: SchemaType.STRING, description: "Energy efficiency class: A_PLUS, A, B, C, D, E, F, G, H" } as FunctionDeclarationSchema,
-        primaryEnergySource: { type: SchemaType.STRING, description: "Primary energy source" } as FunctionDeclarationSchema,
+        energyConsumption: { type: SchemaType.NUMBER, description: "Energy consumption in kWh/(m²·a)" } as FunctionDeclarationSchema,
+        primaryEnergySource: { type: SchemaType.STRING, description: "Primary energy source (e.g., Gas, Fernwärme)" } as FunctionDeclarationSchema,
+        features: { type: SchemaType.ARRAY, description: "List of features/equipment (e.g., ['Einbauküche', 'Balkon'])", items: { type: SchemaType.STRING } } as FunctionDeclarationSchema,
+        locationDescription: { type: SchemaType.STRING, description: "Description of location, surroundings, infrastructure" } as FunctionDeclarationSchema,
+        equipmentDescription: { type: SchemaType.STRING, description: "Detailed description of equipment/Ausstattung" } as FunctionDeclarationSchema,
+        aiFacts: { type: SchemaType.STRING, description: "AI-generated facts or context notes" } as FunctionDeclarationSchema,
+        virtualTour: { type: SchemaType.STRING, description: "URL to virtual tour (e.g., Matterport)" } as FunctionDeclarationSchema,
         status: { type: SchemaType.STRING, description: "Status: ACTIVE, RESERVED, SOLD, RENTED, ARCHIVED" } as FunctionDeclarationSchema,
+        priority: { type: SchemaType.STRING, description: "Priority: LOW, MEDIUM, HIGH" } as FunctionDeclarationSchema,
+        defaultExposeTemplateId: { type: SchemaType.STRING, description: "ID of default expose template for auto-generation" } as FunctionDeclarationSchema,
       },
       required: ["propertyId"]
     }
@@ -717,6 +764,55 @@ export const CRM_TOOLS = {
       properties: {
         limit: { type: SchemaType.NUMBER, description: "Maximum number (default: 50)" } as FunctionDeclarationSchema,
       }
+    }
+  },
+  update_expose_template: {
+    name: "update_expose_template",
+    description: "Updates an Exposé template's name or theme.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        templateId: { type: SchemaType.STRING, description: "ID of the template to update" } as FunctionDeclarationSchema,
+        name: { type: SchemaType.STRING, description: "New template name" } as FunctionDeclarationSchema,
+        theme: { type: SchemaType.STRING, description: "Theme: modern, classic, elegant, minimal, luxury, bold" } as FunctionDeclarationSchema,
+      },
+      required: ["templateId"]
+    }
+  },
+  delete_expose_template: {
+    name: "delete_expose_template",
+    description: "Deletes an Exposé template. DANGEROUS! Ask for confirmation first.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        templateId: { type: SchemaType.STRING, description: "ID of the template to delete" } as FunctionDeclarationSchema,
+        confirmed: { type: SchemaType.BOOLEAN, description: "Must be true to confirm deletion" } as FunctionDeclarationSchema,
+      },
+      required: ["templateId", "confirmed"]
+    }
+  },
+  add_video_to_property: {
+    name: "add_video_to_property",
+    description: "Adds a video URL to a property's video list.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        propertyId: { type: SchemaType.STRING, description: "ID of the property" } as FunctionDeclarationSchema,
+        videoUrl: { type: SchemaType.STRING, description: "URL of the video" } as FunctionDeclarationSchema,
+      },
+      required: ["propertyId", "videoUrl"]
+    }
+  },
+  set_virtual_tour: {
+    name: "set_virtual_tour",
+    description: "Sets or updates the virtual tour URL for a property.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        propertyId: { type: SchemaType.STRING, description: "ID of the property" } as FunctionDeclarationSchema,
+        tourUrl: { type: SchemaType.STRING, description: "URL of the virtual tour (e.g. Matterport link)" } as FunctionDeclarationSchema,
+      },
+      required: ["propertyId", "tourUrl"]
     }
   },
 };
@@ -2469,6 +2565,50 @@ export class AiToolExecutor {
         });
       }
 
+      case 'update_expose_template': {
+        const { templateId, ...updateData } = args;
+        const template = await getPrisma().exposeTemplate.findFirst({
+          where: { id: templateId, tenantId }
+        });
+        if (!template) throw new Error('Template nicht gefunden oder kein Zugriff');
+        return await getPrisma().exposeTemplate.update({
+          where: { id: templateId },
+          data: updateData
+        });
+      }
+
+      case 'delete_expose_template': {
+        const { templateId, confirmed } = args;
+        if (!confirmed) return 'Löschung abgebrochen. Bitte bestätige mit confirmed: true.';
+        const tmpl = await getPrisma().exposeTemplate.findFirst({
+          where: { id: templateId, tenantId }
+        });
+        if (!tmpl) throw new Error('Template nicht gefunden oder kein Zugriff');
+        await getPrisma().exposeTemplate.delete({ where: { id: templateId } });
+        return `Exposé-Vorlage "${tmpl.name}" wurde gelöscht.`;
+      }
+
+      case 'add_video_to_property': {
+        const { propertyId, videoUrl } = args;
+        const prop = await getPrisma().property.findFirst({
+          where: { id: propertyId, tenantId }
+        });
+        if (!prop) throw new Error('Objekt nicht gefunden oder kein Zugriff');
+        const updatedVideos = [...(prop.videos || []), videoUrl];
+        return await getPrisma().property.update({
+          where: { id: propertyId },
+          data: { videos: updatedVideos }
+        });
+      }
+
+      case 'set_virtual_tour': {
+        const { propertyId, tourUrl } = args;
+        return await getPrisma().property.update({
+          where: { id: propertyId },
+          data: { virtualTour: tourUrl }
+        });
+      }
+
       // Exposé Tools (Editor-specific)
       case 'create_expose_block': {
         const { exposeId, templateId, blockType, position, ...blockFields } = args;
@@ -3280,21 +3420,44 @@ async function executeCreateProperty(args: any, tenantId: string) {
       title: args.title,
       description: args.description || null,
       address: args.address || '',
+      street: args.street || null,
+      houseNumber: args.houseNumber || null,
+      floor: args.floor != null ? parseInt(args.floor) : null,
       zipCode: args.zipCode || null,
       city: args.city || null,
+      district: args.district || null,
+      state: args.state || null,
+      country: args.country || 'Deutschland',
       propertyType: args.propertyType || 'APARTMENT',
       marketingType: args.marketingType || 'SALE',
       salePrice: args.salePrice || null,
       rentCold: args.rentCold || null,
+      rentWarm: args.rentWarm || null,
       additionalCosts: args.additionalCosts || null,
+      deposit: args.deposit || null,
+      commission: args.commission || null,
       livingArea: args.livingArea || args.area || null,
+      usableArea: args.usableArea || null,
+      plotArea: args.plotArea || null,
       rooms: args.rooms || null,
       bedrooms: args.bedrooms || null,
       bathrooms: args.bathrooms || null,
       yearBuilt: args.yearBuilt || null,
+      yearRenovated: args.yearRenovated || null,
       condition: args.condition || null,
+      buildingType: args.buildingType || null,
+      totalFloors: args.totalFloors != null ? parseInt(args.totalFloors) : null,
+      heatingType: args.heatingType || null,
+      energyCertificateType: args.energyCertificateType || null,
       energyEfficiencyClass: args.energyEfficiencyClass || null,
+      energyConsumption: args.energyConsumption || null,
       primaryEnergySource: args.primaryEnergySource || null,
+      features: args.features || null,
+      locationDescription: args.locationDescription || null,
+      equipmentDescription: args.equipmentDescription || null,
+      virtualTour: args.virtualTour || null,
+      status: args.status || 'ACTIVE',
+      priority: args.priority || 'MEDIUM',
       // Legacy fields for backward compatibility
       price: args.salePrice || args.price || null,
       area: args.livingArea || args.area || null,

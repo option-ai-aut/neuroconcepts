@@ -108,7 +108,14 @@ const TEMPLATE_FIELDS: TemplateField[] = [
   { id: 'propertyType', label: 'Objektart', variable: '{{property.propertyType}}', category: 'property', icon: '🏘️' },
   { id: 'heatingType', label: 'Heizungsart', variable: '{{property.heatingType}}', category: 'property', icon: '🔥' },
   { id: 'energyClass', label: 'Energieklasse', variable: '{{property.energyClass}}', category: 'property', icon: '⚡' },
+  { id: 'energyConsumption', label: 'Energieverbrauch', variable: '{{property.energyConsumption}}', category: 'property', icon: '📊' },
+  { id: 'usableArea', label: 'Nutzfläche (m²)', variable: '{{property.usableArea}}', category: 'property', icon: '📏' },
+  { id: 'deposit', label: 'Kaution', variable: '{{property.deposit}}', category: 'property', icon: '🔒' },
+  { id: 'commission', label: 'Provision', variable: '{{property.commission}}', category: 'property', icon: '🤝' },
   { id: 'description', label: 'Beschreibung', variable: '{{property.description}}', category: 'property', icon: '📝' },
+  { id: 'locationDescription', label: 'Lagebeschreibung', variable: '{{property.locationDescription}}', category: 'property', icon: '🗺️' },
+  { id: 'equipmentDescription', label: 'Ausstattungstext', variable: '{{property.equipmentDescription}}', category: 'property', icon: '🛋️' },
+  { id: 'virtualTour', label: '360° Tour URL', variable: '{{property.virtualTour}}', category: 'property', icon: '🔄' },
   
   // User/Agent fields
   { id: 'userName', label: 'Makler Name', variable: '{{user.name}}', category: 'user', icon: '👤' },
@@ -313,7 +320,23 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
   const [showFieldsSidebar, setShowFieldsSidebar] = useState(false);
   const [templateFieldFocused, setTemplateFieldFocused] = useState(false);
   const fieldsButtonRef = useRef<HTMLButtonElement>(null);
+  const blockEditorRef = useRef<HTMLDivElement>(null);
+  const [editorRect, setEditorRect] = useState<{ top: number; left: number; bottom: number } | null>(null);
   
+  // Track block editor position for portal-based fields button
+  useEffect(() => {
+    const update = () => {
+      if (blockEditorRef.current) {
+        const rect = blockEditorRef.current.getBoundingClientRect();
+        setEditorRect({ top: rect.top, left: rect.left, bottom: rect.bottom });
+      }
+    };
+    update();
+    window.addEventListener('resize', update);
+    const interval = setInterval(update, 500);
+    return () => { window.removeEventListener('resize', update); clearInterval(interval); };
+  }, [minimized, isVisible]);
+
   // @-Mention state
   const [mentionState, setMentionState] = useState<{
     isOpen: boolean;
@@ -1574,23 +1597,9 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
   };
 
   // Render template fields as a floating overlay panel (for drag & drop into block editor)
-  const renderFieldsSidebar = () => {
-    if (!isTemplate) return null;
-
-    // Floating toggle button (always visible, anchored to the right edge of the preview area)
-    if (!showFieldsSidebar) {
-      return (
-        <button
-          ref={fieldsButtonRef}
-          onClick={() => setShowFieldsSidebar(true)}
-          className={`absolute right-[calc(theme(spacing.60)+1px)] 2xl:right-[calc(theme(spacing.72)+1px)] top-14 z-30 bg-white border border-gray-200 shadow-md rounded-l-lg px-2 py-6 text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-all duration-300 fields-toggle-btn ${templateFieldFocused ? 'fields-btn-spark' : ''}`}
-          title="Felder-Panel öffnen"
-          style={{ writingMode: 'vertical-lr' }}
-        >
-          <span className="text-[10px] font-medium tracking-wider uppercase">Felder @</span>
-        </button>
-      );
-    }
+  const renderFieldsPanel = () => {
+    if (!isTemplate || !showFieldsSidebar) return null;
+    if (typeof document === 'undefined') return null;
 
     const groupedFields = TEMPLATE_FIELDS.reduce((acc, field) => {
       if (!acc[field.category]) acc[field.category] = [];
@@ -1598,8 +1607,16 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
       return acc;
     }, {} as Record<string, TemplateField[]>);
 
-    return (
-      <div className="absolute right-[calc(theme(spacing.60)+1px)] 2xl:right-[calc(theme(spacing.72)+1px)] top-14 bottom-4 z-30 w-44 2xl:w-48 bg-white border border-gray-200 rounded-l-xl shadow-lg flex flex-col overflow-hidden">
+    // Measure block editor to position the overlay panel to its left
+    let pos = editorRect;
+    if (!pos && blockEditorRef.current) {
+      const rect = blockEditorRef.current.getBoundingClientRect();
+      pos = { top: rect.top, left: rect.left, bottom: rect.bottom };
+    }
+    if (!pos) return null;
+
+    return createPortal(
+      <div className="fixed w-48 2xl:w-52 bg-white border border-gray-200 rounded-l-xl shadow-lg flex flex-col overflow-hidden" style={{ zIndex: 99999, top: pos.top, bottom: window.innerHeight - pos.bottom, left: pos.left - 192 }}>
         {/* Header */}
         <div className="px-2.5 py-2 border-b border-gray-100 flex items-center justify-between shrink-0">
           <span className="text-xs font-medium text-gray-700">
@@ -1645,7 +1662,8 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
             </div>
           ))}
         </div>
-      </div>
+      </div>,
+      document.body
     );
   };
 
@@ -1655,11 +1673,29 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
   // ============================================
 
   const renderBlockEditor = () => {
+    // Felder-Button at the top of block editor (only for templates)
+    const fieldsButton = isTemplate ? (
+      <button
+        onClick={() => setShowFieldsSidebar(!showFieldsSidebar)}
+        className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium border-b transition-all duration-300 ${
+          showFieldsSidebar
+            ? 'bg-indigo-50 text-indigo-600 border-indigo-200'
+            : `bg-gray-50 text-gray-500 border-gray-100 hover:bg-indigo-50 hover:text-indigo-600 ${templateFieldFocused ? 'fields-btn-spark' : ''}`
+        }`}
+      >
+        <span>@</span>
+        <span>{showFieldsSidebar ? 'Felder schließen' : 'Felder'}</span>
+      </button>
+    ) : null;
+
     if (selectedBlockIndex === null) {
       return (
-        <div className="flex flex-col items-center justify-center h-full text-gray-400">
-          <Type className="w-12 h-12 mb-4" />
-          <p className="text-center">Wähle einen Block aus<br />um ihn zu bearbeiten</p>
+        <div className="h-full flex flex-col">
+          {fieldsButton}
+          <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+            <Type className="w-12 h-12 mb-4" />
+            <p className="text-center">Wähle einen Block aus<br />um ihn zu bearbeiten</p>
+          </div>
         </div>
       );
     }
@@ -1670,7 +1706,9 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     const blockDef = BLOCK_TYPES.find(b => b.type === block.type);
 
     return (
-      <div className="p-3 2xl:p-4 space-y-3 2xl:space-y-4">
+      <div>
+        {fieldsButton}
+        <div className="p-3 2xl:p-4 space-y-3 2xl:space-y-4">
         <div className="flex items-center gap-2 pb-2 2xl:pb-3 border-b">
           {blockDef && <blockDef.icon className="w-4 h-4 2xl:w-5 2xl:h-5 text-gray-700" />}
           <span className="font-semibold text-gray-900 text-sm 2xl:text-base">{blockDef?.label || block.type}</span>
@@ -2400,6 +2438,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
           </>
         )}
       </div>
+      </div>
     );
   };
 
@@ -2995,12 +3034,12 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
           </div>
 
           {/* Right: Block Editor */}
-          <div className="w-60 2xl:w-72 border-l border-gray-100 bg-white overflow-y-auto">
+          <div ref={blockEditorRef} className="w-60 2xl:w-72 border-l border-gray-100 bg-white overflow-y-auto flex-shrink-0">
             {renderBlockEditor()}
           </div>
 
-          {/* Right: Template Fields Sidebar (only for templates) */}
-          {renderFieldsSidebar()}
+          {/* Fields sidebar rendered via portal */}
+          {renderFieldsPanel()}
         </div>
       )}
 

@@ -206,7 +206,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   };
 
 
-  const handleInputChange = (field: keyof Property, value: string | number) => {
+  const handleInputChange = (field: keyof Property, value: string | number | string[] | null) => {
     setFormData(prev => {
       const newData = { ...prev, [field]: value };
       
@@ -708,6 +708,86 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   <option value="NEEDS_RENOVATION">Renovierungsbedürftig</option>
                 </select>
               </div>
+              {/* Additional fields: bedrooms, bathrooms, plotArea, usableArea */}
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Schlafzimmer</label>
+                <input type="number" value={formData.bedrooms || ''} onChange={(e) => handleInputChange('bedrooms', parseInt(e.target.value))} className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Badezimmer</label>
+                <input type="number" value={formData.bathrooms || ''} onChange={(e) => handleInputChange('bathrooms', parseInt(e.target.value))} className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Grundstücksfläche (m²)</label>
+                <input type="number" value={formData.plotArea || ''} onChange={(e) => handleInputChange('plotArea', parseFloat(e.target.value))} className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Nutzfläche (m²)</label>
+                <input type="number" value={formData.usableArea || ''} onChange={(e) => handleInputChange('usableArea', parseFloat(e.target.value))} className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Gesamtetagen</label>
+                <input type="number" value={formData.totalFloors || ''} onChange={(e) => handleInputChange('totalFloors', parseInt(e.target.value))} className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Etage</label>
+                <input type="number" value={formData.floor || ''} onChange={(e) => handleInputChange('floor', parseInt(e.target.value))} className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all" />
+              </div>
+
+              {/* Rent extras: deposit, commission */}
+              {(formData.marketingType || 'SALE') === 'RENT' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-2">Kaution</label>
+                    <input type="text" value={formData.deposit || ''} onChange={(e) => handleInputChange('deposit', e.target.value)} className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all" placeholder="z.B. 3 Monatsmieten" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-2">Provision</label>
+                    <input type="text" value={formData.commission || ''} onChange={(e) => handleInputChange('commission', e.target.value)} className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all" placeholder="z.B. 2 Monatsmieten zzgl. MwSt." />
+                  </div>
+                </>
+              )}
+
+              {/* Heizungsart */}
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Heizungsart</label>
+                <input type="text" value={formData.heatingType || ''} onChange={(e) => handleInputChange('heatingType', e.target.value)} className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all" placeholder="z.B. Fernwärme, Gas, Wärmepumpe" />
+              </div>
+            </div>
+          </div>
+
+          {/* Ausstattung & Highlights */}
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Ausstattung & Highlights</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Merkmale des Objekts — werden in Exposé-Blöcken „Ausstattung" und „Highlights" verwendet
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Ausstattungsmerkmale</label>
+                <p className="text-xs text-gray-400 mb-2">Kommagetrennt eingeben, z. B. Einbauküche, Balkon, Fußbodenheizung, Aufzug</p>
+                <textarea
+                  rows={3}
+                  value={Array.isArray(formData.features) ? (formData.features as string[]).join(', ') : (formData.features as string || '')}
+                  onChange={(e) => {
+                    const items = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                    handleInputChange('features', items);
+                  }}
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all resize-none"
+                  placeholder="Einbauküche, Balkon, Fußbodenheizung, Aufzug, Keller, Garage"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Ausstattungsbeschreibung</label>
+                <textarea
+                  rows={4}
+                  value={formData.equipmentDescription || ''}
+                  onChange={(e) => handleInputChange('equipmentDescription', e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all resize-none"
+                  placeholder="Ausführliche Beschreibung der Ausstattung..."
+                />
+              </div>
             </div>
           </div>
 
@@ -773,21 +853,72 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   placeholder="Gas, Fernwärme, etc."
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Gültig bis</label>
+                <input
+                  type="date"
+                  value={formData.energyCertificateValidUntil ? new Date(formData.energyCertificateValidUntil).toISOString().split('T')[0] : ''}
+                  onChange={(e) => handleInputChange('energyCertificateValidUntil', e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Beschreibung */}
+          {/* Beschreibungen */}
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Beschreibung</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Beschreibungen</h2>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-500 mb-2">Exposé-Text</label>
-              <textarea
-                rows={6}
-                value={formData.description || ''}
-                onChange={(e) => handleInputChange('description', e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all resize-none"
-              />
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Objektbeschreibung</label>
+                <textarea
+                  rows={6}
+                  value={formData.description || ''}
+                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all resize-none"
+                  placeholder="Allgemeine Beschreibung des Objekts..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Lagebeschreibung</label>
+                <textarea
+                  rows={4}
+                  value={formData.locationDescription || ''}
+                  onChange={(e) => handleInputChange('locationDescription', e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all resize-none"
+                  placeholder="Beschreibung der Lage, Umgebung, Infrastruktur..."
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Medien-Links */}
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Medien-Links</h2>
+            <p className="text-sm text-gray-500 mb-6">Externe Links für Video und virtuelle Besichtigung</p>
+            
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Video-URL</label>
+                <input
+                  type="url"
+                  value={(formData.videos && formData.videos.length > 0) ? formData.videos[0] : ''}
+                  onChange={(e) => handleInputChange('videos', e.target.value ? [e.target.value] : [])}
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
+                  placeholder="https://youtube.com/..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">360° Tour URL</label>
+                <input
+                  type="url"
+                  value={formData.virtualTour || ''}
+                  onChange={(e) => handleInputChange('virtualTour', e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-gray-900 transition-all"
+                  placeholder="https://matterport.com/..."
+                />
+              </div>
             </div>
           </div>
 

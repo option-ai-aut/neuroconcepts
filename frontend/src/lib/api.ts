@@ -126,6 +126,9 @@ export interface Property {
   floor?: number;
   totalFloors?: number;
   
+  // Heating
+  heatingType?: string;
+  
   // Energy Certificate
   energyCertificateType?: string;
   energyEfficiencyClass?: string;
