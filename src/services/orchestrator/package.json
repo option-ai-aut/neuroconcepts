@@ -35,6 +35,7 @@
     "pg": "^8.11.3",
     "puppeteer": "^24.36.1",
     "qrcode": "^1.5.4",
+    "resend": "^6.9.2",
     "serverless-http": "^3.2.0"
   },
   "devDependencies": {

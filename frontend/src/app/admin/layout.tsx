@@ -32,8 +32,8 @@ const NAV_SECTIONS = [
   {
     label: 'Betrieb',
     items: [
-      { name: 'Support & Tickets', href: '/admin/support', icon: HeadphonesIcon },
-      { name: 'Sales & Pipeline', href: '/admin/sales', icon: TrendingUp },
+      { name: 'Bug Reports', href: '/admin/support', icon: HeadphonesIcon },
+      { name: 'Tenants', href: '/admin/sales', icon: TrendingUp },
       { name: 'Finance', href: '/admin/finance', icon: DollarSign },
     ],
   },

@@ -710,10 +710,10 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           </div>
         </div>
       )}
-      <div className={`px-4 flex items-center justify-between bg-white shrink-0 border-b border-gray-100 ${mobile ? 'h-14 pt-[env(safe-area-inset-top)]' : 'h-16'}`}>
+      <div className={`px-4 flex items-center justify-between bg-white shrink-0 border-b border-gray-100 ${mobile ? 'h-14 pt-[env(safe-area-inset-top)]' : 'h-12'}`}>
         <div className="flex items-center space-x-2">
-          <NextImage src="/logo-icon-only.png" alt="Jarvis" width={32} height={32} />
-          <span className="font-bold text-gray-900">Jarvis</span>
+          <NextImage src="/logo-icon-only.png" alt="Jarvis" width={28} height={28} />
+          <span className="text-sm font-bold text-gray-900">Jarvis</span>
           <span className="text-[9px] font-medium text-blue-500 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 leading-none">KI</span>
         </div>
         <div className="flex items-center space-x-1">

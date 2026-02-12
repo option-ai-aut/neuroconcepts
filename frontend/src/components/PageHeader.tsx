@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, Users, Inbox, Calendar, FileText, 
   MessageSquare, Wand2, Activity, Settings, RefreshCw,
-  Sun, Moon
+  Sun, Moon, Bug
 } from 'lucide-react';
 import NotificationBell from '@/components/NotificationBell';
 import { useGlobalState } from '@/context/GlobalStateContext';
@@ -46,7 +46,7 @@ export default function PageHeader() {
   const router = useRouter();
   const { mutate } = useSWRConfig();
   const { data: user } = useSWR('/me', getMe);
-  const { headerActions } = useGlobalState();
+  const { headerActions, openDrawer } = useGlobalState();
   const { isDark, toggleDarkMode } = useDarkMode();
   const { title, icon: Icon } = getPageInfo(pathname);
   const [refreshing, setRefreshing] = useState(false);
@@ -74,6 +74,15 @@ export default function PageHeader() {
         <div className="hidden lg:flex items-center gap-2">
           {headerActions}
         </div>
+
+        {/* Bug Report */}
+        <button
+          onClick={() => openDrawer('BUG_REPORT')}
+          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+          title="Bug melden"
+        >
+          <Bug className="w-4 h-4" />
+        </button>
 
         {/* Dark Mode Toggle */}
         <button

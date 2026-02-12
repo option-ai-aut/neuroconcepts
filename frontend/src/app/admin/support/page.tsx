@@ -1,242 +1,451 @@
 'use client';
 
-import { useState } from 'react';
-import { 
-  Search, Filter, Plus, Clock, AlertTriangle, CheckCircle2, 
-  Circle, ArrowUp, ArrowDown, Minus, MessageSquare, User, 
-  Building2, Tag, X, Send, Paperclip, MoreVertical, RefreshCw
-} from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Bug, Inbox, ChevronRight, Clock, CheckCircle, XCircle, AlertTriangle, ArrowRight, RefreshCw, Filter, Camera, Terminal, Maximize2 } from 'lucide-react';
+import {
+  getAdminBugReports,
+  updateAdminBugReport,
+  BugReport,
+  BugReportStatus,
+  BugReportPriority,
+} from '@/lib/adminApi';
 
-type Priority = 'critical' | 'high' | 'medium' | 'low';
-type Status = 'open' | 'in_progress' | 'waiting' | 'resolved' | 'closed';
-
-interface Ticket {
-  id: string;
-  subject: string;
-  description: string;
-  tenant: string;
-  contactEmail: string;
-  priority: Priority;
-  status: Status;
-  assignedTo: string;
-  category: string;
-  createdAt: string;
-  updatedAt: string;
-  messages: number;
-}
-
-const PRIORITY_CONFIG: Record<Priority, { label: string; color: string; icon: any }> = {
-  critical: { label: 'Kritisch', color: 'bg-red-100 text-red-700', icon: AlertTriangle },
-  high: { label: 'Hoch', color: 'bg-orange-100 text-orange-700', icon: ArrowUp },
-  medium: { label: 'Mittel', color: 'bg-amber-100 text-amber-700', icon: Minus },
-  low: { label: 'Niedrig', color: 'bg-gray-100 text-gray-600', icon: ArrowDown },
+const STATUS_CONFIG: Record<BugReportStatus, { label: string; color: string; bgColor: string; icon: any }> = {
+  OPEN: { label: 'Offen', color: 'text-blue-700', bgColor: 'bg-blue-50 border-blue-200', icon: Inbox },
+  IN_PROGRESS: { label: 'In Bearbeitung', color: 'text-amber-700', bgColor: 'bg-amber-50 border-amber-200', icon: Clock },
+  RESOLVED: { label: 'Gelöst', color: 'text-green-700', bgColor: 'bg-green-50 border-green-200', icon: CheckCircle },
+  CLOSED: { label: 'Geschlossen', color: 'text-gray-700', bgColor: 'bg-gray-50 border-gray-200', icon: XCircle },
+  WONT_FIX: { label: 'Wird nicht behoben', color: 'text-red-700', bgColor: 'bg-red-50 border-red-200', icon: XCircle },
 };
 
-const STATUS_CONFIG: Record<Status, { label: string; color: string }> = {
-  open: { label: 'Offen', color: 'bg-red-50 text-red-600 border-red-200' },
-  in_progress: { label: 'In Bearbeitung', color: 'bg-gray-100 text-gray-700 border-gray-200' },
-  waiting: { label: 'Wartet auf Kunde', color: 'bg-amber-50 text-amber-600 border-amber-200' },
-  resolved: { label: 'Gelöst', color: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
-  closed: { label: 'Geschlossen', color: 'bg-gray-50 text-gray-500 border-gray-200' },
+const PRIORITY_CONFIG: Record<BugReportPriority, { label: string; color: string; dot: string }> = {
+  LOW: { label: 'Niedrig', color: 'text-gray-600', dot: 'bg-gray-400' },
+  MEDIUM: { label: 'Mittel', color: 'text-blue-600', dot: 'bg-blue-400' },
+  HIGH: { label: 'Hoch', color: 'text-orange-600', dot: 'bg-orange-400' },
+  CRITICAL: { label: 'Kritisch', color: 'text-red-600', dot: 'bg-red-500' },
 };
 
-const MOCK_TICKETS: Ticket[] = [
-  { id: 'T-0047', subject: 'Google Kalender synchronisiert nicht mehr', description: 'Seit heute Morgen werden keine neuen Termine mehr synchronisiert.', tenant: 'Kellner Immobilien', contactEmail: 'markus@kellner-immo.at', priority: 'critical', status: 'in_progress', assignedTo: 'Tom Fischer', category: 'Integration', createdAt: '2026-01-29 08:15', updatedAt: '2026-01-29 09:30', messages: 4 },
-  { id: 'T-0046', subject: 'Exposé-PDF wird nicht generiert', description: 'Beim Export als PDF erscheint ein weißes Dokument.', tenant: 'Immo Wien', contactEmail: 'office@immowien.at', priority: 'high', status: 'open', assignedTo: 'Nicht zugewiesen', category: 'Exposé', createdAt: '2026-01-28 16:45', updatedAt: '2026-01-28 16:45', messages: 1 },
-  { id: 'T-0045', subject: 'Lead-Import aus Willhaben doppelte Einträge', description: 'Seit dem letzten Update werden Leads doppelt importiert.', tenant: 'Remax Salzburg', contactEmail: 'info@remax-sbg.at', priority: 'medium', status: 'waiting', assignedTo: 'Max Huber', category: 'Import', createdAt: '2026-01-28 11:20', updatedAt: '2026-01-29 08:00', messages: 6 },
-  { id: 'T-0044', subject: 'Frage zur Rechnungsstellung', description: 'Können wir auf jährliche Abrechnung umstellen?', tenant: 'Schmidt & Partner', contactEmail: 'buchhaltung@schmidt-partner.de', priority: 'low', status: 'waiting', assignedTo: 'Sarah Weber', category: 'Billing', createdAt: '2026-01-27 14:00', updatedAt: '2026-01-28 10:00', messages: 3 },
-  { id: 'T-0043', subject: 'Jarvis antwortet auf Englisch statt Deutsch', description: 'In manchen Fällen antwortet der KI-Assistent auf Englisch.', tenant: 'Immobilien Huber', contactEmail: 'peter@huber-immo.de', priority: 'medium', status: 'resolved', assignedTo: 'Dennis Kral', category: 'AI / Jarvis', createdAt: '2026-01-26 09:00', updatedAt: '2026-01-28 15:30', messages: 8 },
-  { id: 'T-0042', subject: 'Neues Feature: Massenversand von Exposés', description: 'Wir möchten Exposés an mehrere Leads gleichzeitig senden.', tenant: 'ProImmo GmbH', contactEmail: 'anfrage@proimmo.at', priority: 'low', status: 'open', assignedTo: 'Nicht zugewiesen', category: 'Feature Request', createdAt: '2026-01-25 16:00', updatedAt: '2026-01-25 16:00', messages: 1 },
-];
+const STATUS_FLOW: BugReportStatus[] = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
 
 export default function SupportPage() {
-  const [tickets] = useState(MOCK_TICKETS);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all');
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-  const [reply, setReply] = useState('');
+  const [reports, setReports] = useState<BugReport[]>([]);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState<string>('ALL');
+  const [selected, setSelected] = useState<BugReport | null>(null);
+  const [adminNotes, setAdminNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [screenshotFullscreen, setScreenshotFullscreen] = useState(false);
+  const [logsExpanded, setLogsExpanded] = useState(false);
 
-  const filtered = tickets.filter(t => {
-    const matchSearch = `${t.subject} ${t.tenant} ${t.id}`.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === 'all' || t.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  const fetchReports = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await getAdminBugReports(filterStatus);
+      setReports(data.reports);
+      setCounts(data.counts);
+    } catch (err) {
+      console.error('Failed to load bug reports:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [filterStatus]);
 
-  const stats = {
-    open: tickets.filter(t => t.status === 'open').length,
-    inProgress: tickets.filter(t => t.status === 'in_progress').length,
-    waiting: tickets.filter(t => t.status === 'waiting').length,
-    resolved: tickets.filter(t => ['resolved', 'closed'].includes(t.status)).length,
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
+
+  const handleStatusChange = async (report: BugReport, newStatus: BugReportStatus) => {
+    setSaving(true);
+    try {
+      const updated = await updateAdminBugReport(report.id, { status: newStatus });
+      setReports(prev => prev.map(r => r.id === updated.id ? updated : r));
+      if (selected?.id === updated.id) setSelected(updated);
+      // Update counts
+      fetchReports();
+    } catch (err) {
+      console.error('Failed to update status:', err);
+    } finally {
+      setSaving(false);
+    }
   };
 
+  const handlePriorityChange = async (report: BugReport, newPriority: BugReportPriority) => {
+    setSaving(true);
+    try {
+      const updated = await updateAdminBugReport(report.id, { priority: newPriority });
+      setReports(prev => prev.map(r => r.id === updated.id ? updated : r));
+      if (selected?.id === updated.id) setSelected(updated);
+    } catch (err) {
+      console.error('Failed to update priority:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      const updated = await updateAdminBugReport(selected.id, { adminNotes });
+      setReports(prev => prev.map(r => r.id === updated.id ? updated : r));
+      setSelected(updated);
+    } catch (err) {
+      console.error('Failed to save notes:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openCount = (counts['OPEN'] || 0) + (counts['IN_PROGRESS'] || 0);
+  const totalCount = Object.values(counts).reduce((a, b) => a + b, 0);
+
   return (
-    <div className="flex h-[calc(100vh-48px)]">
-      {/* Ticket List */}
-      <div className={`${selectedTicket ? 'w-[420px]' : 'flex-1'} bg-white border-r border-gray-200 flex flex-col shrink-0`}>
-        {/* Header */}
-        <div className="px-4 py-3 border-b border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-base font-bold text-gray-900">Support & Tickets</h1>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-lg hover:bg-gray-800">
-              <Plus className="w-3.5 h-3.5" />
-              Neues Ticket
-            </button>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-4 gap-2 mb-3">
-            {[
-              { label: 'Offen', value: stats.open, color: 'text-red-600 bg-red-50' },
-              { label: 'In Bearbeitung', value: stats.inProgress, color: 'text-gray-700 bg-gray-100' },
-              { label: 'Wartet', value: stats.waiting, color: 'text-amber-600 bg-amber-50' },
-              { label: 'Gelöst', value: stats.resolved, color: 'text-emerald-600 bg-emerald-50' },
-            ].map((s) => (
-              <div key={s.label} className={`rounded-lg px-2.5 py-1.5 text-center ${s.color}`}>
-                <p className="text-lg font-bold">{s.value}</p>
-                <p className="text-[10px] font-medium">{s.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Ticket ID, Betreff oder Tenant..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+    <div className="p-6 max-w-[1600px] mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Bug Reports</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {openCount} offen · {totalCount} gesamt
+          </p>
         </div>
-
-        {/* Status Tabs */}
-        <div className="flex gap-0.5 px-4 py-2 border-b border-gray-100 overflow-x-auto">
-          {[{ key: 'all', label: 'Alle' }, ...Object.entries(STATUS_CONFIG).map(([key, c]) => ({ key, label: c.label }))].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setStatusFilter(tab.key as Status | 'all')}
-              className={`px-2.5 py-1 text-[11px] font-medium rounded-md whitespace-nowrap transition-colors ${
-                statusFilter === tab.key ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Ticket List */}
-        <div className="flex-1 overflow-y-auto">
-          {filtered.map((ticket) => (
-            <div
-              key={ticket.id}
-              onClick={() => setSelectedTicket(ticket)}
-              className={`px-4 py-3 border-b border-gray-50 cursor-pointer transition-colors ${
-                selectedTicket?.id === ticket.id ? 'bg-gray-100' : 'hover:bg-gray-50'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-mono text-gray-400">{ticket.id}</span>
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${PRIORITY_CONFIG[ticket.priority].color}`}>
-                  {PRIORITY_CONFIG[ticket.priority].label}
-                </span>
-              </div>
-              <p className="text-xs font-medium text-gray-900 truncate">{ticket.subject}</p>
-              <div className="flex items-center justify-between mt-1.5">
-                <span className="text-[10px] text-gray-400">{ticket.tenant}</span>
-                <div className="flex items-center gap-2">
-                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${STATUS_CONFIG[ticket.status].color}`}>
-                    {STATUS_CONFIG[ticket.status].label}
-                  </span>
-                  <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
-                    <MessageSquare className="w-2.5 h-2.5" />{ticket.messages}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <button
+          onClick={fetchReports}
+          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+          title="Aktualisieren"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
-      {/* Ticket Detail */}
-      {selectedTicket && (
-        <div className="flex-1 flex flex-col bg-white">
-          {/* Detail Header */}
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between shrink-0">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono text-gray-400">{selectedTicket.id}</span>
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${STATUS_CONFIG[selectedTicket.status].color}`}>
-                  {STATUS_CONFIG[selectedTicket.status].label}
-                </span>
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${PRIORITY_CONFIG[selectedTicket.priority].color}`}>
-                  {PRIORITY_CONFIG[selectedTicket.priority].label}
-                </span>
-              </div>
-              <h2 className="text-sm font-semibold text-gray-900 mt-1">{selectedTicket.subject}</h2>
-            </div>
-            <button onClick={() => setSelectedTicket(null)} className="p-1 hover:bg-gray-100 rounded-md">
-              <X className="w-4 h-4 text-gray-400" />
+      {/* Status Tabs / Pipeline */}
+      <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
+        <button
+          onClick={() => { setFilterStatus('ALL'); setSelected(null); }}
+          className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap ${
+            filterStatus === 'ALL'
+              ? 'bg-gray-900 text-white border-gray-900'
+              : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+          }`}
+        >
+          Alle ({totalCount})
+        </button>
+        {STATUS_FLOW.map((status) => {
+          const cfg = STATUS_CONFIG[status];
+          return (
+            <button
+              key={status}
+              onClick={() => { setFilterStatus(status); setSelected(null); }}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                filterStatus === status
+                  ? `${cfg.bgColor} ${cfg.color} border-current`
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <cfg.icon className="w-3 h-3" />
+              {cfg.label} ({counts[status] || 0})
             </button>
-          </div>
+          );
+        })}
+        <button
+          onClick={() => { setFilterStatus('WONT_FIX'); setSelected(null); }}
+          className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            filterStatus === 'WONT_FIX'
+              ? `${STATUS_CONFIG.WONT_FIX.bgColor} ${STATUS_CONFIG.WONT_FIX.color} border-current`
+              : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+          }`}
+        >
+          <XCircle className="w-3 h-3" />
+          Wird nicht behoben ({counts['WONT_FIX'] || 0})
+        </button>
+      </div>
 
-          {/* Ticket Info */}
-          <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 grid grid-cols-4 gap-4">
-            <div>
-              <p className="text-[10px] text-gray-400 font-medium">Tenant</p>
-              <p className="text-xs text-gray-700 flex items-center gap-1 mt-0.5"><Building2 className="w-3 h-3" />{selectedTicket.tenant}</p>
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-400 font-medium">Kontakt</p>
-              <p className="text-xs text-gray-700 flex items-center gap-1 mt-0.5"><User className="w-3 h-3" />{selectedTicket.contactEmail}</p>
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-400 font-medium">Zugewiesen</p>
-              <p className="text-xs text-gray-700 mt-0.5">{selectedTicket.assignedTo}</p>
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-400 font-medium">Kategorie</p>
-              <p className="text-xs text-gray-700 flex items-center gap-1 mt-0.5"><Tag className="w-3 h-3" />{selectedTicket.category}</p>
-            </div>
+      {loading && reports.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
+          <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-gray-500">Lade Bug Reports...</p>
+        </div>
+      ) : reports.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
+          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Bug className="w-8 h-8 text-gray-300" />
           </div>
+          <h3 className="text-base font-semibold text-gray-900 mb-1">Keine Bug Reports</h3>
+          <p className="text-sm text-gray-500 max-w-sm mx-auto">
+            {filterStatus === 'ALL'
+              ? 'Wenn Nutzer Bugs melden, erscheinen sie hier.'
+              : `Keine Reports mit Status "${STATUS_CONFIG[filterStatus as BugReportStatus]?.label || filterStatus}".`}
+          </p>
+        </div>
+      ) : (
+        <div className="flex gap-6">
+          {/* Report List */}
+          <div className={`flex-1 min-w-0 space-y-2 ${selected ? 'hidden lg:block lg:max-w-[55%]' : ''}`}>
+            {reports.map((report) => {
+              const statusCfg = STATUS_CONFIG[report.status];
+              const priorityCfg = PRIORITY_CONFIG[report.priority];
+              const isSelected = selected?.id === report.id;
 
-          {/* Message Thread */}
-          <div className="flex-1 overflow-y-auto px-5 py-4">
-            <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
-                  <User className="w-3 h-3 text-gray-500" />
-                </div>
-                <span className="text-xs font-medium text-gray-900">{selectedTicket.contactEmail}</span>
-                <span className="text-[10px] text-gray-400">{selectedTicket.createdAt}</span>
-              </div>
-              <p className="text-sm text-gray-700">{selectedTicket.description}</p>
-            </div>
-            
-            <div className="text-center text-[10px] text-gray-400 py-2">
-              — {selectedTicket.messages - 1} weitere Nachrichten —
-            </div>
-          </div>
-
-          {/* Reply Input */}
-          <div className="px-5 py-3 border-t border-gray-100">
-            <div className="bg-gray-50 rounded-xl p-2 focus-within:ring-2 focus-within:ring-blue-500 transition-all">
-              <textarea
-                value={reply}
-                onChange={(e) => setReply(e.target.value)}
-                placeholder="Antwort schreiben..."
-                rows={2}
-                className="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none"
-              />
-              <div className="flex items-center justify-between mt-1">
-                <button className="p-1 text-gray-400 hover:text-gray-600 rounded-md"><Paperclip className="w-4 h-4" /></button>
-                <button className="px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-md hover:bg-gray-800 flex items-center gap-1.5">
-                  <Send className="w-3 h-3" />Senden
+              return (
+                <button
+                  key={report.id}
+                  onClick={() => { setSelected(report); setAdminNotes(report.adminNotes || ''); setLogsExpanded(false); setScreenshotFullscreen(false); }}
+                  className={`w-full text-left p-4 rounded-xl border transition-all hover:shadow-sm ${
+                    isSelected
+                      ? 'border-blue-300 bg-blue-50/50 shadow-sm'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${statusCfg.bgColor} ${statusCfg.color}`}>
+                          <statusCfg.icon className="w-2.5 h-2.5" />
+                          {statusCfg.label}
+                        </span>
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${priorityCfg.color}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${priorityCfg.dot}`} />
+                          {priorityCfg.label}
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-semibold text-gray-900 truncate">{report.title}</h3>
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{report.description}</p>
+                      <div className="flex items-center gap-3 mt-2 text-[11px] text-gray-400">
+                        <span>{report.userName || report.userEmail}</span>
+                        <span>·</span>
+                        <span>{report.tenantName}</span>
+                        <span>·</span>
+                        <span>{new Date(report.createdAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                        {report.page && (
+                          <>
+                            <span>·</span>
+                            <span className="truncate max-w-[140px]">{report.page}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-300 shrink-0 mt-1" />
+                  </div>
                 </button>
+              );
+            })}
+          </div>
+
+          {/* Detail Panel */}
+          {selected && (
+            <div className="flex-1 min-w-0 lg:max-w-[45%]">
+              <div className="bg-white rounded-xl border border-gray-200 sticky top-6">
+                {/* Detail Header */}
+                <div className="p-5 border-b border-gray-100">
+                  <button
+                    onClick={() => setSelected(null)}
+                    className="text-xs text-gray-400 hover:text-gray-600 mb-2 lg:hidden"
+                  >
+                    ← Zurück zur Liste
+                  </button>
+                  <h2 className="text-base font-bold text-gray-900 mb-1">{selected.title}</h2>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span>{selected.userName || selected.userEmail}</span>
+                    <span>·</span>
+                    <span>{selected.tenantName}</span>
+                    <span>·</span>
+                    <span>{new Date(selected.createdAt).toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                  {selected.page && (
+                    <p className="text-xs text-gray-400 mt-1">Seite: {selected.page}</p>
+                  )}
+                </div>
+
+                {/* Stage Pipeline Visual */}
+                <div className="p-5 border-b border-gray-100">
+                  <p className="text-xs font-medium text-gray-500 mb-3">Status-Pipeline</p>
+                  <div className="flex items-center gap-1">
+                    {STATUS_FLOW.map((status, i) => {
+                      const cfg = STATUS_CONFIG[status];
+                      const isActive = selected.status === status;
+                      const isPast = STATUS_FLOW.indexOf(selected.status) > i;
+
+                      return (
+                        <div key={status} className="flex items-center gap-1 flex-1">
+                          <button
+                            onClick={() => handleStatusChange(selected, status)}
+                            disabled={saving}
+                            className={`flex-1 py-2 px-2 rounded-lg text-[11px] font-medium text-center transition-all border ${
+                              isActive
+                                ? `${cfg.bgColor} ${cfg.color} border-current shadow-sm`
+                                : isPast
+                                  ? 'bg-gray-100 text-gray-500 border-gray-200'
+                                  : 'bg-white text-gray-400 border-gray-100 hover:border-gray-300 hover:text-gray-600'
+                            }`}
+                          >
+                            {cfg.label}
+                          </button>
+                          {i < STATUS_FLOW.length - 1 && (
+                            <ArrowRight className="w-3 h-3 text-gray-300 shrink-0" />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => handleStatusChange(selected, 'WONT_FIX')}
+                    disabled={saving}
+                    className={`mt-2 w-full py-1.5 rounded-lg text-[11px] font-medium text-center transition-all border ${
+                      selected.status === 'WONT_FIX'
+                        ? 'bg-red-50 text-red-700 border-red-200'
+                        : 'bg-white text-gray-400 border-gray-100 hover:border-red-200 hover:text-red-500'
+                    }`}
+                  >
+                    Wird nicht behoben
+                  </button>
+                </div>
+
+                {/* Priority */}
+                <div className="p-5 border-b border-gray-100">
+                  <p className="text-xs font-medium text-gray-500 mb-2">Priorität</p>
+                  <div className="flex gap-2">
+                    {(Object.keys(PRIORITY_CONFIG) as BugReportPriority[]).map((p) => {
+                      const cfg = PRIORITY_CONFIG[p];
+                      const isActive = selected.priority === p;
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => handlePriorityChange(selected, p)}
+                          disabled={saving}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all flex items-center gap-1.5 ${
+                            isActive
+                              ? `${cfg.color} bg-white border-current shadow-sm`
+                              : 'text-gray-400 border-gray-100 hover:border-gray-300'
+                          }`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+                          {cfg.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="p-5 border-b border-gray-100">
+                  <p className="text-xs font-medium text-gray-500 mb-2">Beschreibung</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{selected.description}</p>
+                </div>
+
+                {/* Screenshot */}
+                {selected.screenshotUrl && (
+                  <div className="p-5 border-b border-gray-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-medium text-gray-500 flex items-center gap-1.5">
+                        <Camera className="w-3 h-3" />
+                        Screenshot
+                      </p>
+                      <button
+                        onClick={() => setScreenshotFullscreen(true)}
+                        className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
+                      >
+                        <Maximize2 className="w-3 h-3" />
+                        Vergrößern
+                      </button>
+                    </div>
+                    <img
+                      src={selected.screenshotUrl}
+                      alt="Bug Screenshot"
+                      className="w-full rounded-lg border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => setScreenshotFullscreen(true)}
+                    />
+                  </div>
+                )}
+
+                {/* Screenshot Fullscreen Modal */}
+                {screenshotFullscreen && selected.screenshotUrl && (
+                  <div
+                    className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-8"
+                    onClick={() => setScreenshotFullscreen(false)}
+                  >
+                    <img
+                      src={selected.screenshotUrl}
+                      alt="Bug Screenshot"
+                      className="max-w-full max-h-full rounded-lg shadow-2xl"
+                    />
+                    <button
+                      onClick={() => setScreenshotFullscreen(false)}
+                      className="absolute top-6 right-6 text-white/70 hover:text-white"
+                    >
+                      <XCircle className="w-8 h-8" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Console Logs */}
+                {selected.consoleLogs && (
+                  <div className="p-5 border-b border-gray-100">
+                    <button
+                      onClick={() => setLogsExpanded(!logsExpanded)}
+                      className="flex items-center justify-between w-full mb-2"
+                    >
+                      <p className="text-xs font-medium text-gray-500 flex items-center gap-1.5">
+                        <Terminal className="w-3 h-3" />
+                        Console-Logs
+                        <span className="text-gray-400">
+                          ({(() => { try { return JSON.parse(selected.consoleLogs!).length; } catch { return '?'; } })()})
+                        </span>
+                      </p>
+                      <span className="text-[10px] text-gray-400">
+                        {logsExpanded ? '▾ Ausblenden' : '▸ Anzeigen'}
+                      </span>
+                    </button>
+                    {logsExpanded && (
+                      <div className="bg-gray-900 rounded-lg p-3 max-h-60 overflow-y-auto">
+                        {(() => {
+                          try {
+                            const logs = JSON.parse(selected.consoleLogs!);
+                            return logs.map((log: any, i: number) => (
+                              <div key={i} className={`text-[11px] font-mono leading-relaxed ${
+                                log.level === 'error' ? 'text-red-400' : log.level === 'warn' ? 'text-amber-400' : 'text-gray-400'
+                              }`}>
+                                <span className="text-gray-600 mr-2">
+                                  {new Date(log.timestamp).toLocaleTimeString('de-DE')}
+                                </span>
+                                <span className={`mr-1.5 ${
+                                  log.level === 'error' ? 'text-red-500' : log.level === 'warn' ? 'text-amber-500' : 'text-gray-500'
+                                }`}>
+                                  [{log.level}]
+                                </span>
+                                <span className="break-all">{log.message}</span>
+                              </div>
+                            ));
+                          } catch {
+                            return <p className="text-xs text-gray-500">Logs konnten nicht gelesen werden.</p>;
+                          }
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Admin Notes */}
+                <div className="p-5">
+                  <p className="text-xs font-medium text-gray-500 mb-2">Interne Notizen</p>
+                  <textarea
+                    rows={3}
+                    value={adminNotes}
+                    onChange={(e) => setAdminNotes(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    placeholder="Notizen zum Bug (nur für Admins sichtbar)..."
+                  />
+                  <button
+                    onClick={handleSaveNotes}
+                    disabled={saving || adminNotes === (selected.adminNotes || '')}
+                    className="mt-2 px-4 py-1.5 text-xs font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                  >
+                    {saving ? 'Speichern...' : 'Notizen speichern'}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>

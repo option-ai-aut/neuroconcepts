@@ -937,3 +937,45 @@ enum EmailProvider {
   OUTLOOK
   SMTP
 }
+
+// --- Bug Reports ---
+
+model BugReport {
+  id          String   @id @default(uuid())
+  tenantId    String
+  userId      String
+  userEmail   String
+  userName    String?
+  tenantName  String?
+
+  title       String
+  description String   @db.Text
+  page        String?  // URL/route where the bug was reported
+  screenshotUrl String? // S3 URL of the screenshot
+  consoleLogs String? @db.Text // JSON string of console log entries
+
+  status      BugReportStatus @default(OPEN)
+  priority    BugReportPriority @default(MEDIUM)
+  adminNotes  String? @db.Text
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([tenantId])
+}
+
+enum BugReportStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  WONT_FIX
+}
+
+enum BugReportPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}

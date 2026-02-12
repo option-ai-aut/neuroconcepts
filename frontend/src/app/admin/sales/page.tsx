@@ -1,155 +1,215 @@
 'use client';
 
-import { useState } from 'react';
-import { 
-  TrendingUp, DollarSign, Users, Building2, ArrowUpRight, ArrowDownRight,
-  Phone, Mail, Calendar, CheckCircle2, Clock, Target, Zap,
-  ChevronRight, Star, Filter, Plus, MoreVertical
-} from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Building2, Users, FileText, Home, Search, Loader2, Plus, Trash2, ChevronDown, Mail, ToggleLeft, ToggleRight } from 'lucide-react';
+import { getAdminTenants, createAdminTenant, deleteAdminTenant, AdminTenant } from '@/lib/adminApi';
 
-const PIPELINE_STAGES = [
-  { name: 'Kontaktiert', count: 12, value: '€14.4k', color: 'bg-gray-200' },
-  { name: 'Demo gebucht', count: 8, value: '€9.6k', color: 'bg-gray-200' },
-  { name: 'Demo durchgeführt', count: 5, value: '€6.0k', color: 'bg-gray-300' },
-  { name: 'Angebot gesendet', count: 3, value: '€3.6k', color: 'bg-gray-300' },
-  { name: 'Verhandlung', count: 2, value: '€2.4k', color: 'bg-gray-400' },
-  { name: 'Gewonnen', count: 4, value: '€4.8k', color: 'bg-emerald-300' },
-];
-
-const DEALS = [
-  { name: 'Remax Wien', contact: 'Thomas Berger', value: '€2.400/mo', stage: 'Demo gebucht', probability: 60, lastContact: 'Heute', agents: 15 },
-  { name: 'EHL Immobilien', contact: 'Anna Schneider', value: '€4.900/mo', stage: 'Angebot gesendet', probability: 75, lastContact: 'Gestern', agents: 35 },
-  { name: 'ImmoFair GmbH', contact: 'Peter Neumann', value: '€890/mo', stage: 'Demo durchgeführt', probability: 40, lastContact: 'vor 2 Tagen', agents: 6 },
-  { name: 'Realconsult', contact: 'Markus Lang', value: '€1.200/mo', stage: 'Verhandlung', probability: 85, lastContact: 'Heute', agents: 8 },
-  { name: 'Immo123 Wien', contact: 'Julia Klein', value: '€590/mo', stage: 'Kontaktiert', probability: 20, lastContact: 'vor 3 Tagen', agents: 3 },
-];
-
-const SALES_KPIS = [
-  { label: 'Pipeline Value', value: '€40.8k', change: '+22%', up: true, icon: DollarSign },
-  { label: 'Neue Leads/Monat', value: '34', change: '+18%', up: true, icon: Users },
-  { label: 'Win Rate', value: '28%', change: '+3%', up: true, icon: Target },
-  { label: 'Avg. Deal Size', value: '€1.2k', change: '-5%', up: false, icon: TrendingUp },
-];
-
-const ACTIVITIES = [
-  { type: 'call', text: 'Demo-Call mit Remax Wien', time: '10:00', person: 'Lisa Müller' },
-  { type: 'email', text: 'Follow-up an EHL Immobilien', time: '11:30', person: 'Lisa Müller' },
-  { type: 'meeting', text: 'Verhandlung Realconsult', time: '14:00', person: 'Dennis Kral' },
-  { type: 'task', text: 'Angebot für ImmoFair erstellen', time: '15:00', person: 'Lisa Müller' },
-];
+function formatDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
 
 export default function SalesPage() {
+  const [tenants, setTenants] = useState<AdminTenant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newAddress, setNewAddress] = useState('');
+  const [creating, setCreating] = useState(false);
+
+  const loadTenants = () => {
+    setLoading(true);
+    getAdminTenants()
+      .then(setTenants)
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { loadTenants(); }, []);
+
+  const handleCreate = async () => {
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      await createAdminTenant({ name: newName.trim(), address: newAddress.trim() || undefined });
+      setShowCreateModal(false);
+      setNewName('');
+      setNewAddress('');
+      loadTenants();
+    } catch (e: any) {
+      alert('Fehler: ' + e.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Tenant "${name}" wirklich löschen? Alle zugehörigen Daten werden gelöscht.`)) return;
+    try {
+      await deleteAdminTenant(id);
+      loadTenants();
+    } catch (e: any) {
+      alert('Fehler: ' + e.message);
+    }
+  };
+
+  const filteredTenants = tenants.filter(t =>
+    t.name.toLowerCase().includes(search.toLowerCase()) ||
+    (t.address || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
-      <div className="flex items-center justify-between">
+    <div className="p-6 max-w-[1600px] mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Sales & Pipeline</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Vertrieb, Leads und Kundenakquise</p>
+          <h1 className="text-xl font-bold text-gray-900">Tenants</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{tenants.length} Tenant{tenants.length !== 1 ? 's' : ''} auf der Plattform</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800">
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors shadow-sm"
+        >
           <Plus className="w-4 h-4" />
-          Neuer Deal
+          Neuer Tenant
         </button>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-4 gap-4">
-        {SALES_KPIS.map((kpi) => (
-          <div key={kpi.label} className="bg-white rounded-xl border border-gray-200 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <kpi.icon className="w-5 h-5 text-gray-400" />
-              <span className={`flex items-center gap-0.5 text-xs font-medium ${kpi.up ? 'text-emerald-600' : 'text-red-500'}`}>
-                {kpi.up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}{kpi.change}
-              </span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{kpi.value}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{kpi.label}</p>
-          </div>
-        ))}
+      {error && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{error}</div>
+      )}
+
+      {/* Search */}
+      <div className="relative max-w-sm mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Tenant suchen..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
       </div>
 
-      {/* Pipeline */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h2 className="text-sm font-semibold text-gray-900 mb-4">Pipeline Übersicht</h2>
-        <div className="flex gap-2">
-          {PIPELINE_STAGES.map((stage) => (
-            <div key={stage.name} className="flex-1">
-              <div className={`h-2 rounded-full ${stage.color} mb-2`} />
-              <p className="text-[11px] font-medium text-gray-900">{stage.name}</p>
-              <p className="text-xs text-gray-400">{stage.count} Deals · {stage.value}</p>
+      {/* Tenants Grid */}
+      {filteredTenants.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <Building2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-sm text-gray-500">{tenants.length === 0 ? 'Noch keine Tenants' : 'Keine Treffer'}</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredTenants.map((tenant) => (
+            <div key={tenant.id} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">{tenant.name}</h3>
+                  {tenant.address && <p className="text-[10px] text-gray-400 mt-0.5">{tenant.address}</p>}
+                </div>
+                <button
+                  onClick={() => handleDelete(tenant.id, tenant.name)}
+                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="flex items-center gap-1.5">
+                  <Users className="w-3 h-3 text-gray-400" />
+                  <span className="text-xs text-gray-600">{tenant.userCount} User</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Home className="w-3 h-3 text-gray-400" />
+                  <span className="text-xs text-gray-600">{tenant.propertyCount} Objekte</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <FileText className="w-3 h-3 text-gray-400" />
+                  <span className="text-xs text-gray-600">{tenant.leadCount} Leads</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <FileText className="w-3 h-3 text-gray-400" />
+                  <span className="text-xs text-gray-600">{tenant.templateCount} Vorlagen</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                <span className="text-[10px] text-gray-400">Erstellt: {formatDate(tenant.createdAt)}</span>
+                <div className="flex items-center gap-1.5">
+                  {tenant.autoReply ? (
+                    <ToggleRight className="w-3.5 h-3.5 text-emerald-500" />
+                  ) : (
+                    <ToggleLeft className="w-3.5 h-3.5 text-gray-300" />
+                  )}
+                  <span className="text-[10px] text-gray-400">Auto-Reply</span>
+                </div>
+              </div>
+              {tenant.inboundEmail && (
+                <div className="flex items-center gap-1.5 mt-2">
+                  <Mail className="w-3 h-3 text-gray-400" />
+                  <span className="text-[10px] font-mono text-gray-400">{tenant.inboundEmail}</span>
+                </div>
+              )}
             </div>
           ))}
         </div>
-      </div>
+      )}
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Deals Table */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-900">Aktive Deals</h2>
-            <button className="text-xs text-blue-600 hover:text-blue-700 font-medium">Alle anzeigen</button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase">Unternehmen</th>
-                  <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase">Wert</th>
-                  <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase">Phase</th>
-                  <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase">Wahrsch.</th>
-                  <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase">Letzter Kontakt</th>
-                </tr>
-              </thead>
-              <tbody>
-                {DEALS.map((deal, i) => (
-                  <tr key={i} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 cursor-pointer">
-                    <td className="px-4 py-2.5">
-                      <p className="text-xs font-medium text-gray-900">{deal.name}</p>
-                      <p className="text-[10px] text-gray-400">{deal.contact} · {deal.agents} Makler</p>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs font-semibold text-gray-900">{deal.value}</td>
-                    <td className="px-4 py-2.5">
-                      <span className="text-[10px] font-medium text-gray-700 bg-gray-100 px-2 py-0.5 rounded">{deal.stage}</span>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full ${deal.probability >= 70 ? 'bg-emerald-500' : deal.probability >= 40 ? 'bg-amber-500' : 'bg-gray-300'}`} style={{ width: `${deal.probability}%` }} />
-                        </div>
-                        <span className="text-[10px] text-gray-500">{deal.probability}%</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-[10px] text-gray-400">{deal.lastContact}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Today's Activities */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">Heutige Aktivitäten</h2>
-          <div className="space-y-3">
-            {ACTIVITIES.map((act, i) => (
-              <div key={i} className="flex items-start gap-2.5">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
-                  act.type === 'call' ? 'bg-gray-100' : act.type === 'email' ? 'bg-gray-100' : act.type === 'meeting' ? 'bg-gray-100' : 'bg-amber-100'
-                }`}>
-                  {act.type === 'call' && <Phone className="w-3 h-3 text-gray-600" />}
-                  {act.type === 'email' && <Mail className="w-3 h-3 text-gray-600" />}
-                  {act.type === 'meeting' && <Calendar className="w-3 h-3 text-gray-600" />}
-                  {act.type === 'task' && <CheckCircle2 className="w-3 h-3 text-amber-600" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-gray-900 truncate">{act.text}</p>
-                  <p className="text-[10px] text-gray-400">{act.time} · {act.person}</p>
-                </div>
+      {/* Create Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCreateModal(false)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h2 className="text-base font-semibold text-gray-900">Neuen Tenant erstellen</h2>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Name *</label>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="z.B. Kellner Immobilien"
+                  autoFocus
+                />
               </div>
-            ))}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Adresse</label>
+                <input
+                  type="text"
+                  value={newAddress}
+                  onChange={(e) => setNewAddress(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-xl">
+              <button onClick={() => setShowCreateModal(false)} className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
+                Abbrechen
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={!newName.trim() || creating}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                {creating ? 'Erstelle...' : 'Erstellen'}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

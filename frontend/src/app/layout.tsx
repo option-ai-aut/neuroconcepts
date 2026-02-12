@@ -5,6 +5,7 @@ import { AuthProvider } from "@/components/AuthProvider";
 import { GlobalStateProvider } from "@/context/GlobalStateContext";
 import { RuntimeConfigProvider } from "@/components/RuntimeConfigProvider";
 import CookieConsent from "@/components/CookieConsent";
+import ConsoleCaptureInit from "@/components/ConsoleCaptureInit";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -226,6 +227,7 @@ export default function RootLayout({
         <RuntimeConfigProvider>
           <AuthProvider>
             <GlobalStateProvider>
+              <ConsoleCaptureInit />
               {children}
               <CookieConsent />
             </GlobalStateProvider>

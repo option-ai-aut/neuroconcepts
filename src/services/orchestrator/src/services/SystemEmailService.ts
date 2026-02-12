@@ -1,20 +1,29 @@
 /**
- * SystemEmailService - Sends system emails via AWS SES
+ * SystemEmailService - Sends system emails via Resend
  * Used for: Registration confirmations, password resets, Jarvis notifications, escalations
  * NOT for lead communication (that uses EmailService with user's connected provider)
  */
 
-import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { Resend } from 'resend';
 
-// Initialize SES client
-const ses = new SESClient({ 
-  region: process.env.AWS_REGION || 'eu-central-1' 
-});
+// Initialize Resend client (lazy — created on first use)
+let resendClient: Resend | null = null;
+
+function getResend(): Resend {
+  if (!resendClient) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      throw new Error('RESEND_API_KEY is not configured');
+    }
+    resendClient = new Resend(apiKey);
+  }
+  return resendClient;
+}
 
 // Configuration
-const FROM_EMAIL = process.env.SES_FROM_EMAIL || 'noreply@immivo.ai';
-const FROM_NAME = process.env.SES_FROM_NAME || 'Immivo';
-const SES_ENABLED = process.env.SES_ENABLED !== 'false'; // Default enabled in production
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.SES_FROM_EMAIL || 'noreply@immivo.ai';
+const FROM_NAME = process.env.RESEND_FROM_NAME || process.env.SES_FROM_NAME || 'Immivo';
+const EMAIL_ENABLED = process.env.RESEND_ENABLED !== 'false' && process.env.SES_ENABLED !== 'false';
 
 interface SendEmailParams {
   to: string | string[];
@@ -25,15 +34,15 @@ interface SendEmailParams {
 }
 
 /**
- * Send a system email via AWS SES
+ * Send a system email via Resend
  */
 export async function sendSystemEmail(params: SendEmailParams): Promise<boolean> {
   const { to, subject, html, text, replyTo } = params;
   const recipients = Array.isArray(to) ? to : [to];
 
   // Log in development mode
-  if (!SES_ENABLED) {
-    console.log('📧 [SES DISABLED] Would send email:');
+  if (!EMAIL_ENABLED) {
+    console.log('📧 [EMAIL DISABLED] Would send email:');
     console.log('   To:', recipients.join(', '));
     console.log('   Subject:', subject);
     console.log('   Body preview:', html.substring(0, 200) + '...');
@@ -41,22 +50,22 @@ export async function sendSystemEmail(params: SendEmailParams): Promise<boolean>
   }
 
   try {
-    const command = new SendEmailCommand({
-      Source: `${FROM_NAME} <${FROM_EMAIL}>`,
-      Destination: {
-        ToAddresses: recipients
-      },
-      Message: {
-        Subject: { Data: subject, Charset: 'UTF-8' },
-        Body: {
-          Html: { Data: html, Charset: 'UTF-8' },
-          ...(text && { Text: { Data: text, Charset: 'UTF-8' } })
-        }
-      },
-      ...(replyTo && { ReplyToAddresses: [replyTo] })
+    const resend = getResend();
+
+    const { error } = await resend.emails.send({
+      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+      to: recipients,
+      subject,
+      html,
+      ...(text && { text }),
+      ...(replyTo && { replyTo }),
     });
 
-    await ses.send(command);
+    if (error) {
+      console.error('📧 Resend error:', error);
+      return false;
+    }
+
     console.log('📧 Email sent successfully to:', recipients.join(', '));
     return true;
   } catch (error: any) {

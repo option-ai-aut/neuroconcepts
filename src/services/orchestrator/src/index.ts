@@ -68,6 +68,7 @@ async function loadAppSecrets() {
           'MICROSOFT_REDIRECT_URI',
           'MICROSOFT_EMAIL_REDIRECT_URI',
           'GEMINI_API_KEY',
+          'RESEND_API_KEY',
         ];
         for (const key of keysToLoad) {
           if (secrets[key]) process.env[key] = secrets[key];
@@ -5013,23 +5014,26 @@ app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, asyn
     else geminiAspectRatio = '3:2';
 
     const { GoogleGenAI } = require('@google/genai');
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!geminiKey) {
+      return res.status(500).json({ error: 'Gemini API Key ist nicht konfiguriert.' });
+    }
+    const ai = new GoogleGenAI({ apiKey: geminiKey });
 
-    console.log(`🎨 Virtual staging (Gemini 3): style=${style}, room=${roomType}, aspect=${geminiAspectRatio}, prompt="${stagingPrompt.substring(0, 80)}..."`);
+    // Try gemini-2.5-flash-image (stable) first, fall back to gemini-3-pro-image-preview
+    const modelId = 'gemini-2.5-flash-image';
 
+    console.log(`🎨 Virtual staging: model=${modelId}, style=${style}, room=${roomType}, aspect=${geminiAspectRatio}, imageSize=${Math.round(imageData.length / 1024)}KB, prompt="${stagingPrompt.substring(0, 80)}..."`);
+
+    // Use flat contents format matching official docs for image editing
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-image-preview',
+      model: modelId,
       contents: [
-        {
-          role: 'user',
-          parts: [
-            { inlineData: { mimeType, data: imageData } },
-            { text: stagingPrompt },
-          ],
-        },
+        { inlineData: { mimeType, data: imageData } },
+        { text: stagingPrompt },
       ],
       config: {
-        responseModalities: ['IMAGE', 'TEXT'],
+        responseModalities: ['TEXT', 'IMAGE'],
         imageConfig: {
           aspectRatio: geminiAspectRatio,
         },
@@ -5038,22 +5042,26 @@ app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, asyn
 
     // Extract generated image from response
     let generatedImage: string | null = null;
+    let responseText: string | null = null;
 
     if (response.candidates && response.candidates[0]?.content?.parts) {
       for (const part of response.candidates[0].content.parts) {
         if (part.inlineData && part.inlineData.data) {
           const outMime = part.inlineData.mimeType || 'image/png';
           generatedImage = `data:${outMime};base64,${part.inlineData.data}`;
-          break;
+        }
+        if (part.text) {
+          responseText = part.text;
         }
       }
     }
 
     if (!generatedImage) {
-      return res.status(500).json({ error: 'No image generated — the model returned no image. Try a different prompt or image.' });
+      console.error(`❌ No image in response. Text response: ${responseText || 'none'}. Candidates: ${JSON.stringify(response.candidates?.length || 0)}, promptFeedback: ${JSON.stringify(response.promptFeedback || 'none')}`);
+      return res.status(500).json({ error: responseText || 'Das Modell hat kein Bild generiert. Versuche einen anderen Prompt oder ein anderes Bild.' });
     }
 
-    console.log(`✅ Image staged for ${currentUser.email} (Gemini 3 Pro Image)`);
+    console.log(`✅ Image staged for ${currentUser.email} (${modelId})`);
 
     res.json({ 
       image: generatedImage,
@@ -5061,10 +5069,22 @@ app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, asyn
       roomType
     });
   } catch (error: any) {
-    console.error('Image staging error:', error?.message || error);
-    const msg = error?.message?.includes('SAFETY') || error?.message?.includes('safety')
-      ? 'Das Bild wurde von der KI-Sicherheitsrichtlinie abgelehnt. Bitte versuche ein anderes Bild.'
-      : 'Bildbearbeitung fehlgeschlagen. Bitte versuche es erneut.';
+    const errMsg = error?.message || String(error);
+    console.error('Image staging error:', errMsg);
+    console.error('Image staging full error:', JSON.stringify(error, null, 2));
+    
+    let msg: string;
+    if (errMsg.includes('SAFETY') || errMsg.includes('safety') || errMsg.includes('BLOCKED')) {
+      msg = 'Das Bild wurde von der KI-Sicherheitsrichtlinie abgelehnt. Bitte versuche ein anderes Bild.';
+    } else if (errMsg.includes('not found') || errMsg.includes('404') || errMsg.includes('does not exist')) {
+      msg = 'Das KI-Modell ist nicht verfügbar. Bitte kontaktiere den Support.';
+    } else if (errMsg.includes('quota') || errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED')) {
+      msg = 'API-Limit erreicht. Bitte warte einen Moment und versuche es erneut.';
+    } else if (errMsg.includes('API key') || errMsg.includes('401') || errMsg.includes('UNAUTHENTICATED')) {
+      msg = 'Gemini API-Key ungültig oder nicht konfiguriert.';
+    } else {
+      msg = `Bildbearbeitung fehlgeschlagen: ${errMsg.substring(0, 100)}`;
+    }
     res.status(500).json({ error: msg });
   }
 });
@@ -5927,6 +5947,397 @@ app.post('/admin/backfill-activities', authMiddleware, async (req: any, res) => 
     res.json({ success: true, created, total: leads.length });
   } catch (error: any) {
     console.error('Error backfilling activities:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// Admin Panel API (Platform-wide, adminAuthMiddleware)
+// ============================================
+
+// --- Admin Dashboard Stats ---
+app.get('/admin/platform/stats', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const db = await initializePrisma();
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const [tenantCount, userCount, leadCount, propertyCount, exposeCount, emailCount,
+           newTenantsThisMonth, newLeadsThisMonth, newUsersThisMonth] = await Promise.all([
+      db.tenant.count(),
+      db.user.count(),
+      db.lead.count(),
+      db.property.count(),
+      db.expose.count(),
+      db.email.count(),
+      db.tenant.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+      db.lead.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+      db.user.count({ where: {} }), // Can't filter by createdAt on User (no field), use total
+    ]);
+
+    // Lead status distribution
+    const leadsByStatus = await db.lead.groupBy({ by: ['status'], _count: true });
+    
+    // Properties by status
+    const propertiesByStatus = await db.property.groupBy({ by: ['status'], _count: true });
+
+    // Recent activities (platform-wide, last 20)
+    const recentActivities = await db.leadActivity.findMany({
+      take: 20,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        lead: { select: { firstName: true, lastName: true, email: true, tenant: { select: { name: true } } } },
+      }
+    });
+
+    res.json({
+      tenants: tenantCount,
+      users: userCount,
+      leads: leadCount,
+      properties: propertyCount,
+      exposes: exposeCount,
+      emails: emailCount,
+      newTenantsThisMonth,
+      newLeadsThisMonth,
+      leadsByStatus: leadsByStatus.reduce((acc: any, s: any) => ({ ...acc, [s.status]: s._count }), {}),
+      propertiesByStatus: propertiesByStatus.reduce((acc: any, s: any) => ({ ...acc, [s.status]: s._count }), {}),
+      recentActivities: recentActivities.map(a => ({
+        id: a.id,
+        type: a.type,
+        description: a.description,
+        createdAt: a.createdAt,
+        tenantName: a.lead?.tenant?.name || '—',
+        leadName: `${a.lead?.firstName || ''} ${a.lead?.lastName || ''}`.trim() || a.lead?.email || '—',
+      })),
+    });
+  } catch (error: any) {
+    console.error('Admin stats error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Admin Health Check ---
+app.get('/admin/platform/health', adminAuthMiddleware, async (_req, res) => {
+  const results: Record<string, { status: string; latency?: number; detail?: string }> = {};
+  
+  // DB Check
+  try {
+    const start = Date.now();
+    const db = await initializePrisma();
+    await db.$queryRaw`SELECT 1`;
+    results['database'] = { status: 'healthy', latency: Date.now() - start };
+  } catch (e: any) {
+    results['database'] = { status: 'error', detail: e.message };
+  }
+
+  // Cognito Check (env vars configured?)
+  results['cognito'] = {
+    status: process.env.USER_POOL_ID && process.env.CLIENT_ID ? 'healthy' : 'error',
+    detail: process.env.USER_POOL_ID ? 'Configured' : 'Not configured',
+  };
+
+  // Admin Cognito Check
+  results['admin_cognito'] = {
+    status: process.env.ADMIN_USER_POOL_ID && process.env.ADMIN_CLIENT_ID ? 'healthy' : 'error',
+    detail: process.env.ADMIN_USER_POOL_ID ? 'Configured' : 'Not configured',
+  };
+
+  // S3 Media Bucket
+  results['s3_media'] = {
+    status: process.env.MEDIA_BUCKET_NAME ? 'healthy' : 'warning',
+    detail: process.env.MEDIA_BUCKET_NAME || 'Not configured (local fallback)',
+  };
+
+  // OpenAI / AI
+  results['openai'] = {
+    status: process.env.OPENAI_API_KEY ? 'healthy' : 'error',
+    detail: process.env.OPENAI_API_KEY ? 'API Key configured' : 'Not configured',
+  };
+
+  // Gemini
+  results['gemini'] = {
+    status: process.env.GEMINI_API_KEY ? 'healthy' : 'warning',
+    detail: process.env.GEMINI_API_KEY ? 'API Key configured' : 'Not configured',
+  };
+
+  // Email (Resend)
+  results['email'] = {
+    status: process.env.RESEND_API_KEY ? 'healthy' : 'warning',
+    detail: process.env.RESEND_API_KEY ? 'Resend API Key configured' : 'Not configured',
+  };
+
+  // Lambda environment
+  results['lambda'] = {
+    status: process.env.AWS_LAMBDA_FUNCTION_NAME ? 'healthy' : 'info',
+    detail: process.env.AWS_LAMBDA_FUNCTION_NAME || 'Local development',
+  };
+
+  const allHealthy = Object.values(results).every(r => r.status === 'healthy' || r.status === 'info');
+  res.json({ overall: allHealthy ? 'healthy' : 'degraded', services: results });
+});
+
+// --- Admin Tenants ---
+app.get('/admin/platform/tenants', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const db = await initializePrisma();
+    const tenants = await db.tenant.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        _count: { select: { users: true, leads: true, properties: true, exposeTemplates: true } },
+        settings: { select: { inboundLeadEmail: true, autoReplyEnabled: true } },
+      }
+    });
+    res.json(tenants.map(t => ({
+      id: t.id,
+      name: t.name,
+      address: t.address,
+      createdAt: t.createdAt,
+      userCount: t._count.users,
+      leadCount: t._count.leads,
+      propertyCount: t._count.properties,
+      templateCount: t._count.exposeTemplates,
+      inboundEmail: t.settings?.inboundLeadEmail ? `${t.settings.inboundLeadEmail}@leads.immivo.ai` : null,
+      autoReply: t.settings?.autoReplyEnabled || false,
+    })));
+  } catch (error: any) {
+    console.error('Admin tenants error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Admin: Create Tenant ---
+app.post('/admin/platform/tenants', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { name, address } = req.body;
+    if (!name) return res.status(400).json({ error: 'Name required' });
+    
+    const tenant = await db.tenant.create({ data: { name, address } });
+    // Create default settings
+    await db.tenantSettings.create({ data: { tenantId: tenant.id } });
+    res.json(tenant);
+  } catch (error: any) {
+    console.error('Admin create tenant error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Admin: Delete Tenant ---
+app.delete('/admin/platform/tenants/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    await db.tenant.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Admin delete tenant error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Admin: All Users (platform-wide) ---
+app.get('/admin/platform/users', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const db = await initializePrisma();
+    const users = await db.user.findMany({
+      orderBy: { email: 'asc' },
+      include: {
+        tenant: { select: { name: true } },
+        _count: { select: { leads: true } },
+      }
+    });
+    res.json(users.map(u => ({
+      id: u.id,
+      email: u.email,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      phone: u.phone,
+      role: u.role,
+      tenantId: u.tenantId,
+      tenantName: u.tenant.name,
+      leadCount: u._count.leads,
+    })));
+  } catch (error: any) {
+    console.error('Admin users error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Admin: Audit Logs ---
+app.get('/admin/platform/audit-logs', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+    const flaggedOnly = req.query.flagged === 'true';
+
+    const where = flaggedOnly ? { flagged: true } : {};
+    const [logs, total] = await Promise.all([
+      db.aiAuditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          user: { select: { email: true, firstName: true, lastName: true } },
+          tenant: { select: { name: true } },
+        }
+      }),
+      db.aiAuditLog.count({ where }),
+    ]);
+
+    res.json({
+      logs: logs.map(l => ({
+        id: l.id,
+        endpoint: l.endpoint,
+        message: l.message.substring(0, 200),
+        response: l.response?.substring(0, 200),
+        flagged: l.flagged,
+        flagReason: l.flagReason,
+        userEmail: l.user.email,
+        userName: `${l.user.firstName || ''} ${l.user.lastName || ''}`.trim(),
+        tenantName: l.tenant.name,
+        createdAt: l.createdAt,
+      })),
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+    });
+  } catch (error: any) {
+    console.error('Admin audit error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Admin: Platform Settings (read env-based config) ---
+app.get('/admin/platform/settings', adminAuthMiddleware, async (_req, res) => {
+  try {
+    res.json({
+      ai: {
+        openaiKey: process.env.OPENAI_API_KEY ? '••••' + (process.env.OPENAI_API_KEY).slice(-4) : '',
+        geminiKey: process.env.GEMINI_API_KEY ? '••••' + (process.env.GEMINI_API_KEY).slice(-4) : '',
+      },
+      auth: {
+        userPoolId: process.env.USER_POOL_ID || '',
+        clientId: process.env.CLIENT_ID || '',
+        adminUserPoolId: process.env.ADMIN_USER_POOL_ID || '',
+        adminClientId: process.env.ADMIN_CLIENT_ID || '',
+      },
+      email: {
+        provider: 'Resend',
+        resendKey: process.env.RESEND_API_KEY ? '••••' + (process.env.RESEND_API_KEY).slice(-4) : '',
+        fromEmail: process.env.RESEND_FROM_EMAIL || process.env.SES_FROM_EMAIL || 'noreply@immivo.ai',
+      },
+      storage: {
+        mediaBucket: process.env.MEDIA_BUCKET_NAME || '',
+      },
+      environment: process.env.AWS_LAMBDA_FUNCTION_NAME ? 'production' : 'development',
+      region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'eu-central-1',
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// Bug Reports API
+// ============================================
+
+// Create bug report (tenant user)
+app.post('/bug-reports', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const user = await db.user.findUnique({
+      where: { email: req.user!.email },
+      include: { tenant: { select: { name: true } } }
+    });
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { title, description, page, screenshot, consoleLogs } = req.body;
+    if (!title || !description) return res.status(400).json({ error: 'Titel und Beschreibung erforderlich' });
+
+    // Upload screenshot to S3 if provided (base64 PNG)
+    let screenshotUrl: string | null = null;
+    if (screenshot && typeof screenshot === 'string') {
+      try {
+        const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+        const filename = `bug-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`;
+        screenshotUrl = await uploadToS3(buffer, filename, 'image/png', 'bug-reports');
+      } catch (err) {
+        console.error('Bug report screenshot upload error:', err);
+      }
+    }
+
+    const report = await db.bugReport.create({
+      data: {
+        tenantId: user.tenantId,
+        userId: user.id,
+        userEmail: user.email,
+        userName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+        tenantName: user.tenant.name,
+        title,
+        description,
+        page: page || null,
+        screenshotUrl,
+        consoleLogs: consoleLogs || null,
+      }
+    });
+
+    res.json(report);
+  } catch (error: any) {
+    console.error('Bug report create error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// List bug reports (admin)
+app.get('/admin/platform/bug-reports', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const status = req.query.status as string | undefined;
+    const where = status && status !== 'ALL' ? { status: status as any } : {};
+    
+    const reports = await db.bugReport.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+
+    const counts = await db.bugReport.groupBy({
+      by: ['status'],
+      _count: true,
+    });
+
+    res.json({
+      reports,
+      counts: counts.reduce((acc: any, c: any) => ({ ...acc, [c.status]: c._count }), {}),
+      total: reports.length,
+    });
+  } catch (error: any) {
+    console.error('Bug reports list error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update bug report status/priority/notes (admin)
+app.patch('/admin/platform/bug-reports/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { status, priority, adminNotes } = req.body;
+    
+    const data: any = {};
+    if (status) data.status = status;
+    if (priority) data.priority = priority;
+    if (adminNotes !== undefined) data.adminNotes = adminNotes;
+
+    const report = await db.bugReport.update({
+      where: { id: req.params.id },
+      data,
+    });
+
+    res.json(report);
+  } catch (error: any) {
+    console.error('Bug report update error:', error);
     res.status(500).json({ error: error.message });
   }
 });

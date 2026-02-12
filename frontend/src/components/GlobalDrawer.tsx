@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGlobalState } from '@/context/GlobalStateContext';
-import { X, Minus, Maximize2, Send, Paperclip, ChevronDown, ChevronUp, Bold, Italic, Underline, List, ListOrdered, Link2, Image, Trash2, FileText, Plus, User } from 'lucide-react';
+import { X, Minus, Maximize2, Send, Paperclip, ChevronDown, ChevronUp, Bold, Italic, Underline, List, ListOrdered, Link2, Image, Trash2, FileText, Plus, User, Camera, Terminal } from 'lucide-react';
 import { createLead, createProperty, sendManualEmail, API_ENDPOINTS, fetchWithAuth, getApiUrl } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { mutate } from 'swr';
@@ -418,6 +418,18 @@ export default function GlobalDrawer() {
   // Animation state
   const [isVisible, setIsVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Bug report form state
+  const [bugTitle, setBugTitle] = useState('');
+  const [bugDescription, setBugDescription] = useState('');
+  const [bugSubmitting, setBugSubmitting] = useState(false);
+  const [bugSuccess, setBugSuccess] = useState(false);
+  const [bugScreenshot, setBugScreenshot] = useState<string | null>(null);
+  const [bugConsoleLogs, setBugConsoleLogs] = useState<any[]>([]);
+  const [bugIncludeScreenshot, setBugIncludeScreenshot] = useState(true);
+  const [bugIncludeLogs, setBugIncludeLogs] = useState(true);
+  const [bugLogsExpanded, setBugLogsExpanded] = useState(false);
+  const [bugCapturing, setBugCapturing] = useState(false);
   
   // Collapsible sections for Property form
   const [expandedSections, setExpandedSections] = useState({
@@ -441,6 +453,48 @@ export default function GlobalDrawer() {
       setIsVisible(false);
     }
   }, [drawerOpen]);
+
+  // Capture screenshot + console logs when BUG_REPORT drawer opens
+  useEffect(() => {
+    if (drawerOpen && drawerType === 'BUG_REPORT') {
+      setBugCapturing(true);
+      setBugScreenshot(null);
+      setBugConsoleLogs([]);
+      setBugIncludeScreenshot(true);
+      setBugIncludeLogs(true);
+      setBugLogsExpanded(false);
+
+      // Capture console logs
+      import('@/lib/consoleCapture').then(({ getConsoleLogs }) => {
+        setBugConsoleLogs(getConsoleLogs());
+      });
+
+      // Capture screenshot (with small delay so drawer doesn't appear in it)
+      const timer = setTimeout(async () => {
+        try {
+          const html2canvas = (await import('html2canvas')).default;
+          const mainContent = document.querySelector('main') || document.body;
+          const canvas = await html2canvas(mainContent as HTMLElement, {
+            useCORS: true,
+            allowTaint: true,
+            scale: 0.75, // Lower res for smaller payload
+            logging: false,
+            ignoreElements: (el) => {
+              // Ignore the drawer itself and overlays
+              return el.getAttribute('data-drawer') === 'true' || el.classList.contains('fixed');
+            },
+          });
+          setBugScreenshot(canvas.toDataURL('image/png', 0.7));
+        } catch (err) {
+          console.error('Screenshot capture failed:', err);
+        } finally {
+          setBugCapturing(false);
+        }
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [drawerOpen, drawerType]);
 
   // Animated close function
   const handleAnimatedClose = () => {
@@ -545,11 +599,44 @@ export default function GlobalDrawer() {
 
   if (!drawerOpen) return null;
 
+  const handleSubmitBug = async () => {
+    if (!bugTitle.trim() || !bugDescription.trim()) return;
+    setBugSubmitting(true);
+    try {
+      const { fetchWithAuth, getApiUrl } = await import('@/lib/api');
+      await fetchWithAuth(`${getApiUrl()}/bug-reports`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: bugTitle.trim(),
+          description: bugDescription.trim(),
+          page: typeof window !== 'undefined' ? window.location.pathname : null,
+          screenshot: bugIncludeScreenshot ? bugScreenshot : null,
+          consoleLogs: bugIncludeLogs && bugConsoleLogs.length > 0 ? JSON.stringify(bugConsoleLogs) : null,
+        }),
+      });
+      setBugSuccess(true);
+      setBugTitle('');
+      setBugDescription('');
+      setBugScreenshot(null);
+      setBugConsoleLogs([]);
+      setTimeout(() => {
+        setBugSuccess(false);
+        handleAnimatedClose();
+      }, 2000);
+    } catch (err) {
+      console.error('Bug report error:', err);
+    } finally {
+      setBugSubmitting(false);
+    }
+  };
+
   const getDrawerTitle = () => {
     switch (drawerType) {
       case 'LEAD': return 'Neuen Lead erfassen';
       case 'PROPERTY': return 'Neues Objekt anlegen';
       case 'EMAIL': return 'E-Mail verfassen';
+      case 'BUG_REPORT': return 'Bug melden';
       default: return '';
     }
   };
@@ -559,6 +646,7 @@ export default function GlobalDrawer() {
       case 'LEAD': return 'bg-gray-800';
       case 'PROPERTY': return 'bg-gray-800';
       case 'EMAIL': return 'bg-gray-800';
+      case 'BUG_REPORT': return 'bg-red-700';
       default: return 'bg-gray-500';
     }
   };
@@ -1220,6 +1308,150 @@ export default function GlobalDrawer() {
                   {loading ? 'Speichern...' : 'Objekt anlegen'}
                 </button>
               </div>
+            </div>
+          )}
+
+          {drawerType === 'BUG_REPORT' && (
+            <div className="space-y-5">
+              {bugSuccess ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mb-4">
+                    <svg className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Vielen Dank!</h3>
+                  <p className="text-sm text-gray-500">Dein Bug-Report wurde erfolgreich gesendet.</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Beschreibe den Fehler so genau wie möglich. Die aktuelle Seite wird automatisch mitgesendet.
+                  </p>
+                  <div>
+                    <label className={labelClass}>Titel *</label>
+                    <input
+                      type="text"
+                      value={bugTitle}
+                      onChange={(e) => setBugTitle(e.target.value)}
+                      className={inputClass}
+                      placeholder="Kurze Zusammenfassung des Fehlers..."
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Beschreibung *</label>
+                    <textarea
+                      rows={4}
+                      value={bugDescription}
+                      onChange={(e) => setBugDescription(e.target.value)}
+                      className={textareaClass}
+                      placeholder="Was ist passiert? Was hast du erwartet? Welche Schritte führen zum Fehler?"
+                    />
+                  </div>
+
+                  {/* Screenshot Toggle + Preview */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setBugIncludeScreenshot(!bugIncludeScreenshot)}
+                      className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Camera className="w-3.5 h-3.5 text-gray-500" />
+                        <span className="text-xs font-medium text-gray-700">Screenshot mitsenden</span>
+                      </div>
+                      <div className={`w-8 h-[18px] rounded-full transition-colors relative ${bugIncludeScreenshot ? 'bg-red-500' : 'bg-gray-300'}`}>
+                        <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow transition-transform ${bugIncludeScreenshot ? 'translate-x-[16px]' : 'translate-x-[2px]'}`} />
+                      </div>
+                    </button>
+                    {bugIncludeScreenshot && (
+                      <div className="p-3 border-t border-gray-100">
+                        {bugCapturing ? (
+                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                            <div className="w-3 h-3 border border-gray-300 border-t-gray-500 rounded-full animate-spin" />
+                            Screenshot wird erstellt...
+                          </div>
+                        ) : bugScreenshot ? (
+                          <img
+                            src={bugScreenshot}
+                            alt="Screenshot"
+                            className="w-full rounded border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => window.open(bugScreenshot!, '_blank')}
+                            title="Klicken zum Vergrößern"
+                          />
+                        ) : (
+                          <p className="text-xs text-gray-400">Screenshot konnte nicht erstellt werden.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Console Logs Toggle + Preview */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setBugIncludeLogs(!bugIncludeLogs)}
+                      className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Terminal className="w-3.5 h-3.5 text-gray-500" />
+                        <span className="text-xs font-medium text-gray-700">Console-Logs mitsenden</span>
+                        {bugConsoleLogs.length > 0 && (
+                          <span className="text-[10px] text-gray-400">({bugConsoleLogs.length})</span>
+                        )}
+                      </div>
+                      <div className={`w-8 h-[18px] rounded-full transition-colors relative ${bugIncludeLogs ? 'bg-red-500' : 'bg-gray-300'}`}>
+                        <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow transition-transform ${bugIncludeLogs ? 'translate-x-[16px]' : 'translate-x-[2px]'}`} />
+                      </div>
+                    </button>
+                    {bugIncludeLogs && bugConsoleLogs.length > 0 && (
+                      <div className="border-t border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => setBugLogsExpanded(!bugLogsExpanded)}
+                          className="w-full px-3 py-1.5 text-[10px] text-gray-400 hover:text-gray-600 text-left"
+                        >
+                          {bugLogsExpanded ? '▾ Logs ausblenden' : '▸ Logs anzeigen'}
+                        </button>
+                        {bugLogsExpanded && (
+                          <div className="max-h-40 overflow-y-auto px-3 pb-2 space-y-0.5">
+                            {bugConsoleLogs.map((log, i) => (
+                              <div key={i} className={`text-[10px] font-mono leading-tight truncate ${
+                                log.level === 'error' ? 'text-red-600' : log.level === 'warn' ? 'text-amber-600' : 'text-gray-500'
+                              }`}>
+                                <span className="text-gray-300 mr-1">{new Date(log.timestamp).toLocaleTimeString('de-DE')}</span>
+                                <span className={`mr-1 font-semibold ${
+                                  log.level === 'error' ? 'text-red-500' : log.level === 'warn' ? 'text-amber-500' : 'text-gray-400'
+                                }`}>[{log.level}]</span>
+                                {log.message}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {bugIncludeLogs && bugConsoleLogs.length === 0 && (
+                      <div className="p-3 border-t border-gray-100">
+                        <p className="text-xs text-gray-400">Keine Console-Logs vorhanden.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
+                    <button
+                      onClick={handleAnimatedClose}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      onClick={handleSubmitBug}
+                      disabled={bugSubmitting || !bugTitle.trim() || !bugDescription.trim()}
+                      className="px-6 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                    >
+                      {bugSubmitting ? 'Senden...' : 'Bug melden'}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

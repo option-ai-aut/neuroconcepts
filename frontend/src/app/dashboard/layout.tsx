@@ -104,7 +104,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
           aria-label="Jarvis KI-Chat öffnen"
         >
-          <Image src="/logo-icon-only.png" alt="Jarvis" width={52} height={52} className="shadow-lg rounded-2xl" />
+          <Image src="/logo-icon-only.png" alt="Jarvis" width={52} height={52} />
         </button>
       )}
 

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useCallback, useRef } from 'react';
 
-type DrawerType = 'LEAD' | 'PROPERTY' | 'EMAIL' | 'EXPOSE_EDITOR' | null;
+type DrawerType = 'LEAD' | 'PROPERTY' | 'EMAIL' | 'EXPOSE_EDITOR' | 'BUG_REPORT' | null;
 
 // Expose Editor Context - shared between Editor and AI Chat
 interface ExposeEditorContext {
