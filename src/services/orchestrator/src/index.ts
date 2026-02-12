@@ -356,13 +356,30 @@ async function uploadToS3(buffer: Buffer, filename: string, contentType: string,
   return `/uploads/${folder}/${filename}`;
 }
 
-// Serve uploaded files (local dev fallback only)
+// Serve uploaded files
 if (!isLambda) {
+  // Local dev: serve from disk
   const localUploadDir = path.join(__dirname, '../uploads');
   if (!fs.existsSync(localUploadDir)) {
     fs.mkdirSync(localUploadDir, { recursive: true });
   }
   app.use('/uploads', express.static(localUploadDir));
+} else if (MEDIA_BUCKET) {
+  // Lambda: proxy /uploads/* to S3 (for legacy /uploads/ URLs in DB)
+  app.get('/uploads/*', async (req, res) => {
+    try {
+      const key = req.path.replace(/^\/uploads\//, '');
+      const obj = await s3Client.getObject({ Bucket: MEDIA_BUCKET, Key: key }).promise();
+      res.set('Content-Type', obj.ContentType || 'image/jpeg');
+      res.set('Cache-Control', 'public, max-age=86400');
+      res.send(obj.Body);
+    } catch {
+      // Return 1x1 transparent PNG for missing files
+      const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAAlwSFlzAAAWJQAAFiUBSVIk8AAAAA0lEQVQI12P4z8BQDwAEgAF/QualzQAAAABJRU5ErkJggg==', 'base64');
+      res.set('Content-Type', 'image/png');
+      res.status(404).send(pixel);
+    }
+  });
 }
 
 // --- Auth & User Management ---
