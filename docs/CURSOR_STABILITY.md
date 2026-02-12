@@ -67,7 +67,7 @@ grep -o 'max-old-space-size=8192.*experimental-network-inspection' "$WORKBENCH" 
 ```json
 {
     "disable-hardware-acceleration": true,
-    "js-flags": "--max-old-space-size=2048 --optimize-for-size --gc-interval=100",
+    "js-flags": "--max-old-space-size=4096",
     "disable-gpu-compositing": true
 }
 ```
@@ -75,12 +75,10 @@ grep -o 'max-old-space-size=8192.*experimental-network-inspection' "$WORKBENCH" 
 | Flag | Betrifft | Beschreibung |
 |------|----------|-------------|
 | `disable-hardware-acceleration` | Electron | Verhindert GPU-bezogene Crashes |
-| `max-old-space-size=2048` | **NUR Renderer** | Begrenzt Renderer V8 Heap auf 2 GB |
-| `optimize-for-size` | **NUR Renderer** | V8 optimiert für weniger Speicherverbrauch |
-| `gc-interval=100` | **NUR Renderer** | GC läuft häufiger |
+| `max-old-space-size=4096` | **NUR Renderer** | Renderer V8 Heap auf 4 GB |
 | `disable-gpu-compositing` | Electron | Deaktiviert GPU-Compositing |
 
-> **Wichtig:** `argv.json js-flags` betreffen NUR den Electron-Prozess (Renderer). Extension Host Node-Prozesse werden davon NICHT beeinflusst! Dafür braucht man `NODE_OPTIONS`.
+> **Wichtig:** `--optimize-for-size` und `--gc-interval=100` wurden entfernt — sie verursachten Renderer-Instabilität (Code 5 Crashes). `argv.json js-flags` betreffen NUR den Electron-Renderer, NICHT Extension Host Prozesse. Die Extension Host Memory wird durch den Node Binary Wrapper und den execArgv Patch gesteuert.
 
 ### 3. Cursor settings.json (Memory-Reduktion)
 
