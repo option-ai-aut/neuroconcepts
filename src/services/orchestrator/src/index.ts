@@ -328,8 +328,22 @@ const upload = multer({
   }
 });
 
-// S3 helper: upload buffer to S3 and return public URL
+// S3 helpers
 const s3Client = new AWS.S3();
+
+// Extract S3 object key from any S3 URL format (with or without region)
+function extractS3Key(url: string): string | null {
+  // Matches: bucket.s3.amazonaws.com/key OR bucket.s3.REGION.amazonaws.com/key
+  const match = url.match(/\.s3(?:\.[a-z0-9-]+)?\.amazonaws\.com\/(.+)$/);
+  return match ? match[1] : null;
+}
+
+// Check if a URL is an S3 URL
+function isS3Url(url: string): boolean {
+  return /\.s3(?:\.[a-z0-9-]+)?\.amazonaws\.com\//.test(url);
+}
+
+// S3 helper: upload buffer to S3 and return public URL
 async function uploadToS3(buffer: Buffer, filename: string, contentType: string, folder: string): Promise<string> {
   const key = `${folder}/${filename}`;
   
@@ -1612,10 +1626,10 @@ app.delete('/properties/:id/images', authMiddleware, async (req, res) => {
     });
 
     // Delete file from S3 or disk
-    if (imageUrl.includes('.s3.amazonaws.com/') && MEDIA_BUCKET) {
+    if (isS3Url(imageUrl) && MEDIA_BUCKET) {
       try {
-        const key = imageUrl.split('.s3.amazonaws.com/')[1];
-        await s3Client.deleteObject({ Bucket: MEDIA_BUCKET, Key: key }).promise();
+        const key = extractS3Key(imageUrl);
+        if (key) await s3Client.deleteObject({ Bucket: MEDIA_BUCKET, Key: key }).promise();
       } catch (e) {
         console.error('S3 delete error:', e);
       }
@@ -1719,10 +1733,10 @@ app.delete('/properties/:id/documents', authMiddleware, async (req, res) => {
     });
 
     // Delete file from S3 or disk
-    if (docToDelete.url.includes('.s3.amazonaws.com/') && MEDIA_BUCKET) {
+    if (isS3Url(docToDelete.url) && MEDIA_BUCKET) {
       try {
-        const key = docToDelete.url.split('.s3.amazonaws.com/')[1];
-        await s3Client.deleteObject({ Bucket: MEDIA_BUCKET, Key: key }).promise();
+        const key = extractS3Key(docToDelete.url);
+        if (key) await s3Client.deleteObject({ Bucket: MEDIA_BUCKET, Key: key }).promise();
       } catch (e) { console.error('S3 delete error:', e); }
     } else if (docToDelete.url.startsWith('/uploads/')) {
       const filePath = path.join(__dirname, '..', docToDelete.url);
@@ -1810,10 +1824,10 @@ app.delete('/leads/:id/documents', authMiddleware, async (req, res) => {
     });
 
     // Delete file from S3 or disk
-    if (docToDelete.url.includes('.s3.amazonaws.com/') && MEDIA_BUCKET) {
+    if (isS3Url(docToDelete.url) && MEDIA_BUCKET) {
       try {
-        const key = docToDelete.url.split('.s3.amazonaws.com/')[1];
-        await s3Client.deleteObject({ Bucket: MEDIA_BUCKET, Key: key }).promise();
+        const key = extractS3Key(docToDelete.url);
+        if (key) await s3Client.deleteObject({ Bucket: MEDIA_BUCKET, Key: key }).promise();
       } catch (e) { console.error('S3 delete error:', e); }
     } else if (docToDelete.url.startsWith('/uploads/')) {
       const filePath = path.join(__dirname, '..', docToDelete.url);

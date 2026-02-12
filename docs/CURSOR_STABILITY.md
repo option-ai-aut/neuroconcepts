@@ -14,52 +14,50 @@ Cursor (Electron-basiert) stürzt wiederholt ab mit `Code 5` (renderer process c
 
 ## Lösung (Stand: Februar 2026, Cursor 2.4.31)
 
-### 1. NODE_OPTIONS für Extension Host (KRITISCH!)
+### 1. Node Binary Wrapper + Extension Host Patch (KRITISCH!)
 
-Die Extension Host Child-Prozesse (Pfad: `Contents/Resources/app/resources/helpers/node`) erben KEIN `--max-old-space-size` aus `argv.json`. Sie brauchen die Umgebungsvariable `NODE_OPTIONS`.
+> **`NODE_OPTIONS` funktioniert NICHT!** Electron strippt die Variable aus Child-Prozessen. Die einzige zuverlässige Lösung sind direkte Patches im App-Bundle.
 
-**Drei Stellen, um sicherzustellen, dass es immer gesetzt ist:**
+#### a) Node Binary Wrapper (für standalone node-Prozesse)
 
-#### a) `~/.zshenv` (wird von Cursor's `getShellEnv()` geladen)
-
-```bash
-# Cursor Extension Host: prevent V8 OOM crashes in child node processes
-export NODE_OPTIONS="--max-old-space-size=4096"
-```
-
-#### b) `launchctl setenv` (für Dock/Spotlight-gestartete Apps)
+Die Node-Binary bei `Contents/Resources/app/resources/helpers/node` wird durch einen Wrapper ersetzt:
 
 ```bash
-launchctl setenv NODE_OPTIONS "--max-old-space-size=4096"
+# Original sichern
+cp "/Applications/Cursor.app/Contents/Resources/app/resources/helpers/node" \
+   "/Applications/Cursor.app/Contents/Resources/app/resources/helpers/node.real"
+
+# Wrapper erstellen
+cat > "/Applications/Cursor.app/Contents/Resources/app/resources/helpers/node" << 'WRAPPER'
+#!/bin/sh
+exec "$(dirname "$0")/node.real" --max-old-space-size=8192 "$@"
+WRAPPER
+
+chmod +x "/Applications/Cursor.app/Contents/Resources/app/resources/helpers/node"
 ```
 
-#### c) Launch Agent `~/Library/LaunchAgents/com.cursor.env.plist`
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.cursor.env</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/bin/sh</string>
-        <string>-c</string>
-        <string>launchctl setenv OTEL_SDK_DISABLED true; launchctl setenv OTEL_TRACES_EXPORTER none; launchctl setenv OTEL_METRICS_EXPORTER none; launchctl setenv OTEL_LOGS_EXPORTER none; launchctl setenv OTEL_EXPORTER_OTLP_ENDPOINT http://localhost:1; launchctl setenv NODE_OPTIONS --max-old-space-size=4096</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-</dict>
-</plist>
-```
-
-Laden/Neuladen:
+**Verifizieren:**
 
 ```bash
-launchctl unload ~/Library/LaunchAgents/com.cursor.env.plist 2>/dev/null
-launchctl load ~/Library/LaunchAgents/com.cursor.env.plist
+"/Applications/Cursor.app/Contents/Resources/app/resources/helpers/node" -e \
+  "console.log('Heap:', Math.round(require('v8').getHeapStatistics().heap_size_limit/1024/1024), 'MB')"
+# Erwartete Ausgabe: Heap: 8240 MB
+```
+
+#### b) Extension Host execArgv Patch (für Electron Helper Prozesse)
+
+In `workbench.desktop.main.js` wird `--max-old-space-size=8192` zu den Extension Host execArgv hinzugefügt:
+
+```bash
+WORKBENCH="/Applications/Cursor.app/Contents/Resources/app/out/vs/workbench/workbench.desktop.main.js"
+
+sed -i '' 's/s.execArgv.unshift("--dns-result-order=ipv4first","--experimental-network-inspection")/s.execArgv.unshift("--max-old-space-size=8192","--dns-result-order=ipv4first","--experimental-network-inspection")/' "$WORKBENCH"
+```
+
+**Verifizieren:**
+
+```bash
+grep -o 'max-old-space-size=8192.*experimental-network-inspection' "$WORKBENCH" | head -1
 ```
 
 ### 2. Cursor argv.json (Renderer Memory-Begrenzung)
