@@ -151,24 +151,27 @@ const A4_PADDING_PX = 40; // Page margins
 const A4_CONTENT_HEIGHT = A4_HEIGHT_PX - (A4_PADDING_PX * 2);
 
 // Estimated block heights in pixels (for page break calculation)
+// Realistic block heights based on actual rendered sizes (in px)
+// Lower estimates allow blocks to fit better on pages before overflowing
 const BLOCK_HEIGHTS: Record<string, number> = {
-  hero: 280,
-  stats: 100,
-  text: 150,
-  gallery: 220,
-  features: 180,
-  highlights: 180,
-  location: 140,
-  contact: 160,
-  priceTable: 180,
-  energyCertificate: 140,
-  cta: 140,
-  quote: 100,
-  floorplan: 300,
-  twoColumn: 180,
-  video: 120,
-  virtualTour: 120,
-  pageBreak: 0, // Special block type for manual page breaks
+  hero: 256,       // h-64 = 256px
+  stats: 80,       // compact horizontal stats
+  text: 110,       // paragraph with title
+  gallery: 190,    // 2x2 grid of images
+  features: 140,   // list of features
+  highlights: 140,  
+  location: 100,   // address + short description
+  contact: 120,    // contact card
+  priceTable: 140, // price rows
+  energyCertificate: 110,
+  cta: 110,        // call-to-action button
+  quote: 80,       // short quote
+  floorplan: 240,  // floorplan image
+  twoColumn: 140,  // two columns
+  video: 90,       // video embed placeholder
+  virtualTour: 90, // tour embed placeholder
+  leadInfo: 120,   // lead info card
+  pageBreak: 0,    // Special block type for manual page breaks
 };
 
 // ============================================
@@ -297,11 +300,15 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
   const colorManagerRef = useRef<HTMLDivElement>(null);
   const colorButtonRef = useRef<HTMLButtonElement>(null);
   const [colorPopupPos, setColorPopupPos] = useState({ top: 0, left: 0 });
+  // Drag & Drop state — supports both reordering existing blocks and inserting new ones from sidebar
   const [dragState, setDragState] = useState<{
     isDragging: boolean;
-    dragIndex: number | null;
-    hoverIndex: number | null;
-  }>({ isDragging: false, dragIndex: null, hoverIndex: null });
+    dragIndex: number | null;   // Index of existing block being dragged (null if new block from sidebar)
+    hoverIndex: number | null;  // Where the block would be inserted
+    newBlockType: string | null; // Block type being dragged from sidebar (null if reordering)
+  }>({ isDragging: false, dragIndex: null, hoverIndex: null, newBlockType: null });
+  // Live preview blocks during drag (reordered in real-time)
+  const [dragPreviewBlocks, setDragPreviewBlocks] = useState<ExposeBlock[] | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -450,20 +457,6 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     }
   }, [showPropertySelector]);
 
-  // Global mouse up handler to end dragging
-  useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      if (dragState.isDragging) {
-        handleDragEnd();
-      }
-    };
-
-    if (dragState.isDragging) {
-      document.addEventListener('mouseup', handleGlobalMouseUp);
-      return () => document.removeEventListener('mouseup', handleGlobalMouseUp);
-    }
-  }, [dragState.isDragging]);
-
   // Set active context for AI Chat to know what's open
   useEffect(() => {
     const context = {
@@ -537,7 +530,9 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     return pages;
   }, []);
 
-  const pages = calculatePages(currentBlocks);
+  // Use drag preview blocks during drag for live reordering, otherwise current blocks
+  const displayBlocks = dragPreviewBlocks || currentBlocks;
+  const pages = calculatePages(displayBlocks);
 
   // ============================================
   // DATA LOADING
@@ -742,7 +737,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     }
   }, [isTemplate, template, expose]);
 
-  const addBlock = (type: string) => {
+  const addBlock = (type: string, atIndex?: number) => {
     const blockDef = BLOCK_TYPES.find(b => b.type === type);
     if (!blockDef) return;
     
@@ -752,7 +747,8 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
       ...blockDef.defaultData,
     };
     
-    const insertIndex = selectedBlockIndex !== null ? selectedBlockIndex + 1 : currentBlocks.length;
+    // Always append at the end (unless atIndex is specified, e.g. from drag & drop)
+    const insertIndex = atIndex ?? currentBlocks.length;
     const newBlocks = [...currentBlocks];
     newBlocks.splice(insertIndex, 0, newBlock);
     updateBlocks(newBlocks);
@@ -820,59 +816,126 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
   // RENDER BLOCK PREVIEW
   // ============================================
 
-  // Handle drag start
-  const handleDragStart = (index: number) => {
-    setDragState({ isDragging: true, dragIndex: index, hoverIndex: null });
+  // ============================================
+  // DRAG & DROP HANDLERS (HTML5 DnD with live preview)
+  // ============================================
+
+  // Drag start for existing blocks
+  const handleBlockDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', `block:${index}`);
+    // Small delay so the drag image captures current state
+    setTimeout(() => {
+      setDragState({ isDragging: true, dragIndex: index, hoverIndex: index, newBlockType: null });
+      setDragPreviewBlocks([...currentBlocks]);
+    }, 0);
   };
 
-  // Handle drag over
-  const handleDragHover = (index: number) => {
-    if (dragState.dragIndex !== null && dragState.dragIndex !== index) {
-      setDragState(prev => ({ ...prev, hoverIndex: index }));
+  // Drag start for new blocks from sidebar
+  const handleNewBlockDragStart = (e: React.DragEvent, blockType: string) => {
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('text/plain', `new:${blockType}`);
+    const blockDef = BLOCK_TYPES.find(b => b.type === blockType);
+    if (!blockDef) return;
+    const tempBlock: ExposeBlock = {
+      id: `temp-${Date.now()}`,
+      type: blockType,
+      ...blockDef.defaultData,
+    };
+    setTimeout(() => {
+      setDragState({ isDragging: true, dragIndex: null, hoverIndex: currentBlocks.length, newBlockType: blockType });
+      setDragPreviewBlocks([...currentBlocks, tempBlock]);
+    }, 0);
+  };
+
+  // Calculate insert index from mouse position relative to a block
+  const handleBlockDragOver = (e: React.DragEvent, globalIndex: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = dragState.newBlockType ? 'copy' : 'move';
+    
+    if (!dragState.isDragging || !dragPreviewBlocks) return;
+
+    // Determine if we're in the top or bottom half of the target
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const insertBefore = e.clientY < midY;
+    
+    // Calculate the target index in the ORIGINAL block array
+    const targetIndex = insertBefore ? globalIndex : globalIndex + 1;
+    
+    if (targetIndex === dragState.hoverIndex) return; // No change
+
+    // Rebuild the preview blocks
+    if (dragState.newBlockType) {
+      // Inserting a new block from sidebar
+      const blocksWithoutTemp = currentBlocks.filter(b => !b.id.startsWith('temp-'));
+      const blockDef = BLOCK_TYPES.find(b => b.type === dragState.newBlockType!);
+      if (!blockDef) return;
+      const tempBlock: ExposeBlock = {
+        id: `temp-${Date.now()}`,
+        type: dragState.newBlockType!,
+        ...blockDef.defaultData,
+      };
+      const newPreview = [...blocksWithoutTemp];
+      const clampedTarget = Math.min(targetIndex, newPreview.length);
+      newPreview.splice(clampedTarget, 0, tempBlock);
+      setDragPreviewBlocks(newPreview);
+      setDragState(prev => ({ ...prev, hoverIndex: clampedTarget }));
+    } else if (dragState.dragIndex !== null) {
+      // Reordering an existing block
+      const newPreview = [...currentBlocks];
+      const [removed] = newPreview.splice(dragState.dragIndex, 1);
+      const adjustedTarget = targetIndex > dragState.dragIndex ? targetIndex - 1 : targetIndex;
+      const clampedTarget = Math.max(0, Math.min(adjustedTarget, newPreview.length));
+      newPreview.splice(clampedTarget, 0, removed);
+      setDragPreviewBlocks(newPreview);
+      setDragState(prev => ({ ...prev, hoverIndex: clampedTarget }));
     }
   };
 
-  // Handle drop
-  const handleDrop = (targetIndex: number) => {
-    if (dragState.dragIndex !== null && dragState.dragIndex !== targetIndex) {
-      const newBlocks = [...currentBlocks];
-      const [removed] = newBlocks.splice(dragState.dragIndex, 1);
-      const adjustedTarget = targetIndex > dragState.dragIndex ? targetIndex : targetIndex;
-      newBlocks.splice(adjustedTarget, 0, removed);
-      updateBlocks(newBlocks);
-      setSelectedBlockIndex(adjustedTarget);
+  // Handle drop on the preview area
+  const handlePreviewDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!dragPreviewBlocks) return;
+
+    if (dragState.newBlockType) {
+      // Finalize new block insertion — replace temp ID with permanent one
+      const finalBlocks = dragPreviewBlocks.map(b => 
+        b.id.startsWith('temp-') ? { ...b, id: `block-${Date.now()}` } : b
+      );
+      updateBlocks(finalBlocks);
+      const newIndex = finalBlocks.findIndex(b => b.id.startsWith('block-') && !currentBlocks.find(cb => cb.id === b.id));
+      setSelectedBlockIndex(newIndex >= 0 ? newIndex : finalBlocks.length - 1);
+    } else {
+      // Finalize block reorder
+      updateBlocks(dragPreviewBlocks);
+      if (dragState.hoverIndex !== null) {
+        setSelectedBlockIndex(dragState.hoverIndex);
+      }
     }
-    setDragState({ isDragging: false, dragIndex: null, hoverIndex: null });
+
+    setDragState({ isDragging: false, dragIndex: null, hoverIndex: null, newBlockType: null });
+    setDragPreviewBlocks(null);
   };
 
-  // Handle drag end (cancel)
+  // Handle drag end (cancel or drop outside)
   const handleDragEnd = () => {
-    setDragState({ isDragging: false, dragIndex: null, hoverIndex: null });
+    setDragState({ isDragging: false, dragIndex: null, hoverIndex: null, newBlockType: null });
+    setDragPreviewBlocks(null);
+  };
+
+  // Handle drag over on empty page / preview container
+  const handlePreviewDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = dragState.newBlockType ? 'copy' : 'move';
   };
 
   const renderBlockPreview = (block: ExposeBlock, index: number, isFirstOnPage: boolean = false, isLastOnPage: boolean = false) => {
     const isSelected = selectedBlockIndex === index;
-    const isDragging = dragState.dragIndex === index;
-    const isHoverTarget = dragState.hoverIndex === index && dragState.dragIndex !== index;
+    const isBeingDragged = dragState.isDragging && dragState.dragIndex !== null && 
+      currentBlocks[dragState.dragIndex]?.id === block.id;
+    const isTempBlock = block.id.startsWith('temp-');
     const blockDef = BLOCK_TYPES.find(b => b.type === block.type);
-
-    // Calculate visual offset for smooth reordering preview
-    let translateY = '';
-    if (dragState.isDragging && dragState.dragIndex !== null && dragState.hoverIndex !== null) {
-      if (index === dragState.dragIndex) {
-        // Don't move the dragged item visually here
-      } else if (dragState.dragIndex < dragState.hoverIndex) {
-        // Dragging down: items between drag and hover move up
-        if (index > dragState.dragIndex && index <= dragState.hoverIndex) {
-          translateY = '-translate-y-full';
-        }
-      } else {
-        // Dragging up: items between hover and drag move down
-        if (index >= dragState.hoverIndex && index < dragState.dragIndex) {
-          translateY = 'translate-y-full';
-        }
-      }
-    }
 
     // Determine border radius based on position on page
     const roundedClasses = `${isFirstOnPage ? 'rounded-t-lg' : ''} ${isLastOnPage ? 'rounded-b-lg' : ''}`;
@@ -880,71 +943,60 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     return (
       <div
         key={block.id}
-        className={`relative transition-all duration-200 ease-out overflow-hidden ${roundedClasses} ${
-          isDragging 
-            ? 'z-50 shadow-2xl scale-[1.02] opacity-90' 
-            : 'z-0'
+        draggable={!isTempBlock}
+        onDragStart={(e) => {
+          if (isTempBlock) return;
+          // Find the real index in currentBlocks for this block
+          const realIndex = currentBlocks.findIndex(b => b.id === block.id);
+          if (realIndex >= 0) handleBlockDragStart(e, realIndex);
+        }}
+        onDragOver={(e) => handleBlockDragOver(e, index)}
+        onDragEnd={handleDragEnd}
+        className={`relative transition-all duration-150 ease-out overflow-hidden ${roundedClasses} ${
+          isBeingDragged 
+            ? 'opacity-40' 
+            : isTempBlock
+              ? 'opacity-50 border-2 border-dashed border-gray-400'
+              : 'opacity-100'
         }`}
         style={{
-          cursor: isDragging ? 'grabbing' : 'default',
+          cursor: isBeingDragged ? 'grabbing' : 'default',
         }}
         onClick={(e) => { 
-          if (!dragState.isDragging) {
+          if (!dragState.isDragging && !isTempBlock) {
             e.stopPropagation(); 
-            setSelectedBlockIndex(index); 
-          }
-        }}
-        onMouseEnter={() => {
-          if (dragState.isDragging) {
-            handleDragHover(index);
-          }
-        }}
-        onMouseUp={() => {
-          if (dragState.isDragging && dragState.dragIndex !== index) {
-            handleDrop(index);
+            // Find the real index in currentBlocks
+            const realIndex = currentBlocks.findIndex(b => b.id === block.id);
+            setSelectedBlockIndex(realIndex >= 0 ? realIndex : null); 
           }
         }}
       >
         {/* Selection indicator - inner border overlay */}
-        {isSelected && !isDragging && (
+        {isSelected && !dragState.isDragging && !isTempBlock && (
           <div 
             className={`absolute inset-0 pointer-events-none z-20 border-2 border-gray-400 ${roundedClasses}`}
             style={{ boxShadow: 'inset 0 0 12px rgba(156,163,175,0.3)' }}
           />
         )}
 
-        {/* Drop indicator line */}
-        {isHoverTarget && (
-          <div className="absolute inset-x-0 -top-0.5 z-30 pointer-events-none">
-            <div className="h-1 bg-gray-800 rounded-full mx-2" />
-          </div>
-        )}
-
         {/* Block wrapper */}
         <div className="relative">
-          {/* Block Controls - only visible when selected */}
-          {!dragState.isDragging && isSelected && (
+          {/* Block Controls - only visible when selected and not dragging */}
+          {!dragState.isDragging && isSelected && !isTempBlock && (
             <div className="absolute -left-12 top-1/2 -translate-y-1/2 flex flex-col gap-1 animate-in fade-in slide-in-from-left-2 duration-200">
               <button
-                onClick={(e) => { e.stopPropagation(); moveBlock(index, 'up'); }}
-                disabled={index === 0}
+                onClick={(e) => { e.stopPropagation(); moveBlock(currentBlocks.findIndex(b => b.id === block.id), 'up'); }}
+                disabled={currentBlocks.findIndex(b => b.id === block.id) === 0}
                 className="p-1.5 bg-white rounded-md shadow hover:bg-gray-50 disabled:opacity-30 transition-colors"
               >
                 <ChevronUp className="w-3.5 h-3.5 text-gray-500" />
               </button>
-              <div 
-                className="p-1.5 bg-white rounded-md shadow cursor-grab hover:bg-gray-50 hover:shadow-md transition-all"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleDragStart(index);
-                }}
-              >
+              <div className="p-1.5 bg-white rounded-md shadow cursor-grab hover:bg-gray-50 hover:shadow-md transition-all">
                 <GripVertical className="w-3.5 h-3.5 text-gray-400" />
               </div>
               <button
-                onClick={(e) => { e.stopPropagation(); moveBlock(index, 'down'); }}
-                disabled={index === currentBlocks.length - 1}
+                onClick={(e) => { e.stopPropagation(); moveBlock(currentBlocks.findIndex(b => b.id === block.id), 'down'); }}
+                disabled={currentBlocks.findIndex(b => b.id === block.id) === currentBlocks.length - 1}
                 className="p-1.5 bg-white rounded-md shadow hover:bg-gray-50 disabled:opacity-30 transition-colors"
               >
                 <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
@@ -953,9 +1005,9 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
           )}
 
           {/* Delete button - only visible when selected */}
-          {!dragState.isDragging && isSelected && (
+          {!dragState.isDragging && isSelected && !isTempBlock && (
             <button
-              onClick={(e) => { e.stopPropagation(); deleteBlock(index); }}
+              onClick={(e) => { e.stopPropagation(); deleteBlock(currentBlocks.findIndex(b => b.id === block.id)); }}
               className="absolute right-2 top-2 p-1.5 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 z-10 animate-in fade-in zoom-in-50 duration-200"
             >
               <Trash2 className="w-3 h-3" />
@@ -973,6 +1025,31 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
   const pv = (value: string | undefined, fallback: string = ''): string => {
     if (!value) return fallback;
     return isTemplate ? replaceTemplateVariables(value) : value;
+  };
+
+  // Render value with styled variable chips (for templates without previewProperty)
+  const renderPv = (value: string | undefined, fallback: string = ''): React.ReactNode => {
+    if (!value) return fallback;
+    // If we have a previewProperty or it's not a template, just show the resolved text
+    if (!isTemplate || previewProperty) return pv(value, fallback);
+    
+    // Replace {{...}} patterns with styled chips
+    const parts = value.split(/(\{\{[^}]+\}\})/g);
+    if (parts.length === 1 && !parts[0].match(/^\{\{/)) return value || fallback;
+    
+    return parts.map((part, i) => {
+      if (part.match(/^\{\{[^}]+\}\}$/)) {
+        const field = TEMPLATE_FIELDS.find(f => f.variable === part);
+        const label = field?.label || part.replace(/[{}]/g, '');
+        return (
+          <span key={i} className="inline-flex items-center px-1.5 py-0.5 mx-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-medium border border-gray-200">
+            {field?.icon && <span className="mr-0.5 text-[9px]">{field.icon}</span>}
+            {label}
+          </span>
+        );
+      }
+      return part || null;
+    });
   };
 
   const renderBlockContent = (block: ExposeBlock) => {
@@ -1019,8 +1096,8 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
           <div className="py-6 px-4 flex justify-around" style={{ backgroundColor: blockBg || '#F9FAFB' }}>
             {stats.map((stat: any, i: number) => (
               <div key={i} className="text-center">
-                <div className={`text-2xl ${hCls}`} style={{ color: blockTitleColor || themeColors.primary }}>{pv(stat.value)}</div>
-                <div className={`text-sm ${bCls}`} style={{ color: blockTextColor || '#6B7280' }}>{pv(stat.label)}</div>
+                <div className={`text-2xl ${hCls}`} style={{ color: blockTitleColor || themeColors.primary }}>{renderPv(stat.value)}</div>
+                <div className={`text-sm ${bCls}`} style={{ color: blockTextColor || '#6B7280' }}>{renderPv(stat.label)}</div>
               </div>
             ))}
           </div>
@@ -1083,19 +1160,19 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
       case 'location':
         return (
           <div className="p-6" style={{ backgroundColor: blockBg || '#F9FAFB' }}>
-            <h3 className={`text-lg mb-2 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{pv(block.title, 'Lage')}</h3>
-            <p className={`mb-2 ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>{pv(block.address, '{{property.address}}')}</p>
-            {block.description && <p className={`text-sm ${bCls}`} style={{ color: blockTextColor || '#6B7280' }}>{pv(block.description)}</p>}
+            <h3 className={`text-lg mb-2 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{renderPv(block.title, 'Lage')}</h3>
+            <p className={`mb-2 ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>{renderPv(block.address, '{{property.address}}')}</p>
+            {block.description && <p className={`text-sm ${bCls}`} style={{ color: blockTextColor || '#6B7280' }}>{renderPv(block.description)}</p>}
           </div>
         );
 
       case 'contact':
         return (
           <div className="p-6" style={{ backgroundColor: blockBg || themeColors.primary }}>
-            <h3 className={`text-lg mb-3 ${hCls}`} style={{ color: blockTitleColor || '#FFFFFF' }}>{pv(block.title, 'Ihr Ansprechpartner')}</h3>
-            <p className={bCls} style={{ color: blockTextColor || '#FFFFFF' }}>{pv(block.name, '{{user.name}}')}</p>
-            <p className={bCls} style={{ color: blockTextColor || '#FFFFFF', opacity: 0.8 }}>{pv(block.email, '{{user.email}}')}</p>
-            {block.phone && <p className={bCls} style={{ color: blockTextColor || '#FFFFFF', opacity: 0.8 }}>{pv(block.phone)}</p>}
+            <h3 className={`text-lg mb-3 ${hCls}`} style={{ color: blockTitleColor || '#FFFFFF' }}>{renderPv(block.title, 'Ihr Ansprechpartner')}</h3>
+            <p className={bCls} style={{ color: blockTextColor || '#FFFFFF' }}>{renderPv(block.name, '{{user.name}}')}</p>
+            <p className={bCls} style={{ color: blockTextColor || '#FFFFFF', opacity: 0.8 }}>{renderPv(block.email, '{{user.email}}')}</p>
+            {block.phone && <p className={bCls} style={{ color: blockTextColor || '#FFFFFF', opacity: 0.8 }}>{renderPv(block.phone)}</p>}
           </div>
         );
 
@@ -1106,11 +1183,11 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               <p className={`text-sm mb-2 ${bCls}`} style={{ color: blockTextColor || '#6B7280' }}>Erstellt für</p>
             )}
             <h3 className={`text-lg mb-2 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>
-              {pv(block.leadName, '{{lead.name}}')}
+              {renderPv(block.leadName, '{{lead.name}}')}
             </h3>
             <div className={`space-y-1 text-sm ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>
-              <p>{pv(block.leadEmail, '{{lead.email}}')}</p>
-              {block.leadPhone && <p>{pv(block.leadPhone)}</p>}
+              <p>{renderPv(block.leadEmail, '{{lead.email}}')}</p>
+              {block.leadPhone && <p>{renderPv(block.leadPhone)}</p>}
             </div>
           </div>
         );
@@ -1123,12 +1200,12 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         ];
         return (
           <div className="p-6" style={{ backgroundColor: blockBg }}>
-            {block.title && <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{pv(block.title)}</h3>}
+            {block.title && <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{renderPv(block.title)}</h3>}
             <div className="space-y-2">
               {priceItems.map((item: any, i: number) => (
                 <div key={i} className="flex justify-between py-2 border-b border-gray-100">
-                  <span className={bCls} style={{ color: blockTextColor || '#4B5563' }}>{pv(item.label)}</span>
-                  <span className={hCls} style={{ color: blockTitleColor || undefined }}>{pv(item.value)}</span>
+                  <span className={bCls} style={{ color: blockTextColor || '#4B5563' }}>{renderPv(item.label)}</span>
+                  <span className={hCls} style={{ color: blockTitleColor || undefined }}>{renderPv(item.value)}</span>
                 </div>
               ))}
             </div>
@@ -2877,9 +2954,12 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                     {BLOCK_TYPES.filter(b => b.category === category).map((blockType) => (
                       <button
                         key={blockType.type}
+                        draggable
+                        onDragStart={(e) => handleNewBlockDragStart(e, blockType.type)}
+                        onDragEnd={handleDragEnd}
                         onClick={() => addBlock(blockType.type)}
-                        className="w-full flex items-center pl-1.5 pr-2 py-1 2xl:pl-2 2xl:pr-3 2xl:py-1.5 text-xs 2xl:text-sm text-gray-600 hover:bg-white hover:text-blue-600 hover:shadow-sm rounded-md transition-colors"
-                        title={blockType.label}
+                        className="w-full flex items-center pl-1.5 pr-2 py-1 2xl:pl-2 2xl:pr-3 2xl:py-1.5 text-xs 2xl:text-sm text-gray-600 hover:bg-white hover:text-blue-600 hover:shadow-sm rounded-md transition-colors cursor-grab active:cursor-grabbing"
+                        title={`${blockType.label} — Klicken zum Hinzufügen oder auf die Seite ziehen`}
                       >
                         <blockType.icon className="w-3.5 h-3.5 2xl:w-4 2xl:h-4 shrink-0" />
                         <span className={`ml-1.5 2xl:ml-2 whitespace-nowrap transition-opacity duration-300 ${
@@ -2899,6 +2979,8 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
           <div 
             className="flex-1 bg-gray-200 overflow-y-auto flex flex-col items-center py-8 px-4 gap-8"
             onClick={() => setSelectedBlockIndex(null)}
+            onDragOver={handlePreviewDragOver}
+            onDrop={handlePreviewDrop}
           >
             {pages.map((pageBlocks, pageIndex) => {
               // Calculate the global block index offset for this page
@@ -2999,8 +3081,8 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                         }}
                       >
                         {pageBlocks.map((block, blockIndexOnPage) => {
-                          // Find the actual global index of this block
-                          const globalIndex = currentBlocks.findIndex(b => b.id === block.id);
+                          // Find the actual global index in displayBlocks (which may be reordered during drag)
+                          const globalIndex = displayBlocks.findIndex(b => b.id === block.id);
                           const isFirstOnPage = blockIndexOnPage === 0;
                           const isLastOnPage = blockIndexOnPage === pageBlocks.length - 1;
                           return renderBlockPreview(block, globalIndex, isFirstOnPage, isLastOnPage);

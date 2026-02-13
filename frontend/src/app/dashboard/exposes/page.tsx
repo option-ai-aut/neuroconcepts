@@ -11,25 +11,25 @@ const A4_WIDTH_PX = 595;
 const A4_HEIGHT_PX = 842;
 const A4_PADDING_PX = 40;
 
-// Block heights for page calculation - MUST match ExposeEditor.tsx
+// Realistic block heights for page calculation - MUST match ExposeEditor.tsx
 const BLOCK_HEIGHTS: Record<string, number> = {
-  hero: 280,
-  stats: 100,
-  text: 150,
-  features: 180,
-  highlights: 180,
-  gallery: 300,
-  floorplan: 350,
-  video: 250,
-  virtualTour: 250,
-  priceTable: 200,
-  energyCertificate: 150,
-  location: 120,
-  contact: 140,
+  hero: 256,
+  stats: 80,
+  text: 110,
+  gallery: 190,
+  features: 140,
+  highlights: 140,
+  location: 100,
+  contact: 120,
+  priceTable: 140,
+  energyCertificate: 110,
+  cta: 110,
+  quote: 80,
+  floorplan: 240,
+  twoColumn: 140,
+  video: 90,
+  virtualTour: 90,
   leadInfo: 120,
-  cta: 150,
-  quote: 120,
-  twoColumn: 200,
   pageBreak: 0,
 };
 
