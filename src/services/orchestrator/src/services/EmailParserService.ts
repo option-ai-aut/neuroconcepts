@@ -1,8 +1,13 @@
 /**
- * EmailParserService - Uses Jarvis (AI) to parse portal emails
+ * EmailParserService - Uses Jarvis (AI) to classify & parse ALL incoming emails
  * 
- * Instead of maintaining complex regex patterns for each portal,
- * we let Jarvis analyze the email and extract lead data.
+ * Jarvis reads every email and decides:
+ * - LEAD_INQUIRY: Real lead/inquiry from a portal or direct → create lead
+ * - NEWSLETTER: Marketing/newsletter email → skip
+ * - INVOICE: Invoice/billing email → skip
+ * - NOTIFICATION: System notification (portal account, stats) → skip
+ * - SPAM: Spam/irrelevant → skip
+ * - OTHER: Unclassifiable → skip but log
  */
 
 import OpenAI from 'openai';
@@ -15,6 +20,8 @@ function getOpenAI(): OpenAI {
   }
   return _openai;
 }
+
+export type EmailClassification = 'LEAD_INQUIRY' | 'NEWSLETTER' | 'INVOICE' | 'NOTIFICATION' | 'SPAM' | 'OTHER';
 
 export interface ParsedLeadData {
   firstName?: string;
@@ -32,58 +39,83 @@ export interface PropertyReference {
 
 export interface EmailParseResult {
   success: boolean;
-  hasClickLink: boolean;  // Email requires clicking a link to see data
-  clickLinkUrl?: string;  // The URL to click if hasClickLink is true
-  portal: string;         // Detected portal name
+  classification: EmailClassification;
+  classificationReason: string;   // Why Jarvis classified it this way
+  hasClickLink: boolean;           // Email requires clicking a link to see data
+  clickLinkUrl?: string;           // The URL to click if hasClickLink is true
+  portal: string;                  // Detected portal name (or "Direct" / "Unknown")
   leadData: ParsedLeadData;
   propertyRef: PropertyReference | null;
-  rawMessage?: string;    // Original message from the lead
+  rawMessage?: string;             // Original message from the lead
   error?: string;
 }
 
-const PARSE_PROMPT = `Du bist ein Email-Parser für Immobilien-Portale im DACH-Raum (Deutschland, Österreich, Schweiz). Analysiere die folgende Email und extrahiere die Lead-Daten.
+const CLASSIFY_AND_PARSE_PROMPT = `Du bist ein Email-Klassifizierer und -Parser für eine Immobilienverwaltungs-Software. Du analysierst JEDE eingehende Email und entscheidest, ob es sich um eine echte Interessenten-Anfrage (Lead) handelt oder um etwas anderes.
 
-WICHTIG:
-1. Erkenne zuerst, ob die Email einen "Klick hier"-Link enthält, der geklickt werden muss, um die Daten zu sehen.
+## SCHRITT 1: KLASSIFIZIERUNG
+
+Klassifiziere die Email in eine der folgenden Kategorien:
+
+- **LEAD_INQUIRY**: Eine echte Anfrage eines Interessenten zu einem Immobilienobjekt. Der Absender möchte ein Objekt besichtigen, Informationen erhalten, oder meldet Interesse an.
+  Beispiele: Kontaktanfragen über Immobilienportale, direkte Anfragen per Email, Besichtigungsanfragen
+  
+- **NEWSLETTER**: Ein Newsletter, Marketing-Email, oder Werbe-Email.
+  Beispiele: Portal-Newsletter, Immobilienmarkt-Updates, Werbung von Portalen
+  
+- **INVOICE**: Eine Rechnung, Zahlungsaufforderung, Kontoauszug.
+  Beispiele: Portal-Rechnungen, Gebühren, Zahlungsbestätigungen
+  
+- **NOTIFICATION**: Eine System-Benachrichtigung die KEIN Lead ist.
+  Beispiele: Portal-Statistiken, Performance-Reports, Inserats-Ablauf-Warnungen, Account-Benachrichtigungen, Inserat-Bestätigungen
+  
+- **SPAM**: Offensichtlicher Spam, Phishing, oder irrelevante Werbung.
+
+- **OTHER**: Alles andere was in keine der obigen Kategorien passt.
+
+## SCHRITT 2: NUR BEI LEAD_INQUIRY - Lead-Daten extrahieren
+
+Wenn die Email eine LEAD_INQUIRY ist:
+
+1. Prüfe ob die Email einen "Klick hier"-Link enthält, der geklickt werden muss, um die Daten zu sehen.
    - Typische Phrasen: "Klicken Sie hier", "Anfrage ansehen", "Details anzeigen", "Zur Anfrage"
    - Wenn ja, setze hasClickLink auf true und extrahiere die URL wenn möglich.
 
 2. Wenn Daten direkt in der Email stehen, extrahiere:
    - firstName, lastName (aus dem Namen des Interessenten)
-   - email (Email-Adresse des Interessenten)
+   - email (Email-Adresse des Interessenten - NICHT die des Portals/Absenders!)
    - phone (Telefonnummer, falls vorhanden)
    - message (die Nachricht/Anfrage des Interessenten)
 
-3. Erkenne das Portal anhand von Absender-Domain oder Inhalt. Unterstützte Portale:
+3. Erkenne das Portal / die Quelle:
    DEUTSCHLAND:
-   - ImmobilienScout24 (immobilienscout24.de) - Absender: *@immobilienscout24.de
-   - Immowelt (immowelt.de) - Absender: *@immowelt.de
-   - Immonet (immonet.de) - Absender: *@immonet.de (gehört zu Immowelt)
-   - Kleinanzeigen (kleinanzeigen.de) - Absender: noreply-immobilien@mail.kleinanzeigen.de
-   - Kalaydo (kalaydo.de) - Absender: *@kalaydo.de
-   - Immozentral (immozentral.com) - Absender: *@immozentral.com
-   - Immopool (immopool.de) - Absender: *@immopool.de
-   - 1A Immobilien (1a-immobilienmarkt.de) - Absender: *@1a-immobilienmarkt.de
-   - IVD24 (ivd24immobilien.de) - Absender: *@ivd24immobilien.de, *@ivd24.de
-   - Neubau Kompass (neubaukompass.de) - Absender: *@neubaukompass.de
-   - SZ Immobilien (sueddeutsche.de) - Absender: *@sueddeutsche.de (Immobilien-Anfrage)
-   - FAZ Immobilien (faz.net) - Absender: *@faz.net (Immobilien-Anfrage)
-   - Welt Immobilien (welt.de) - Absender: *@welt.de (Immobilien-Anfrage)
+   - ImmobilienScout24 (immobilienscout24.de)
+   - Immowelt (immowelt.de)
+   - Immonet (immonet.de)
+   - Kleinanzeigen (kleinanzeigen.de)
+   - Kalaydo (kalaydo.de)
+   - Immozentral (immozentral.com)
+   - Immopool (immopool.de)
+   - 1A Immobilien (1a-immobilienmarkt.de)
+   - IVD24 (ivd24immobilien.de)
+   - Neubau Kompass (neubaukompass.de)
+   - SZ Immobilien, FAZ Immobilien, Welt Immobilien
    
    ÖSTERREICH:
-   - Willhaben (willhaben.at) - Absender: *@willhaben.at
-   - ImmobilienScout24 AT (immobilienscout24.at) - Absender: *@immobilienscout24.at
-   - Immmo.at (immmo.at) - Absender: *@immmo.at
-   - FindMyHome (findmyhome.at) - Absender: *@findmyhome.at
-   - Der Standard Immobilien (derstandard.at) - Absender: *@derstandard.at (Immobilien-Anfrage)
+   - Willhaben (willhaben.at)
+   - ImmobilienScout24 AT (immobilienscout24.at)
+   - Immmo.at (immmo.at)
+   - FindMyHome (findmyhome.at)
+   - Der Standard Immobilien
    
    SCHWEIZ:
-   - Homegate (homegate.ch) - Absender: *@homegate.ch
-   - ImmoScout24 CH (immoscout24.ch) - Absender: *@immoscout24.ch
-   - Comparis (comparis.ch) - Absender: *@comparis.ch
-   - Newhome (newhome.ch) - Absender: *@newhome.ch
-   - ImmoStreet (immostreet.ch) - Absender: *@immostreet.ch
-   - Flatfox (flatfox.ch) - Absender: *@flatfox.ch
+   - Homegate (homegate.ch)
+   - ImmoScout24 CH (immoscout24.ch)
+   - Comparis (comparis.ch)
+   - Newhome (newhome.ch)
+   - ImmoStreet (immostreet.ch)
+   - Flatfox (flatfox.ch)
+   
+   Wenn es kein Portal ist sondern eine direkte Anfrage, setze portal auf "Direkt".
 
 4. Extrahiere die Objekt-Referenz:
    - Portal-ID (z.B. "Scout-ID: 123456789", "Objekt-Nr: abc123")
@@ -92,6 +124,8 @@ WICHTIG:
 
 Antworte NUR mit validem JSON im folgenden Format:
 {
+  "classification": "LEAD_INQUIRY" | "NEWSLETTER" | "INVOICE" | "NOTIFICATION" | "SPAM" | "OTHER",
+  "classificationReason": "Kurze Begründung der Klassifizierung",
   "hasClickLink": boolean,
   "clickLinkUrl": string | null,
   "portal": string,
@@ -107,9 +141,15 @@ Antworte NUR mit validem JSON im folgenden Format:
     "value": string,
     "portal": string
   } | null
-}`;
+}
 
-export async function parsePortalEmail(params: {
+Für NICHT-LEAD Emails setze leadData auf leere Werte und propertyRef auf null.`;
+
+/**
+ * Classify and parse ANY incoming email with Jarvis
+ * Jarvis decides if it's a real lead or something else
+ */
+export async function classifyAndParseEmail(params: {
   from: string;
   subject: string;
   text: string;
@@ -131,18 +171,23 @@ export async function parsePortalEmail(params: {
         .trim();
     }
 
+    // Truncate very long emails to save tokens (keep first 4000 chars)
+    if (content && content.length > 4000) {
+      content = content.substring(0, 4000) + '\n...[Email gekürzt]';
+    }
+
     const emailContent = `
 Von: ${from}
 Betreff: ${subject}
 
 Inhalt:
-${content}
+${content || '(Kein Text-Inhalt)'}
 `.trim();
 
     const response = await getOpenAI().chat.completions.create({
-      model: 'gpt-5-mini',
+      model: 'gpt-4.1-mini',
       messages: [
-        { role: 'system', content: PARSE_PROMPT },
+        { role: 'system', content: CLASSIFY_AND_PARSE_PROMPT },
         { role: 'user', content: emailContent }
       ],
       temperature: 0,
@@ -153,6 +198,8 @@ ${content}
 
     return {
       success: true,
+      classification: result.classification || 'OTHER',
+      classificationReason: result.classificationReason || '',
       hasClickLink: result.hasClickLink || false,
       clickLinkUrl: result.clickLinkUrl || undefined,
       portal: result.portal || 'Unknown',
@@ -167,100 +214,27 @@ ${content}
       rawMessage: result.leadData?.message || undefined,
     };
   } catch (error: any) {
-    console.error('Error parsing email with Jarvis:', error);
+    console.error('Error classifying email with Jarvis:', error);
     return {
       success: false,
+      classification: 'OTHER',
+      classificationReason: `Klassifizierung fehlgeschlagen: ${error.message}`,
       hasClickLink: false,
       portal: 'Unknown',
       leadData: {},
       propertyRef: null,
-      error: error.message || 'Failed to parse email',
+      error: error.message || 'Failed to classify email',
     };
   }
 }
 
+// Keep backward compatibility alias
+export const parsePortalEmail = classifyAndParseEmail;
+
 /**
- * Quick check if email is from a known portal (all 24 DACH portals)
+ * @deprecated Use classifyAndParseEmail instead - Jarvis now classifies ALL emails
  */
-export function isPortalEmail(from: string, subject: string): boolean {
-  // Domain patterns for all 24 supported portals
-  const portalDomainPatterns = [
-    // Deutschland (13)
-    'immobilienscout24.de',
-    'immowelt.de',
-    'immonet.de',
-    'kleinanzeigen.de',
-    'ebay-kleinanzeigen.de',
-    'kalaydo.de',
-    'immozentral.com',
-    'immopool.de',
-    '1a-immobilienmarkt.de',
-    'ivd24immobilien.de',
-    'ivd24.de',
-    'neubaukompass.de',
-    // Österreich (5)
-    'willhaben.at',
-    'immobilienscout24.at',
-    'immmo.at',
-    'findmyhome.at',
-    // Schweiz (6)
-    'homegate.ch',
-    'immoscout24.ch',
-    'comparis.ch',
-    'newhome.ch',
-    'immostreet.ch',
-    'flatfox.ch',
-  ];
-
-  // Subject/content patterns (for newspaper portals where domain may differ)
-  const subjectPatterns = [
-    'immobilienscout',
-    'immoscout24',
-    'immowelt',
-    'willhaben',
-    'kleinanzeigen',
-    'homegate',
-    'comparis',
-    'newhome',
-    'immonet',
-    'kalaydo',
-    'immozentral',
-    'immopool',
-    'ivd24',
-    'neubaukompass',
-    'immostreet',
-    'flatfox',
-    'findmyhome',
-    // Newspaper portals - match by subject content (e.g. "Immobilien-Anfrage" from these)
-    'sueddeutsche.de',
-    'faz.net',
-    'welt.de',
-    'derstandard.at',
-    'immmo.at',
-  ];
-
-  const lowerFrom = from.toLowerCase();
-  const lowerSubject = subject.toLowerCase();
-
-  // Check if sender domain matches any portal
-  if (portalDomainPatterns.some(domain => lowerFrom.includes(domain))) {
-    return true;
-  }
-
-  // Check subject/content for portal indicators
-  if (subjectPatterns.some(pattern => lowerSubject.includes(pattern))) {
-    return true;
-  }
-
-  // Check for generic real estate inquiry patterns from newspaper portals
-  if (
-    (lowerFrom.includes('sueddeutsche.de') || lowerFrom.includes('faz.net') || 
-     lowerFrom.includes('welt.de') || lowerFrom.includes('derstandard.at')) &&
-    (lowerSubject.includes('immobili') || lowerSubject.includes('anfrage') || 
-     lowerSubject.includes('objekt') || lowerSubject.includes('inserat'))
-  ) {
-    return true;
-  }
-
-  return false;
+export function isPortalEmail(_from: string, _subject: string): boolean {
+  // Always return true - Jarvis now handles classification
+  return true;
 }

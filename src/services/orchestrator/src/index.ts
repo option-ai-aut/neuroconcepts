@@ -7186,7 +7186,7 @@ app.post('/internal/scheduler/escalation', async (req, res) => {
 // Internal Lead Ingestion Endpoint (called by Email Parser Lambda)
 // ============================================
 
-import { parsePortalEmail, isPortalEmail } from './services/EmailParserService';
+import { classifyAndParseEmail, type EmailClassification } from './services/EmailParserService';
 import { matchProperty, getPropertiesForSelection } from './services/PropertyMatchingService';
 
 app.post('/internal/ingest-lead', async (req, res) => {
@@ -7194,7 +7194,7 @@ app.post('/internal/ingest-lead', async (req, res) => {
     const db = await initializePrisma();
     const { recipientEmail, from, subject, text, html, rawEmail } = req.body;
 
-    console.log(`📧 Lead ingestion: Email to ${recipientEmail} from ${from}`);
+    console.log(`📧 Email ingestion: Email to ${recipientEmail} from ${from}, subject: "${subject}"`);
 
     // 1. Find tenant by inboundLeadEmail
     const emailPrefix = recipientEmail?.split('@')[0];
@@ -7216,29 +7216,39 @@ app.post('/internal/ingest-lead', async (req, res) => {
     const tenantId = tenantSettings.tenantId;
     console.log(`✅ Tenant identified: ${tenantSettings.tenant.name} (${tenantId})`);
 
-    // 2. Check if this is a portal email
-    if (!isPortalEmail(from, subject)) {
-      console.log('⚠️ Not a recognized portal email, skipping');
-      return res.json({ success: false, message: 'Not a portal email' });
+    // 2. Jarvis classifies & parses the email (ALL emails, not just portal ones)
+    console.log('🤖 Jarvis classifying email...');
+    const parseResult = await classifyAndParseEmail({ from, subject, text, html });
+
+    console.log(`📋 Classification: ${parseResult.classification} (${parseResult.classificationReason})`);
+    console.log(`📋 Portal: ${parseResult.portal}, hasClickLink: ${parseResult.hasClickLink}`);
+
+    // 3. Handle based on classification
+    if (parseResult.classification !== 'LEAD_INQUIRY') {
+      // NOT a lead — log and skip
+      console.log(`📭 Email classified as ${parseResult.classification} — skipping lead creation`);
+      console.log(`   Reason: ${parseResult.classificationReason}`);
+      console.log(`   From: ${from}, Subject: "${subject}"`);
+
+      return res.json({
+        success: true,
+        classification: parseResult.classification,
+        classificationReason: parseResult.classificationReason,
+        leadCreated: false,
+        message: `Email als "${parseResult.classification}" klassifiziert — kein Lead erstellt`,
+      });
     }
 
-    // 3. Parse email with Jarvis
-    console.log('🤖 Parsing email with Jarvis...');
-    const parseResult = await parsePortalEmail({ from, subject, text, html });
+    // === LEAD_INQUIRY: Create the lead ===
+    console.log('🎯 Email is a LEAD_INQUIRY — creating lead...');
 
     if (!parseResult.success) {
-      console.log(`⚠️ Failed to parse email: ${parseResult.error}`);
+      console.log(`⚠️ Parse partially failed: ${parseResult.error}`);
       // Still create a lead with minimal data
     }
 
-    console.log(`📋 Parse result: portal=${parseResult.portal}, hasClickLink=${parseResult.hasClickLink}`);
-
-    // 4. Determine lead stage based on parse result
-    let leadStatus: 'NEW' | 'CONTACTED' | 'CONVERSATION' | 'BOOKED' | 'LOST' = 'NEW';
-    
-    // 5. Create the lead (always!)
+    // 4. Create the lead
     const leadData = parseResult.leadData;
-    // Build notes with message and link info
     let leadNotes = leadData.message || parseResult.rawMessage || '';
     if (parseResult.hasClickLink) {
       leadNotes = `⚠️ Portal-Email erfordert Link-Klick. URL: ${parseResult.clickLinkUrl || 'nicht erkannt'}\n\n${leadNotes}`;
@@ -7253,14 +7263,14 @@ app.post('/internal/ingest-lead', async (req, res) => {
         phone: leadData.phone || undefined,
         source: 'PORTAL',
         sourceDetails: parseResult.portal,
-        status: leadStatus,
+        status: 'NEW',
         notes: leadNotes || undefined,
       }
     });
 
     console.log(`✅ Lead created: ${lead.id}`);
 
-    // 6. Try to match property
+    // 5. Try to match property
     let matchedProperty = null;
     let assignedUserIds: string[] = [];
 
@@ -7272,6 +7282,12 @@ app.post('/internal/ingest-lead', async (req, res) => {
         matchedProperty = matchResult.property;
         console.log(`✅ Property matched: ${matchedProperty.title} (${matchResult.matchType}, ${matchResult.confidence}%)`);
 
+        // Link lead to property
+        await db.lead.update({
+          where: { id: lead.id },
+          data: { propertyId: matchedProperty.id }
+        });
+
         // Get assigned users for this property
         const assignments = await db.propertyAssignment.findMany({
           where: { propertyId: matchedProperty.id },
@@ -7281,7 +7297,7 @@ app.post('/internal/ingest-lead', async (req, res) => {
       }
     }
 
-    // 7. Create activity
+    // 6. Create activity
     const activityType = parseResult.hasClickLink ? 'LINK_CLICK_REQUIRED' : 'PORTAL_INQUIRY';
     const activityDescription = parseResult.hasClickLink
       ? `Neue Anfrage via ${parseResult.portal} - Link-Klick erforderlich`
@@ -7295,6 +7311,8 @@ app.post('/internal/ingest-lead', async (req, res) => {
         propertyId: matchedProperty?.id,
         metadata: {
           portal: parseResult.portal,
+          classification: parseResult.classification,
+          classificationReason: parseResult.classificationReason,
           hasClickLink: parseResult.hasClickLink,
           clickLinkUrl: parseResult.clickLinkUrl,
           propertyRef: parseResult.propertyRef ? JSON.parse(JSON.stringify(parseResult.propertyRef)) : null,
@@ -7303,15 +7321,23 @@ app.post('/internal/ingest-lead', async (req, res) => {
       }
     });
 
+    // 7. Store the original email as a message on the lead
+    await db.message.create({
+      data: {
+        leadId: lead.id,
+        role: 'USER',
+        content: leadData.message || `[Email von ${from}] ${subject}\n\n${text || '(Kein Text)'}`.substring(0, 5000),
+        status: 'SENT',
+      }
+    });
+
     // 8. Determine who to notify
     let usersToNotify: string[] = [];
 
     if (assignedUserIds.length > 0) {
-      // Notify assigned users of the property
       usersToNotify = assignedUserIds;
       console.log(`📢 Notifying ${usersToNotify.length} assigned user(s)`);
     } else {
-      // No property match or no assigned users -> notify ALL users in tenant
       const allUsers = await db.user.findMany({
         where: { tenantId },
         select: { id: true }
@@ -7322,9 +7348,10 @@ app.post('/internal/ingest-lead', async (req, res) => {
 
     // 9. Create notifications
     const notificationType = parseResult.hasClickLink ? 'JARVIS_QUESTION' : 'NEW_LEAD';
+    const leadName = [leadData.firstName, leadData.lastName].filter(Boolean).join(' ') || leadData.email || 'Unbekannt';
     const notificationTitle = parseResult.hasClickLink
       ? `Neue Portal-Anfrage - Link-Klick erforderlich`
-      : `Neuer Lead: ${[leadData.firstName, leadData.lastName].filter(Boolean).join(' ') || leadData.email || 'Unbekannt'}`;
+      : `Neuer Lead: ${leadName}`;
     const notificationMessage = matchedProperty
       ? `Anfrage für "${matchedProperty.title}" via ${parseResult.portal}`
       : `Anfrage via ${parseResult.portal} - kein Objekt zugeordnet`;
@@ -7349,14 +7376,12 @@ app.post('/internal/ingest-lead', async (req, res) => {
     // 10. If no property matched, create JarvisQuery for assignment
     let jarvisAction = null;
     if (!matchedProperty && !parseResult.hasClickLink) {
-      // Get properties for selection
       const propertyOptions = await getPropertiesForSelection(tenantId);
       const options = [
         ...propertyOptions.map(p => ({ id: p.id, label: `${p.label} (${p.address})` })),
         { id: 'none', label: 'Keinem Objekt zuordnen' }
       ];
 
-      // Create JarvisQuery for the first user (or admin)
       const targetUser = usersToNotify[0];
       if (targetUser) {
         jarvisAction = await db.jarvisPendingAction.create({
@@ -7365,7 +7390,7 @@ app.post('/internal/ingest-lead', async (req, res) => {
             userId: targetUser,
             leadId: lead.id,
             type: 'ASSIGN_PROPERTY',
-            question: `Neuer Lead "${[leadData.firstName, leadData.lastName].filter(Boolean).join(' ') || leadData.email}" via ${parseResult.portal}. Welchem Objekt soll ich die Anfrage zuordnen?`,
+            question: `Neuer Lead "${leadName}" via ${parseResult.portal}. Welchem Objekt soll ich die Anfrage zuordnen?`,
             options,
             allowCustom: false,
             context: {
@@ -7376,7 +7401,6 @@ app.post('/internal/ingest-lead', async (req, res) => {
           }
         });
 
-        // Link activity to JarvisAction
         await db.leadActivity.update({
           where: { id: activity.id },
           data: {
@@ -7414,7 +7438,6 @@ app.post('/internal/ingest-lead', async (req, res) => {
           }
         });
 
-        // Link activity to JarvisAction
         await db.leadActivity.update({
           where: { id: activity.id },
           data: { jarvisActionId: jarvisAction.id }
@@ -7426,6 +7449,8 @@ app.post('/internal/ingest-lead', async (req, res) => {
 
     res.json({
       success: true,
+      classification: parseResult.classification,
+      leadCreated: true,
       leadId: lead.id,
       propertyId: matchedProperty?.id,
       jarvisActionId: jarvisAction?.id,
@@ -7438,7 +7463,7 @@ app.post('/internal/ingest-lead', async (req, res) => {
     });
 
   } catch (error: any) {
-    console.error('❌ Error in lead ingestion:', error);
+    console.error('❌ Error in email ingestion:', error);
     res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
