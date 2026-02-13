@@ -136,7 +136,32 @@ async function initializePrisma() {
     injectPrismaIntoServices(prisma);
   }
   
+  // Auto-apply pending schema migrations (safe: uses IF NOT EXISTS / IF EXISTS)
+  await applyPendingMigrations(prisma);
+  
   return prisma;
+}
+
+// Auto-migration: Apply missing columns/tables that exist in Prisma schema but not in DB
+// Each statement uses IF NOT EXISTS / IF EXISTS so it's safe to run multiple times
+async function applyPendingMigrations(db: PrismaClient) {
+  const migrations = [
+    // 2026-02-13: Add missing columns
+    'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lastSeenAt" TIMESTAMP(3)',
+    'ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "heatingType" TEXT',
+  ];
+  
+  for (const sql of migrations) {
+    try {
+      await db.$executeRawUnsafe(sql);
+    } catch (err: any) {
+      // Ignore "already exists" errors, log others
+      if (!err.message?.includes('already exists')) {
+        console.warn('Migration warning:', sql, err.message);
+      }
+    }
+  }
+  console.log(`✅ Auto-migrations checked (${migrations.length} statements)`);
 }
 
 // Initialize Prisma on startup for local dev
