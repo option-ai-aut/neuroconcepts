@@ -132,17 +132,17 @@ function AdminTopBar() {
   const router = useRouter();
 
   return (
-    <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
+    <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 shrink-0">
       <div className="flex items-center gap-3">
         <button className="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors">
           <Search className="w-3.5 h-3.5" />
-          <span>Suchen...</span>
+          <span className="hidden sm:inline">Suchen...</span>
           <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] text-gray-400 bg-gray-100 border border-gray-200 rounded font-mono">
             <Command className="w-2.5 h-2.5" />K
           </kbd>
         </button>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         <button 
           onClick={() => router.push('/admin/contacts')}
           className="relative p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -159,6 +159,16 @@ function AdminTopBar() {
             <p className="text-[10px] text-gray-400 leading-none mt-0.5">Super Admin</p>
           </div>
         </div>
+        <button
+          onClick={async () => {
+            await signOut();
+            window.location.href = '/admin/login';
+          }}
+          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          title="Abmelden"
+        >
+          <LogOut className="w-4 h-4" />
+        </button>
       </div>
     </div>
   );
