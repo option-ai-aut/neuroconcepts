@@ -5276,28 +5276,7 @@ app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, asyn
     const roomPart = roomType ? `${roomType} ` : '';
     const userRequest = prompt && prompt.trim() ? `: ${prompt.trim()}` : '';
     
-    stagingPrompt = `TASK: Virtual furniture staging for a real estate photo.
-
-ADD ONLY: ${stylePart}${roomPart}furniture and small decorative items${userRequest}.
-
-CRITICAL CONSTRAINTS — ZERO TOLERANCE FOR VIOLATIONS:
-- The photo is a REAL photograph of an EXISTING room. Treat the room as a sacred, immutable backdrop.
-- Every single pixel of the room's architecture MUST remain IDENTICAL to the input image:
-  * ALL walls: same position, same color, same texture, same number of walls
-  * ALL doors: same position, same size, same style, same color — do NOT add, remove, or move ANY door
-  * ALL windows: same position, same size, same frame — do NOT add, remove, or move ANY window
-  * ALL floors: same material, same color, same pattern
-  * ALL ceilings: same height, same color, same fixtures
-  * ALL columns, beams, pillars, niches, alcoves: UNCHANGED
-  * ALL light switches, outlets, radiators, pipes, vents: UNCHANGED
-  * ALL built-in elements (kitchen counters, cabinets, shelving): UNCHANGED
-- Do NOT alter the room's geometry, proportions, or layout in ANY way
-- Do NOT change wall colors, add/remove walls, or modify any architectural surface
-- Do NOT change the camera angle, perspective, focal length, or lighting direction
-- Do NOT add windows, doors, arches, or openings that don't exist in the original
-- Do NOT remove or hide any existing architectural element behind furniture
-
-WHAT TO ADD: Only freestanding furniture (sofas, tables, chairs, beds, shelves, lamps, rugs, curtains, plants, art). Place them naturally on the existing floor, respecting the room's real dimensions and perspective.`;
+    stagingPrompt = `Add ${stylePart}${roomPart}furniture into this room photo${userRequest}. The room must stay EXACTLY as-is — keep every wall, door, window, ceiling light, floor, and fixture identical. Only add freestanding furniture and decor.`;
 
 
     // Map numeric aspect ratio to Gemini-supported string
