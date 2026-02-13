@@ -254,9 +254,11 @@ export class ImmivoStack extends cdk.Stack {
         restrictPublicBuckets: false,
       }),
       cors: [{
-        allowedMethods: [s3.HttpMethods.GET],
+        allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.HEAD],
         allowedOrigins: ['*'],
         allowedHeaders: ['*'],
+        exposedHeaders: ['Content-Length', 'Content-Type', 'ETag'],
+        maxAge: 3600,
       }],
     });
 
@@ -282,6 +284,8 @@ export class ImmivoStack extends cdk.Stack {
       deployOptions: {
         stageName: props.stageName,
       },
+      // Enable binary media types for file uploads (multipart/form-data)
+      binaryMediaTypes: ['multipart/form-data', 'image/*', 'application/octet-stream'],
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: apigateway.Cors.ALL_METHODS,

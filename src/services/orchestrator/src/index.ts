@@ -5323,10 +5323,29 @@ app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, asyn
       return res.status(500).json({ error: responseText || 'Das Modell hat kein Bild generiert. Versuche einen anderen Prompt oder ein anderes Bild.' });
     }
 
-    console.log(`✅ Image staged for ${currentUser.email} (${modelId})`);
+    // Upload to S3 immediately so we return a URL instead of huge base64
+    let imageUrl = generatedImage; // fallback: return base64 if S3 fails
+    if (MEDIA_BUCKET) {
+      try {
+        const base64Data = generatedImage.split(',')[1];
+        const imgBuffer = Buffer.from(base64Data, 'base64');
+        const outMime = generatedImage.match(/^data:([^;]+);/)?.[1] || 'image/png';
+        const ext = outMime.includes('jpeg') || outMime.includes('jpg') ? '.jpg' : '.png';
+        const stagingFilename = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}-staged${ext}`;
+        const stagingFolder = `staging/${currentUser.tenantId}`;
+        const s3Url = await uploadToS3(imgBuffer, stagingFilename, outMime, stagingFolder);
+        imageUrl = s3Url;
+        console.log(`✅ Image staged & uploaded to S3 for ${currentUser.email} (${modelId}): ${s3Url}`);
+      } catch (s3Err: any) {
+        console.error('S3 upload for staged image failed, returning base64:', s3Err.message);
+        // imageUrl stays as base64 fallback
+      }
+    } else {
+      console.log(`✅ Image staged for ${currentUser.email} (${modelId}) — no S3 bucket, returning base64`);
+    }
 
     res.json({ 
-      image: generatedImage,
+      image: imageUrl,
       style,
       roomType
     });
@@ -7409,7 +7428,9 @@ app.post('/internal/ingest-lead', async (req, res) => {
   }
 });
 
-export const handler = serverless(app);
+export const handler = serverless(app, {
+  binary: ['multipart/form-data', 'image/*', 'application/octet-stream'],
+});
 
 // Local dev support
 if (require.main === module) {

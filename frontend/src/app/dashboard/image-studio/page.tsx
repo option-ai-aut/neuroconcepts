@@ -301,14 +301,33 @@ export default function ImageStudioPage() {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!resultImage) return;
-    const link = document.createElement('a');
-    link.href = resultImage;
-    link.download = `staged-${selectedRoom?.id || 'room'}-${selectedStyle?.id || 'style'}-${Date.now()}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      // For S3 URLs we need to fetch and create a blob URL for download
+      if (resultImage.startsWith('http')) {
+        const response = await fetch(resultImage);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `staged-${selectedRoom?.id || 'room'}-${selectedStyle?.id || 'style'}-${Date.now()}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
+      } else {
+        // Base64 data URL — direct download
+        const link = document.createElement('a');
+        link.href = resultImage;
+        link.download = `staged-${selectedRoom?.id || 'room'}-${selectedStyle?.id || 'style'}-${Date.now()}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (err) {
+      console.error('Download error:', err);
+    }
   };
 
   const handleSaveToProperty = async (property: Property) => {

@@ -2718,25 +2718,26 @@ export class AiToolExecutor {
         
         if (!generatedImage) throw new Error('KI konnte kein Bild generieren. Versuche einen anderen Prompt.');
         
-        // 4. Upload result to S3 so we have a URL
-        const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
-        const s3 = new S3Client({ region: process.env.AWS_REGION || 'eu-central-1' });
-        const bucket = process.env.S3_BUCKET || process.env.AWS_S3_BUCKET;
-        
+        // 4. Upload result to S3 so we have a URL (use MEDIA_BUCKET_NAME, same as rest of app)
         const imageBuffer = Buffer.from(generatedImage.split(',')[1], 'base64');
+        const mediaBucket = process.env.MEDIA_BUCKET_NAME || '';
+        const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'eu-central-1';
         const s3Key = `staging/${tenantId}/${Date.now()}-staged.png`;
         
-        await s3.send(new PutObjectCommand({
-          Bucket: bucket,
+        if (!mediaBucket) {
+          throw new Error('MEDIA_BUCKET_NAME is not configured. Cannot save staged image.');
+        }
+        
+        const AWS = require('aws-sdk');
+        const s3Client = new AWS.S3();
+        await s3Client.putObject({
+          Bucket: mediaBucket,
           Key: s3Key,
           Body: imageBuffer,
           ContentType: 'image/png',
-        }));
+        }).promise();
         
-        const cdnDomain = process.env.CLOUDFRONT_DOMAIN;
-        const resultUrl = cdnDomain 
-          ? `https://${cdnDomain}/${s3Key}`
-          : `https://${bucket}.s3.${process.env.AWS_REGION || 'eu-central-1'}.amazonaws.com/${s3Key}`;
+        const resultUrl = `https://${mediaBucket}.s3.${region}.amazonaws.com/${s3Key}`;
         
         // 5. Optionally save to property
         let savedToProperty = false;
