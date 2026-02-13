@@ -229,7 +229,7 @@ export class OpenAIService {
     const allToolNames: string[] = [];
     let hadAnyFunctionCalls = false;
     let currentMessages = [...messages];
-    const MAX_TOOL_ROUNDS = 8; // Safety limit to prevent infinite loops
+    const MAX_TOOL_ROUNDS = 4; // Keep low to stay within API GW 29s timeout
     const openAITools = convertToolsToOpenAI(CRM_TOOLS);
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
@@ -287,7 +287,13 @@ export class OpenAIService {
         hadAnyFunctionCalls = true;
         const toolNames = roundToolCalls.map(tc => (tc as any).function.name as string);
         allToolNames.push(...toolNames);
-        yield { chunk: '', hadFunctionCalls: true, toolsUsed: allToolNames };
+        
+        // Stream any intermediate text (e.g. "Ich erstelle die Leads...") immediately
+        if (roundContent) {
+          yield { chunk: roundContent, hadFunctionCalls: true, toolsUsed: allToolNames };
+        } else {
+          yield { chunk: '', hadFunctionCalls: true, toolsUsed: allToolNames };
+        }
 
         const toolResults = await this.executeToolCalls(roundToolCalls, tenantId);
 
@@ -411,25 +417,18 @@ WICHTIG: Nutze IMMER exposeId="${targetId}" bei allen Tool-Aufrufen!`;
     toolCalls: OpenAI.Chat.ChatCompletionMessageToolCall[], 
     tenantId: string
   ): Promise<OpenAI.Chat.ChatCompletionToolMessageParam[]> {
-    const results: OpenAI.Chat.ChatCompletionToolMessageParam[] = [];
+    // Execute all tool calls IN PARALLEL for speed (critical for API GW 29s limit)
+    const functionCalls = toolCalls.filter(call => call.type === 'function');
     
-    for (const call of toolCalls) {
-      // Only handle function-type tool calls
-      if (call.type !== 'function') continue;
-      
+    const resultPromises = functionCalls.map(async (call): Promise<OpenAI.Chat.ChatCompletionToolMessageParam> => {
       try {
-        console.log(`Executing tool ${call.function.name} for tenant ${tenantId} with args:`, call.function.arguments);
+        console.log(`Executing tool ${call.function.name} for tenant ${tenantId}`);
         
         // Tool rate limiting / guardrails
         const toolCheck = AiSafetyMiddleware.checkToolLimit(call.function.name, this.currentUserId || tenantId);
         if (!toolCheck.allowed) {
           console.warn(`[AI Safety] Tool rate limit hit: ${call.function.name}`);
-          results.push({
-            role: 'tool',
-            tool_call_id: call.id,
-            content: JSON.stringify({ error: toolCheck.reason }),
-          });
-          continue;
+          return { role: 'tool', tool_call_id: call.id, content: JSON.stringify({ error: toolCheck.reason }) };
         }
 
         const args = JSON.parse(call.function.arguments);
@@ -440,21 +439,21 @@ WICHTIG: Nutze IMMER exposeId="${targetId}" bei allen Tool-Aufrufen!`;
         }
         
         const output = await AiToolExecutor.execute(call.function.name, args, tenantId, this.currentUserId);
-        results.push({
+        return {
           role: 'tool',
           tool_call_id: call.id,
           content: typeof output === 'string' ? output : JSON.stringify(output),
-        });
+        };
       } catch (error: any) {
         console.error(`Tool ${call.function.name} error:`, error);
-        results.push({
+        return {
           role: 'tool',
           tool_call_id: call.id,
           content: JSON.stringify({ error: error.message }),
-        });
+        };
       }
-    }
+    });
 
-    return results;
+    return Promise.all(resultPromises);
   }
 }
