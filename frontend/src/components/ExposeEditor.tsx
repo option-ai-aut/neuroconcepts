@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   X, Minus, Maximize2, Save, Download, RefreshCw, 
@@ -267,6 +267,188 @@ const THEMES: ThemeDefinition[] = [
 
 // ============================================
 // PROPS
+// ============================================
+
+// ─── Rich Text Editor Field ─────────────────────────────────────────────
+// File-level component to properly handle contentEditable with refs.
+// Prevents React reconciliation from resetting contentEditable content
+// (the classic controlled-contentEditable problem).
+
+interface RichEditorFieldProps {
+  fieldId: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  multiline: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+  valueToHtml?: (val: string) => string;
+  htmlToValue?: (el: HTMLElement) => string;
+  onFocusChange?: (focused: boolean) => void;
+  onEditorInput?: (el: HTMLElement) => void;
+  onEditorKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
+  onEditorBlur?: () => void;
+}
+
+const RichEditorField: React.FC<RichEditorFieldProps> = ({
+  fieldId,
+  value,
+  onChange,
+  placeholder,
+  multiline,
+  className,
+  style,
+  valueToHtml,
+  htmlToValue,
+  onFocusChange,
+  onEditorInput,
+  onEditorKeyDown,
+  onEditorBlur,
+}) => {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const lastValueRef = useRef<string>(value);
+
+  // Convert value to HTML for display
+  const toHtml = useCallback((val: string): string => {
+    if (!val) return '';
+    if (valueToHtml) return valueToHtml(val);
+    // Non-template: if it has HTML tags, return as-is; otherwise \n → <br>
+    if (val.match(/<[a-z]/i)) return val;
+    return val.replace(/\n/g, '<br>');
+  }, [valueToHtml]);
+
+  // Read value from editor DOM
+  const fromHtml = useCallback((): string => {
+    if (!editorRef.current) return '';
+    if (htmlToValue) return htmlToValue(editorRef.current);
+    return editorRef.current.innerHTML;
+  }, [htmlToValue]);
+
+  // Set content on mount only
+  useEffect(() => {
+    if (editorRef.current) {
+      editorRef.current.innerHTML = toHtml(value || '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync ONLY external value changes (not changes from user input)
+  useEffect(() => {
+    if (!editorRef.current) return;
+    if (value !== lastValueRef.current) {
+      // Value changed from outside (undo, mention insert, block switch, etc.)
+      editorRef.current.innerHTML = toHtml(value || '');
+      lastValueRef.current = value;
+    }
+  }, [value, toHtml]);
+
+  // Event delegation for internal tag drag-start (tags inside contentEditable)
+  useEffect(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const handleDragStart = (e: DragEvent) => {
+      const target = e.target as HTMLElement;
+      if (target?.getAttribute?.('data-variable')) {
+        e.dataTransfer?.setData('application/x-expose-internal-tag', 'true');
+        e.dataTransfer?.setData('text/plain', target.getAttribute('data-variable') || '');
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+      }
+    };
+    el.addEventListener('dragstart', handleDragStart, true);
+    return () => el.removeEventListener('dragstart', handleDragStart, true);
+  }, []);
+
+  const handleInput = useCallback(() => {
+    if (!editorRef.current) return;
+    const newValue = fromHtml();
+    lastValueRef.current = newValue;
+    onChange(newValue);
+    onEditorInput?.(editorRef.current);
+  }, [fromHtml, onChange, onEditorInput]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Format shortcuts
+    if (e.key === 'b' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); document.execCommand('bold'); }
+    else if (e.key === 'i' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); document.execCommand('italic'); }
+    else if (e.key === 'u' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); document.execCommand('underline'); }
+    // Prevent Enter in single-line mode
+    if (!multiline && e.key === 'Enter') e.preventDefault();
+    // Forward to parent for mention handling etc.
+    onEditorKeyDown?.(e);
+  }, [multiline, onEditorKeyDown]);
+
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    // Internal tag drag - let browser handle natively (moves the span)
+    if (e.dataTransfer.types.includes('application/x-expose-internal-tag')) {
+      // After browser moves the tag, save the new content
+      setTimeout(() => {
+        if (editorRef.current) {
+          const newValue = fromHtml();
+          lastValueRef.current = newValue;
+          onChange(newValue);
+        }
+      }, 0);
+      return;
+    }
+
+    // External drop (from sidebar fields panel)
+    const droppedText = e.dataTransfer.getData('text/plain');
+    if (droppedText.startsWith('{{') && valueToHtml) {
+      e.preventDefault();
+      const el = editorRef.current;
+      if (!el) return;
+
+      const tagHtml = valueToHtml(droppedText);
+      // Insert at drop position
+      const range = (document as any).caretRangeFromPoint?.(e.clientX, e.clientY);
+      if (range) {
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+        const temp = document.createElement('span');
+        temp.innerHTML = tagHtml + '\u00A0';
+        const frag = document.createDocumentFragment();
+        while (temp.firstChild) frag.appendChild(temp.firstChild);
+        range.insertNode(frag);
+        range.collapse(false);
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      } else {
+        el.innerHTML += tagHtml + '\u00A0';
+      }
+
+      const newValue = fromHtml();
+      lastValueRef.current = newValue;
+      onChange(newValue);
+    }
+  }, [valueToHtml, fromHtml, onChange]);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = e.dataTransfer.types.includes('application/x-expose-internal-tag') ? 'move' : 'copy';
+  }, []);
+
+  return (
+    <div
+      ref={editorRef}
+      data-field-id={fieldId}
+      contentEditable
+      suppressContentEditableWarning
+      className={className}
+      style={style}
+      onInput={handleInput}
+      onFocus={() => onFocusChange?.(true)}
+      onBlur={() => { onFocusChange?.(false); onEditorBlur?.(); }}
+      onKeyDown={handleKeyDown}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      data-placeholder={placeholder}
+    />
+  );
+};
+
+RichEditorField.displayName = 'RichEditorField';
+
 // ============================================
 
 interface ExposeEditorProps {
@@ -606,24 +788,39 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     if (!text || !isTemplate) return text || '';
     if (!previewProperty) return text; // Keep variables if no preview property selected
     
+    const priceFormatted = previewProperty.salePrice 
+      ? `${previewProperty.salePrice.toLocaleString('de-DE')} €`
+      : previewProperty.rentCold 
+        ? `${previewProperty.rentCold.toLocaleString('de-DE')} €/Monat`
+        : '';
+    
     const replacements: Record<string, string> = {
-      // Property fields
+      // Property fields - ALL from TEMPLATE_FIELDS
       '{{property.title}}': previewProperty.title || '',
       '{{property.address}}': previewProperty.address || '',
       '{{property.city}}': previewProperty.city || '',
-      '{{property.price}}': previewProperty.salePrice 
-        ? `${previewProperty.salePrice.toLocaleString('de-DE')} €`
-        : previewProperty.rentCold 
-          ? `${previewProperty.rentCold.toLocaleString('de-DE')} €/Monat`
-          : '',
+      '{{property.zipCode}}': previewProperty.zipCode || '',
+      '{{property.price}}': priceFormatted,
+      '{{property.priceFormatted}}': priceFormatted,
       '{{property.rooms}}': previewProperty.rooms?.toString() || '',
       '{{property.area}}': previewProperty.livingArea ? `${previewProperty.livingArea} m²` : '',
+      '{{property.plotArea}}': previewProperty.plotArea ? `${previewProperty.plotArea} m²` : '',
       '{{property.bedrooms}}': previewProperty.bedrooms?.toString() || '',
       '{{property.bathrooms}}': previewProperty.bathrooms?.toString() || '',
+      '{{property.floor}}': previewProperty.floor?.toString() || '',
+      '{{property.totalFloors}}': previewProperty.totalFloors?.toString() || '',
       '{{property.yearBuilt}}': previewProperty.yearBuilt?.toString() || '',
       '{{property.propertyType}}': previewProperty.propertyType || '',
+      '{{property.heatingType}}': previewProperty.heatingType || '',
       '{{property.energyClass}}': previewProperty.energyEfficiencyClass || '',
+      '{{property.energyConsumption}}': previewProperty.energyConsumption ? `${previewProperty.energyConsumption} kWh/(m²·a)` : '',
+      '{{property.usableArea}}': previewProperty.usableArea ? `${previewProperty.usableArea} m²` : '',
+      '{{property.deposit}}': previewProperty.deposit || '',
+      '{{property.commission}}': previewProperty.commission || '',
       '{{property.description}}': previewProperty.description || '',
+      '{{property.locationDescription}}': previewProperty.locationDescription || '',
+      '{{property.equipmentDescription}}': previewProperty.equipmentDescription || '',
+      '{{property.virtualTour}}': previewProperty.virtualTour || '',
       
       // User/Agent fields (mock data for preview)
       '{{user.name}}': 'Max Mustermann',
@@ -1052,6 +1249,19 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     });
   };
 
+  // HTML version of renderPv for use inside dangerouslySetInnerHTML (returns string, not ReactNode)
+  const pvHtml = (value: string | undefined, fallback: string = ''): string => {
+    if (!value) return fallback;
+    if (!isTemplate || previewProperty) return pv(value, fallback);
+    // Template mode without previewProperty: convert {{...}} to styled HTML chips
+    return value.replace(/\{\{([^}]+)\}\}/g, (match) => {
+      const field = TEMPLATE_FIELDS.find(f => f.variable === match);
+      const label = field?.label || match.replace(/[{}]/g, '');
+      const icon = field?.icon ? `<span style="margin-right:2px;font-size:9px">${field.icon}</span>` : '';
+      return `<span style="display:inline-flex;align-items:center;padding:1px 6px;margin:0 2px;background:#F3F4F6;color:#4B5563;border-radius:4px;font-size:10px;font-weight:500;border:1px solid #E5E7EB">${icon}${label}</span>`;
+    });
+  };
+
   const renderBlockContent = (block: ExposeBlock) => {
     // Per-block color overrides
     const blockBg = block.backgroundColor || undefined;
@@ -1079,8 +1289,8 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
               </div>
             )}
             <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/60 via-black/30 to-transparent pt-16">
-              <h1 className={`text-3xl mb-2 ${hCls}`} style={{ color: blockTitleColor || '#FFFFFF' }}>{pv(block.title, 'Titel eingeben...')}</h1>
-              <p className={`text-lg opacity-90 ${bCls}`} style={{ color: blockTextColor || '#FFFFFF' }}>{pv(block.subtitle, 'Untertitel eingeben...')}</p>
+              <h1 className={`text-3xl mb-2 ${hCls}`} style={{ color: blockTitleColor || '#FFFFFF' }}>{renderPv(block.title, 'Titel eingeben...')}</h1>
+              <p className={`text-lg opacity-90 ${bCls}`} style={{ color: blockTextColor || '#FFFFFF' }}>{renderPv(block.subtitle, 'Untertitel eingeben...')}</p>
             </div>
           </div>
         );
@@ -1104,11 +1314,11 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         );
 
       case 'text': {
-        const textContent = pv(block.content, 'Text eingeben...');
+        const textContent = pvHtml(block.content, 'Text eingeben...');
         const isHtml = textContent.includes('<');
         return (
           <div className={`p-6 ${block.style === 'highlight' && !blockBg ? 'border-l-4' : ''}`} style={{ backgroundColor: blockBg || (block.style === 'highlight' ? '#F9FAFB' : undefined), borderColor: block.style === 'highlight' ? themeColors.primary : undefined }}>
-            {block.title && <h3 className={`text-lg mb-3 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{pv(block.title)}</h3>}
+            {block.title && <h3 className={`text-lg mb-3 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{renderPv(block.title)}</h3>}
             {isHtml ? (
               <div className={`prose prose-sm max-w-none ${bCls}`} style={{ color: blockTextColor || '#4B5563' }} dangerouslySetInnerHTML={{ __html: textContent }} />
             ) : (
@@ -1150,12 +1360,12 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         const items = block.items || [];
         return (
           <div className="p-6" style={{ backgroundColor: blockBg }}>
-            {block.title && <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{pv(block.title)}</h3>}
+            {block.title && <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{renderPv(block.title)}</h3>}
             <div className="grid grid-cols-2 gap-3">
               {items.length > 0 ? items.map((item: any, i: number) => (
                 <div key={i} className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: blockTitleColor || themeColors.primary }} />
-                  <span className={`text-sm ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>{pv(typeof item === 'string' ? item : item.text)}</span>
+                  <span className={`text-sm ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>{renderPv(typeof item === 'string' ? item : item.text)}</span>
                 </div>
               )) : (
                 <span className="text-gray-400 text-sm">Elemente hinzufügen...</span>
@@ -1225,11 +1435,11 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
             <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>Energieausweis</h3>
             <div className="flex items-center gap-4">
               <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl ${hCls}`} style={{ backgroundColor: themeColors.primary }}>
-                {pv(block.energyClass, 'B')}
+                {renderPv(block.energyClass, 'B')}
               </div>
               <div>
                 <p className={`text-sm ${bCls}`} style={{ color: blockTextColor || '#6B7280' }}>Energieeffizienzklasse</p>
-                <p className={hCls} style={{ color: blockTitleColor || undefined }}>{pv(block.consumption, '85 kWh/(m²·a)')}</p>
+                <p className={hCls} style={{ color: blockTitleColor || undefined }}>{renderPv(block.consumption, '85 kWh/(m²·a)')}</p>
               </div>
             </div>
           </div>
@@ -1238,9 +1448,9 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
       case 'cta':
         return (
           <div className="p-8 text-center" style={{ backgroundColor: blockBg || '#F9FAFB' }}>
-            <h3 className={`text-xl mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{pv(block.title, 'Interesse geweckt?')}</h3>
+            <h3 className={`text-xl mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{renderPv(block.title, 'Interesse geweckt?')}</h3>
             <button className={`px-6 py-3 text-white rounded-lg ${hCls}`} style={{ backgroundColor: themeColors.primary }}>
-              {pv(block.buttonText, 'Jetzt Termin vereinbaren')}
+              {renderPv(block.buttonText, 'Jetzt Termin vereinbaren')}
             </button>
           </div>
         );
@@ -1248,8 +1458,8 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
       case 'quote':
         return (
           <div className="p-6 border-l-4" style={{ borderColor: themeColors.accent, backgroundColor: blockBg }}>
-            <p className={`text-lg italic mb-2 ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>"{pv(block.text, 'Zitat eingeben...')}"</p>
-            {block.author && <p className={`text-sm ${bCls}`} style={{ color: blockTextColor || '#6B7280' }}>— {pv(block.author)}</p>}
+            <p className={`text-lg italic mb-2 ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>"{renderPv(block.text, 'Zitat eingeben...')}"</p>
+            {block.author && <p className={`text-sm ${bCls}`} style={{ color: blockTextColor || '#6B7280' }}>— {renderPv(block.author)}</p>}
           </div>
         );
 
@@ -1258,7 +1468,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         const floorplanImage = block.imageUrl || (effectiveProperty?.floorplans?.[0] ? getImageUrl(effectiveProperty.floorplans[0]) : '');
         return (
           <div className="p-6" style={{ backgroundColor: blockBg }}>
-            {block.title && <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{pv(block.title)}</h3>}
+            {block.title && <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{renderPv(block.title)}</h3>}
             {floorplanImage ? (
               <img src={floorplanImage.startsWith('http') || floorplanImage.startsWith('/') ? floorplanImage : getImageUrl(floorplanImage)} alt="Grundriss" className="w-full" />
             ) : (
@@ -1271,8 +1481,8 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
       }
 
       case 'twoColumn': {
-        const leftHtml = pv(block.leftContent, 'Linke Spalte...');
-        const rightHtml = pv(block.rightContent, 'Rechte Spalte...');
+        const leftHtml = pvHtml(block.leftContent, 'Linke Spalte...');
+        const rightHtml = pvHtml(block.rightContent, 'Rechte Spalte...');
         return (
           <div className="p-6" style={{ backgroundColor: blockBg }}>
             <div className="grid grid-cols-2 gap-6">
@@ -1286,7 +1496,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
       case 'video':
         return (
           <div className="p-6" style={{ backgroundColor: blockBg }}>
-            {block.title && <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{pv(block.title)}</h3>}
+            {block.title && <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{renderPv(block.title)}</h3>}
             {block.videoUrl ? (
               <div className="aspect-video bg-black rounded overflow-hidden">
                 {block.videoUrl.includes('youtube') || block.videoUrl.includes('youtu.be') ? (
@@ -1318,7 +1528,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
       case 'virtualTour':
         return (
           <div className="p-6">
-            {block.title && <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: themeColors.secondary }}>{pv(block.title)}</h3>}
+            {block.title && <h3 className={`text-lg mb-4 ${hCls}`} style={{ color: themeColors.secondary }}>{renderPv(block.title)}</h3>}
             {block.tourUrl ? (
               <div className="aspect-video rounded overflow-hidden border border-gray-200">
                 <iframe
@@ -1481,17 +1691,8 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                         if (!el) return;
 
                         if (el.getAttribute('contenteditable') === 'true') {
-                          // contentEditable mode: replace @search with the tag
-                          const rawValue = tagHtmlToValue(el);
-                          const atIdx = rawValue.lastIndexOf('@');
-                          if (atIdx !== -1) {
-                            const before = rawValue.substring(0, atIdx);
-                            const after = rawValue.substring(atIdx + 1 + mentionState.searchTerm.length);
-                            const newValue = before + field.variable + after;
-                            // Find the onChange from the block editor
-                            el.innerHTML = valueToTagHtml(newValue);
-                            el.dispatchEvent(new Event('input', { bubbles: true }));
-                          }
+                          // contentEditable mode: use DOM-based insertion (works with HTML content)
+                          insertMentionTag(fieldId, field);
                         } else {
                           // Plain input mode (fallback)
                           const input = el as HTMLInputElement | HTMLTextAreaElement;
@@ -1518,35 +1719,85 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     );
   };
 
-  // Convert a raw value (with {{variable}} syntax) to HTML with visual tag chips
+  // Convert a raw value (HTML with {{variable}} markers) to display HTML with visual tag chips
   const valueToTagHtml = (value: string): string => {
     if (!value) return '';
-    return value.replace(/\{\{([^}]+)\}\}/g, (match) => {
+    let html = value;
+    // Backwards compatibility: if value is plain text (no HTML tags), convert \n to <br>
+    if (!html.match(/<[a-z]/i)) {
+      html = html.replace(/\n/g, '<br>');
+    }
+    // Replace {{variable}} with styled, draggable tag chips
+    return html.replace(/\{\{([^}]+)\}\}/g, (match) => {
       const field = TEMPLATE_FIELDS.find(f => f.variable === match);
       if (!field) return match;
-      return `<span contenteditable="false" data-variable="${match}" style="display:inline-flex;align-items:center;gap:2px;padding:1px 6px;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;border-radius:4px;font-size:11px;font-weight:500;cursor:default;user-select:all;vertical-align:baseline;line-height:1.4;margin:0 1px;">${field.icon} ${field.label}</span>`;
+      return `<span contenteditable="false" draggable="true" data-variable="${match}" style="display:inline-flex;align-items:center;gap:2px;padding:1px 6px;background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;border-radius:4px;font-size:11px;font-weight:500;cursor:grab;user-select:all;vertical-align:baseline;line-height:1.4;margin:0 1px;">${field.icon} ${field.label}</span>`;
     });
   };
 
-  // Convert HTML from contentEditable back to raw value with {{variable}} syntax
+  // Convert HTML from contentEditable back to storable value:
+  // Replace tag chip spans with {{variable}} text, preserve ALL other HTML (bold, italic, lists, divs, etc.)
   const tagHtmlToValue = (el: HTMLElement): string => {
-    let result = '';
-    el.childNodes.forEach(node => {
-      if (node.nodeType === Node.TEXT_NODE) {
-        result += node.textContent || '';
-      } else if (node.nodeType === Node.ELEMENT_NODE) {
-        const elem = node as HTMLElement;
-        const variable = elem.getAttribute('data-variable');
-        if (variable) {
-          result += variable;
-        } else if (elem.tagName === 'BR') {
-          result += '\n';
-        } else {
-          result += tagHtmlToValue(elem);
-        }
+    let html = el.innerHTML;
+    // Replace all tag chip spans with their {{variable}} markers
+    html = html.replace(/<span\s[^>]*?data-variable="([^"]*)"[^>]*?>[\s\S]*?<\/span>/gi, '$1');
+    return html;
+  };
+
+  // Insert a mention tag at the @ position in the editor using DOM manipulation
+  // (works correctly with HTML content, unlike string-based approach)
+  const insertMentionTag = (fieldId: string, field: TemplateField) => {
+    const el = document.querySelector(`[data-field-id="${fieldId}"]`) as HTMLElement;
+    if (!el) return;
+
+    // Walk text nodes to find the last @
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let atNode: Text | null = null;
+    let atOffset = -1;
+
+    while (walker.nextNode()) {
+      const text = walker.currentNode as Text;
+      const content = text.textContent || '';
+      const idx = content.lastIndexOf('@');
+      if (idx !== -1) {
+        atNode = text;
+        atOffset = idx;
       }
-    });
-    return result;
+    }
+
+    if (atNode && atOffset !== -1) {
+      const endOffset = Math.min(atOffset + 1 + mentionState.searchTerm.length, atNode.textContent?.length || 0);
+
+      // Create range from @ to end of search term and delete it
+      const range = document.createRange();
+      range.setStart(atNode, atOffset);
+      range.setEnd(atNode, endOffset);
+      range.deleteContents();
+
+      // Create and insert the tag span
+      const tagHtml = valueToTagHtml(field.variable);
+      const temp = document.createElement('span');
+      temp.innerHTML = tagHtml;
+      const tagSpan = temp.firstChild;
+
+      if (tagSpan) {
+        range.insertNode(tagSpan);
+        // Add a non-breaking space after the tag
+        const space = document.createTextNode('\u00A0');
+        tagSpan.parentNode?.insertBefore(space, tagSpan.nextSibling);
+
+        // Move cursor after the space
+        const newRange = document.createRange();
+        newRange.setStartAfter(space);
+        newRange.collapse(true);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(newRange);
+      }
+
+      // Trigger input event to save via RichEditorField's onInput handler
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
   };
 
   // Execute formatting command on the currently focused contentEditable
@@ -1565,7 +1816,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     </div>
   );
 
-  // Render a template-aware input field with @-mention support and visual tags
+  // Render a template-aware input field with @-mention support, visual tags, and rich text
   const renderTemplateInput = (
     fieldId: string,
     value: string,
@@ -1573,47 +1824,27 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     placeholder: string,
     multiline: boolean = false
   ) => {
-    // Convert plain text (with newlines) to HTML for backwards compatibility
-    const toEditableHtml = (val: string): string => {
-      if (!val) return '';
-      if (val.includes('<')) return val; // Already HTML
-      return val.replace(/\n/g, '<br>');
-    };
+    // For non-template mode, single-line: use plain input
+    if (!isTemplate && !multiline) {
+      return <input type="text" value={value || ''} placeholder={placeholder}
+        className="w-full px-2.5 py-1.5 2xl:px-3 2xl:py-2 border border-gray-200 rounded-md text-xs 2xl:text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
+        onChange={(e) => onChange(e.target.value)}
+      />;
+    }
 
-    // Convert HTML back to a storable format (keep HTML for rich text)
-    const fromEditableHtml = (el: HTMLElement): string => {
-      return el.innerHTML
-        .replace(/<div><br><\/div>/gi, '\n')
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<\/div><div>/gi, '\n')
-        .replace(/<div>/gi, '\n')
-        .replace(/<\/div>/gi, '');
-    };
-
-    // For non-template mode with multiline: use rich text editor
+    // For non-template mode with multiline: rich text editor (no template tags)
     if (!isTemplate && multiline) {
       return (
         <div className="relative">
           {renderFormatToolbar(fieldId)}
-          <div
-            data-field-id={fieldId}
-            contentEditable
-            suppressContentEditableWarning
+          <RichEditorField
+            key={fieldId}
+            fieldId={fieldId}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            multiline
             className="w-full px-2.5 py-1.5 2xl:px-3 2xl:py-2 border border-gray-200 border-t-0 rounded-b-md text-xs 2xl:text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 focus:outline-none min-h-[100px] max-h-[250px] overflow-y-auto"
-            dangerouslySetInnerHTML={{ __html: toEditableHtml(value || '') }}
-            onBlur={(e) => {
-              // Save on blur to avoid cursor issues during typing
-              const html = e.currentTarget.innerHTML;
-              if (html !== toEditableHtml(value || '')) {
-                onChange(html);
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'b' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); execFormat('bold'); }
-              else if (e.key === 'i' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); execFormat('italic'); }
-              else if (e.key === 'u' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); execFormat('underline'); }
-            }}
-            data-placeholder={placeholder}
           />
           <style>{`
             [data-field-id="${fieldId}"]:empty::before {
@@ -1631,132 +1862,82 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
       );
     }
 
-    // For non-template mode, single-line: use plain input
-    if (!isTemplate) {
-      return <input type="text" value={value || ''} placeholder={placeholder}
-        className="w-full px-2.5 py-1.5 2xl:px-3 2xl:py-2 border border-gray-200 rounded-md text-xs 2xl:text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
-        onChange={(e) => onChange(e.target.value)}
-      />;
-    }
+    // ─── Template mode: contentEditable with visual tag chips ───
+    // Mention detection: called after every input in the editor
+    const handleTemplateMentionInput = (el: HTMLElement) => {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        const preRange = document.createRange();
+        preRange.setStart(el, 0);
+        preRange.setEnd(range.startContainer, range.startOffset);
+        const textBefore = preRange.toString();
+        const atIndex = textBefore.lastIndexOf('@');
 
-    // For template mode: contentEditable with visual tag chips
+        if (atIndex !== -1 && (atIndex === 0 || textBefore[atIndex - 1] === ' ' || textBefore[atIndex - 1] === '\n')) {
+          const searchTerm = textBefore.substring(atIndex + 1).toLowerCase();
+          const filtered = searchTerm
+            ? TEMPLATE_FIELDS.filter(f =>
+                f.label.toLowerCase().includes(searchTerm) ||
+                f.id.toLowerCase().includes(searchTerm)
+              )
+            : TEMPLATE_FIELDS;
+          setMentionState({
+            isOpen: true,
+            searchTerm,
+            activeField: fieldId,
+            cursorPosition: atIndex,
+            filteredFields: filtered,
+          });
+        } else {
+          setMentionState(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    };
+
+    // Mention keyboard handling (Escape / Enter)
+    const handleTemplateMentionKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (mentionState.isOpen && mentionState.activeField === fieldId) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setMentionState(prev => ({ ...prev, isOpen: false }));
+        } else if (e.key === 'Enter' && mentionState.filteredFields.length > 0) {
+          e.preventDefault();
+          const field = mentionState.filteredFields[0];
+          insertMentionTag(fieldId, field);
+          setMentionState({ isOpen: false, searchTerm: '', activeField: null, cursorPosition: 0, filteredFields: [] });
+        }
+      }
+    };
+
     return (
       <div className="relative">
         {multiline && renderFormatToolbar(fieldId)}
-        <div
-          data-field-id={fieldId}
-          contentEditable
-          suppressContentEditableWarning
+        <RichEditorField
+          key={fieldId}
+          fieldId={fieldId}
+          value={value}
+          onChange={onChange}
+          placeholder={`${placeholder} (tippe @ für Felder)`}
+          multiline={multiline}
           className={`w-full px-2.5 border border-gray-200 ${multiline ? 'border-t-0 rounded-b-md' : 'rounded-md'} text-xs 2xl:text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 focus:outline-none ${multiline ? 'min-h-[100px] max-h-[250px] overflow-y-auto py-1.5 2xl:py-2' : 'overflow-hidden whitespace-nowrap'}`}
           style={multiline ? undefined : { lineHeight: '34px', paddingTop: 0, paddingBottom: 0 }}
-          dangerouslySetInnerHTML={{ __html: valueToTagHtml(value) || '' }}
-          onFocus={() => setTemplateFieldFocused(true)}
-          data-placeholder={`${placeholder} (tippe @ für Felder)`}
-          onInput={(e) => {
-            const el = e.currentTarget;
-            const rawValue = tagHtmlToValue(el);
-            onChange(rawValue);
-
-            // Check for @-mention trigger
-            const sel = window.getSelection();
-            if (sel && sel.rangeCount > 0) {
-              const range = sel.getRangeAt(0);
-              // Get text content before cursor
-              const preRange = document.createRange();
-              preRange.setStart(el, 0);
-              preRange.setEnd(range.startContainer, range.startOffset);
-              const textBefore = preRange.toString();
-              const atIndex = textBefore.lastIndexOf('@');
-
-              if (atIndex !== -1 && (atIndex === 0 || textBefore[atIndex - 1] === ' ' || textBefore[atIndex - 1] === '\n')) {
-                const searchTerm = textBefore.substring(atIndex + 1).toLowerCase();
-                const filtered = searchTerm
-                  ? TEMPLATE_FIELDS.filter(f =>
-                      f.label.toLowerCase().includes(searchTerm) ||
-                      f.id.toLowerCase().includes(searchTerm)
-                    )
-                  : TEMPLATE_FIELDS;
-                setMentionState({
-                  isOpen: true,
-                  searchTerm,
-                  activeField: fieldId,
-                  cursorPosition: atIndex,
-                  filteredFields: filtered,
-                });
-              } else {
-                setMentionState(prev => ({ ...prev, isOpen: false }));
-              }
-            }
-          }}
-          onKeyDown={(e) => {
-            if (mentionState.isOpen && mentionState.activeField === fieldId) {
-              if (e.key === 'Escape') {
-                e.preventDefault();
-                setMentionState(prev => ({ ...prev, isOpen: false }));
-              } else if (e.key === 'Enter' && mentionState.filteredFields.length > 0) {
-                e.preventDefault();
-                // Insert the first matching field as a tag
-                const field = mentionState.filteredFields[0];
-                const el = e.currentTarget;
-                const rawValue = tagHtmlToValue(el);
-                const atIdx = rawValue.lastIndexOf('@');
-                if (atIdx !== -1) {
-                  const newValue = rawValue.substring(0, atIdx) + field.variable + rawValue.substring(rawValue.indexOf(' ', atIdx) === -1 ? rawValue.length : rawValue.length);
-                  // Find where the @ and search term end
-                  const beforeAt = rawValue.substring(0, atIdx);
-                  const afterSearch = rawValue.substring(atIdx + 1 + mentionState.searchTerm.length);
-                  onChange(beforeAt + field.variable + afterSearch);
-                  // Re-render will update the contentEditable
-                  setTimeout(() => {
-                    el.innerHTML = valueToTagHtml(beforeAt + field.variable + afterSearch);
-                    // Place cursor at end
-                    const range = document.createRange();
-                    range.selectNodeContents(el);
-                    range.collapse(false);
-                    const sel = window.getSelection();
-                    sel?.removeAllRanges();
-                    sel?.addRange(range);
-                  }, 0);
-                }
-                setMentionState({ isOpen: false, searchTerm: '', activeField: null, cursorPosition: 0, filteredFields: [] });
-              }
-            }
-            // Prevent Enter in single-line mode
-            if (!multiline && e.key === 'Enter') {
-              e.preventDefault();
-            }
-            // Rich text shortcuts for multiline
-            if (multiline) {
-              if (e.key === 'b' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); execFormat('bold'); }
-              else if (e.key === 'i' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); execFormat('italic'); }
-              else if (e.key === 'u' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); execFormat('underline'); }
-            }
-          }}
-          onBlur={() => {
-            setTemplateFieldFocused(false);
-            setTimeout(() => {
-              if (mentionState.activeField === fieldId) {
-                setMentionState(prev => ({ ...prev, isOpen: false }));
-              }
-            }, 200);
-          }}
-          onDrop={(e) => {
-            e.preventDefault();
-            const droppedText = e.dataTransfer.getData('text/plain');
-            if (droppedText.startsWith('{{')) {
-              const el = e.currentTarget;
-              const rawValue = tagHtmlToValue(el);
-              const newValue = rawValue + droppedText;
-              onChange(newValue);
+          valueToHtml={valueToTagHtml}
+          htmlToValue={(el) => tagHtmlToValue(el)}
+          onFocusChange={(focused) => {
+            if (focused) {
+              setTemplateFieldFocused(true);
+            } else {
+              setTemplateFieldFocused(false);
               setTimeout(() => {
-                el.innerHTML = valueToTagHtml(newValue);
-              }, 0);
+                if (mentionState.activeField === fieldId) {
+                  setMentionState(prev => ({ ...prev, isOpen: false }));
+                }
+              }, 200);
             }
           }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'copy';
-          }}
+          onEditorInput={handleTemplateMentionInput}
+          onEditorKeyDown={handleTemplateMentionKeyDown}
         />
         <style>{`
           [data-field-id="${fieldId}"]:empty::before {
@@ -2106,13 +2287,12 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
           <>
             <div>
               <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Button Text</label>
-              <input
-                type="text"
-                value={block.buttonText || ''}
-                onChange={(e) => updateBlock(selectedBlockIndex, { buttonText: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Jetzt Termin vereinbaren"
-              />
+              {renderTemplateInput(
+                `block-${selectedBlockIndex}-buttonText`,
+                block.buttonText || '',
+                (value) => updateBlock(selectedBlockIndex, { buttonText: value }),
+                'Jetzt Termin vereinbaren'
+              )}
             </div>
             <div>
               <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Button URL</label>
@@ -2131,26 +2311,21 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
           <>
             <div>
               <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Energieeffizienzklasse</label>
-              <select
-                value={block.energyClass || ''}
-                onChange={(e) => updateBlock(selectedBlockIndex, { energyClass: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Auswählen...</option>
-                {['A+', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+              {renderTemplateInput(
+                `block-${selectedBlockIndex}-energyClass`,
+                block.energyClass || '',
+                (value) => updateBlock(selectedBlockIndex, { energyClass: value }),
+                'z.B. B oder {{property.energyClass}}'
+              )}
             </div>
             <div>
               <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Verbrauch</label>
-              <input
-                type="text"
-                value={block.consumption || ''}
-                onChange={(e) => updateBlock(selectedBlockIndex, { consumption: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="z.B. 85 kWh/(m²·a)"
-              />
+              {renderTemplateInput(
+                `block-${selectedBlockIndex}-consumption`,
+                block.consumption || '',
+                (value) => updateBlock(selectedBlockIndex, { consumption: value }),
+                'z.B. 85 kWh/(m²·a)'
+              )}
             </div>
           </>
         )}

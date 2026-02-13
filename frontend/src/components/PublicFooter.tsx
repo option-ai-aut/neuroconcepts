@@ -2,21 +2,36 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { Mail, Phone, MapPin } from 'lucide-react';
 
 export default function PublicFooter() {
   return (
     <footer className="bg-gray-900 text-white py-12 md:py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 mb-8 md:mb-12">
-          {/* Brand */}
-          <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="flex items-center mb-4 md:mb-6">
-              <Image src="/logo-icon.png" alt="Immivo" width={40} height={40} />
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 md:gap-12 mb-8 md:mb-12">
+          {/* Brand & Contact */}
+          <div className="col-span-2">
+            <Link href="/" className="inline-block mb-4 md:mb-6">
+              <Image src="/logo-white.png" alt="Immivo" width={160} height={160} className="w-28 sm:w-36 h-auto" />
             </Link>
-            <p className="text-gray-400 text-sm leading-relaxed">
+            <p className="text-gray-400 text-sm leading-relaxed mb-4">
               Das KI-gesteuerte Betriebssystem für moderne Immobilienmakler. 
               Mehr Abschlüsse, weniger Büro.
             </p>
+            <div className="space-y-2 text-sm text-gray-400">
+              <a href="mailto:office@immivo.ai" className="flex items-center gap-2 hover:text-white transition-colors">
+                <Mail className="w-4 h-4 flex-shrink-0" />
+                office@immivo.ai
+              </a>
+              <a href="tel:+436703551221" className="flex items-center gap-2 hover:text-white transition-colors">
+                <Phone className="w-4 h-4 flex-shrink-0" />
+                +43 670 355 1221
+              </a>
+              <div className="flex items-start gap-2">
+                <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>Immivo GmbH<br />Sterngasse 3, 1010 Wien</span>
+              </div>
+            </div>
           </div>
 
           {/* Product */}
@@ -25,8 +40,8 @@ export default function PublicFooter() {
             <ul className="space-y-3 text-gray-400 text-sm">
               <li><Link href="/#jarvis" className="hover:text-white transition-colors">Jarvis KI</Link></li>
               <li><Link href="/#features" className="hover:text-white transition-colors">Features</Link></li>
+              <li><Link href="/#bildbearbeitung" className="hover:text-white transition-colors">KI-Bildstudio</Link></li>
               <li><Link href="/preise" className="hover:text-white transition-colors">Preise</Link></li>
-              <li><Link href="/integrationen" className="hover:text-white transition-colors">Integrationen</Link></li>
             </ul>
           </div>
 
@@ -53,7 +68,7 @@ export default function PublicFooter() {
         </div>
 
         <div className="pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-gray-500 text-center md:text-left">© 2026 Immivo AI GmbH. Alle Rechte vorbehalten.</p>
+          <p className="text-sm text-gray-500 text-center md:text-left">© 2026 Immivo GmbH. Alle Rechte vorbehalten.</p>
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <span className="flex w-2 h-2 bg-green-500 rounded-full"></span>
             Alle Systeme operational

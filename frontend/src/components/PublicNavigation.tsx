@@ -58,7 +58,7 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
                       <Link href="/#bildbearbeitung" className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">KI-Bildbearbeitung</Link>
                     </>
                   )}
-                  <Link href="/integrationen" className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Integrationen</Link>
+                  <Link href="/preise" className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Preise</Link>
                 </div>
               </div>
             </div>
@@ -98,7 +98,7 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
               Anmelden
             </Link>
             <Link 
-              href="/login" 
+              href="/login?mode=register" 
               className="bg-gray-900 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:shadow-lg hover:shadow-gray-500/20 transition-all hover:-translate-y-0.5"
             >
               Kostenlos starten
@@ -139,7 +139,7 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
                   <Link href="/#bildbearbeitung" className="block py-2 text-gray-600 hover:text-gray-900" onClick={() => setMobileMenuOpen(false)}>KI-Bildbearbeitung</Link>
                 </>
               )}
-              <Link href="/integrationen" className="block py-2 text-gray-600 hover:text-gray-900" onClick={() => setMobileMenuOpen(false)}>Integrationen</Link>
+              <Link href="/preise" className="block py-2 text-gray-600 hover:text-gray-900" onClick={() => setMobileMenuOpen(false)}>Preise</Link>
             </div>
 
             <div className="border-t border-gray-100 pt-4">
@@ -175,7 +175,7 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
                 Anmelden
               </Link>
               <Link 
-                href="/login" 
+                href="/login?mode=register" 
                 className="block w-full text-center py-3 bg-gray-900 text-white font-medium rounded-xl hover:shadow-lg transition-all"
                 onClick={() => setMobileMenuOpen(false)}
               >

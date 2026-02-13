@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { signIn, signUp, confirmSignUp, resetPassword, confirmResetPassword, fetchAuthSession, confirmSignIn } from 'aws-amplify/auth';
 import { Amplify } from 'aws-amplify';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -39,7 +39,8 @@ export default function LoginPage() {
   }, [config]);
 
   const [checkingSession, setCheckingSession] = useState(true);
-  const [view, setView] = useState<AuthView>('signIn');
+  const searchParams = useSearchParams();
+  const [view, setView] = useState<AuthView>(searchParams.get('mode') === 'register' ? 'signUp' : 'signIn');
 
   // Helper: get redirect target from URL params
   const getRedirectTarget = () => {

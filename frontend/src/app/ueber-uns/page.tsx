@@ -1,8 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
-import { Target, Heart, Zap, Users, ArrowRight } from 'lucide-react';
+import { Mail, MapPin, Phone, ArrowRight, Sparkles, Shield, Users, Target, Zap, Globe, Code, TrendingUp } from 'lucide-react';
 import PublicNavigation from '@/components/PublicNavigation';
 import PublicFooter from '@/components/PublicFooter';
 
@@ -11,49 +10,63 @@ export default function UeberUnsPage() {
     <div className="min-h-screen bg-white">
       <PublicNavigation currentPage="ueber-uns" />
 
-      {/* Hero */}
-      <section className="pt-24 sm:pt-32 pb-12 sm:pb-16 bg-gradient-to-b from-gray-50 to-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <Image src="/logo-icon.png" alt="Immivo" width={56} height={56} className="rounded-2xl mx-auto mb-6 shadow-lg" />
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-4 sm:mb-6">
-            Über Immivo
+      {/* Hero — Bold, full-width */}
+      <section className="relative pt-24 sm:pt-32 pb-20 sm:pb-32 bg-gray-900 text-white overflow-hidden">
+        <div className="absolute inset-0">
+          <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
+          <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-white/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" />
+        </div>
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="inline-flex items-center px-4 py-2 rounded-full bg-white/10 text-sm font-medium mb-8 border border-white/10">
+            <Zap className="w-4 h-4 mr-2" />
+            Gegründet 2026 in Wien
+          </div>
+          <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold mb-6 leading-tight">
+            Wir machen Makler<br />
+            <span className="text-gray-400">unaufhaltbar.</span>
           </h1>
-          <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto px-4">
-            Wir glauben, dass Immobilienmakler sich auf das konzentrieren sollten, 
-            was sie am besten können: Menschen helfen, ihr Traumzuhause zu finden.
+          <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto leading-relaxed">
+            Immivo ist das erste vollständig KI-gesteuerte Betriebssystem für die Immobilienbranche. 
+            Zwei Gründer, eine Mission: Makler von Büroarbeit befreien.
           </p>
         </div>
       </section>
 
-      {/* Mission */}
-      <section className="py-12 sm:py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-2 gap-8 sm:gap-16 items-center">
+      {/* Story — Engaging narrative */}
+      <section className="py-16 sm:py-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">Unsere Mission</h2>
-              <p className="text-base sm:text-lg text-gray-600 mb-4 sm:mb-6 leading-relaxed">
-                Immivo wurde 2024 gegründet mit einer klaren Vision: 
-                Die Immobilienbranche durch künstliche Intelligenz zu revolutionieren.
-              </p>
-              <p className="text-base sm:text-lg text-gray-600 leading-relaxed">
-                Wir haben gesehen, wie viel Zeit Makler mit administrativen Aufgaben verbringen — 
-                Zeit, die sie lieber mit Kunden verbringen würden. Jarvis, unser KI-Assistent, 
-                übernimmt diese Aufgaben und gibt Maklern ihre Zeit zurück.
-              </p>
+              <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">Die Geschichte</span>
+              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mt-3 mb-6">
+                Vom Frust zur Lösung
+              </h2>
+              <div className="space-y-4 text-gray-600 text-lg leading-relaxed">
+                <p>
+                  Anfang 2026. Wien. Zwei Gründer sitzen in einem Kaffeehaus und reden über ein Problem, 
+                  das die gesamte Immobilienbranche betrifft: Makler verbringen 80% ihrer Zeit mit E-Mails, 
+                  Papierkram und Organisation — statt mit dem, wofür sie eigentlich brennen.
+                </p>
+                <p>
+                  Die Idee war einfach: Was wäre, wenn ein KI-Assistent das gesamte Tagesgeschäft übernimmt? 
+                  Nicht ein weiteres CRM. Nicht noch ein Tool. Ein komplettes Betriebssystem, das mitdenkt.
+                </p>
+                <p className="font-medium text-gray-900">
+                  Aus dieser Idee wurde Immivo — und aus dem Assistenten wurde Jarvis.
+                </p>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 gap-4">
               {[
-                { icon: Target, title: 'Vision', description: 'KI-gestützte Immobilienbranche' },
-                { icon: Heart, title: 'Werte', description: 'Transparenz, Innovation, Qualität' },
-                { icon: Zap, title: 'Antrieb', description: 'Effizienz durch Automatisierung' },
-                { icon: Users, title: 'Fokus', description: 'Makler-zentrierte Entwicklung' }
+                { icon: Code, label: 'Entwickelt', value: 'in Wien' },
+                { icon: Globe, label: 'Portale', value: '24+' },
+                { icon: Shield, label: 'Hosting', value: 'AWS EU' },
+                { icon: TrendingUp, label: 'Gründung', value: '2026' },
               ].map((item, i) => (
-                <div key={i} className="bg-gray-50 rounded-xl p-4 sm:p-6">
-                  <div className="w-8 sm:w-10 h-8 sm:h-10 bg-gray-100 rounded-lg flex items-center justify-center mb-3 sm:mb-4">
-                    <item.icon className="w-4 sm:w-5 h-4 sm:h-5 text-blue-600" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900 mb-1 text-sm sm:text-base">{item.title}</h3>
-                  <p className="text-xs sm:text-sm text-gray-600">{item.description}</p>
+                <div key={i} className="bg-gray-50 rounded-2xl p-6 border border-gray-100 text-center">
+                  <item.icon className="w-6 h-6 text-gray-900 mx-auto mb-3" />
+                  <p className="text-2xl font-bold text-gray-900">{item.value}</p>
+                  <p className="text-sm text-gray-500">{item.label}</p>
                 </div>
               ))}
             </div>
@@ -61,42 +74,144 @@ export default function UeberUnsPage() {
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="py-12 sm:py-16 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 text-center">
+      {/* Founders — Josef first, no quotes */}
+      <section className="py-16 sm:py-24 bg-gray-50">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">Das Team</span>
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mt-3">
+              Die Gründer
+            </h2>
+            <p className="text-gray-600 mt-3 max-w-xl mx-auto">Beide Gründer halten jeweils 50% der Anteile an der Immivo GmbH.</p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-8">
+            {/* Josef Leutgeb — First */}
+            <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:shadow-lg transition-shadow">
+              <div className="flex items-center gap-5 mb-6">
+                <div className="w-20 h-20 rounded-2xl bg-gray-900 text-white flex items-center justify-center font-bold text-2xl flex-shrink-0">
+                  JL
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Josef Leutgeb</h3>
+                  <p className="text-blue-600 font-medium">Co-Founder & CEO</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {[
+                  'Seriengründer mit Erfahrung im Aufbau mehrerer erfolgreicher Unternehmen',
+                  'Verantwortlich für Strategie, Vertrieb und Partnerschaften',
+                  'Starkes Netzwerk in der Immobilien- und Tech-Branche',
+                  'Hält den Gesamtüberblick über Unternehmensentwicklung und Wachstum',
+                ].map((point, i) => (
+                  <div key={i} className="flex gap-3 text-gray-600">
+                    <div className="w-1.5 h-1.5 rounded-full bg-gray-900 mt-2 flex-shrink-0" />
+                    <span>{point}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 pt-6 border-t border-gray-100">
+                <a href="mailto:josef.leutgeb@immivo.ai" className="inline-flex items-center gap-2 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors">
+                  <Mail className="w-4 h-4" />
+                  josef.leutgeb@immivo.ai
+                </a>
+              </div>
+            </div>
+
+            {/* Dennis Kral — Second */}
+            <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:shadow-lg transition-shadow">
+              <div className="flex items-center gap-5 mb-6">
+                <div className="w-20 h-20 rounded-2xl bg-gray-900 text-white flex items-center justify-center font-bold text-2xl flex-shrink-0">
+                  DK
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Dennis Kral</h3>
+                  <p className="text-blue-600 font-medium">Technical Co-Founder & CTO</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {[
+                  'Einer der führenden KI-Spezialisten Österreichs',
+                  'Hat die gesamte Immivo-Plattform von Grund auf entwickelt',
+                  'Verantwortlich für Technologie, Projektmanagement und Team',
+                  'Experte für Machine Learning, Cloud-Architektur und Fullstack-Entwicklung',
+                ].map((point, i) => (
+                  <div key={i} className="flex gap-3 text-gray-600">
+                    <div className="w-1.5 h-1.5 rounded-full bg-gray-900 mt-2 flex-shrink-0" />
+                    <span>{point}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 pt-6 border-t border-gray-100">
+                <a href="mailto:dennis.kral@immivo.ai" className="inline-flex items-center gap-2 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors">
+                  <Mail className="w-4 h-4" />
+                  dennis.kral@immivo.ai
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Values */}
+      <section className="py-16 sm:py-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">Was uns antreibt</span>
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mt-3">
+              Unsere Werte
+            </h2>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { value: '500+', label: 'Aktive Nutzer' },
-              { value: '50.000+', label: 'Verarbeitete Anfragen' },
-              { value: '15h', label: 'Zeitersparnis/Woche' },
-              { value: '99.9%', label: 'Uptime' }
-            ].map((stat, i) => (
-              <div key={i}>
-                <div className="text-2xl sm:text-4xl font-extrabold text-blue-600 mb-1 sm:mb-2">{stat.value}</div>
-                <div className="text-sm sm:text-base text-gray-600">{stat.label}</div>
+              { icon: Sparkles, title: 'Innovation', description: 'KI ist nicht nur ein Feature — sie ist das Fundament unserer Plattform.' },
+              { icon: Target, title: 'Einfachheit', description: 'Komplexe Technologie, die sich anfühlt, als wäre sie einfach.' },
+              { icon: Shield, title: 'Vertrauen', description: 'DSGVO-konform. AWS EU. Eure Daten gehören euch.' },
+              { icon: Users, title: 'Kundenerfolg', description: 'Wir gewinnen nur, wenn unsere Kunden gewinnen.' },
+            ].map((value) => (
+              <div key={value.title} className="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:shadow-md transition-shadow">
+                <div className="w-12 h-12 rounded-xl bg-gray-900 flex items-center justify-center mb-4">
+                  <value.icon className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2">{value.title}</h3>
+                <p className="text-gray-600 text-sm leading-relaxed">{value.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-12 sm:py-16">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <Image src="/logo-icon.png" alt="Immivo" width={48} height={48} className="rounded-xl mx-auto mb-5 shadow-md" />
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">
-            Bereit, uns kennenzulernen?
+      {/* Company Info + CTA */}
+      <section className="py-16 sm:py-24 bg-gray-900 text-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+            Bereit, die Zukunft zu erleben?
           </h2>
-          <p className="text-lg sm:text-xl text-gray-600 mb-6 sm:mb-8 px-4">
-            Teste Immivo 14 Tage kostenlos und überzeuge dich selbst.
+          <p className="text-gray-400 mb-8 max-w-xl mx-auto">
+            Entdecke, wie Immivo dein Tagesgeschäft transformiert — in einer kostenlosen Demo oder direkt selbst.
           </p>
-          <Link 
-            href="/login"
-            className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 bg-gray-900 text-white rounded-full font-semibold hover:bg-gray-800 transition-all"
-          >
-            Jetzt kostenlos starten
-            <ArrowRight className="ml-2 w-5 h-5" />
-          </Link>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+            <Link href="/#demo" className="inline-flex items-center px-8 py-4 bg-white text-gray-900 rounded-full font-semibold hover:bg-gray-100 transition-colors">
+              Demo buchen
+              <ArrowRight className="ml-2 w-5 h-5" />
+            </Link>
+            <Link href="/login?mode=register" className="inline-flex items-center px-8 py-4 border-2 border-white/30 text-white rounded-full font-semibold hover:bg-white/10 transition-colors">
+              Kostenlos starten
+            </Link>
+          </div>
+          <div className="pt-8 border-t border-white/10">
+            <p className="font-semibold text-lg mb-4">Immivo GmbH</p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-gray-400">
+              <a href="https://maps.google.com/?q=Sterngasse+3,+1010+Wien" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-white transition-colors">
+                <MapPin className="w-4 h-4" /> Sterngasse 3, 1010 Wien
+              </a>
+              <a href="mailto:office@immivo.ai" className="flex items-center gap-2 hover:text-white transition-colors">
+                <Mail className="w-4 h-4" /> office@immivo.ai
+              </a>
+              <a href="tel:+436703551221" className="flex items-center gap-2 hover:text-white transition-colors">
+                <Phone className="w-4 h-4" /> +43 670 355 1221
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 

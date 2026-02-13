@@ -183,17 +183,49 @@ export default function ExposesPage() {
     
     // If we have a preview property, replace with actual values
     if (previewProperty) {
+      const priceFormatted = previewProperty.salePrice 
+        ? `${previewProperty.salePrice.toLocaleString('de-DE')} €`
+        : previewProperty.rentCold 
+          ? `${previewProperty.rentCold.toLocaleString('de-DE')} €/Monat`
+          : '';
       const replacements: Record<string, string> = {
         '{{property.title}}': previewProperty.title || '',
         '{{property.address}}': previewProperty.address || '',
         '{{property.city}}': previewProperty.city || '',
-        '{{property.price}}': previewProperty.salePrice 
-          ? `${previewProperty.salePrice.toLocaleString('de-DE')} €`
-          : previewProperty.rentCold 
-            ? `${previewProperty.rentCold.toLocaleString('de-DE')} €/Monat`
-            : '',
+        '{{property.zipCode}}': previewProperty.zipCode || '',
+        '{{property.price}}': priceFormatted,
+        '{{property.priceFormatted}}': priceFormatted,
         '{{property.rooms}}': previewProperty.rooms?.toString() || '',
         '{{property.area}}': previewProperty.livingArea ? `${previewProperty.livingArea} m²` : '',
+        '{{property.plotArea}}': previewProperty.plotArea ? `${previewProperty.plotArea} m²` : '',
+        '{{property.bedrooms}}': previewProperty.bedrooms?.toString() || '',
+        '{{property.bathrooms}}': previewProperty.bathrooms?.toString() || '',
+        '{{property.floor}}': previewProperty.floor?.toString() || '',
+        '{{property.totalFloors}}': previewProperty.totalFloors?.toString() || '',
+        '{{property.yearBuilt}}': previewProperty.yearBuilt?.toString() || '',
+        '{{property.propertyType}}': previewProperty.propertyType || '',
+        '{{property.heatingType}}': previewProperty.heatingType || '',
+        '{{property.energyClass}}': previewProperty.energyEfficiencyClass || '',
+        '{{property.energyConsumption}}': previewProperty.energyConsumption ? `${previewProperty.energyConsumption} kWh/(m²·a)` : '',
+        '{{property.usableArea}}': previewProperty.usableArea ? `${previewProperty.usableArea} m²` : '',
+        '{{property.deposit}}': previewProperty.deposit || '',
+        '{{property.commission}}': previewProperty.commission || '',
+        '{{property.description}}': previewProperty.description || '',
+        '{{property.locationDescription}}': previewProperty.locationDescription || '',
+        '{{property.equipmentDescription}}': previewProperty.equipmentDescription || '',
+        '{{property.virtualTour}}': previewProperty.virtualTour || '',
+        '{{user.name}}': 'Max Mustermann',
+        '{{user.email}}': 'max@immobilien.de',
+        '{{user.phone}}': '+49 123 456789',
+        '{{company.name}}': 'Mustermann Immobilien',
+        '{{lead.name}}': 'Anna Beispiel',
+        '{{lead.firstName}}': 'Anna',
+        '{{lead.lastName}}': 'Beispiel',
+        '{{lead.email}}': 'anna@beispiel.de',
+        '{{lead.phone}}': '+49 987 654321',
+        '{{lead.greeting}}': 'Sehr geehrte Frau Beispiel',
+        '{{date.today}}': new Date().toLocaleDateString('de-DE'),
+        '{{date.year}}': new Date().getFullYear().toString(),
       };
       
       let result = text;

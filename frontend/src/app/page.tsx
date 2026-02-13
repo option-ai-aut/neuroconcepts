@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import { 
   Bot, TrendingUp, Clock, ArrowRight, CheckCircle2,
   Users, Building2, Mail, Calendar, FileText, Zap, Shield,
-  ChevronRight, Star, Quote, BarChart3,
-  MessageSquare, Brain, Rocket, Target, Award, Globe, Image,
+  ChevronRight, Star, BarChart3,
+  MessageSquare, Brain, Rocket, Target, Award, Globe,
   Wand2, Server
 } from 'lucide-react';
 import NextImage from 'next/image';
@@ -67,6 +67,70 @@ function FloatingElement({ children, delay = 0 }: { children: React.ReactNode; d
       style={{ animationDelay: `${delay}s` }}
     >
       {children}
+    </div>
+  );
+}
+
+// Before/After Slider Component
+function BeforeAfterSlider() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [sliderPos, setSliderPos] = useState(50);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const updatePosition = (clientX: number) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+    setSliderPos((x / rect.width) * 100);
+  };
+
+  useEffect(() => {
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      if (!isDragging) return;
+      e.preventDefault();
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      updatePosition(clientX);
+    };
+    const handleUp = () => setIsDragging(false);
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMove);
+      window.addEventListener('touchmove', handleMove, { passive: false });
+      window.addEventListener('mouseup', handleUp);
+      window.addEventListener('touchend', handleUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('touchend', handleUp);
+    };
+  }, [isDragging]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative rounded-2xl overflow-hidden shadow-2xl cursor-col-resize select-none"
+      onMouseDown={(e) => { setIsDragging(true); updatePosition(e.clientX); }}
+      onTouchStart={(e) => { setIsDragging(true); updatePosition(e.touches[0].clientX); }}
+    >
+      <div className="aspect-[4/3] relative">
+        {/* After (full background) */}
+        <NextImage src="/Neu.jpg" alt="Nachher — Möbliert mit KI" fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" priority />
+        {/* Before (clipped) */}
+        <div className="absolute inset-0 overflow-hidden" style={{ width: `${sliderPos}%` }}>
+          <NextImage src="/Alt.jpg" alt="Vorher — Leerer Raum" fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" style={{ minWidth: containerRef.current ? `${containerRef.current.offsetWidth}px` : '100%' }} priority />
+        </div>
+        {/* Labels */}
+        <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1.5 rounded-full z-20 pointer-events-none">Vorher</div>
+        <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm text-gray-900 text-xs font-semibold px-3 py-1.5 rounded-full z-20 pointer-events-none">Nachher</div>
+        {/* Slider Handle */}
+        <div className="absolute inset-y-0 z-30 pointer-events-none" style={{ left: `${sliderPos}%` }}>
+          <div className="absolute inset-y-0 w-0.5 bg-white shadow-lg -translate-x-1/2" />
+          <div className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center pointer-events-auto cursor-col-resize">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M5 3L2 8L5 13M11 3L14 8L11 13" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -229,10 +293,10 @@ export default function LandingPage() {
               
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-8 sm:mb-12">
                 <Link 
-                  href="/login" 
+                  href="/login?mode=register" 
                   className="group inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base font-semibold text-white bg-gray-900 rounded-full hover:shadow-xl hover:shadow-gray-500/20 transition-all hover:-translate-y-1"
                 >
-                  14 Tage kostenlos testen
+                  Kostenlos testen
                   <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Link>
                 <a 
@@ -550,12 +614,12 @@ export default function LandingPage() {
           className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${section3.isInView ? 'animate-slide-up' : 'opacity-0'}`}
         >
           <div className="text-center mb-8 sm:mb-16">
-            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">Echte Ergebnisse</span>
+            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">Das Ergebnis</span>
             <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mt-3 sm:mt-4 mb-4 sm:mb-6">
               Mehr Umsatz. Weniger Stress.
             </h2>
             <p className="text-base sm:text-xl text-gray-600 max-w-3xl mx-auto">
-              Unsere Kunden berichten von dramatischen Verbesserungen in Effizienz und Umsatz.
+              Immivo automatisiert dein Tagesgeschäft — so kannst du dich auf das konzentrieren, was wirklich zählt.
             </p>
           </div>
 
@@ -580,22 +644,26 @@ export default function LandingPage() {
             ))}
           </div>
 
-          {/* Testimonial */}
-          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-12 border border-gray-200">
+          {/* 24 Portale Integration */}
+          <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-12 border border-gray-700">
             <div className="flex flex-col md:flex-row items-center gap-4 sm:gap-8">
-              <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gray-800 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-xl sm:text-3xl font-bold text-white">MK</span>
+              <div className="w-16 h-16 sm:w-24 sm:h-24 bg-white/10 rounded-2xl flex items-center justify-center flex-shrink-0">
+                <Globe className="w-8 h-8 sm:w-12 sm:h-12 text-white" />
               </div>
               <div>
-                <Quote className="w-6 h-6 sm:w-10 sm:h-10 text-gray-400 mb-2 sm:mb-4" />
-                <p className="text-sm sm:text-xl text-gray-700 mb-3 sm:mb-4 leading-relaxed">
-                  "Seit wir Immivo nutzen, habe ich endlich wieder Zeit für das, was ich liebe: 
-                  Kunden beraten und Deals abschließen. Jarvis erledigt den ganzen Papierkram. 
-                  <strong> Mein Umsatz ist um 30% gestiegen</strong>, während ich weniger arbeite."
+                <h3 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-3">
+                  24 Immobilienportale — ein Klick.
+                </h3>
+                <p className="text-sm sm:text-lg text-gray-300 mb-3 sm:mb-4 leading-relaxed">
+                  Verbinde deine Portale und pushe Objekte mit einem Klick auf ImmoScout24, Willhaben, 
+                  Immowelt, Homegate, Kleinanzeigen und 19 weitere Portale. Keine manuelle Arbeit, keine Fehler.
                 </p>
-                <div>
-                  <p className="font-bold text-gray-900">Markus Kellner</p>
-                  <p className="text-gray-600">Geschäftsführer, Kellner Immobilien GmbH</p>
+                <div className="flex flex-wrap gap-2">
+                  {['ImmoScout24', 'Willhaben', 'Immowelt', 'Homegate', 'Kleinanzeigen', '+19 weitere'].map((portal, i) => (
+                    <span key={i} className={`px-3 py-1 rounded-full text-xs font-medium ${i === 5 ? 'bg-white/20 text-white' : 'bg-white/10 text-gray-300 border border-white/10'}`}>
+                      {portal}
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
@@ -703,37 +771,7 @@ export default function LandingPage() {
           <div className="grid lg:grid-cols-2 gap-8 sm:gap-16 items-center">
             {/* Left: Image Preview */}
             <div className="relative">
-              <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-                {/* Before/After Slider Simulation */}
-                <div className="aspect-[4/3] bg-gradient-to-br from-gray-100 to-gray-200 relative">
-                  {/* Before Side */}
-                  <div className="absolute inset-0 w-1/2 bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="w-16 h-16 bg-gray-500/30 rounded-xl flex items-center justify-center mx-auto mb-3">
-                        <Image className="w-8 h-8 text-gray-600" />
-                      </div>
-                      <p className="text-gray-600 font-medium">Vorher</p>
-                      <p className="text-gray-500 text-sm">Leerer Raum</p>
-                    </div>
-                  </div>
-                  {/* After Side */}
-                  <div className="absolute inset-0 left-1/2 w-1/2 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                    <div className="text-center">
-                        <div className="w-16 h-16 bg-gray-600/30 rounded-xl flex items-center justify-center mx-auto mb-3">
-                        <Wand2 className="w-8 h-8 text-gray-600" />
-                      </div>
-                      <p className="text-gray-900 font-medium">Nachher</p>
-                      <p className="text-gray-600 text-sm">Mit Möbeln</p>
-                    </div>
-                  </div>
-                  {/* Divider */}
-                  <div className="absolute inset-y-0 left-1/2 w-1 bg-white shadow-lg transform -translate-x-1/2">
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center">
-                      <ChevronRight className="w-5 h-5 text-gray-400" />
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <BeforeAfterSlider />
 
               {/* Floating Stats */}
               <div className="absolute -right-2 sm:-right-4 -bottom-2 sm:-bottom-4 bg-white rounded-xl shadow-xl p-3 sm:p-4 border border-gray-100">
@@ -821,8 +859,8 @@ export default function LandingPage() {
               },
               {
                 step: '02',
-                title: 'Trainieren',
-                description: 'Lade deine Objekte hoch und zeig Jarvis deine Vorlagen. Er lernt sofort.',
+                title: 'Einrichten',
+                description: 'Lade deine Objekte hoch und erstelle Exposé-Vorlagen — selbst im Editor oder lass Jarvis sie für dich generieren.',
                 icon: Brain
               },
               {
@@ -916,27 +954,27 @@ export default function LandingPage() {
 
           <div className="inline-flex items-center px-4 py-2 rounded-full bg-white/20 text-white text-sm font-medium mb-8 border border-white/20">
             <Star className="w-4 h-4 mr-2 text-yellow-300" />
-            14 Tage kostenlos • Keine Kreditkarte
+            7 Tage kostenlos testen • Keine Kreditkarte
           </div>
 
           <h2 className="text-2xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6">
             Bereit, dein Business zu transformieren?
           </h2>
           <p className="text-base sm:text-xl text-white/80 mb-6 sm:mb-10 max-w-2xl mx-auto">
-            Schließe dich hunderten Maklern an, die mit Immivo mehr verdienen und weniger arbeiten. 
-            Starte heute — in 5 Minuten bist du live.
+            Starte jetzt mit Immivo — in 5 Minuten bist du live. 
+            Mehr Abschlüsse, weniger Büroarbeit, ab dem ersten Tag.
           </p>
           
           <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
             <Link 
-              href="/login" 
+              href="/login?mode=register" 
               className="group inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-bold text-gray-900 bg-white rounded-full hover:bg-gray-100 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1"
             >
               Jetzt kostenlos starten
               <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <a 
-              href="mailto:hello@immivo.ai" 
+              href="mailto:office@immivo.ai" 
               className="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-semibold text-white border-2 border-white/30 rounded-full hover:bg-white/10 transition-all"
             >
               Persönliche Demo buchen
@@ -945,9 +983,9 @@ export default function LandingPage() {
 
           {/* Trust Logos */}
           <div className="mt-8 sm:mt-16 pt-6 sm:pt-8 border-t border-white/20">
-            <p className="text-sm text-white/60 mb-6">Integriert mit den Tools, die du bereits nutzt</p>
-            <div className="flex justify-center items-center gap-8 flex-wrap opacity-70">
-              {['Alle gängigen Portale', 'Google Workspace', 'Microsoft 365'].map((name, i) => (
+            <p className="text-sm text-white/60 mb-6">Verbunden mit 24+ Portalen und den Tools, die du nutzt</p>
+            <div className="flex justify-center items-center gap-4 sm:gap-8 flex-wrap opacity-70">
+              {['24 Immobilienportale', 'Google Workspace', 'Microsoft 365', 'AWS EU Hosting'].map((name, i) => (
                 <div key={i} className="px-4 py-2 bg-white/10 rounded-lg text-sm font-medium">
                   {name}
                 </div>

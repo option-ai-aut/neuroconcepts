@@ -7466,6 +7466,441 @@ app.post('/internal/ingest-lead', async (req, res) => {
   }
 });
 
+// ============================================
+// PUBLIC WEBSITE API ENDPOINTS
+// ============================================
+
+// --- Contact Form ---
+app.post('/contact', async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { firstName, lastName, email, subject, message } = req.body;
+    if (!firstName || !lastName || !email || !subject || !message) {
+      return res.status(400).json({ error: 'Alle Pflichtfelder müssen ausgefüllt sein' });
+    }
+    const submission = await db.contactSubmission.create({
+      data: { firstName, lastName, email, subject, message }
+    });
+    // Send notification email
+    try {
+      const { sendSystemEmail } = await import('./services/SystemEmailService');
+      await sendSystemEmail({
+        to: 'office@immivo.ai',
+        subject: `Neue Kontaktanfrage: ${subject}`,
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #111827; color: white; padding: 24px 32px; border-radius: 12px 12px 0 0;">
+              <h2 style="margin: 0; font-size: 20px;">Neue Kontaktanfrage</h2>
+              <p style="margin: 4px 0 0; opacity: 0.7; font-size: 14px;">via immivo.ai/kontakt</p>
+            </div>
+            <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px; width: 100px;">Name</td><td style="padding: 8px 0; font-weight: 600;">${firstName} ${lastName}</td></tr>
+                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;">E-Mail</td><td style="padding: 8px 0;"><a href="mailto:${email}" style="color: #2563eb;">${email}</a></td></tr>
+                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Betreff</td><td style="padding: 8px 0; font-weight: 500;">${subject}</td></tr>
+              </table>
+              <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                <p style="color: #6b7280; font-size: 14px; margin: 0 0 8px;">Nachricht:</p>
+                <div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb; white-space: pre-wrap;">${message}</div>
+              </div>
+              <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">Du kannst direkt auf diese E-Mail antworten, um ${firstName} zu kontaktieren.</p>
+            </div>
+          </div>`,
+        replyTo: email,
+      });
+    } catch (emailErr) {
+      console.error('Failed to send contact notification:', emailErr);
+    }
+    res.json({ success: true, id: submission.id });
+  } catch (error: any) {
+    console.error('Contact form error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Blog (Public) ---
+app.get('/blog/posts', async (_req, res) => {
+  try {
+    const db = await initializePrisma();
+    const posts = await db.blogPost.findMany({
+      where: { published: true },
+      orderBy: { publishedAt: 'desc' },
+      select: { id: true, slug: true, title: true, excerpt: true, coverImage: true, author: true, category: true, tags: true, publishedAt: true }
+    });
+    res.json({ posts });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/blog/posts/:slug', async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const post = await db.blogPost.findFirst({
+      where: { slug: req.params.slug, published: true }
+    });
+    if (!post) return res.status(404).json({ error: 'Artikel nicht gefunden' });
+    res.json({ post });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Newsletter (Public Subscribe) ---
+app.post('/newsletter/subscribe', async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { email, name, source } = req.body;
+    if (!email) return res.status(400).json({ error: 'E-Mail ist erforderlich' });
+    const existing = await db.newsletterSubscriber.findUnique({ where: { email } });
+    if (existing) {
+      if (existing.unsubscribed) {
+        await db.newsletterSubscriber.update({ where: { email }, data: { unsubscribed: false, confirmed: true } });
+      }
+      return res.json({ success: true, message: 'Erfolgreich angemeldet' });
+    }
+    await db.newsletterSubscriber.create({
+      data: { email, name, source: source || 'website', confirmed: true }
+    });
+    res.json({ success: true, message: 'Erfolgreich angemeldet' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/newsletter/unsubscribe', async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'E-Mail ist erforderlich' });
+    await db.newsletterSubscriber.updateMany({ where: { email }, data: { unsubscribed: true } });
+    res.json({ success: true, message: 'Erfolgreich abgemeldet' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Jobs (Public) ---
+app.get('/jobs', async (_req, res) => {
+  try {
+    const db = await initializePrisma();
+    const jobs = await db.jobPosting.findMany({
+      where: { published: true },
+      orderBy: { publishedAt: 'desc' },
+      select: { id: true, title: true, department: true, location: true, type: true, remote: true, description: true, requirements: true, benefits: true, salary: true, publishedAt: true }
+    });
+    res.json({ jobs });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/jobs/:id', async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const job = await db.jobPosting.findFirst({ where: { id: req.params.id, published: true } });
+    if (!job) return res.status(404).json({ error: 'Stelle nicht gefunden' });
+    res.json({ job });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/jobs/:id/apply', async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { firstName, lastName, email, phone, coverLetter } = req.body;
+    if (!firstName || !lastName || !email) {
+      return res.status(400).json({ error: 'Pflichtfelder fehlen' });
+    }
+    const job = await db.jobPosting.findFirst({ where: { id: req.params.id, published: true } });
+    if (!job) return res.status(404).json({ error: 'Stelle nicht gefunden' });
+    const application = await db.jobApplication.create({
+      data: { jobId: job.id, firstName, lastName, email, phone, coverLetter }
+    });
+    // Notify team
+    try {
+      const { sendSystemEmail } = await import('./services/SystemEmailService');
+      await sendSystemEmail({
+        to: 'office@immivo.ai',
+        subject: `Neue Bewerbung: ${job.title} — ${firstName} ${lastName}`,
+        html: `<h3>Neue Bewerbung</h3><p><strong>Stelle:</strong> ${job.title}</p><p><strong>Name:</strong> ${firstName} ${lastName}</p><p><strong>E-Mail:</strong> ${email}</p>${phone ? `<p><strong>Telefon:</strong> ${phone}</p>` : ''}${coverLetter ? `<p><strong>Anschreiben:</strong></p><p>${coverLetter}</p>` : ''}`,
+        replyTo: email,
+      });
+    } catch (emailErr) {
+      console.error('Failed to send application notification:', emailErr);
+    }
+    res.json({ success: true, id: application.id });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Admin: Blog CRUD ---
+app.get('/admin/blog', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const posts = await db.blogPost.findMany({ orderBy: { createdAt: 'desc' } });
+    res.json({ posts });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/admin/blog', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { title, slug, excerpt, content, coverImage, author, category, tags, published } = req.body;
+    if (!title || !content) return res.status(400).json({ error: 'Titel und Inhalt sind erforderlich' });
+    const finalSlug = slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const post = await db.blogPost.create({
+      data: {
+        title, slug: finalSlug, excerpt, content, coverImage, author: author || 'Immivo Team',
+        category, tags: tags || [], published: !!published, publishedAt: published ? new Date() : null
+      }
+    });
+    res.json({ post });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/admin/blog/:id', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { title, slug, excerpt, content, coverImage, author, category, tags, published } = req.body;
+    const existing = await db.blogPost.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Nicht gefunden' });
+    const post = await db.blogPost.update({
+      where: { id: req.params.id },
+      data: {
+        ...(title !== undefined && { title }),
+        ...(slug !== undefined && { slug }),
+        ...(excerpt !== undefined && { excerpt }),
+        ...(content !== undefined && { content }),
+        ...(coverImage !== undefined && { coverImage }),
+        ...(author !== undefined && { author }),
+        ...(category !== undefined && { category }),
+        ...(tags !== undefined && { tags }),
+        ...(published !== undefined && { published, publishedAt: published && !existing.publishedAt ? new Date() : existing.publishedAt }),
+      }
+    });
+    res.json({ post });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/admin/blog/:id', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    await db.blogPost.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Admin: Newsletter ---
+app.get('/admin/newsletter/subscribers', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const subscribers = await db.newsletterSubscriber.findMany({ orderBy: { createdAt: 'desc' } });
+    res.json({ subscribers });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/admin/newsletter/campaigns', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const campaigns = await db.newsletterCampaign.findMany({ orderBy: { createdAt: 'desc' } });
+    res.json({ campaigns });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/admin/newsletter/campaigns', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { subject, content, previewText } = req.body;
+    if (!subject || !content) return res.status(400).json({ error: 'Betreff und Inhalt sind erforderlich' });
+    const campaign = await db.newsletterCampaign.create({
+      data: { subject, content, previewText }
+    });
+    res.json({ campaign });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/admin/newsletter/campaigns/:id', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { subject, content, previewText } = req.body;
+    const campaign = await db.newsletterCampaign.update({
+      where: { id: req.params.id },
+      data: { ...(subject !== undefined && { subject }), ...(content !== undefined && { content }), ...(previewText !== undefined && { previewText }) }
+    });
+    res.json({ campaign });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/admin/newsletter/campaigns/:id/send', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const campaign = await db.newsletterCampaign.findUnique({ where: { id: req.params.id } });
+    if (!campaign) return res.status(404).json({ error: 'Kampagne nicht gefunden' });
+    if (campaign.status === 'SENT') return res.status(400).json({ error: 'Bereits gesendet' });
+    const subscribers = await db.newsletterSubscriber.findMany({ where: { confirmed: true, unsubscribed: false } });
+    await db.newsletterCampaign.update({ where: { id: req.params.id }, data: { status: 'SENDING' } });
+    let sentCount = 0;
+    const { sendSystemEmail } = await import('./services/SystemEmailService');
+    for (const sub of subscribers) {
+      try {
+        await sendSystemEmail({
+          to: sub.email,
+          subject: campaign.subject,
+          html: campaign.content + `<br/><hr/><p style="font-size:12px;color:#666;">Du erhältst diese E-Mail, weil du den Immivo Newsletter abonniert hast. <a href="https://immivo.ai/newsletter/unsubscribe?email=${encodeURIComponent(sub.email)}">Abmelden</a></p>`,
+        });
+        sentCount++;
+      } catch (e) { console.error(`Failed to send to ${sub.email}:`, e); }
+    }
+    await db.newsletterCampaign.update({
+      where: { id: req.params.id },
+      data: { status: 'SENT', sentAt: new Date(), sentCount }
+    });
+    res.json({ success: true, sentCount });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/admin/newsletter/campaigns/:id', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    await db.newsletterCampaign.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Admin: Jobs ---
+app.get('/admin/jobs', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const jobs = await db.jobPosting.findMany({ orderBy: { createdAt: 'desc' }, include: { applications: { select: { id: true } } } });
+    res.json({ jobs: jobs.map(j => ({ ...j, applicationCount: j.applications.length, applications: undefined })) });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/admin/jobs', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { title, department, location, type, remote, description, requirements, benefits, salary, published } = req.body;
+    if (!title || !description) return res.status(400).json({ error: 'Titel und Beschreibung sind erforderlich' });
+    const job = await db.jobPosting.create({
+      data: { title, department, location, type: type || 'FULL_TIME', remote: !!remote, description, requirements, benefits, salary, published: !!published, publishedAt: published ? new Date() : null }
+    });
+    res.json({ job });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/admin/jobs/:id', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { title, department, location, type, remote, description, requirements, benefits, salary, published } = req.body;
+    const existing = await db.jobPosting.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Nicht gefunden' });
+    const job = await db.jobPosting.update({
+      where: { id: req.params.id },
+      data: {
+        ...(title !== undefined && { title }),
+        ...(department !== undefined && { department }),
+        ...(location !== undefined && { location }),
+        ...(type !== undefined && { type }),
+        ...(remote !== undefined && { remote }),
+        ...(description !== undefined && { description }),
+        ...(requirements !== undefined && { requirements }),
+        ...(benefits !== undefined && { benefits }),
+        ...(salary !== undefined && { salary }),
+        ...(published !== undefined && { published, publishedAt: published && !existing.publishedAt ? new Date() : existing.publishedAt }),
+      }
+    });
+    res.json({ job });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/admin/jobs/:id', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    await db.jobPosting.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/admin/jobs/:id/applications', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const applications = await db.jobApplication.findMany({ where: { jobId: req.params.id }, orderBy: { createdAt: 'desc' } });
+    res.json({ applications });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/admin/jobs/applications/:id', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { status, notes } = req.body;
+    const application = await db.jobApplication.update({
+      where: { id: req.params.id },
+      data: { ...(status !== undefined && { status }), ...(notes !== undefined && { notes }) }
+    });
+    res.json({ application });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Admin: Contact Submissions ---
+app.get('/admin/contacts', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const submissions = await db.contactSubmission.findMany({ orderBy: { createdAt: 'desc' } });
+    res.json({ submissions });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/admin/contacts/:id', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { status, notes } = req.body;
+    const submission = await db.contactSubmission.update({
+      where: { id: req.params.id },
+      data: { ...(status !== undefined && { status }), ...(notes !== undefined && { notes }) }
+    });
+    res.json({ submission });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export const handler = serverless(app, {
   binary: ['multipart/form-data', 'image/*', 'application/octet-stream'],
 });

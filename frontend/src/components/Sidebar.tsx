@@ -7,7 +7,8 @@ import { signOut } from 'aws-amplify/auth';
 import { useState } from 'react';
 import { 
   LayoutDashboard, Users, Settings, LogOut, Inbox,
-  Calendar, FileText, MessageSquare, Wand2, Activity
+  Calendar, FileText, MessageSquare, Wand2, Activity, Newspaper,
+  Mail, Briefcase
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useGlobalState } from '@/context/GlobalStateContext';
@@ -31,12 +32,16 @@ export default function Sidebar() {
     { name: 'Kalender', href: '/dashboard/calendar', icon: Calendar },
     { name: 'Exposés', href: '/dashboard/exposes', icon: FileText },
     { name: 'Bildstudio', href: '/dashboard/image-studio', icon: Wand2 },
+    { name: 'Blog', href: '/dashboard/marketing/blog', icon: Newspaper },
+    { name: 'Newsletter', href: '/dashboard/marketing/newsletter', icon: Mail },
+    { name: 'Karriere', href: '/dashboard/marketing/karriere', icon: Briefcase },
     { name: 'Team Chat', href: '/dashboard/assistant', icon: MessageSquare },
   ];
 
   const isActive = (itemHref: string) => {
     if (itemHref === '/dashboard') return pathname === '/dashboard';
     if (itemHref === '/dashboard/crm/leads') return pathname.startsWith('/dashboard/crm');
+    if (itemHref === '/dashboard/marketing/blog') return pathname.startsWith('/dashboard/marketing');
     return pathname.startsWith(itemHref);
   };
 
