@@ -121,8 +121,8 @@ function BeforeAfterSlider() {
           <NextImage src="/Alt.jpg" alt="Vorher — Leerer Raum" fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" style={{ minWidth: containerRef.current ? `${containerRef.current.offsetWidth}px` : '100%' }} priority />
         </div>
         {/* Labels */}
-        <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1.5 rounded-full z-20 pointer-events-none">Vorher</div>
-        <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm text-gray-900 text-xs font-semibold px-3 py-1.5 rounded-full z-20 pointer-events-none">Nachher</div>
+        <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1.5 rounded-full z-20 pointer-events-none">Vorher</div>
+        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-gray-900 text-xs font-semibold px-3 py-1.5 rounded-full z-20 pointer-events-none">Nachher</div>
         {/* Slider Handle */}
         <div className="absolute inset-y-0 z-30 pointer-events-none" style={{ left: `${sliderPos}%` }}>
           <div className="absolute inset-y-0 w-0.5 bg-white shadow-lg -translate-x-1/2" />

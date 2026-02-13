@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import {
   CheckCircle2,
+  XCircle,
+  AlertCircle,
   ArrowRight,
   Zap,
   Building2,
@@ -55,11 +57,11 @@ export default function PreisePage() {
       period: '/Monat',
       subtext: '1 Woche gratis',
       features: [
-        'Alle Grundfunktionen',
-        'Jarvis auf 20 Eingaben beschränkt',
-        'Bildstudio auf 3 Generierungen beschränkt',
-        'KEIN Portal-Push',
-        'E-Mail-Support',
+        { text: 'Alle Grundfunktionen', color: 'green' as const },
+        { text: 'Jarvis auf 20 Eingaben beschränkt', color: 'yellow' as const },
+        { text: 'Bildstudio auf 3 Generierungen beschränkt', color: 'yellow' as const },
+        { text: 'KEIN Portal-Push', color: 'red' as const },
+        { text: 'E-Mail-Support', color: 'green' as const },
       ],
       cta: 'Jetzt testen',
       href: '/login',
@@ -76,14 +78,14 @@ export default function PreisePage() {
       subtext: null,
       seats: '1 Seat',
       features: [
-        'Zugriff auf ALLES',
-        'Unbegrenzter Jarvis',
-        'Unbegrenztes Bildstudio',
-        '24 Portal-Integrationen',
-        'KI-Exposé-Editor',
-        'CRM + Lead-Management',
-        'E-Mail & Kalender',
-        'Priority Support',
+        { text: 'Zugriff auf ALLES', color: 'green' as const },
+        { text: 'Unbegrenzter Jarvis', color: 'green' as const },
+        { text: 'Unbegrenztes Bildstudio', color: 'green' as const },
+        { text: '24 Portal-Integrationen', color: 'green' as const },
+        { text: 'KI-Exposé-Editor', color: 'green' as const },
+        { text: 'CRM + Lead-Management', color: 'green' as const },
+        { text: 'E-Mail & Kalender', color: 'green' as const },
+        { text: 'Priority Support', color: 'green' as const },
       ],
       cta: 'Jetzt starten',
       href: '/login',
@@ -100,10 +102,10 @@ export default function PreisePage() {
       subtext: null,
       seats: '3 Seats inklusive',
       features: [
-        'Everything in Solo PLUS',
-        'Team-Verwaltung',
-        'Gemeinsame Objekte & Leads',
-        'Rollen & Berechtigungen',
+        { text: 'Everything in Solo PLUS', color: 'green' as const },
+        { text: 'Team-Verwaltung', color: 'green' as const },
+        { text: 'Gemeinsame Objekte & Leads', color: 'green' as const },
+        { text: 'Rollen & Berechtigungen', color: 'green' as const },
       ],
       cta: 'Jetzt starten',
       href: '/login',
@@ -121,12 +123,12 @@ export default function PreisePage() {
       subtext: 'jeder weitere +50€/Monat',
       seats: 'Bis zu 10 Seats',
       features: [
-        'Everything in Team PLUS',
-        'Eigene Domain',
-        'Dedizierter Account Manager',
-        'API-Zugang',
-        'Custom Integrationen',
-        'SLA-Garantie',
+        { text: 'Everything in Team PLUS', color: 'green' as const },
+        { text: 'Eigene Domain', color: 'green' as const },
+        { text: 'Dedizierter Account Manager', color: 'green' as const },
+        { text: 'API-Zugang', color: 'green' as const },
+        { text: 'Custom Integrationen', color: 'green' as const },
+        { text: 'SLA-Garantie', color: 'green' as const },
       ],
       cta: 'Kontakt aufnehmen',
       href: '/kontakt',
@@ -346,22 +348,31 @@ export default function PreisePage() {
                 </div>
 
                 <ul className="space-y-3 sm:space-y-4 mb-6 sm:mb-8 flex-1">
-                  {plan.features.map((feature, j) => (
-                    <li key={j} className="flex items-start gap-3">
-                      <CheckCircle2
-                        className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
-                          plan.popular ? 'text-gray-300' : 'text-green-500'
-                        }`}
-                      />
-                      <span
-                        className={`text-sm sm:text-base ${
-                          plan.popular ? 'text-white' : 'text-gray-700'
-                        }`}
-                      >
-                        {feature}
-                      </span>
-                    </li>
-                  ))}
+                  {plan.features.map((feature, j) => {
+                    const color = feature.color || 'green';
+                    const iconColor = plan.popular
+                      ? 'text-gray-300'
+                      : color === 'red'
+                      ? 'text-red-500'
+                      : color === 'yellow'
+                      ? 'text-amber-500'
+                      : 'text-green-500';
+                    const Icon = color === 'red' ? XCircle : color === 'yellow' ? AlertCircle : CheckCircle2;
+                    return (
+                      <li key={j} className="flex items-start gap-3">
+                        <Icon
+                          className={`w-5 h-5 flex-shrink-0 mt-0.5 ${iconColor}`}
+                        />
+                        <span
+                          className={`text-sm sm:text-base ${
+                            plan.popular ? 'text-white' : color === 'red' ? 'text-gray-400' : 'text-gray-700'
+                          }`}
+                        >
+                          {feature.text}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
 
                 <Link
