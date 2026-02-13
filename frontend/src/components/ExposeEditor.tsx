@@ -1178,7 +1178,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
 
       case 'leadInfo':
         return (
-          <div className="p-6 border-l-4" style={{ backgroundColor: blockBg || undefined, borderColor: themeColors.accent }}>
+          <div className="p-6" style={{ backgroundColor: blockBg || undefined }}>
             {block.showGreeting !== false && (
               <p className={`text-sm mb-2 ${bCls}`} style={{ color: blockTextColor || '#6B7280' }}>Erstellt für</p>
             )}

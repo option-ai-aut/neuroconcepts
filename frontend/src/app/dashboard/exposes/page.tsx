@@ -383,7 +383,7 @@ export default function ExposesPage() {
 
       case 'leadInfo':
         return (
-          <div className="p-6 bg-gray-50 border-l-4" style={{ borderColor: themeColors.accent }}>
+          <div className="p-6 bg-gray-50">
             {block.showGreeting !== false && (
               <p className="text-sm text-gray-500 mb-2">Erstellt für</p>
             )}
