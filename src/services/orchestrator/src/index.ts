@@ -6617,14 +6617,15 @@ app.delete('/calendar/events/:id', authMiddleware, async (req: any, res) => {
   }
 });
 
-// Get busy slots (for public booking page)
+// Get busy slots (for public booking page) — always checks office@ calendar
 app.get('/calendar/busy', async (req, res) => {
   try {
     const creds = getWorkMailCreds();
     if (!creds.email || !creds.password) {
-      return res.status(500).json({ error: 'WorkMail not configured' });
+      return res.json({ slots: [] }); // graceful fallback
     }
-    const email = req.query.email as string || creds.email;
+    // Always check office@ calendar for demo bookings (contains all employee events)
+    const email = req.query.email as string || 'office@immivo.ai';
     const start = new Date(req.query.start as string || new Date().toISOString());
     const end = new Date(req.query.end as string || new Date(Date.now() + 14 * 86400000).toISOString());
 
@@ -6632,7 +6633,7 @@ app.get('/calendar/busy', async (req, res) => {
     res.json({ slots });
   } catch (error: any) {
     console.error('Calendar busy error:', error);
-    res.status(500).json({ error: error.message });
+    res.json({ slots: [] }); // graceful fallback
   }
 });
 
@@ -7983,6 +7984,170 @@ app.put('/admin/contacts/:id', authMiddleware, async (req, res) => {
     res.json({ submission });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Admin: WorkMail Email Endpoints
+// ═══════════════════════════════════════════════════════════════════
+
+app.get('/admin/emails', adminAuthMiddleware, async (req, res) => {
+  try {
+    const creds = getWorkMailCreds();
+    if (!creds.email || !creds.password) {
+      return res.json({ emails: [], total: 0, unreadCounts: {} });
+    }
+
+    const mailbox = (req.query.mailbox as string) || creds.email;
+    const folder = (req.query.folder as string) || 'INBOX';
+    const search = req.query.search as string | undefined;
+    const limit = parseInt(req.query.limit as string) || 50;
+
+    const { getEmails } = await import('./services/WorkMailEmailService');
+    const result = await getEmails(creds, mailbox, folder as any, limit, search);
+
+    res.json({
+      emails: result.emails,
+      total: result.total,
+      unreadCounts: {},
+    });
+  } catch (error: any) {
+    console.error('Admin emails error:', error);
+    res.json({ emails: [], total: 0, unreadCounts: {} });
+  }
+});
+
+app.get('/admin/emails/unread-counts', adminAuthMiddleware, async (req, res) => {
+  try {
+    const creds = getWorkMailCreds();
+    if (!creds.email || !creds.password) {
+      return res.json({ counts: {} });
+    }
+
+    const mailboxes = ['office@immivo.ai', 'support@immivo.ai', 'dennis.kral@immivo.ai', 'josef.leutgeb@immivo.ai'];
+    const { getUnreadCount } = await import('./services/WorkMailEmailService');
+
+    const counts: Record<string, number> = {};
+    for (const mb of mailboxes) {
+      try {
+        counts[mb] = await getUnreadCount(creds, mb);
+      } catch {
+        counts[mb] = 0;
+      }
+    }
+
+    res.json({ counts });
+  } catch (error: any) {
+    console.error('Admin unread counts error:', error);
+    res.json({ counts: {} });
+  }
+});
+
+app.patch('/admin/emails/:id/read', adminAuthMiddleware, async (req, res) => {
+  try {
+    const creds = getWorkMailCreds();
+    if (!creds.email || !creds.password) {
+      return res.json({ success: false });
+    }
+
+    const { markEmailRead } = await import('./services/WorkMailEmailService');
+    const result = await markEmailRead(creds, req.params.id, req.body.isRead ?? true);
+    res.json({ success: result });
+  } catch (error: any) {
+    res.json({ success: false });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Admin: User Management Endpoints (Super Admin)
+// ═══════════════════════════════════════════════════════════════════
+
+app.patch('/admin/platform/users/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { role, firstName, lastName, phone } = req.body;
+
+    const updateData: any = {};
+    if (role !== undefined) updateData.role = role;
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
+    if (phone !== undefined) updateData.phone = phone;
+
+    const user = await db.user.update({
+      where: { id: req.params.id },
+      data: updateData,
+      include: { tenant: { select: { name: true } }, _count: { select: { leads: true } } },
+    });
+
+    res.json({
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone,
+      role: user.role,
+      tenantId: user.tenantId,
+      tenantName: user.tenant.name,
+      leadCount: user._count.leads,
+    });
+  } catch (error: any) {
+    console.error('Admin update user error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/admin/platform/users/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    
+    // Don't allow deleting SUPER_ADMIN users
+    const user = await db.user.findUnique({ where: { id: req.params.id } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.role === 'SUPER_ADMIN') {
+      return res.status(403).json({ error: 'Super Admins können nicht gelöscht werden' });
+    }
+
+    await db.user.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Admin delete user error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Calendar: Sync to office@ when creating events
+// ═══════════════════════════════════════════════════════════════════
+
+app.post('/calendar/events/sync-to-office', authMiddleware, async (req: any, res) => {
+  try {
+    const creds = getWorkMailCreds();
+    if (!creds.email || !creds.password) {
+      return res.json({ success: false, reason: 'WorkMail not configured' });
+    }
+    const { subject, body, start, end, location, attendees, isAllDay } = req.body;
+    if (!subject || !start || !end) {
+      return res.status(400).json({ error: 'subject, start, end required' });
+    }
+
+    // Create event in office@ calendar
+    const result = await createCalendarEvent(
+      { email: 'office@immivo.ai', password: creds.password },
+      {
+        subject,
+        body,
+        start: new Date(start),
+        end: new Date(end),
+        location,
+        attendees,
+        isAllDay,
+      }
+    );
+
+    res.json({ success: true, eventId: result?.id });
+  } catch (error: any) {
+    console.error('Calendar sync to office error:', error);
+    res.json({ success: false, error: error.message });
   }
 });
 

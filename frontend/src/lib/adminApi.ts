@@ -161,3 +161,38 @@ export const getAdminBugReports = (status?: string) =>
   adminFetch<BugReportsResponse>(`/admin/platform/bug-reports${status && status !== 'ALL' ? `?status=${status}` : ''}`);
 export const updateAdminBugReport = (id: string, data: { status?: BugReportStatus; priority?: BugReportPriority; adminNotes?: string }) =>
   adminFetch<BugReport>(`/admin/platform/bug-reports/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+
+// User Management
+export const updateAdminUser = (id: string, data: { role?: string; firstName?: string; lastName?: string; phone?: string }) =>
+  adminFetch<AdminUser>(`/admin/platform/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+export const deleteAdminUser = (id: string) =>
+  adminFetch<{ success: boolean }>(`/admin/platform/users/${id}`, { method: 'DELETE' });
+
+// Admin Emails (WorkMail)
+export interface AdminEmail {
+  id: string;
+  from: string;
+  fromName: string;
+  to: string[];
+  cc: string[];
+  subject: string;
+  bodyHtml: string;
+  bodyText: string;
+  isRead: boolean;
+  hasAttachments: boolean;
+  receivedAt: string;
+  folder: string;
+}
+
+export interface AdminEmailsResponse {
+  emails: AdminEmail[];
+  total: number;
+  unreadCounts: Record<string, number>;
+}
+
+export const getAdminEmails = (mailbox: string, folder = 'INBOX', search?: string) =>
+  adminFetch<AdminEmailsResponse>(`/admin/emails?mailbox=${encodeURIComponent(mailbox)}&folder=${folder}${search ? `&search=${encodeURIComponent(search)}` : ''}`);
+export const getAdminUnreadCounts = () =>
+  adminFetch<{ counts: Record<string, number> }>('/admin/emails/unread-counts');
+export const markAdminEmailRead = (id: string, isRead: boolean) =>
+  adminFetch<{ success: boolean }>(`/admin/emails/${id}/read`, { method: 'PATCH', body: JSON.stringify({ isRead }) });

@@ -18,7 +18,10 @@
   "author": "Immivo AI",
   "license": "ISC",
   "devDependencies": {
-    "typescript": "^5.3.3",
-    "@types/node": "^20.11.0"
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "puppeteer": "^24.37.3"
   }
 }
