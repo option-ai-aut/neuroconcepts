@@ -40,6 +40,7 @@ interface Message {
   role: 'USER' | 'ASSISTANT' | 'SYSTEM';
   content: string;
   isAction?: boolean; // Flag for action messages
+  isExecutingTools?: boolean; // Flag for live tool execution indicator
   attachments?: { name: string; type: string }[]; // Show attachments in message
   toolsUsed?: string[]; // Tools that were used for this response
 }
@@ -606,7 +607,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         let buffer = '';
         let hadFunctionCalls = false;
         let toolsUsed: string[] = [];
-        let showingActionMessage = false;
+        
 
         while (true) {
           const { done, value } = await reader.read();
@@ -620,17 +621,18 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
             if (line.startsWith('data: ')) {
               const data = JSON.parse(line.slice(6));
               
-              // Capture tools used and update message immediately
+              // Capture tools used and update message immediately with live action indicator
               if (data.toolsUsed && data.toolsUsed.length > 0) {
                 toolsUsed = data.toolsUsed;
-                // Update the assistant message with tools immediately
+                // Update the assistant message with tools immediately and show action indicator
                 setMessages(prev => {
                   const newMessages = [...prev];
                   const assistantIdx = newMessages.findIndex((m, idx) => idx === assistantMsgIndex && m.role === 'ASSISTANT');
                   if (assistantIdx !== -1) {
                     newMessages[assistantIdx] = {
                       ...newMessages[assistantIdx],
-                      toolsUsed: toolsUsed
+                      toolsUsed: toolsUsed,
+                      isExecutingTools: true
                     };
                   }
                   return newMessages;
@@ -638,11 +640,6 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
               }
               
               if (data.error) {
-                // Remove action message if showing
-                if (showingActionMessage) {
-                  setMessages(prev => prev.filter(m => !m.isAction));
-                  showingActionMessage = false;
-                }
                 setMessages(prev => {
                   const newMessages = [...prev];
                   newMessages[assistantMsgIndex] = { role: 'ASSISTANT', content: 'Fehler bei der Verbindung zu Jarvis.' };
@@ -652,12 +649,6 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
               }
               
               if (data.done) {
-                // Remove action message when done
-                if (showingActionMessage) {
-                  setMessages(prev => prev.filter(m => !m.isAction));
-                  showingActionMessage = false;
-                }
-                
                 // Check if AI performed actions
                 if (data.hadFunctionCalls) {
                   hadFunctionCalls = true;
@@ -666,14 +657,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
               }
               
               if (data.chunk) {
-                // Check if we should show action message
-                // Show it when we detect function calls (usually starts with "[")
-                if (!showingActionMessage && data.chunk.trim().startsWith('[')) {
-                  setMessages(prev => [...prev, { role: 'SYSTEM', content: 'Jarvis führt Aktion aus...', isAction: true }]);
-                  showingActionMessage = true;
-                }
-
-                // Update the assistant message with new chunk (preserve toolsUsed)
+                // Update the assistant message with new chunk (preserve toolsUsed, clear executing flag)
                 setMessages(prev => {
                   const newMessages = [...prev];
                   // Find the assistant message (not the action message)
@@ -681,7 +665,8 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                   if (assistantIdx !== -1) {
                     newMessages[assistantIdx] = {
                       ...newMessages[assistantIdx], // Preserve existing properties like toolsUsed
-                      content: (newMessages[assistantIdx]?.content || '') + data.chunk
+                      content: (newMessages[assistantIdx]?.content || '') + data.chunk,
+                      isExecutingTools: false
                     };
                   }
                   return newMessages;
@@ -865,7 +850,14 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                       return Object.entries(toolCounts).map(([tool, count], i) => {
                         const { label, icon } = getToolLabel(tool);
                         return (
-                          <span key={i} className="inline-flex items-center gap-1 bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 border border-gray-200 rounded-md px-2 py-0.5 text-[10px] font-medium shadow-sm">
+                          <span key={i} className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium shadow-sm ${
+                            msg.isExecutingTools
+                              ? 'bg-gradient-to-r from-indigo-50 to-blue-50 text-indigo-700 border border-indigo-200 animate-pulse'
+                              : 'bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 border border-gray-200'
+                          }`}>
+                            {msg.isExecutingTools && (
+                              <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping" />
+                            )}
                             <span>{icon}</span>
                             {count > 1 ? `${count}x ${label}` : label}
                           </span>

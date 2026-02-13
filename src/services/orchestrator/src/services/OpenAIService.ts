@@ -6,6 +6,26 @@ import { AiSafetyMiddleware } from '../middleware/aiSafety';
 const ALL_TOOLS = { ...CRM_TOOLS, ...EXPOSE_TOOLS };
 
 // Convert our tool definitions to OpenAI function format
+function convertPropertyToOpenAI(value: any): any {
+  const result: any = { type: value.type?.toLowerCase() || 'string', description: value.description };
+  // Support array items
+  if (result.type === 'array' && value.items) {
+    result.items = { type: value.items.type?.toLowerCase() || 'string' };
+  }
+  // Support enum
+  if (value.enum) {
+    result.enum = value.enum;
+  }
+  // Support nested object properties
+  if (result.type === 'object' && value.properties) {
+    result.properties = Object.fromEntries(
+      Object.entries(value.properties).map(([k, v]: [string, any]) => [k, convertPropertyToOpenAI(v)])
+    );
+    if (value.required) result.required = value.required;
+  }
+  return result;
+}
+
 function convertToolsToOpenAI(tools: Record<string, any>): OpenAI.Chat.ChatCompletionTool[] {
   return Object.values(tools).map((tool: any) => ({
     type: 'function' as const,
@@ -17,7 +37,7 @@ function convertToolsToOpenAI(tools: Record<string, any>): OpenAI.Chat.ChatCompl
         properties: Object.fromEntries(
           Object.entries(tool.parameters?.properties || {}).map(([key, value]: [string, any]) => [
             key,
-            { type: value.type?.toLowerCase() || 'string', description: value.description }
+            convertPropertyToOpenAI(value)
           ])
         ),
         required: tool.parameters?.required || [],
@@ -77,7 +97,14 @@ DEINE FÄHIGKEITEN (nutze die passenden Tools):
 
 SICHERHEIT: Nur Tenant-eigene Daten. Bei Lösch-Ops: Bestätigung. Bei E-Mail-Versand: Entwurf zeigen. Leads immer mit vollständigem Namen.
 
-KONTEXT-BEWUSSTSEIN: Du weißt IMMER, auf welcher Seite der App sich der Benutzer gerade befindet. Diese Info wird dir als "AKTUELLE SEITE" mitgeteilt. Wenn der User fragt "wo bin ich", "auf welcher Seite bin ich", "siehst du wo ich bin", "was mache ich gerade" oder Ähnliches — antworte SOFORT und SELBSTBEWUSST mit der Seite. Sag NICHT "ich kann deinen Bildschirm nicht sehen". Du KANNST es sehen, du WEISST es. Antworte z.B.: "Du bist gerade im Posteingang." oder "Du bearbeitest gerade eine Exposé-Vorlage." Kurz, direkt, ohne Einschränkungen.`;
+KONTEXT-BEWUSSTSEIN: Du weißt IMMER, auf welcher Seite der App sich der Benutzer gerade befindet. Diese Info wird dir als "AKTUELLE SEITE" mitgeteilt. Wenn der User fragt "wo bin ich", "auf welcher Seite bin ich", "siehst du wo ich bin", "was mache ich gerade" oder Ähnliches — antworte SOFORT und SELBSTBEWUSST mit der Seite. Sag NICHT "ich kann deinen Bildschirm nicht sehen". Du KANNST es sehen, du WEISST es. Antworte z.B.: "Du bist gerade im Posteingang." oder "Du bearbeitest gerade eine Exposé-Vorlage." Kurz, direkt, ohne Einschränkungen.
+
+ABSOLUT KRITISCH — ANTWORTFORMAT:
+- Gib NUR die finale Antwort an den User aus. NIEMALS interne Gedanken, Planungen oder Zwischenschritte als Text ausgeben.
+- Schreibe NIEMALS JSON, Tool-Argumente, Funktionsnamen oder Parameter als sichtbaren Text.
+- Schreibe NIEMALS Sätze wie "Ich werde jetzt...", "Die aktuelle Seite des Benutzers ist...", "Ich rufe jetzt das Tool X auf..." — das sind interne Vorgänge, die der User nie sehen soll.
+- Erwähne die aktuelle Seite NUR wenn der User explizit danach fragt.
+- Wenn du mehrere Aktionen nacheinander ausführst (z.B. 3 Objekte anlegen), arbeite STILL und gib am Ende EINE kurze Zusammenfassung.`;
 }
 
 const EXPOSE_SYSTEM_PROMPT = `Du bist Jarvis, ein KI-Assistent für Immobilienmakler. Du hilfst beim Erstellen und Bearbeiten von Exposés.
@@ -211,91 +238,86 @@ export class OpenAIService {
       { role: 'user', content: message },
     ];
 
-    // First call with streaming to check for tool calls
-    const stream = await this.client.chat.completions.create({
-      model: MODEL,
-      messages,
-      tools: convertToolsToOpenAI(CRM_TOOLS),
-      tool_choice: 'auto',
-      stream: true,
-    });
+    const allToolNames: string[] = [];
+    let hadAnyFunctionCalls = false;
+    let currentMessages = [...messages];
+    const MAX_TOOL_ROUNDS = 8; // Safety limit to prevent infinite loops
+    const openAITools = convertToolsToOpenAI(CRM_TOOLS);
 
-    // Collect the full response to check for tool calls
-    let fullContent = '';
-    const toolCalls: OpenAI.Chat.ChatCompletionMessageToolCall[] = [];
-    const toolCallsInProgress: Map<number, { id: string; type: 'function'; function: { name: string; arguments: string } }> = new Map();
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      const isFirstRound = round === 0;
 
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta;
-      
-      // Collect content
-      if (delta?.content) {
-        fullContent += delta.content;
-        yield { chunk: delta.content, hadFunctionCalls: false };
-      }
-      
-      // Collect tool calls
-      if (delta?.tool_calls) {
-        for (const tc of delta.tool_calls) {
-          if (tc.index !== undefined) {
-            if (!toolCallsInProgress.has(tc.index)) {
-              toolCallsInProgress.set(tc.index, {
-                id: tc.id || '',
-                type: 'function',
-                function: { name: '', arguments: '' }
-              });
-            }
-            const existing = toolCallsInProgress.get(tc.index)!;
-            if (tc.id) existing.id = tc.id;
-            if (tc.function?.name) existing.function.name += tc.function.name;
-            if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
-          }
-        }
-      }
-    }
-
-    // Convert collected tool calls
-    for (const [_, tc] of toolCallsInProgress) {
-      if (tc.id && tc.function.name) {
-        toolCalls.push(tc as OpenAI.Chat.ChatCompletionMessageToolCall);
-      }
-    }
-
-    // Handle tool calls if any
-    if (toolCalls.length > 0) {
-      // Extract tool names for frontend display
-      const toolNames = toolCalls
-        .filter(tc => tc.type === 'function' && 'function' in tc)
-        .map(tc => (tc as any).function.name as string);
-      yield { chunk: '', hadFunctionCalls: true, toolsUsed: toolNames };
-      
-      const toolResults = await this.executeToolCalls(toolCalls, tenantId);
-      
-      // Build assistant message with tool calls
-      const assistantMessage: OpenAI.Chat.ChatCompletionMessageParam = {
-        role: 'assistant',
-        content: fullContent || null,
-        tool_calls: toolCalls,
-      };
-      
-      // Stream final response
-      const followUpMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-        ...messages,
-        assistantMessage,
-        ...toolResults,
-      ];
-
-      const finalStream = await this.client.chat.completions.create({
+      const stream = await this.client.chat.completions.create({
         model: MODEL,
-        messages: followUpMessages,
+        messages: currentMessages,
+        tools: openAITools,
+        tool_choice: 'auto',
         stream: true,
       });
 
-      for await (const chunk of finalStream) {
-        const content = chunk.choices[0]?.delta?.content;
-        if (content) {
-          yield { chunk: content, hadFunctionCalls: true };
+      let roundContent = '';
+      const toolCallsInProgress: Map<number, { id: string; type: 'function'; function: { name: string; arguments: string } }> = new Map();
+
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta;
+        
+        // Collect content — only stream to client on final round (when no more tool calls)
+        if (delta?.content) {
+          roundContent += delta.content;
         }
+        
+        // Collect tool calls
+        if (delta?.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            if (tc.index !== undefined) {
+              if (!toolCallsInProgress.has(tc.index)) {
+                toolCallsInProgress.set(tc.index, {
+                  id: tc.id || '',
+                  type: 'function',
+                  function: { name: '', arguments: '' }
+                });
+              }
+              const existing = toolCallsInProgress.get(tc.index)!;
+              if (tc.id) existing.id = tc.id;
+              if (tc.function?.name) existing.function.name += tc.function.name;
+              if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
+            }
+          }
+        }
+      }
+
+      // Convert collected tool calls
+      const roundToolCalls: OpenAI.Chat.ChatCompletionMessageToolCall[] = [];
+      for (const [_, tc] of toolCallsInProgress) {
+        if (tc.id && tc.function.name) {
+          roundToolCalls.push(tc as OpenAI.Chat.ChatCompletionMessageToolCall);
+        }
+      }
+
+      if (roundToolCalls.length > 0) {
+        // More tool calls to execute
+        hadAnyFunctionCalls = true;
+        const toolNames = roundToolCalls.map(tc => (tc as any).function.name as string);
+        allToolNames.push(...toolNames);
+        yield { chunk: '', hadFunctionCalls: true, toolsUsed: allToolNames };
+
+        const toolResults = await this.executeToolCalls(roundToolCalls, tenantId);
+
+        // Add this round's assistant message + tool results to conversation
+        currentMessages.push({
+          role: 'assistant',
+          content: roundContent || null,
+          tool_calls: roundToolCalls,
+        } as any);
+        currentMessages.push(...toolResults);
+
+        // Continue loop for next round
+      } else {
+        // No more tool calls — stream the final text content to client
+        if (roundContent) {
+          yield { chunk: roundContent, hadFunctionCalls: hadAnyFunctionCalls };
+        }
+        break; // Done
       }
     }
   }
