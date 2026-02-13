@@ -15,6 +15,15 @@ const getApiUrl = () => {
   return url.replace(/\/+$/, '');
 };
 
+// Get Lambda Function URL for streaming (bypasses API GW 29s timeout)
+// Falls back to regular API URL if Function URL not configured
+const getStreamUrl = () => {
+  const config = getRuntimeConfig();
+  const streamUrl = config.streamUrl || '';
+  if (streamUrl) return streamUrl.replace(/\/+$/, '');
+  return getApiUrl(); // fallback to API Gateway
+};
+
 // Get auth headers for API calls
 const getAuthHeaders = async (): Promise<HeadersInit> => {
   try {
@@ -535,10 +544,11 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         // Show action indicator
         setMessages(prev => [...prev, { role: 'SYSTEM', content: 'Jarvis führt Aktion aus...', isAction: true }]);
         
-        // Determine endpoint
+        // Determine endpoint — use Function URL for longer timeout
+        const baseUrl = getStreamUrl();
         const endpoint = hasTemplateContext 
-          ? `${apiUrl}/templates/${activeExposeContext.templateId}/chat`
-          : `${apiUrl}/exposes/${activeExposeContext.exposeId}/chat`;
+          ? `${baseUrl}/templates/${activeExposeContext.templateId}/chat`
+          : `${baseUrl}/exposes/${activeExposeContext.exposeId}/chat`;
         
         const authHeaders = await getAuthHeaders();
         const exposePageContext = getPageContext(pathname, activeExposeContext);
@@ -552,12 +562,12 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           }),
           signal: abortController.signal,
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({ response: 'Fehler bei der Verbindung zu Jarvis.' }));
         
         // Remove action indicator and add response
         setMessages(prev => [
           ...prev.filter(m => !m.isAction), 
-          { role: 'ASSISTANT', content: data.response }
+          { role: 'ASSISTANT', content: data.response || data.text || 'Jarvis konnte nicht antworten.' }
         ]);
         
         if (data.actionsPerformed && data.actionsPerformed.length > 0) {
@@ -566,7 +576,8 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         setIsLoading(false);
       } else {
         // Regular chat endpoint with STREAMING
-        // Note: userId and tenantId come from auth token on backend
+        // Use Lambda Function URL (no 29s timeout) if available, else API Gateway
+        const streamBaseUrl = getStreamUrl();
         const authHeaders = await getAuthHeaders();
         
         // Use FormData if we have files, otherwise JSON
@@ -580,7 +591,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
             formData.append('files', f.file);
           });
           
-          res = await fetch(`${apiUrl}/chat/stream`, {
+          res = await fetch(`${streamBaseUrl}/chat/stream`, {
             method: 'POST',
             headers: {
               'Authorization': (authHeaders as Record<string, string>)['Authorization'] || '',
@@ -590,7 +601,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           });
         } else {
           const pageContext = getPageContext(pathname, activeExposeContext);
-          res = await fetch(`${apiUrl}/chat/stream`, {
+          res = await fetch(`${streamBaseUrl}/chat/stream`, {
             method: 'POST',
             headers: authHeaders,
             body: JSON.stringify({
@@ -901,19 +912,22 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                 )}
                 {/* Render content with inline images for URLs */}
                 {(() => {
+                  // Guard against undefined/null content
+                  const msgContent = msg.content || '';
+                  if (!msgContent) return null;
+
                   // Detect image URLs in the message and render them as images
                   const imageUrlRegex = /(https?:\/\/[^\s]+?\.(png|jpg|jpeg|webp|gif)(\?[^\s]*)?)/gi;
-                  const parts = msg.content.split(imageUrlRegex);
-                  const hasImageUrls = imageUrlRegex.test(msg.content);
+                  const hasImageUrls = imageUrlRegex.test(msgContent);
                   
                   if (!hasImageUrls) {
-                    return <p className="whitespace-pre-wrap">{msg.content}</p>;
+                    return <p className="whitespace-pre-wrap">{msgContent}</p>;
                   }
                   
                   // Split text and render images inline
                   const elements: React.ReactNode[] = [];
                   let lastIndex = 0;
-                  const content = msg.content;
+                  const content = msgContent;
                   const regex = /(https?:\/\/[^\s]+?\.(png|jpg|jpeg|webp|gif)(\?[^\s]*)?)/gi;
                   let match;
                   

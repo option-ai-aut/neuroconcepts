@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 
 interface RuntimeConfig {
   apiUrl: string;
+  streamUrl: string; // Lambda Function URL for streaming (no API GW 29s limit)
   userPoolId: string;
   userPoolClientId: string;
   adminUserPoolId: string;
@@ -13,6 +14,7 @@ interface RuntimeConfig {
 
 const defaultConfig: RuntimeConfig = {
   apiUrl: '',
+  streamUrl: '',
   userPoolId: '',
   userPoolClientId: '',
   adminUserPoolId: '',
@@ -40,6 +42,7 @@ export function RuntimeConfigProvider({ children }: { children: ReactNode }) {
           const data = await res.json();
           const loaded: RuntimeConfig = {
             apiUrl: data.apiUrl || '',
+            streamUrl: data.streamUrl || '',
             userPoolId: data.userPoolId || '',
             userPoolClientId: data.userPoolClientId || '',
             adminUserPoolId: data.adminUserPoolId || '',
