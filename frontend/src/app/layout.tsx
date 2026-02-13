@@ -159,9 +159,17 @@ const jsonLd = {
       ],
       contactPoint: {
         '@type': 'ContactPoint',
-        email: 'hello@immivo.ai',
+        email: 'office@immivo.ai',
+        telephone: '+436703551221',
         contactType: 'customer service',
         availableLanguage: ['German', 'English'],
+      },
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: 'Sterngasse 3',
+        addressLocality: 'Wien',
+        postalCode: '1010',
+        addressCountry: 'AT',
       },
     },
     {
@@ -189,10 +197,10 @@ const jsonLd = {
       description: 'KI-gesteuertes CRM und Betriebssystem für Immobilienmakler mit automatisierter Lead-Qualifizierung, Exposé-Erstellung und Terminbuchung.',
       offers: {
         '@type': 'AggregateOffer',
-        lowPrice: '49',
-        highPrice: '149',
+        lowPrice: '0',
+        highPrice: '699',
         priceCurrency: 'EUR',
-        offerCount: 3,
+        offerCount: 4,
       },
       featureList: [
         'KI-Assistent Jarvis',

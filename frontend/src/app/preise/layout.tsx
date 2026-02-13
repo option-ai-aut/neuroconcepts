@@ -2,10 +2,10 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Preise — Flexible Tarife für Makler & Teams',
-  description: 'Immivo AI Preise: Ab 49€/Monat. Starter, Professional und Enterprise Pläne für Einzelmakler und Teams. 14 Tage kostenlos testen, keine Kreditkarte nötig.',
+  description: 'Immivo AI Preise: Ab 99€/Monat. Solo, Team und Enterprise Pläne für Einzelmakler und Teams. 7 Tage kostenlos testen, keine Kreditkarte nötig.',
   openGraph: {
-    title: 'Immivo AI Preise — Ab 49€/Monat',
-    description: 'Flexible Tarife für Einzelmakler und Teams. KI-Assistent, CRM, Exposé-Editor und mehr. 14 Tage kostenlos testen.',
+    title: 'Immivo AI Preise — Ab 99€/Monat',
+    description: 'Flexible Tarife für Einzelmakler und Teams. KI-Assistent, CRM, Exposé-Editor, 24 Portale und mehr. 7 Tage kostenlos testen.',
     url: 'https://immivo.ai/preise',
   },
   alternates: {
