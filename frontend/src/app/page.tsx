@@ -245,7 +245,7 @@ export default function LandingPage() {
       <PublicNavigation currentPage="home" />
 
       {/* Hero Section */}
-      <section ref={heroRef} className="relative min-h-[80vh] lg:min-h-screen flex items-center justify-center overflow-hidden">
+      <section ref={heroRef} className="relative min-h-[85vh] sm:min-h-[80vh] lg:min-h-screen flex items-center justify-center overflow-hidden">
         {/* Animated Background */}
         <div className="absolute inset-0 -z-10">
           {/* Gradient Mesh */}
@@ -270,15 +270,71 @@ export default function LandingPage() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-8 sm:pb-16">
-          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+
+          {/* ===== MOBILE HERO (< lg) ===== */}
+          <div className="lg:hidden flex flex-col items-center text-center pt-8 pb-4">
+            <NextImage 
+              src="/logo-black.png" 
+              alt="Immivo" 
+              width={200} 
+              height={200} 
+              className="w-32 sm:w-44 h-auto mb-8"
+              priority
+            />
+            
+            <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-gray-900 mb-4 leading-[1.08]">
+              Dein Büro arbeitet.
+              <br />
+              <span className="text-gray-400">Du verdienst.</span>
+            </h1>
+            
+            <p className="text-base sm:text-lg text-gray-500 mb-8 leading-relaxed max-w-md">
+              Das erste <strong className="text-gray-700">KI-gesteuerte Betriebssystem</strong> für Immobilienmakler.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto mb-6">
+              <Link 
+                href="/login?mode=register" 
+                className="group inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold text-white bg-gray-900 rounded-full shadow-lg"
+              >
+                Kostenlos testen
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </Link>
+              <a 
+                href="#demo" 
+                onClick={(e) => handleAnchorClick(e, 'demo')}
+                className="inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold text-gray-700 bg-white border border-gray-200 rounded-full shadow-sm"
+              >
+                Demo buchen
+              </a>
+            </div>
+
+            <div className="flex items-center justify-center gap-4 text-xs text-gray-400">
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                Keine Kreditkarte
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                7 Tage gratis
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5 text-gray-400" />
+                DSGVO
+              </span>
+            </div>
+          </div>
+
+          {/* ===== DESKTOP HERO (lg+) ===== */}
+          <div className="hidden lg:grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             {/* Left: Text Content */}
             <div className="text-left">
-              <div className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gray-100 text-blue-600 text-xs sm:text-sm font-medium mb-5 sm:mb-8 border border-gray-200 backdrop-blur-sm">
+              <div className="inline-flex items-center px-4 py-2 rounded-full bg-gray-100 text-blue-600 text-sm font-medium mb-8 border border-gray-200 backdrop-blur-sm">
                 <span className="flex w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
                 Jarvis 1.0
               </div>
               
-              <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 mb-4 sm:mb-6 leading-[1.05]">
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 mb-6 leading-[1.05]">
                 Dein Büro arbeitet.
                 <br />
                 <span className="font-extrabold text-gray-900">
@@ -286,15 +342,15 @@ export default function LandingPage() {
                 </span>
               </h1>
               
-              <p className="text-base sm:text-xl text-gray-600 mb-6 sm:mb-10 leading-relaxed max-w-xl">
+              <p className="text-xl text-gray-600 mb-10 leading-relaxed max-w-xl">
                 Immivo ist das erste <strong>vollständig KI-gesteuerte</strong> Betriebssystem für Immobilienmakler. 
                 Jarvis übernimmt dein Tagesgeschäft — du konzentrierst dich auf Abschlüsse.
               </p>
               
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-8 sm:mb-12">
+              <div className="flex flex-row gap-4 mb-12">
                 <Link 
                   href="/login?mode=register" 
-                  className="group inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base font-semibold text-white bg-gray-900 rounded-full hover:shadow-xl hover:shadow-gray-500/20 transition-all hover:-translate-y-1"
+                  className="group inline-flex items-center justify-center px-8 py-4 text-base font-semibold text-white bg-gray-900 rounded-full hover:shadow-xl hover:shadow-gray-500/20 transition-all hover:-translate-y-1"
                 >
                   Kostenlos testen
                   <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -302,7 +358,7 @@ export default function LandingPage() {
                 <a 
                   href="#demo" 
                   onClick={(e) => handleAnchorClick(e, 'demo')}
-                  className="group inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base font-semibold text-gray-700 bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-all hover:-translate-y-1 shadow-sm"
+                  className="group inline-flex items-center justify-center px-8 py-4 text-base font-semibold text-gray-700 bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-all hover:-translate-y-1 shadow-sm"
                 >
                   <Calendar className="mr-2 w-5 h-5 text-blue-600" />
                   Demo buchen
@@ -310,7 +366,7 @@ export default function LandingPage() {
               </div>
 
               {/* Trust Indicators */}
-              <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm text-gray-500">
+              <div className="flex flex-wrap items-center gap-6 text-sm text-gray-500">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-green-500" />
                   Keine Kreditkarte
