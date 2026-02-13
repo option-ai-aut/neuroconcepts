@@ -300,7 +300,7 @@ export default function ExposesPage() {
     switch (block.type) {
       case 'hero':
         return (
-          <div className="relative h-64 bg-gray-900 overflow-hidden">
+          <div className="relative h-64 bg-black overflow-hidden">
             {block.imageUrl ? (
               <img src={getImageUrl(block.imageUrl || '')} alt="" className="absolute inset-0 w-full h-full object-cover" />
             ) : (

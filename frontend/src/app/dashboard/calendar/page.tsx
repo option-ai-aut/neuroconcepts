@@ -49,6 +49,13 @@ export default function CalendarPage() {
   const [savingEvent, setSavingEvent] = useState(false);
   const [deletingEvent, setDeletingEvent] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [now, setNow] = useState(new Date());
+
+  // Update current time every 60 seconds
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     // WorkMail calendar is always connected via backend EWS
@@ -126,11 +133,12 @@ export default function CalendarPage() {
     }
   }, [currentDate, view, isConnected]);
 
-  // Scroll to 9:00 when calendar loads or view changes
+  // Scroll to current time (minus 2h buffer) when calendar loads or view changes
   useEffect(() => {
     if (scrollContainerRef.current && (view === 'day' || view === 'week') && !loading) {
-      // 9 hours * 64px per hour = 576px
-      const scrollTo = 9 * 64;
+      const currentHour = now.getHours() + now.getMinutes() / 60;
+      const slotH = view === 'day' ? (window.innerWidth < 1024 ? 48 : 64) : 64;
+      const scrollTo = Math.max(0, (currentHour - 2) * slotH);
       scrollContainerRef.current.scrollTop = scrollTo;
     }
   }, [view, loading, isConnected]);
@@ -558,6 +566,29 @@ export default function CalendarPage() {
                   <div key={i} className="h-12 lg:h-16 border-b border-gray-50"></div>
                 ))}
 
+                {/* Current Time Indicator */}
+                {currentDate.toDateString() === today.toDateString() && (() => {
+                  const nowHour = now.getHours() + now.getMinutes() / 60;
+                  return (
+                    <>
+                      {/* Mobile */}
+                      <div className="absolute left-0 right-0 z-20 pointer-events-none lg:hidden" style={{ top: `${nowHour * 48}px` }}>
+                        <div className="relative flex items-center">
+                          <div className="w-2.5 h-2.5 rounded-full bg-red-500 -ml-[5px] shrink-0" />
+                          <div className="flex-1 h-[2px] bg-red-500" />
+                        </div>
+                      </div>
+                      {/* Desktop */}
+                      <div className="absolute left-0 right-0 z-20 pointer-events-none hidden lg:block" style={{ top: `${nowHour * 64}px` }}>
+                        <div className="relative flex items-center">
+                          <div className="w-3 h-3 rounded-full bg-red-500 -ml-[6px] shrink-0" />
+                          <div className="flex-1 h-[2px] bg-red-500" />
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+
                 {/* Events */}
                 {getEventsForDay(currentDate).map((event) => {
                   const startTime = new Date(event.start);
@@ -603,12 +634,24 @@ export default function CalendarPage() {
           <div className="min-h-full p-6">
             <div className="grid grid-cols-8 gap-0">
               {/* Time Column */}
-              <div className="col-span-1 pt-14">
+              <div className="col-span-1 pt-14 relative">
                 {timeSlots.map((time) => (
                   <div key={time} className="h-16 text-xs text-gray-400 text-right pr-4 relative">
                     <span className="absolute -top-2 right-4">{time}</span>
                   </div>
                 ))}
+                {/* Current time label */}
+                {(() => {
+                  const nowHour = now.getHours() + now.getMinutes() / 60;
+                  const top = nowHour * 64; // no +56 because pt-14 (56px) is padding
+                  return (
+                    <div className="absolute right-0 z-20 pointer-events-none" style={{ top: `${top + 56}px` }}>
+                      <span className="text-[10px] font-semibold text-red-500 pr-4 -translate-y-1/2 block">
+                        {now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Days Columns */}
@@ -630,6 +673,20 @@ export default function CalendarPage() {
                     {timeSlots.map((_, j) => (
                       <div key={j} className="h-16 border-b border-gray-50"></div>
                     ))}
+
+                    {/* Current Time Indicator */}
+                    {isToday && (() => {
+                      const nowHour = now.getHours() + now.getMinutes() / 60;
+                      const top = nowHour * 64 + 56; // +56 for header
+                      return (
+                        <div className="absolute left-0 right-0 z-20 pointer-events-none" style={{ top: `${top}px` }}>
+                          <div className="relative flex items-center">
+                            <div className="w-3 h-3 rounded-full bg-red-500 -ml-[6px] shrink-0" />
+                            <div className="flex-1 h-[2px] bg-red-500" />
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Events */}
                     {dayEvents.map((event) => {

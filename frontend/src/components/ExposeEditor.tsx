@@ -909,7 +909,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         {isSelected && !isDragging && (
           <div 
             className={`absolute inset-0 pointer-events-none z-20 border-2 border-gray-400 ${roundedClasses}`}
-            style={{ boxShadow: 'inset 0 0 12px rgba(99,102,241,0.3)' }}
+            style={{ boxShadow: 'inset 0 0 12px rgba(156,163,175,0.3)' }}
           />
         )}
 
@@ -988,7 +988,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     switch (block.type) {
       case 'hero':
         return (
-          <div className="relative h-64 overflow-hidden" style={{ backgroundColor: blockBg || '#312E81' }}>
+          <div className="relative h-64 overflow-hidden" style={{ backgroundColor: blockBg || '#000000' }}>
             {block.imageUrl ? (
               <img src={getImageUrl(block.imageUrl || '')} alt="" className="absolute inset-0 w-full h-full object-cover" />
             ) : (
