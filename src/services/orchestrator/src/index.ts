@@ -110,11 +110,10 @@ async function initializePrisma() {
   if (process.env.DATABASE_URL) {
     prisma = new PrismaClient();
     injectPrismaIntoServices(prisma);
-    return prisma;
   }
   
   // In Lambda, get credentials from DB Secret in Secrets Manager
-  if (process.env.DB_SECRET_ARN) {
+  if (!prisma && process.env.DB_SECRET_ARN) {
     const secretsManager = new AWS.SecretsManager();
     try {
       const secret = await secretsManager.getSecretValue({ SecretId: process.env.DB_SECRET_ARN }).promise();
