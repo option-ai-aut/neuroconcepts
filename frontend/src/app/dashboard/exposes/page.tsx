@@ -335,13 +335,20 @@ export default function ExposesPage() {
           </div>
         );
 
-      case 'text':
+      case 'text': {
+        const textVal = replaceVariables(block.content) || 'Text eingeben...';
+        const textIsHtml = textVal.includes('<');
         return (
           <div className={`p-6 ${block.style === 'highlight' ? 'bg-gray-50 border-l-4' : ''}`} style={block.style === 'highlight' ? { borderColor: themeColors.primary } : {}}>
             {block.title && <h3 className="text-lg font-semibold mb-3" style={{ color: themeColors.secondary }}>{rv(block.title)}</h3>}
-            <p className="text-gray-600 whitespace-pre-wrap">{rv(block.content, 'Text eingeben...')}</p>
+            {textIsHtml ? (
+              <div className="text-gray-600 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: textVal }} />
+            ) : (
+              <p className="text-gray-600 whitespace-pre-wrap">{rv(block.content, 'Text eingeben...')}</p>
+            )}
           </div>
         );
+      }
 
       case 'features':
       case 'highlights':

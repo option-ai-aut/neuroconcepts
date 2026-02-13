@@ -1103,13 +1103,20 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
           </div>
         );
 
-      case 'text':
+      case 'text': {
+        const textContent = pv(block.content, 'Text eingeben...');
+        const isHtml = textContent.includes('<');
         return (
           <div className={`p-6 ${block.style === 'highlight' && !blockBg ? 'border-l-4' : ''}`} style={{ backgroundColor: blockBg || (block.style === 'highlight' ? '#F9FAFB' : undefined), borderColor: block.style === 'highlight' ? themeColors.primary : undefined }}>
             {block.title && <h3 className={`text-lg mb-3 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{pv(block.title)}</h3>}
-            <p className={`whitespace-pre-wrap ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>{pv(block.content, 'Text eingeben...')}</p>
+            {isHtml ? (
+              <div className={`prose prose-sm max-w-none ${bCls}`} style={{ color: blockTextColor || '#4B5563' }} dangerouslySetInnerHTML={{ __html: textContent }} />
+            ) : (
+              <p className={`whitespace-pre-wrap ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>{textContent}</p>
+            )}
           </div>
         );
+      }
 
       case 'gallery': {
         // Use block's own images, or fall back to property images
@@ -1263,19 +1270,18 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         );
       }
 
-      case 'twoColumn':
+      case 'twoColumn': {
+        const leftHtml = pv(block.leftContent, 'Linke Spalte...');
+        const rightHtml = pv(block.rightContent, 'Rechte Spalte...');
         return (
           <div className="p-6" style={{ backgroundColor: blockBg }}>
             <div className="grid grid-cols-2 gap-6">
-              <div className="prose prose-sm">
-                <p className={`whitespace-pre-wrap ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>{pv(block.leftContent, 'Linke Spalte...')}</p>
-              </div>
-              <div className="prose prose-sm">
-                <p className={`whitespace-pre-wrap ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>{pv(block.rightContent, 'Rechte Spalte...')}</p>
-              </div>
+              <div className={`prose prose-sm max-w-none ${bCls}`} style={{ color: blockTextColor || '#4B5563' }} dangerouslySetInnerHTML={{ __html: leftHtml }} />
+              <div className={`prose prose-sm max-w-none ${bCls}`} style={{ color: blockTextColor || '#4B5563' }} dangerouslySetInnerHTML={{ __html: rightHtml }} />
             </div>
           </div>
         );
+      }
 
       case 'video':
         return (
@@ -1543,6 +1549,22 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     return result;
   };
 
+  // Execute formatting command on the currently focused contentEditable
+  const execFormat = (command: string, value?: string) => {
+    document.execCommand(command, false, value);
+  };
+
+  // Formatting toolbar for multiline rich text editors
+  const renderFormatToolbar = (fieldId: string) => (
+    <div className="flex items-center gap-0.5 border border-gray-200 rounded-t-md bg-gray-50 px-1.5 py-0.5">
+      <button type="button" onMouseDown={(e) => { e.preventDefault(); execFormat('bold'); }} className="px-1.5 py-0.5 hover:bg-gray-200 rounded text-[11px] font-bold text-gray-600" title="Fett (⌘B)">B</button>
+      <button type="button" onMouseDown={(e) => { e.preventDefault(); execFormat('italic'); }} className="px-1.5 py-0.5 hover:bg-gray-200 rounded text-[11px] italic text-gray-600" title="Kursiv (⌘I)">I</button>
+      <button type="button" onMouseDown={(e) => { e.preventDefault(); execFormat('underline'); }} className="px-1.5 py-0.5 hover:bg-gray-200 rounded text-[11px] underline text-gray-600" title="Unterstrichen (⌘U)">U</button>
+      <div className="w-px h-3.5 bg-gray-300 mx-0.5" />
+      <button type="button" onMouseDown={(e) => { e.preventDefault(); execFormat('insertUnorderedList'); }} className="px-1.5 py-0.5 hover:bg-gray-200 rounded text-[11px] text-gray-600" title="Aufzählung">• Liste</button>
+    </div>
+  );
+
   // Render a template-aware input field with @-mention support and visual tags
   const renderTemplateInput = (
     fieldId: string,
@@ -1551,25 +1573,81 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     placeholder: string,
     multiline: boolean = false
   ) => {
-    // For non-template mode, use plain inputs
+    // Convert plain text (with newlines) to HTML for backwards compatibility
+    const toEditableHtml = (val: string): string => {
+      if (!val) return '';
+      if (val.includes('<')) return val; // Already HTML
+      return val.replace(/\n/g, '<br>');
+    };
+
+    // Convert HTML back to a storable format (keep HTML for rich text)
+    const fromEditableHtml = (el: HTMLElement): string => {
+      return el.innerHTML
+        .replace(/<div><br><\/div>/gi, '\n')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/div><div>/gi, '\n')
+        .replace(/<div>/gi, '\n')
+        .replace(/<\/div>/gi, '');
+    };
+
+    // For non-template mode with multiline: use rich text editor
+    if (!isTemplate && multiline) {
+      return (
+        <div className="relative">
+          {renderFormatToolbar(fieldId)}
+          <div
+            data-field-id={fieldId}
+            contentEditable
+            suppressContentEditableWarning
+            className="w-full px-2.5 py-1.5 2xl:px-3 2xl:py-2 border border-gray-200 border-t-0 rounded-b-md text-xs 2xl:text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 focus:outline-none min-h-[100px] max-h-[250px] overflow-y-auto"
+            dangerouslySetInnerHTML={{ __html: toEditableHtml(value || '') }}
+            onBlur={(e) => {
+              // Save on blur to avoid cursor issues during typing
+              const html = e.currentTarget.innerHTML;
+              if (html !== toEditableHtml(value || '')) {
+                onChange(html);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'b' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); execFormat('bold'); }
+              else if (e.key === 'i' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); execFormat('italic'); }
+              else if (e.key === 'u' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); execFormat('underline'); }
+            }}
+            data-placeholder={placeholder}
+          />
+          <style>{`
+            [data-field-id="${fieldId}"]:empty::before {
+              content: attr(data-placeholder);
+              color: #9ca3af;
+              pointer-events: none;
+            }
+            [data-field-id="${fieldId}"] ul { list-style: disc; padding-left: 1.5em; margin: 0.25em 0; }
+            [data-field-id="${fieldId}"] ol { list-style: decimal; padding-left: 1.5em; margin: 0.25em 0; }
+            [data-field-id="${fieldId}"] b, [data-field-id="${fieldId}"] strong { font-weight: 700; }
+            [data-field-id="${fieldId}"] i, [data-field-id="${fieldId}"] em { font-style: italic; }
+            [data-field-id="${fieldId}"] u { text-decoration: underline; }
+          `}</style>
+        </div>
+      );
+    }
+
+    // For non-template mode, single-line: use plain input
     if (!isTemplate) {
-      const plainProps = {
-        value: value || '',
-        placeholder,
-        className: "w-full px-2.5 py-1.5 2xl:px-3 2xl:py-2 border border-gray-200 rounded-md text-xs 2xl:text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" + (multiline ? " resize-none" : ""),
-        onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange(e.target.value),
-      };
-      return multiline ? <textarea {...plainProps} rows={6} /> : <input type="text" {...plainProps} />;
+      return <input type="text" value={value || ''} placeholder={placeholder}
+        className="w-full px-2.5 py-1.5 2xl:px-3 2xl:py-2 border border-gray-200 rounded-md text-xs 2xl:text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
+        onChange={(e) => onChange(e.target.value)}
+      />;
     }
 
     // For template mode: contentEditable with visual tag chips
     return (
       <div className="relative">
+        {multiline && renderFormatToolbar(fieldId)}
         <div
           data-field-id={fieldId}
           contentEditable
           suppressContentEditableWarning
-          className={`w-full px-2.5 border border-gray-200 rounded-md text-xs 2xl:text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 focus:outline-none ${multiline ? 'min-h-[120px] py-1.5 2xl:py-2' : 'overflow-hidden whitespace-nowrap'}`}
+          className={`w-full px-2.5 border border-gray-200 ${multiline ? 'border-t-0 rounded-b-md' : 'rounded-md'} text-xs 2xl:text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 focus:outline-none ${multiline ? 'min-h-[100px] max-h-[250px] overflow-y-auto py-1.5 2xl:py-2' : 'overflow-hidden whitespace-nowrap'}`}
           style={multiline ? undefined : { lineHeight: '34px', paddingTop: 0, paddingBottom: 0 }}
           dangerouslySetInnerHTML={{ __html: valueToTagHtml(value) || '' }}
           onFocus={() => setTemplateFieldFocused(true)}
@@ -1647,6 +1725,12 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
             if (!multiline && e.key === 'Enter') {
               e.preventDefault();
             }
+            // Rich text shortcuts for multiline
+            if (multiline) {
+              if (e.key === 'b' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); execFormat('bold'); }
+              else if (e.key === 'i' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); execFormat('italic'); }
+              else if (e.key === 'u' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); execFormat('underline'); }
+            }
           }}
           onBlur={() => {
             setTemplateFieldFocused(false);
@@ -1680,6 +1764,11 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
             color: #9ca3af;
             pointer-events: none;
           }
+          [data-field-id="${fieldId}"] ul { list-style: disc; padding-left: 1.5em; margin: 0.25em 0; }
+          [data-field-id="${fieldId}"] ol { list-style: decimal; padding-left: 1.5em; margin: 0.25em 0; }
+          [data-field-id="${fieldId}"] b, [data-field-id="${fieldId}"] strong { font-weight: 700; }
+          [data-field-id="${fieldId}"] i, [data-field-id="${fieldId}"] em { font-style: italic; }
+          [data-field-id="${fieldId}"] u { text-decoration: underline; }
         `}</style>
         {renderMentionDropdown(fieldId)}
       </div>
@@ -2132,23 +2221,23 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
           <>
             <div>
               <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Linke Spalte</label>
-              <textarea
-                value={block.leftContent || ''}
-                onChange={(e) => updateBlock(selectedBlockIndex, { leftContent: e.target.value })}
-                rows={4}
-                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                placeholder="Inhalt linke Spalte..."
-              />
+              {renderTemplateInput(
+                `block-${selectedBlockIndex}-leftContent`,
+                block.leftContent || '',
+                (value) => updateBlock(selectedBlockIndex, { leftContent: value }),
+                'Inhalt linke Spalte...',
+                true
+              )}
             </div>
             <div>
               <label className="block text-[11px] 2xl:text-xs font-medium text-gray-600 2xl:text-gray-700 mb-0.5 2xl:mb-1">Rechte Spalte</label>
-              <textarea
-                value={block.rightContent || ''}
-                onChange={(e) => updateBlock(selectedBlockIndex, { rightContent: e.target.value })}
-                rows={4}
-                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                placeholder="Inhalt rechte Spalte..."
-              />
+              {renderTemplateInput(
+                `block-${selectedBlockIndex}-rightContent`,
+                block.rightContent || '',
+                (value) => updateBlock(selectedBlockIndex, { rightContent: value }),
+                'Inhalt rechte Spalte...',
+                true
+              )}
             </div>
           </>
         )}
