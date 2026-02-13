@@ -950,7 +950,7 @@ export default function LandingPage() {
           ref={section6.ref}
           className={`max-w-4xl mx-auto px-4 text-center relative z-10 ${section6.isInView ? 'animate-scale-in' : 'opacity-0'}`}
         >
-          <NextImage src="/logo-icon.png" alt="Immivo" width={64} height={64} className="rounded-2xl mx-auto mb-6 shadow-lg" />
+          <NextImage src="/logo-white.png" alt="Immivo" width={120} height={120} className="mx-auto mb-6 w-20 sm:w-28 h-auto" />
 
           <div className="inline-flex items-center px-4 py-2 rounded-full bg-white/20 text-white text-sm font-medium mb-8 border border-white/20">
             <Star className="w-4 h-4 mr-2 text-yellow-300" />
@@ -985,7 +985,7 @@ export default function LandingPage() {
           <div className="mt-8 sm:mt-16 pt-6 sm:pt-8 border-t border-white/20">
             <p className="text-sm text-white/60 mb-6">Verbunden mit 24+ Portalen und den Tools, die du nutzt</p>
             <div className="flex justify-center items-center gap-4 sm:gap-8 flex-wrap opacity-70">
-              {['24 Immobilienportale', 'Google Workspace', 'Microsoft 365', 'AWS EU Hosting'].map((name, i) => (
+              {['24 Immobilienportale', 'Google Workspace', 'Microsoft 365'].map((name, i) => (
                 <div key={i} className="px-4 py-2 bg-white/10 rounded-lg text-sm font-medium">
                   {name}
                 </div>

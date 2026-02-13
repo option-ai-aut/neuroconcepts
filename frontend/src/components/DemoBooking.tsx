@@ -205,13 +205,13 @@ export default function DemoBooking() {
                     : 'bg-white border border-gray-100 hover:border-gray-300 hover:shadow-sm text-gray-700'
                 }`}
               >
-                <p className={`text-[10px] font-medium uppercase ${isSelected ? 'text-gray-300' : 'text-gray-400'}`}>
+                <p className={`text-[11px] sm:text-xs font-medium uppercase ${isSelected ? 'text-gray-300' : 'text-gray-400'}`}>
                   {day.toLocaleDateString('de-DE', { weekday: 'short' })}
                 </p>
-                <p className={`text-lg sm:text-xl font-bold ${isSelected ? 'text-white' : 'text-gray-900'}`}>
+                <p className={`text-base sm:text-xl font-bold ${isSelected ? 'text-white' : 'text-gray-900'}`}>
                   {day.getDate()}
                 </p>
-                <p className={`text-[10px] ${isSelected ? 'text-gray-300' : 'text-gray-400'}`}>
+                <p className={`text-[11px] sm:text-xs ${isSelected ? 'text-gray-300' : 'text-gray-400'}`}>
                   {day.toLocaleDateString('de-DE', { month: 'short' })}
                 </p>
               </button>

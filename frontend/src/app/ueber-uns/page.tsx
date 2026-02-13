@@ -13,8 +13,8 @@ export default function UeberUnsPage() {
       {/* Hero — Bold, full-width */}
       <section className="relative pt-24 sm:pt-32 pb-20 sm:pb-32 bg-gray-900 text-white overflow-hidden">
         <div className="absolute inset-0">
-          <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
-          <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-white/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" />
+          <div className="absolute top-0 right-0 w-[300px] sm:w-[600px] h-[300px] sm:h-[600px] bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
+          <div className="absolute bottom-0 left-0 w-[200px] sm:w-[400px] h-[200px] sm:h-[400px] bg-white/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" />
         </div>
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="inline-flex items-center px-4 py-2 rounded-full bg-white/10 text-sm font-medium mb-8 border border-white/10">
@@ -41,7 +41,7 @@ export default function UeberUnsPage() {
               <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mt-3 mb-6">
                 Vom Frust zur Lösung
               </h2>
-              <div className="space-y-4 text-gray-600 text-lg leading-relaxed">
+              <div className="space-y-4 text-gray-600 text-base sm:text-lg leading-relaxed">
                 <p>
                   Anfang 2026. Wien. Zwei Gründer sitzen in einem Kaffeehaus und reden über ein Problem, 
                   das die gesamte Immobilienbranche betrifft: Makler verbringen 80% ihrer Zeit mit E-Mails, 

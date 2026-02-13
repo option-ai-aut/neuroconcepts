@@ -194,7 +194,7 @@ export default function PreisePage() {
           </div>
 
           {/* Monthly/Yearly Toggle */}
-          <div className="flex items-center justify-center gap-4 mb-4">
+          <div className="flex items-center justify-center gap-2 sm:gap-4 flex-wrap mb-4">
             <span
               className={`text-sm font-medium ${!yearly ? 'text-gray-900' : 'text-gray-500'}`}
             >
