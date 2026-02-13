@@ -13,6 +13,32 @@ export const metadata: Metadata = {
   },
 };
 
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'EmployerAggregateRating',
+  itemReviewed: {
+    '@type': 'Organization',
+    name: 'Immivo GmbH',
+    sameAs: 'https://immivo.ai',
+    logo: 'https://immivo.ai/logo-black.png',
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: 'Sterngasse 3',
+      addressLocality: 'Wien',
+      postalCode: '1010',
+      addressCountry: 'AT',
+    },
+  },
+};
+
 export default function KarriereLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      {children}
+    </>
+  );
 }

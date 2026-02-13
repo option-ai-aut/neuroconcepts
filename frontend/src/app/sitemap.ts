@@ -27,13 +27,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.7,
     },
-    // Integrationen
-    {
-      url: `${SITE_URL}/integrationen`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.8,
-    },
     // Blog
     {
       url: `${SITE_URL}/blog`,

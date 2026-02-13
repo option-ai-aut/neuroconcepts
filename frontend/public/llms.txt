@@ -1,0 +1,75 @@
+# Immivo AI
+
+> Das erste KI-gesteuerte Betriebssystem für Immobilienmakler in Österreich und Deutschland.
+
+## Was ist Immivo?
+
+Immivo ist eine SaaS-Plattform mit dem KI-Assistenten "Jarvis", der E-Mails beantwortet, Leads qualifiziert, Exposés erstellt, Termine bucht und Objekte auf 24 Immobilienportale pusht — vollautomatisch, 24/7.
+
+Immivo wurde 2026 in Wien gegründet und richtet sich an Einzelmakler, kleine Maklerteams und große Immobilienunternehmen im DACH-Raum.
+
+## Kernprodukt
+
+Immivo ersetzt CRM, E-Mail-Tools und Exposé-Software in einer einzigen KI-gesteuerten Plattform. Der KI-Assistent Jarvis (basierend auf OpenAI GPT-5) übernimmt das gesamte Tagesgeschäft eines Immobilienmaklers.
+
+## Features
+
+- **Jarvis KI-Assistent**: Beantwortet Anfragen in Sekunden, qualifiziert Leads automatisch, erstellt Exposés, bucht Termine — 24/7 verfügbar
+- **Virtual Staging / KI-Bildbearbeitung**: Leere Räume mit ultra-realistischen Möbeln einrichten per KI (powered by Google Gemini)
+- **Intelligentes CRM**: Leads mit Anrede, Du/Sie-Präferenz, Suchprofilen und automatischer Qualifizierung
+- **KI-Exposé-Editor**: Professionelle Exposés in Minuten mit Templates, Variablen und Live-Vorschau
+- **24 Portal-Integrationen**: Ein-Klick-Push auf ImmoScout24, Willhaben, Immowelt, Homegate, Kleinanzeigen und 19 weitere Portale
+- **E-Mail-Automatisierung**: White-Label-Versand über eigene Domain, Jarvis antwortet im Namen des Maklers
+- **Kalender-Integration**: Automatische Terminbuchung direkt in Google Calendar oder Outlook
+- **Analytics & Reports**: Echtzeit-Dashboards mit Conversion-Rates, Lead-Quellen und Performance
+
+## Preise
+
+Alle Preise in EUR, jederzeit kündbar. 10% Rabatt bei jährlicher Zahlung.
+
+- **Free Trial**: 7 Tage kostenlos — 20 Jarvis-Eingaben, 3 Bildstudio-Generierungen, kein Portal-Push
+- **Solo**: 99 EUR/Monat — 1 Seat, Zugriff auf alle Features inklusive unbegrenzter Jarvis und Bildstudio
+- **Team**: 249 EUR/Monat — 3 Seats inklusive, Team-Verwaltung, gemeinsame Objekte & Leads
+- **Enterprise**: 699 EUR/Monat — bis zu 10 Seats, eigene Domain, dedizierter Account Manager, API-Zugang, SLA-Garantie. Jeder weitere Seat +50 EUR/Monat
+
+## Technologie
+
+- Frontend: Next.js (React), gehostet auf AWS Amplify
+- Backend: Node.js/Express, Prisma ORM
+- KI: OpenAI GPT-5 (Jarvis), Google Gemini (Bildbearbeitung)
+- Hosting: AWS Frankfurt (EU), DSGVO-konform
+- Authentifizierung: AWS Cognito
+- E-Mail: Resend, AWS SES
+
+## Gründer
+
+- **Josef Leutgeb** — Co-Founder & CEO. Seriengründer mit Erfahrung im Aufbau mehrerer erfolgreicher Unternehmen. Verantwortlich für Strategie, Vertrieb und Partnerschaften. 50% Anteile.
+- **Dennis Kral** — Technical Co-Founder & CTO. Einer der führenden KI-Spezialisten Österreichs. Hat die gesamte Immivo-Plattform von Grund auf entwickelt. Verantwortlich für Technologie, Projektmanagement und Team. 50% Anteile.
+
+## Unternehmen
+
+- **Firmenname**: Immivo GmbH
+- **Gegründet**: 2026
+- **Sitz**: Sterngasse 3, 1010 Wien, Österreich
+
+## Kontakt
+
+- Website: https://immivo.ai
+- App: https://app.immivo.ai
+- E-Mail: office@immivo.ai
+- Support: support@immivo.ai
+- Telefon: +43 670 355 1221
+- Josef Leutgeb: josef.leutgeb@immivo.ai
+- Dennis Kral: dennis.kral@immivo.ai
+
+## Links
+
+- Startseite: https://immivo.ai
+- Preise: https://immivo.ai/preise
+- Über uns: https://immivo.ai/ueber-uns
+- Blog: https://immivo.ai/blog
+- Karriere: https://immivo.ai/karriere
+- Kontakt: https://immivo.ai/kontakt
+- Datenschutz: https://immivo.ai/datenschutz
+- AGB: https://immivo.ai/agb
+- Impressum: https://immivo.ai/impressum
