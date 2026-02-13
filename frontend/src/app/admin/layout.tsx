@@ -10,7 +10,7 @@ import {
   Loader2, LayoutDashboard, Users, MessageSquare, Calendar, 
   HeadphonesIcon, DollarSign, Activity, TrendingUp, 
   ClipboardList, Settings, LogOut, ChevronLeft, ChevronRight,
-  Shield, Bell, Search, Command
+  Shield, Bell, Search, Command, Mail, Inbox
 } from 'lucide-react';
 import { useRuntimeConfig } from '@/components/RuntimeConfigProvider';
 
@@ -19,6 +19,13 @@ const NAV_SECTIONS = [
     label: 'Übersicht',
     items: [
       { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: 'Kommunikation',
+    items: [
+      { name: 'Posteingang', href: '/admin/inbox', icon: Inbox },
+      { name: 'Kontaktanfragen', href: '/admin/contacts', icon: Mail },
     ],
   },
   {
@@ -122,6 +129,8 @@ function AdminSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
 }
 
 function AdminTopBar() {
+  const router = useRouter();
+
   return (
     <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
       <div className="flex items-center gap-3">
@@ -134,9 +143,12 @@ function AdminTopBar() {
         </button>
       </div>
       <div className="flex items-center gap-3">
-        <button className="relative p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+        <button 
+          onClick={() => router.push('/admin/contacts')}
+          className="relative p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          title="Kontaktanfragen & Benachrichtigungen"
+        >
           <Bell className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full" />
         </button>
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 bg-gray-800 rounded-full flex items-center justify-center">

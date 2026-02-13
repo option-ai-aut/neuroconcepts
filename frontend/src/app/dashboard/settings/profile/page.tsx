@@ -231,8 +231,12 @@ export default function ProfileSettingsPage() {
             <div>
               <h3 className="text-lg font-medium text-gray-900">{user.firstName} {user.lastName}</h3>
               <p className="text-sm text-gray-500">{user.email}</p>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 mt-2">
-                {user.role}
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mt-2 ${
+                user.role === 'SUPER_ADMIN' ? 'bg-red-100 text-red-800' :
+                user.role === 'ADMIN' ? 'bg-gray-100 text-gray-800' :
+                'bg-blue-100 text-blue-800'
+              }`}>
+                {user.role === 'SUPER_ADMIN' ? 'Super Admin' : user.role === 'ADMIN' ? 'Admin' : user.role === 'AGENT' ? 'Agent' : user.role}
               </span>
             </div>
           </div>

@@ -6639,35 +6639,106 @@ app.get('/calendar/busy', async (req, res) => {
 // Public: Book a demo (no auth required)
 app.post('/calendar/book-demo', async (req, res) => {
   try {
-    const creds = getWorkMailCreds();
-    if (!creds.email || !creds.password) {
-      return res.status(500).json({ error: 'WorkMail not configured' });
-    }
     const { name, email, company, message, start, end } = req.body;
     if (!name || !email || !start || !end) {
       return res.status(400).json({ error: 'name, email, start, end required' });
     }
 
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const dateStr = startDate.toLocaleDateString('de-AT', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+    const timeStr = startDate.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' });
     const subject = `Demo Call – ${name}${company ? ` (${company})` : ''}`;
-    const meetLink = 'https://meet.google.com/new';
-    const body = [
-      `Demo-Termin mit ${name}`,
-      `E-Mail: ${email}`,
-      company ? `Unternehmen: ${company}` : '',
-      message ? `Nachricht: ${message}` : '',
-      '',
-      `Google Meet: ${meetLink}`,
-    ].filter(Boolean).join('\n');
 
-    const result = await createCalendarEvent(creds, {
-      subject,
-      body,
-      start: new Date(start),
-      end: new Date(end),
-      attendees: [email],
-      meetLink,
-    });
-    res.json({ success: true, eventId: result?.id });
+    // 1) Try to create calendar event via WorkMail
+    let eventId: string | undefined;
+    try {
+      const creds = getWorkMailCreds();
+      if (creds.email && creds.password) {
+        const meetLink = 'https://meet.google.com/new';
+        const body = [
+          `Demo-Termin mit ${name}`,
+          `E-Mail: ${email}`,
+          company ? `Unternehmen: ${company}` : '',
+          message ? `Nachricht: ${message}` : '',
+          '',
+          `Google Meet: ${meetLink}`,
+        ].filter(Boolean).join('\n');
+
+        const result = await createCalendarEvent(creds, {
+          subject,
+          body,
+          start: startDate,
+          end: endDate,
+          attendees: [email],
+          meetLink,
+        });
+        eventId = result?.id;
+      }
+    } catch (calErr) {
+      console.error('WorkMail calendar event failed (continuing):', calErr);
+    }
+
+    // 2) Send confirmation email to office@ via SystemEmailService
+    try {
+      const { sendSystemEmail } = await import('./services/SystemEmailService');
+      await sendSystemEmail({
+        to: 'office@immivo.ai',
+        subject: `Neue Demo gebucht: ${name} — ${dateStr} um ${timeStr}`,
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #111827; color: white; padding: 24px 32px; border-radius: 12px 12px 0 0;">
+              <h2 style="margin: 0; font-size: 20px;">Neue Demo-Buchung</h2>
+              <p style="margin: 4px 0 0; opacity: 0.7; font-size: 14px;">via immivo.ai</p>
+            </div>
+            <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px; width: 120px;">Name</td><td style="padding: 8px 0; font-weight: 600;">${name}</td></tr>
+                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;">E-Mail</td><td style="padding: 8px 0;"><a href="mailto:${email}" style="color: #2563eb;">${email}</a></td></tr>
+                ${company ? `<tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Unternehmen</td><td style="padding: 8px 0;">${company}</td></tr>` : ''}
+                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Datum</td><td style="padding: 8px 0; font-weight: 500;">${dateStr}</td></tr>
+                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Uhrzeit</td><td style="padding: 8px 0; font-weight: 500;">${timeStr} Uhr (30 Min)</td></tr>
+              </table>
+              ${message ? `<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;"><p style="color: #6b7280; font-size: 14px; margin: 0 0 8px;">Nachricht:</p><div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb;">${message}</div></div>` : ''}
+              <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">Kalender-Event ${eventId ? 'wurde erstellt' : 'konnte nicht automatisch erstellt werden — bitte manuell anlegen'}.</p>
+            </div>
+          </div>`,
+        replyTo: email,
+      });
+    } catch (emailErr) {
+      console.error('Demo confirmation email failed:', emailErr);
+    }
+
+    // 3) Send confirmation to the person who booked
+    try {
+      const { sendSystemEmail } = await import('./services/SystemEmailService');
+      await sendSystemEmail({
+        to: email,
+        subject: `Deine Demo mit Immivo — ${dateStr} um ${timeStr}`,
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #111827; color: white; padding: 24px 32px; border-radius: 12px 12px 0 0;">
+              <h2 style="margin: 0; font-size: 20px;">Demo bestätigt!</h2>
+              <p style="margin: 4px 0 0; opacity: 0.7; font-size: 14px;">Immivo AI</p>
+            </div>
+            <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+              <p style="margin: 0 0 16px; font-size: 16px; color: #111827;">Hallo ${name},</p>
+              <p style="margin: 0 0 24px; color: #4b5563;">vielen Dank für dein Interesse an Immivo! Hier die Details deiner Demo:</p>
+              <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e5e7eb;">
+                <p style="margin: 0 0 8px; font-size: 18px; font-weight: 700; color: #111827;">${dateStr}</p>
+                <p style="margin: 0 0 4px; font-size: 16px; color: #111827;">${timeStr} Uhr — 30 Minuten</p>
+                <p style="margin: 12px 0 0; font-size: 14px; color: #6b7280;">Google Meet — Link folgt kurz vor dem Termin per E-Mail</p>
+              </div>
+              <p style="margin: 24px 0 0; color: #4b5563; font-size: 14px;">Falls du den Termin verschieben oder absagen möchtest, schreib uns einfach an <a href="mailto:office@immivo.ai" style="color: #2563eb;">office@immivo.ai</a>.</p>
+              <p style="margin: 24px 0 0; color: #4b5563; font-size: 14px;">Bis bald!<br/><strong>Das Immivo Team</strong></p>
+            </div>
+          </div>`,
+      });
+    } catch (emailErr) {
+      console.error('Demo guest confirmation email failed:', emailErr);
+    }
+
+    res.json({ success: true, eventId: eventId || 'booked' });
   } catch (error: any) {
     console.error('Demo booking error:', error);
     res.status(500).json({ error: error.message });
