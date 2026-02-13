@@ -5243,7 +5243,7 @@ app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, asyn
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
 
-    // Extract base64 data from data URL
+    // Extract base64 data from data URL or fetch from URL
     let imageData = image;
     let mimeType = 'image/jpeg';
     
@@ -5252,6 +5252,21 @@ app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, asyn
       if (matches) {
         mimeType = matches[1];
         imageData = matches[2];
+      }
+    } else if (image.startsWith('http://') || image.startsWith('https://')) {
+      // Image is a URL (e.g. S3 URL from property) — fetch and convert to base64
+      console.log(`🖼️ Fetching image from URL: ${image.substring(0, 100)}...`);
+      try {
+        const imgResponse = await fetch(image);
+        if (!imgResponse.ok) throw new Error(`HTTP ${imgResponse.status}`);
+        const contentType = imgResponse.headers.get('content-type');
+        if (contentType) mimeType = contentType.split(';')[0].trim();
+        const arrayBuffer = await imgResponse.arrayBuffer();
+        imageData = Buffer.from(arrayBuffer).toString('base64');
+        console.log(`✅ Fetched image: ${mimeType}, ${Math.round(imageData.length / 1024)}KB base64`);
+      } catch (fetchErr: any) {
+        console.error('❌ Failed to fetch image from URL:', fetchErr.message);
+        return res.status(400).json({ error: `Bild konnte nicht von der URL geladen werden: ${fetchErr.message}` });
       }
     }
 

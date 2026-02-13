@@ -298,11 +298,13 @@ export default function ExposesPage() {
     };
 
     switch (block.type) {
-      case 'hero':
+      case 'hero': {
+        // Use block's own imageUrl, or fall back to previewProperty's first image
+        const heroImage = block.imageUrl || (previewProperty?.images?.[0] ? getImageUrl(previewProperty.images[0]) : '');
         return (
           <div className="relative h-64 bg-black overflow-hidden">
-            {block.imageUrl ? (
-              <img src={getImageUrl(block.imageUrl || '')} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            {heroImage ? (
+              <img src={heroImage.startsWith('http') || heroImage.startsWith('/') ? heroImage : getImageUrl(heroImage)} alt="" className="absolute inset-0 w-full h-full object-cover" />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-white/30">
                 <ImageIcon className="w-16 h-16" />
@@ -314,6 +316,7 @@ export default function ExposesPage() {
             </div>
           </div>
         );
+      }
 
       case 'stats':
         const stats = block.items || [
@@ -432,12 +435,15 @@ export default function ExposesPage() {
           </div>
         );
 
-      case 'gallery':
-        const images = block.images || [];
+      case 'gallery': {
+        // Use block's own images, or fall back to previewProperty images
+        const galleryImages = (block.images && block.images.length > 0) 
+          ? block.images 
+          : (previewProperty?.images || []);
         return (
           <div className="p-6">
             <div className={`grid gap-2 ${block.columns === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
-              {images.length > 0 ? images.map((img: string, i: number) => (
+              {galleryImages.length > 0 ? galleryImages.map((img: string, i: number) => (
                 <div key={i} className="aspect-video bg-gray-200 rounded overflow-hidden">
                   <img src={getImageUrl(img)} alt="" className="w-full h-full object-cover" />
                 </div>
@@ -449,13 +455,16 @@ export default function ExposesPage() {
             </div>
           </div>
         );
+      }
 
-      case 'floorplan':
+      case 'floorplan': {
+        // Use block's own imageUrl, or fall back to previewProperty's first floorplan
+        const floorplanImage = block.imageUrl || (previewProperty?.floorplans?.[0] ? getImageUrl(previewProperty.floorplans[0]) : '');
         return (
           <div className="p-6">
             {block.title && <h3 className="text-lg font-semibold mb-4" style={{ color: themeColors.secondary }}>{rv(block.title)}</h3>}
-            {block.imageUrl ? (
-              <img src={getImageUrl(block.imageUrl || '')} alt="Grundriss" className="w-full" />
+            {floorplanImage ? (
+              <img src={floorplanImage.startsWith('http') || floorplanImage.startsWith('/') ? floorplanImage : getImageUrl(floorplanImage)} alt="Grundriss" className="w-full" />
             ) : (
               <div className="aspect-video bg-gray-200 rounded flex items-center justify-center text-gray-400">
                 <ImageIcon className="w-12 h-12" />
@@ -463,6 +472,7 @@ export default function ExposesPage() {
             )}
           </div>
         );
+      }
 
       case 'twoColumn':
         return (
