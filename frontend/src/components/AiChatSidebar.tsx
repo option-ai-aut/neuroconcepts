@@ -627,6 +627,9 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               const data = JSON.parse(line.slice(6));
+
+              // Skip heartbeat keepalive signals
+              if (data.heartbeat) continue;
               
               // Capture tools used and update message immediately with live action indicator
               if (data.toolsUsed && data.toolsUsed.length > 0) {

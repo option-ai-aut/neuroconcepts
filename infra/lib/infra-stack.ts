@@ -197,7 +197,7 @@ export class ImmivoStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_22_X,
       entry: path.join(__dirname, '../../src/services/orchestrator/src/index.ts'),
       handler: 'handler',
-      timeout: cdk.Duration.seconds(29), // API Gateway max is 29s
+      timeout: cdk.Duration.seconds(120), // 2 min for AI tool calls (Function URL bypasses API GW 29s limit)
       memorySize: 1024, // More memory = faster cold starts + Prisma init
       vpc: lambdaVpc,
       vpcSubnets: props.stageName === 'dev' ? undefined : { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
@@ -277,7 +277,24 @@ export class ImmivoStack extends cdk.Stack {
 
     this.dbSecret.grantRead(orchestratorLambda);
     appSecret.grantRead(orchestratorLambda);
-    
+
+    // Lambda Function URL for streaming endpoints (bypasses API Gateway 29s timeout)
+    const functionUrl = orchestratorLambda.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      cors: {
+        allowedOrigins: ['*'],
+        allowedMethods: [lambda.HttpMethod.ALL],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Secret'],
+      },
+      invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
+    });
+
+    // Export the Function URL for frontend to use for streaming
+    new cdk.CfnOutput(this, 'OrchestratorFunctionUrl', {
+      value: functionUrl.url,
+      description: 'Lambda Function URL for streaming (bypasses API GW 29s limit)',
+    });
+
     const api = new apigateway.LambdaRestApi(this, 'OrchestratorApi', {
       handler: orchestratorLambda,
       proxy: true,

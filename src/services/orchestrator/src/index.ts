@@ -2953,16 +2953,30 @@ app.post('/chat/stream',
         role: currentUser.role,
         pageContext: pageContext || undefined,
       };
-      for await (const result of openai.chatStream(fullMessage, tenantId, optimizedHistory, uploadedFileUrls, currentUser.id, userContext)) {
-        fullResponse += result.chunk;
-        if (result.hadFunctionCalls) hadFunctionCalls = true;
-        if (result.toolsUsed) toolsUsed = result.toolsUsed;
-        // Send chunk as SSE (include tools info when available)
-        if (result.toolsUsed) {
-          res.write(`data: ${JSON.stringify({ chunk: result.chunk, toolsUsed: result.toolsUsed })}\n\n`);
-        } else {
-          res.write(`data: ${JSON.stringify({ chunk: result.chunk })}\n\n`);
+
+      // Keepalive: Send heartbeat every 5s during tool execution to prevent API GW timeout
+      let lastDataTime = Date.now();
+      const heartbeatInterval = setInterval(() => {
+        if (Date.now() - lastDataTime > 4000) {
+          try { res.write(`data: ${JSON.stringify({ heartbeat: true })}\n\n`); } catch {}
         }
+      }, 5000);
+
+      try {
+        for await (const result of openai.chatStream(fullMessage, tenantId, optimizedHistory, uploadedFileUrls, currentUser.id, userContext)) {
+          lastDataTime = Date.now();
+          fullResponse += result.chunk;
+          if (result.hadFunctionCalls) hadFunctionCalls = true;
+          if (result.toolsUsed) toolsUsed = result.toolsUsed;
+          // Send chunk as SSE (include tools info when available)
+          if (result.toolsUsed) {
+            res.write(`data: ${JSON.stringify({ chunk: result.chunk, toolsUsed: result.toolsUsed })}\n\n`);
+          } else {
+            res.write(`data: ${JSON.stringify({ chunk: result.chunk })}\n\n`);
+          }
+        }
+      } finally {
+        clearInterval(heartbeatInterval);
       }
 
       // Send done signal with function call info
