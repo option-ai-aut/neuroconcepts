@@ -119,9 +119,7 @@ export const metadata: Metadata = {
     canonical: SITE_URL,
   },
   verification: {
-    // Add these when you have them:
-    // google: 'your-google-verification-code',
-    // yandex: 'your-yandex-verification-code',
+    google: 'wOCLUpfxHLRSL9ZIdEflVT618PRJd5GrUOa98th3r4I',
   },
   category: 'technology',
   other: {
