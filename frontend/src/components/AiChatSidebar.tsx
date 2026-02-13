@@ -142,6 +142,13 @@ const TOOL_LABELS: Record<string, { label: string; icon: string }> = {
   
   // Dashboard
   get_dashboard_stats: { label: 'Dashboard geladen', icon: '📊' },
+  
+  // Image Studio
+  virtual_staging: { label: 'Virtual Staging', icon: '🎨' },
+  add_video_to_property: { label: 'Video hinzugefügt', icon: '🎬' },
+  set_virtual_tour: { label: 'Tour gesetzt', icon: '🔄' },
+  update_expose_template: { label: 'Vorlage aktualisiert', icon: '✏️' },
+  delete_expose_template: { label: 'Vorlage gelöscht', icon: '🗑️' },
 };
 
 // Helper to get tool label
@@ -653,6 +660,18 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                 if (data.hadFunctionCalls) {
                   hadFunctionCalls = true;
                 }
+                // Clear executing flag on done
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  const assistantIdx = newMessages.findIndex((m, idx) => idx === assistantMsgIndex && m.role === 'ASSISTANT');
+                  if (assistantIdx !== -1 && newMessages[assistantIdx].isExecutingTools) {
+                    newMessages[assistantIdx] = {
+                      ...newMessages[assistantIdx],
+                      isExecutingTools: false
+                    };
+                  }
+                  return newMessages;
+                });
                 break;
               }
               
@@ -792,7 +811,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                   : 'Frag mich nach Leads, Objekten oder E-Mails.'
                 }
               </p>
-              <div className="mt-4 mx-2 p-3 bg-gray-50 rounded-lg border border-gray-100 text-left">
+              <div className="mt-4 mx-2 p-3 bg-gray-50 rounded-lg border border-gray-100 text-center">
                 <p className="text-[10px] text-gray-400 leading-relaxed">
                   Jarvis ist ein KI-Assistent (GPT-5 mini). Deine Nachrichten werden 
                   zur Verarbeitung an OpenAI übermittelt. Es werden keine Daten für 
@@ -877,7 +896,46 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                     ))}
                   </div>
                 )}
-                <p className="whitespace-pre-wrap">{msg.content}</p>
+                {/* Render content with inline images for URLs */}
+                {(() => {
+                  // Detect image URLs in the message and render them as images
+                  const imageUrlRegex = /(https?:\/\/[^\s]+?\.(png|jpg|jpeg|webp|gif)(\?[^\s]*)?)/gi;
+                  const parts = msg.content.split(imageUrlRegex);
+                  const hasImageUrls = imageUrlRegex.test(msg.content);
+                  
+                  if (!hasImageUrls) {
+                    return <p className="whitespace-pre-wrap">{msg.content}</p>;
+                  }
+                  
+                  // Split text and render images inline
+                  const elements: React.ReactNode[] = [];
+                  let lastIndex = 0;
+                  const content = msg.content;
+                  const regex = /(https?:\/\/[^\s]+?\.(png|jpg|jpeg|webp|gif)(\?[^\s]*)?)/gi;
+                  let match;
+                  
+                  while ((match = regex.exec(content)) !== null) {
+                    // Text before the URL
+                    if (match.index > lastIndex) {
+                      const textBefore = content.slice(lastIndex, match.index).trim();
+                      if (textBefore) elements.push(<p key={`t-${lastIndex}`} className="whitespace-pre-wrap">{textBefore}</p>);
+                    }
+                    // The image
+                    elements.push(
+                      <a key={`img-${match.index}`} href={match[0]} target="_blank" rel="noopener noreferrer" className="block my-2">
+                        <img src={match[0]} alt="Ergebnis" className="rounded-lg max-w-full max-h-64 object-contain border border-gray-100" />
+                      </a>
+                    );
+                    lastIndex = regex.lastIndex;
+                  }
+                  // Remaining text
+                  if (lastIndex < content.length) {
+                    const remaining = content.slice(lastIndex).trim();
+                    if (remaining) elements.push(<p key={`t-${lastIndex}`} className="whitespace-pre-wrap">{remaining}</p>);
+                  }
+                  
+                  return <>{elements}</>;
+                })()}
               </div>
             </div>
           );

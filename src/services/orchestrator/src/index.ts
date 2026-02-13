@@ -5231,15 +5231,15 @@ app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, asyn
       }
     }
 
-    // Short, direct prompt — less is more for image editing
+    // Strict prompt — the room structure must stay EXACTLY as-is
     let stagingPrompt: string;
+    const stylePart = style ? `${style} style ` : '';
+    const roomPart = roomType ? `${roomType} ` : '';
+    
     if (prompt && prompt.trim()) {
-      stagingPrompt = `${prompt.trim()} Do not alter the room, walls, floor, ceiling, windows or perspective.`;
+      stagingPrompt = `This is a real photo of an empty room. Place ${stylePart}${roomPart}furniture into this exact room: ${prompt.trim()}. ABSOLUTE RULE: The room itself must remain COMPLETELY UNCHANGED. Every wall, pillar, column, beam, door, window, floor, ceiling, light fixture, outlet, radiator, pipe, and architectural element must stay EXACTLY where it is and look EXACTLY the same. Do NOT add, remove, move, or reshape any walls or structural elements. Do NOT change the paint color, flooring material, or any surface. Do NOT alter the camera angle or perspective. ONLY place furniture and decorative objects into the existing space.`;
     } else {
-      const parts: string[] = [];
-      if (style) parts.push(`${style} style`);
-      if (roomType) parts.push(roomType);
-      stagingPrompt = `Add ${parts.length > 0 ? parts.join(' ') + ' ' : ''}furniture to this room. Do not alter the room, walls, floor, ceiling, windows or perspective.`;
+      stagingPrompt = `This is a real photo of an empty room. Place ${stylePart}${roomPart}furniture into this exact room. ABSOLUTE RULE: The room itself must remain COMPLETELY UNCHANGED. Every wall, pillar, column, beam, door, window, floor, ceiling, light fixture, outlet, radiator, pipe, and architectural element must stay EXACTLY where it is and look EXACTLY the same. Do NOT add, remove, move, or reshape any walls or structural elements. Do NOT change the paint color, flooring material, or any surface. Do NOT alter the camera angle or perspective. ONLY place furniture and decorative objects into the existing space.`;
     }
 
     // Map numeric aspect ratio to Gemini-supported string

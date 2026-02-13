@@ -446,8 +446,8 @@ WICHTIG: Nutze IMMER exposeId="${targetId}" bei allen Tool-Aufrufen!`;
 
         const args = JSON.parse(call.function.arguments);
         
-        // Pass uploaded files to upload tools
-        if ((call.function.name === 'upload_images_to_property' || call.function.name === 'upload_documents_to_lead') && this.uploadedFiles.length > 0) {
+        // Pass uploaded files to upload tools and virtual staging
+        if ((call.function.name === 'upload_images_to_property' || call.function.name === 'upload_documents_to_lead' || call.function.name === 'virtual_staging') && this.uploadedFiles.length > 0) {
           args._uploadedFiles = this.uploadedFiles;
         }
         

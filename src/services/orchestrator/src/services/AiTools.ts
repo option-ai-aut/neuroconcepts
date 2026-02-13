@@ -815,6 +815,22 @@ export const CRM_TOOLS = {
       required: ["propertyId", "tourUrl"]
     }
   },
+  virtual_staging: {
+    name: "virtual_staging",
+    description: "Virtual Staging: Fügt KI-generierte Möbel in ein leeres Raumfoto ein. Kann ein vom User hochgeladenes Bild oder ein Bild aus einem Objekt verwenden. Gibt ein bearbeitetes Bild als URL zurück. Optional kann das Ergebnis direkt zum Objekt gespeichert werden.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        imageUrl: { type: SchemaType.STRING, description: "URL des Bildes das bearbeitet werden soll. Entweder eine hochgeladene Datei-URL oder ein Bild aus property.images[]" } as FunctionDeclarationSchema,
+        propertyId: { type: SchemaType.STRING, description: "Optional: Property-ID um ein Bild daraus zu verwenden (nimmt das erste Bild wenn imageUrl leer)" } as FunctionDeclarationSchema,
+        imageIndex: { type: SchemaType.INTEGER, description: "Optional: Index des Bildes aus dem Objekt (0-basiert, default: 0)" } as FunctionDeclarationSchema,
+        style: { type: SchemaType.STRING, description: "Einrichtungsstil: modern, scandinavian, industrial, classic, bohemian, luxury" } as FunctionDeclarationSchema,
+        roomType: { type: SchemaType.STRING, description: "Raumtyp: living room, bedroom, kitchen, dining room, home office, bathroom, kids room" } as FunctionDeclarationSchema,
+        prompt: { type: SchemaType.STRING, description: "Eigene Anweisung z.B. 'Graues Sofa, Holztisch, warme Beleuchtung'" } as FunctionDeclarationSchema,
+        saveToPropertyId: { type: SchemaType.STRING, description: "Optional: Property-ID zu der das fertige Bild gespeichert werden soll" } as FunctionDeclarationSchema,
+      }
+    }
+  },
 };
 
 // Exposé Tools for Jarvis - Full palette of block types
@@ -2607,6 +2623,149 @@ export class AiToolExecutor {
           where: { id: propertyId },
           data: { virtualTour: tourUrl }
         });
+      }
+
+      case 'virtual_staging': {
+        const { imageUrl, propertyId, imageIndex = 0, style, roomType, prompt, saveToPropertyId, _uploadedFiles } = args;
+        
+        // 1. Get the source image
+        let sourceImageUrl: string | null = imageUrl || null;
+        let sourceProperty: any = null;
+        
+        // If propertyId given but no imageUrl, get image from property
+        if (!sourceImageUrl && propertyId) {
+          sourceProperty = await getPrisma().property.findFirst({
+            where: { id: propertyId, tenantId }
+          });
+          if (!sourceProperty) throw new Error('Objekt nicht gefunden');
+          if (!sourceProperty.images || sourceProperty.images.length === 0) throw new Error('Objekt hat keine Bilder');
+          const idx = Math.min(imageIndex, sourceProperty.images.length - 1);
+          sourceImageUrl = sourceProperty.images[idx];
+        }
+        
+        // If no image yet, check uploaded files from chat
+        if (!sourceImageUrl && _uploadedFiles && _uploadedFiles.length > 0) {
+          sourceImageUrl = _uploadedFiles[0];
+        }
+        
+        if (!sourceImageUrl) throw new Error('Kein Bild angegeben. Lade ein Bild hoch oder gib eine Property-ID an.');
+        
+        // 2. Fetch the image and convert to base64
+        const https = require('https');
+        const http = require('http');
+        const imageBase64 = await new Promise<string>((resolve, reject) => {
+          const url = sourceImageUrl!;
+          const protocol = url.startsWith('https') ? https : http;
+          protocol.get(url, (res: any) => {
+            const chunks: Buffer[] = [];
+            res.on('data', (chunk: Buffer) => chunks.push(chunk));
+            res.on('end', () => {
+              const buffer = Buffer.concat(chunks);
+              const mime = res.headers['content-type'] || 'image/jpeg';
+              resolve(`data:${mime};base64,${buffer.toString('base64')}`);
+            });
+            res.on('error', reject);
+          }).on('error', reject);
+        });
+        
+        // 3. Call the image edit endpoint logic directly
+        const { GoogleGenAI } = require('@google/genai');
+        const geminiKey = process.env.GEMINI_API_KEY;
+        if (!geminiKey) throw new Error('Gemini API Key nicht konfiguriert');
+        
+        const ai = new GoogleGenAI({ apiKey: geminiKey });
+        
+        // Build prompt
+        const STRICT_PRESERVE = 'ABSOLUTE RULE: The room itself must remain COMPLETELY UNCHANGED. Every wall, pillar, column, beam, door, window, floor, ceiling, light fixture, outlet, radiator, pipe, and architectural element must stay EXACTLY where it is. Do NOT add, remove, move, or reshape any walls or structural elements. Do NOT change paint color, flooring material, or any surface. Do NOT alter the camera angle or perspective. ONLY place furniture and decorative objects into the existing space.';
+        const stylePart = style ? `${style} style ` : '';
+        const roomPart = roomType ? `${roomType} ` : '';
+        let stagingPrompt: string;
+        if (prompt && prompt.trim()) {
+          stagingPrompt = `This is a real photo of an empty room. Place ${stylePart}${roomPart}furniture into this exact room: ${prompt.trim()}. ${STRICT_PRESERVE}`;
+        } else {
+          stagingPrompt = `This is a real photo of an empty room. Place ${stylePart}${roomPart}furniture into this exact room. ${STRICT_PRESERVE}`;
+        }
+        
+        // Extract base64 data
+        const matches = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
+        if (!matches) throw new Error('Bild konnte nicht verarbeitet werden');
+        const mimeType = matches[1];
+        const imgData = matches[2];
+        
+        console.log(`🎨 Jarvis virtual staging: style=${style}, room=${roomType}, prompt="${(prompt || '').substring(0, 50)}"`);
+        
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash-image',
+          contents: [
+            { inlineData: { mimeType, data: imgData } },
+            { text: stagingPrompt },
+          ],
+          config: {
+            responseModalities: ['TEXT', 'IMAGE'],
+          },
+        });
+        
+        // Extract generated image
+        let generatedImage: string | null = null;
+        if (response.candidates && response.candidates[0]?.content?.parts) {
+          for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData && part.inlineData.data) {
+              const outMime = part.inlineData.mimeType || 'image/png';
+              generatedImage = `data:${outMime};base64,${part.inlineData.data}`;
+            }
+          }
+        }
+        
+        if (!generatedImage) throw new Error('KI konnte kein Bild generieren. Versuche einen anderen Prompt.');
+        
+        // 4. Upload result to S3 so we have a URL
+        const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+        const s3 = new S3Client({ region: process.env.AWS_REGION || 'eu-central-1' });
+        const bucket = process.env.S3_BUCKET || process.env.AWS_S3_BUCKET;
+        
+        const imageBuffer = Buffer.from(generatedImage.split(',')[1], 'base64');
+        const s3Key = `staging/${tenantId}/${Date.now()}-staged.png`;
+        
+        await s3.send(new PutObjectCommand({
+          Bucket: bucket,
+          Key: s3Key,
+          Body: imageBuffer,
+          ContentType: 'image/png',
+        }));
+        
+        const cdnDomain = process.env.CLOUDFRONT_DOMAIN;
+        const resultUrl = cdnDomain 
+          ? `https://${cdnDomain}/${s3Key}`
+          : `https://${bucket}.s3.${process.env.AWS_REGION || 'eu-central-1'}.amazonaws.com/${s3Key}`;
+        
+        // 5. Optionally save to property
+        let savedToProperty = false;
+        const targetPropertyId = saveToPropertyId || propertyId;
+        if (targetPropertyId) {
+          const targetProp = await getPrisma().property.findFirst({
+            where: { id: targetPropertyId, tenantId }
+          });
+          if (targetProp) {
+            await getPrisma().property.update({
+              where: { id: targetPropertyId },
+              data: { images: [...targetProp.images, resultUrl] }
+            });
+            savedToProperty = true;
+          }
+        }
+        
+        console.log(`✅ Jarvis virtual staging complete: ${resultUrl}`);
+        
+        return {
+          success: true,
+          imageUrl: resultUrl,
+          style: style || 'auto',
+          roomType: roomType || 'auto',
+          savedToProperty,
+          message: savedToProperty 
+            ? `Virtual Staging fertig und zum Objekt gespeichert.`
+            : `Virtual Staging fertig.`
+        };
       }
 
       // Exposé Tools (Editor-specific)

@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   Image as ImageIcon,
   Wand2,
+  Save,
 } from 'lucide-react';
 import useSWR from 'swr';
 import { getProperties, getImageUrl } from '@/lib/api';
@@ -113,14 +114,16 @@ function BeforeAfterSlider({ before, after }: { before: string; after: string })
       onTouchStart={handleMouseDown}
       onClick={(e) => updatePosition(e.clientX)}
     >
+      {/* After image: full width, sets the container height */}
       <img src={after} alt="Nachher" className="w-full h-auto block" draggable={false} />
-      <div className="absolute inset-0 overflow-hidden" style={{ width: `${sliderPos}%` }}>
+      {/* Before image: absolutely positioned, same size, clipped by width */}
+      <div className="absolute inset-0 overflow-hidden" style={{ clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }}>
         <img 
-          src={before} alt="Vorher" className="h-full object-cover"
-          style={{ width: containerRef.current ? `${containerRef.current.offsetWidth}px` : '100%' }}
+          src={before} alt="Vorher" className="absolute inset-0 w-full h-full object-cover"
           draggable={false}
         />
       </div>
+      {/* Slider line + handle */}
       <div className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg z-10" style={{ left: `${sliderPos}%`, transform: 'translateX(-50%)' }}>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center">
           <GripVertical className="w-4 h-4 text-gray-600" />
@@ -128,44 +131,6 @@ function BeforeAfterSlider({ before, after }: { before: string; after: string })
       </div>
       <div className="absolute top-3 left-3 bg-black/60 text-white text-[10px] font-semibold px-2 py-1 rounded-md uppercase tracking-wider">Vorher</div>
       <div className="absolute top-3 right-3 bg-black/60 text-white text-[10px] font-semibold px-2 py-1 rounded-md uppercase tracking-wider">Nachher</div>
-    </div>
-  );
-}
-
-// Loading animation component
-function StagingLoader({ elapsed }: { elapsed: number }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 md:py-24">
-      {/* Animated room with furniture appearing */}
-      <div className="relative w-32 h-32 mb-8">
-        {/* Room outline */}
-        <div className="absolute inset-0 border-2 border-gray-200 rounded-2xl bg-gray-100" />
-        
-        {/* Animated furniture pieces */}
-        <div className="absolute bottom-3 left-3 w-8 h-5 bg-gray-400 rounded-sm animate-[staging-pop_2s_ease-in-out_infinite]" />
-        <div className="absolute bottom-3 right-4 w-6 h-8 bg-gray-500 rounded-sm animate-[staging-pop_2s_ease-in-out_0.4s_infinite]" />
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-10 h-3 bg-gray-400 rounded-sm animate-[staging-pop_2s_ease-in-out_0.8s_infinite]" />
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 w-7 h-7 border-2 border-gray-300 rounded-lg animate-[staging-pop_2s_ease-in-out_1.2s_infinite]" />
-        
-        {/* Sparkle effects */}
-        <div className="absolute -top-1 -right-1 animate-[staging-sparkle_1.5s_ease-in-out_infinite]">
-          <Sparkles className="w-5 h-5 text-yellow-400" />
-        </div>
-        <div className="absolute -bottom-1 -left-1 animate-[staging-sparkle_1.5s_ease-in-out_0.75s_infinite]">
-          <Wand2 className="w-4 h-4 text-gray-500" />
-        </div>
-      </div>
-
-      {/* Progress bar */}
-      <div className="w-48 h-1.5 bg-gray-100 rounded-full overflow-hidden mb-4">
-        <div 
-          className="h-full bg-gray-700 rounded-full transition-all duration-1000 ease-out"
-          style={{ width: `${Math.min((elapsed / 45) * 100, 95)}%` }}
-        />
-      </div>
-
-      <p className="text-sm font-medium text-gray-800">KI platziert Möbel...</p>
-      <p className="text-xs text-gray-400 mt-1">{elapsed}s · ca. 15–40 Sekunden</p>
     </div>
   );
 }
@@ -185,8 +150,11 @@ export default function ImageStudioPage() {
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [showSaveDropdown, setShowSaveDropdown] = useState(false);
+  const [savedToProperty, setSavedToProperty] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const saveDropdownRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -214,7 +182,17 @@ export default function ImageStudioPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showPropertyDropdown]);
 
-  // Validate: at least one of style, room, or custom prompt selected
+  // Close save dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (saveDropdownRef.current && !saveDropdownRef.current.contains(e.target as Node)) {
+        setShowSaveDropdown(false);
+      }
+    }
+    if (showSaveDropdown) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showSaveDropdown]);
+
   const hasSelection = !!selectedStyle || !!selectedRoom || customPrompt.trim().length > 0;
 
   const loadImage = useCallback(async (dataUrl: string) => {
@@ -333,8 +311,8 @@ export default function ImageStudioPage() {
     document.body.removeChild(link);
   };
 
-  const handleSaveToProperty = async () => {
-    if (!resultImage || !selectedProperty) return;
+  const handleSaveToProperty = async (property: Property) => {
+    if (!resultImage) return;
     try {
       const { fetchAuthSession } = await import('aws-amplify/auth');
       const session = await fetchAuthSession();
@@ -348,16 +326,17 @@ export default function ImageStudioPage() {
       const config = getRuntimeConfig();
       const apiUrl = (config.apiUrl || 'http://localhost:3001').replace(/\/+$/, '');
       
-      await fetch(`${apiUrl}/properties/${selectedProperty.id}/images`, {
+      await fetch(`${apiUrl}/properties/${property.id}/images`, {
         method: 'POST',
         headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
         body: formData
       });
       
-      alert('Bild wurde zum Objekt hinzugefügt!');
+      setSavedToProperty(property.id);
+      setShowSaveDropdown(false);
+      setTimeout(() => setSavedToProperty(null), 3000);
     } catch (err) {
       console.error('Error saving to property:', err);
-      alert('Fehler beim Speichern');
     }
   };
 
@@ -371,55 +350,69 @@ export default function ImageStudioPage() {
     setCustomPrompt('');
     setSelectedStyle(null);
     setSelectedRoom(null);
+    setSavedToProperty(null);
+    setShowSaveDropdown(false);
   };
 
-  // ── No image selected: Upload screen ──
-  if (!originalImage) {
-    return (
-      <div className="h-full flex flex-col bg-white">
-        <div className="flex-1 flex items-center justify-center px-4 md:px-8 pb-8">
-          <div className="w-full max-w-xl space-y-6">
-            {/* Title */}
-            <div className="text-center mb-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-xs font-medium mb-4">
-                <Sparkles className="w-3.5 h-3.5" />
-                Virtual Staging mit Gemini 3
+  // ── Unified Layout: Settings left, Image right ──
+  return (
+    <div className="h-full flex bg-white">
+      {/* ── Left Sidebar: Settings ── */}
+      <div className="w-72 2xl:w-80 shrink-0 border-r border-gray-100 flex flex-col h-full overflow-y-auto">
+        <div className="p-4 2xl:p-5 space-y-5 flex-1">
+          {/* Image Source */}
+          <div>
+            <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Bild</h3>
+            
+            {/* Current image info */}
+            {originalImage && (
+              <div className="flex items-center gap-2 mb-2 p-2 bg-gray-50 rounded-lg">
+                <img src={originalImage} alt="" className="w-10 h-10 rounded object-cover" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-medium text-gray-700 truncate">
+                    {selectedProperty?.title || 'Hochgeladen'}
+                  </p>
+                  {imageDimensions && (
+                    <p className="text-[10px] text-gray-400">{imageDimensions.width} x {imageDimensions.height}px</p>
+                  )}
+                </div>
+                <button onClick={handleReset} className="p-1 hover:bg-gray-200 rounded transition-colors shrink-0">
+                  <X className="w-3.5 h-3.5 text-gray-400" />
+                </button>
               </div>
-              <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Leere Räume einrichten</h2>
-              <p className="text-gray-500 mt-2 text-sm">Lade ein Foto hoch und die KI fügt passende Möbel ein.</p>
-            </div>
+            )}
 
             {/* Property Picker */}
             {properties.length > 0 && (
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setShowPropertyDropdown(!showPropertyDropdown)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors text-sm"
+                  className="w-full flex items-center justify-between px-3 py-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors text-xs"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <Building2 className="w-4 h-4 text-gray-400" />
-                    <span className="text-gray-600">Bild aus Objekt wählen...</span>
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="text-gray-600">Aus Objekt wählen</span>
                   </div>
-                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showPropertyDropdown ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showPropertyDropdown ? 'rotate-180' : ''}`} />
                 </button>
                 
                 {showPropertyDropdown && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-200 max-h-[420px] overflow-y-auto z-20">
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-200 max-h-[350px] overflow-y-auto z-30">
                     {properties.filter(p => p.images && p.images.length > 0).length === 0 ? (
-                      <div className="p-6 text-center text-gray-400 text-sm">
-                        <ImageIcon className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                        Keine Objekte mit Bildern vorhanden
+                      <div className="p-4 text-center text-gray-400 text-xs">
+                        <ImageIcon className="w-6 h-6 mx-auto mb-1.5 text-gray-300" />
+                        Keine Objekte mit Bildern
                       </div>
                     ) : (
                       properties.filter(p => p.images && p.images.length > 0).map((property) => (
                         <div key={property.id} className="border-b border-gray-100 last:border-0">
-                          <div className="px-4 pt-3 pb-2">
-                            <p className="text-sm font-semibold text-gray-900">{property.title}</p>
+                          <div className="px-3 pt-2.5 pb-1.5">
+                            <p className="text-xs font-semibold text-gray-900">{property.title}</p>
                             {property.address && (
-                              <p className="text-xs text-gray-400 mt-0.5">{property.address}</p>
+                              <p className="text-[10px] text-gray-400">{property.address}</p>
                             )}
                           </div>
-                          <div className="px-3 pb-3 grid grid-cols-3 gap-2">
+                          <div className="px-2.5 pb-2.5 grid grid-cols-3 gap-1.5">
                             {property.images!.slice(0, 9).map((img, idx) => {
                               const resolvedUrl = getImageUrl(img);
                               return (
@@ -430,15 +423,14 @@ export default function ImageStudioPage() {
                                 >
                                   <img 
                                     src={resolvedUrl} 
-                                    alt={`${property.title} Bild ${idx + 1}`} 
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200 bg-gray-200" 
+                                    alt={`${property.title} ${idx + 1}`} 
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" 
                                     onError={(e) => {
                                       const target = e.target as HTMLImageElement;
                                       target.onerror = null;
-                                      target.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150" viewBox="0 0 200 150"><rect fill="#e5e7eb" width="200" height="150"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="#9ca3af" font-size="12" font-family="sans-serif">Bild nicht verfügbar</text></svg>');
+                                      target.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150" viewBox="0 0 200 150"><rect fill="#e5e7eb" width="200" height="150"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="#9ca3af" font-size="12" font-family="sans-serif">—</text></svg>');
                                     }}
                                   />
-                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                                 </button>
                               );
                             })}
@@ -451,229 +443,287 @@ export default function ImageStudioPage() {
               </div>
             )}
 
-            {/* Divider */}
-            <div className="flex items-center gap-4">
-              <div className="flex-1 h-px bg-gray-200" />
-              <span className="text-xs text-gray-400">oder</span>
-              <div className="flex-1 h-px bg-gray-200" />
-            </div>
-
-            {/* Upload Area */}
-            <div
-              onDrop={handleDrop}
-              onDragOver={(e) => e.preventDefault()}
+            {/* Upload button */}
+            <button
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-200 rounded-xl p-10 md:p-12 text-center cursor-pointer hover:border-gray-400 hover:bg-gray-50/30 transition-all group"
+              className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-50/50 transition-all"
             >
-              <Upload className="w-10 h-10 text-gray-300 group-hover:text-gray-500 mx-auto mb-3 transition-colors" />
-              <p className="text-sm font-medium text-gray-700">Foto hochladen</p>
-              <p className="text-xs text-gray-400 mt-1">Drag & Drop oder klicken · JPG, PNG, WebP</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </div>
-
-            <p className="text-[11px] text-gray-400 text-center">
-              Bilder werden automatisch auf max. 2048px komprimiert.
-            </p>
+              <Upload className="w-3.5 h-3.5" />
+              {originalImage ? 'Anderes Bild' : 'Foto hochladen'}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
           </div>
-        </div>
-      </div>
-    );
-  }
 
-  // ── Image selected: Settings top, image bottom ──
-  return (
-    <div className="h-full flex flex-col bg-white">
-      <div className="flex-1 overflow-auto">
-        {/* Settings Bar */}
-        <div className="border-b border-gray-100 bg-white sticky top-0 z-10">
-          <div className="max-w-5xl mx-auto px-4 md:px-8 py-4 space-y-4">
-            {/* Row 1: Style selection */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Einrichtungsstil</h3>
-                {selectedStyle && (
-                  <button onClick={() => setSelectedStyle(null)} className="text-[10px] text-gray-400 hover:text-gray-600">
-                    Abwählen
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {STYLES.map((style) => (
-                  <button
-                    key={style.id}
-                    onClick={() => setSelectedStyle(selectedStyle?.id === style.id ? null : style)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      selectedStyle?.id === style.id
-                        ? 'bg-gray-900 text-white shadow-sm'
-                        : 'bg-gray-50 border border-gray-150 text-gray-600 hover:border-gray-300 hover:bg-gray-100'
-                    }`}
-                  >
-                    {style.name}
-                  </button>
-                ))}
-              </div>
-            </div>
+          {/* Divider */}
+          <div className="h-px bg-gray-100" />
 
-            {/* Row 2: Room type */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Raumtyp</h3>
-                {selectedRoom && (
-                  <button onClick={() => setSelectedRoom(null)} className="text-[10px] text-gray-400 hover:text-gray-600">
-                    Abwählen
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {ROOMS.map((room) => (
-                  <button
-                    key={room.id}
-                    onClick={() => setSelectedRoom(selectedRoom?.id === room.id ? null : room)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      selectedRoom?.id === room.id
-                        ? 'bg-gray-900 text-white shadow-sm'
-                        : 'bg-gray-50 border border-gray-150 text-gray-600 hover:border-gray-300 hover:bg-gray-100'
-                    }`}
-                  >
-                    {room.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Row 3: Custom prompt + generate button */}
-            <div className="flex items-end gap-3">
-              <div className="flex-1">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                  Eigene Anweisung <span className="font-normal normal-case text-gray-400">(optional)</span>
-                </h3>
-                <input
-                  type="text"
-                  value={customPrompt}
-                  onChange={(e) => setCustomPrompt(e.target.value)}
-                  placeholder="z.B. 'Graues Sofa, Holztisch' — je kürzer, desto besser"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900 placeholder-gray-400"
-                  onKeyDown={(e) => { if (e.key === 'Enter' && hasSelection && !isProcessing) handleGenerate(); }}
-                />
-              </div>
-              <button
-                onClick={handleGenerate}
-                disabled={isProcessing || !hasSelection}
-                className={`flex items-center gap-2 px-5 py-2 rounded-lg font-medium text-sm transition-all shrink-0 ${
-                  isProcessing || !hasSelection
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-gray-900 text-white hover:bg-gray-800 shadow-sm hover:shadow-md'
-                }`}
-              >
-                {isProcessing ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Wand2 className="w-4 h-4" />
-                )}
-                {isProcessing ? `${elapsed}s` : 'Generieren'}
-              </button>
-            </div>
-
-            {/* Validation hint */}
-            {!hasSelection && (
-              <p className="text-[11px] text-amber-600 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" />
-                Wähle mindestens einen Stil, Raumtyp oder gib eine Anweisung ein.
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Image Area */}
-        <div className="max-w-5xl mx-auto px-4 md:px-8 py-6">
-          {/* Error */}
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-100 rounded-lg px-4 py-3 flex items-start gap-3">
-              <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-sm text-red-700">{error}</p>
-                <button onClick={handleGenerate} className="text-xs text-red-600 underline mt-1">Erneut versuchen</button>
-              </div>
-            </div>
-          )}
-
-          {/* Loading state */}
-          {isProcessing && <StagingLoader elapsed={elapsed} />}
-
-          {/* Result: Before/After Slider */}
-          {resultImage && originalImage && !isProcessing && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                  <Check className="w-4 h-4 text-green-500" />
-                  Ergebnis
-                </h3>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={handleGenerate}
-                    className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 px-2.5 py-1.5 rounded-md hover:bg-gray-100 transition-colors"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    Nochmal
-                  </button>
-                  {selectedProperty && (
-                    <button
-                      onClick={handleSaveToProperty}
-                      className="text-xs text-green-600 hover:text-green-700 flex items-center gap-1 px-2.5 py-1.5 rounded-md hover:bg-green-50 transition-colors"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      Zum Objekt
-                    </button>
-                  )}
-                  <button
-                    onClick={handleDownload}
-                    className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 px-2.5 py-1.5 rounded-md hover:bg-gray-50 transition-colors"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    Download
-                  </button>
-                </div>
-              </div>
-              <BeforeAfterSlider before={originalImage} after={resultImage} />
-            </div>
-          )}
-
-          {/* Original image preview (when no result yet and not processing) */}
-          {!resultImage && !isProcessing && originalImage && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <ImageIcon className="w-4 h-4 text-gray-400" />
-                  Hochgeladenes Bild
-                  {imageDimensions && (
-                    <span className="text-[10px] text-gray-400 font-normal">{imageDimensions.width} × {imageDimensions.height}px</span>
-                  )}
-                </h3>
-                <button
-                  onClick={handleReset}
-                  className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 px-2 py-1 rounded-md hover:bg-gray-100 transition-colors"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  Bild ändern
+          {/* Style Selection */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Stil</h3>
+              {selectedStyle && (
+                <button onClick={() => setSelectedStyle(null)} className="text-[10px] text-gray-400 hover:text-gray-600">
+                  Zurücksetzen
                 </button>
-              </div>
-              <div className="rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
-                <img src={originalImage} alt="Original" className="w-full h-auto" />
-              </div>
+              )}
             </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {STYLES.map((style) => (
+                <button
+                  key={style.id}
+                  onClick={() => setSelectedStyle(selectedStyle?.id === style.id ? null : style)}
+                  className={`px-2.5 py-2 rounded-lg text-left transition-all ${
+                    selectedStyle?.id === style.id
+                      ? 'bg-gray-900 text-white shadow-sm'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'
+                  }`}
+                >
+                  <span className="text-xs font-medium block">{style.name}</span>
+                  <span className={`text-[10px] block ${selectedStyle?.id === style.id ? 'text-gray-300' : 'text-gray-400'}`}>{style.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Room Type */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Raumtyp</h3>
+              {selectedRoom && (
+                <button onClick={() => setSelectedRoom(null)} className="text-[10px] text-gray-400 hover:text-gray-600">
+                  Zurücksetzen
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {ROOMS.map((room) => (
+                <button
+                  key={room.id}
+                  onClick={() => setSelectedRoom(selectedRoom?.id === room.id ? null : room)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    selectedRoom?.id === room.id
+                      ? 'bg-gray-900 text-white shadow-sm'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'
+                  }`}
+                >
+                  {room.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom Prompt */}
+          <div>
+            <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              Anweisung <span className="font-normal normal-case text-gray-400">(optional)</span>
+            </h3>
+            <textarea
+              value={customPrompt}
+              onChange={(e) => setCustomPrompt(e.target.value)}
+              placeholder="z.B. Graues Sofa, Holztisch, warme Beleuchtung..."
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-xs text-gray-900 placeholder-gray-400 resize-none"
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && hasSelection && !isProcessing && originalImage) { e.preventDefault(); handleGenerate(); } }}
+            />
+          </div>
+        </div>
+
+        {/* Bottom: Generate button + info */}
+        <div className="p-4 2xl:p-5 border-t border-gray-100 space-y-3">
+          {/* Validation hint */}
+          {!hasSelection && originalImage && (
+            <p className="text-[10px] text-amber-600 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3 shrink-0" />
+              Wähle einen Stil, Raumtyp oder gib eine Anweisung ein.
+            </p>
           )}
 
-          {/* Model info */}
-          <p className="text-[10px] text-gray-400 text-center mt-4">
-            Model: gemini-3-pro-image-preview · Qualität: 2K
+          {error && (
+            <p className="text-[10px] text-red-600 flex items-start gap-1">
+              <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+              {error}
+            </p>
+          )}
+
+          <button
+            onClick={handleGenerate}
+            disabled={isProcessing || !hasSelection || !originalImage}
+            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
+              isProcessing || !hasSelection || !originalImage
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-gray-900 text-white hover:bg-gray-800 shadow-sm hover:shadow-md'
+            }`}
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Generiere... {elapsed}s
+              </>
+            ) : (
+              <>
+                <Wand2 className="w-4 h-4" />
+                Generieren
+              </>
+            )}
+          </button>
+
+          
+
+          <p className="text-[9px] text-gray-300 text-center">
+            Bilder auf max. 2048px komprimiert
           </p>
         </div>
+      </div>
+
+      {/* ── Right: Image Area ── */}
+      <div 
+        className="flex-1 flex items-center justify-center p-6 2xl:p-10 overflow-auto bg-gray-50/50"
+        onDrop={handleDrop}
+        onDragOver={(e) => e.preventDefault()}
+      >
+        {/* No image yet: Upload prompt */}
+        {!originalImage && (
+          <div 
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full max-w-2xl aspect-[4/3] border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 hover:bg-white/60 transition-all group"
+          >
+            <Upload className="w-12 h-12 text-gray-200 group-hover:text-gray-400 mb-4 transition-colors" />
+            <p className="text-sm font-medium text-gray-400 group-hover:text-gray-600 transition-colors">Foto hierher ziehen oder klicken</p>
+            <p className="text-xs text-gray-300 mt-1">JPG, PNG, WebP</p>
+          </div>
+        )}
+
+        {/* Processing */}
+        {isProcessing && originalImage && (
+          <div className="w-full max-w-2xl">
+            <div className="relative rounded-xl overflow-hidden bg-gray-100">
+              <img src={originalImage} alt="Original" className="w-full h-auto opacity-40" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <div className="relative w-20 h-20 mb-6">
+                  <div className="absolute inset-0 border-2 border-gray-200 rounded-2xl bg-white/80" />
+                  <div className="absolute bottom-2 left-2 w-6 h-4 bg-gray-400 rounded-sm animate-[staging-pop_2s_ease-in-out_infinite]" />
+                  <div className="absolute bottom-2 right-3 w-4 h-6 bg-gray-500 rounded-sm animate-[staging-pop_2s_ease-in-out_0.4s_infinite]" />
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-8 h-2.5 bg-gray-400 rounded-sm animate-[staging-pop_2s_ease-in-out_0.8s_infinite]" />
+                  <div className="absolute -top-1 -right-1 animate-[staging-sparkle_1.5s_ease-in-out_infinite]">
+                    <Sparkles className="w-4 h-4 text-yellow-400" />
+                  </div>
+                </div>
+                <div className="w-48 h-1.5 bg-white/60 rounded-full overflow-hidden mb-4">
+                  <div 
+                    className="h-full bg-gray-800 rounded-full transition-all duration-1000 ease-out"
+                    style={{ width: `${Math.min((elapsed / 25) * 100, 95)}%` }}
+                  />
+                </div>
+                <p className="text-base font-semibold text-gray-900">KI platziert Möbel...</p>
+                <p className="text-sm text-gray-500 mt-1">{elapsed}s · ca. 10–20 Sekunden</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Result: Before/After + Action Buttons */}
+        {resultImage && originalImage && !isProcessing && (
+          <div className="w-full max-w-2xl">
+            <BeforeAfterSlider before={originalImage} after={resultImage} />
+            
+            {/* Action buttons below the image */}
+            <div className="flex items-center gap-2 mt-4">
+              <button
+                onClick={handleGenerate}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Nochmal
+              </button>
+              <button
+                onClick={handleDownload}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download
+              </button>
+
+              {/* Save to property */}
+              <div className="relative ml-auto" ref={saveDropdownRef}>
+                {selectedProperty ? (
+                  <button
+                    onClick={() => handleSaveToProperty(selectedProperty)}
+                    className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      savedToProperty === selectedProperty.id
+                        ? 'bg-green-100 text-green-700 border border-green-200'
+                        : 'bg-gray-900 text-white hover:bg-gray-800'
+                    }`}
+                  >
+                    {savedToProperty === selectedProperty.id ? (
+                      <><Check className="w-3.5 h-3.5" /> Gespeichert</>
+                    ) : (
+                      <><Save className="w-3.5 h-3.5" /> Zu &quot;{selectedProperty.title.length > 20 ? selectedProperty.title.slice(0, 20) + '...' : selectedProperty.title}&quot; hinzufügen</>
+                    )}
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setShowSaveDropdown(!showSaveDropdown)}
+                      className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                        savedToProperty
+                          ? 'bg-green-100 text-green-700 border border-green-200'
+                          : 'bg-gray-900 text-white hover:bg-gray-800'
+                      }`}
+                    >
+                      {savedToProperty ? (
+                        <><Check className="w-3.5 h-3.5" /> Gespeichert</>
+                      ) : (
+                        <><Building2 className="w-3.5 h-3.5" /> Objekt hinzufügen</>
+                      )}
+                    </button>
+                    {showSaveDropdown && (
+                      <div className="absolute bottom-full right-0 mb-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 max-h-[300px] overflow-y-auto z-30">
+                        <div className="p-2">
+                          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider px-2 py-1">Bild speichern zu...</p>
+                          {properties.length === 0 ? (
+                            <p className="text-xs text-gray-400 p-3 text-center">Keine Objekte vorhanden</p>
+                          ) : (
+                            properties.map((property) => (
+                              <button
+                                key={property.id}
+                                onClick={() => handleSaveToProperty(property)}
+                                className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+                              >
+                                <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-medium text-gray-900 truncate">{property.title}</p>
+                                  {property.address && <p className="text-[10px] text-gray-400 truncate">{property.address}</p>}
+                                </div>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Original image (no result, not processing) */}
+        {originalImage && !resultImage && !isProcessing && (
+          <div className="w-full max-w-2xl">
+            <div className="rounded-xl overflow-hidden bg-gray-100 border border-gray-100">
+              <img src={originalImage} alt="Original" className="w-full h-auto" />
+            </div>
+            <p className="text-[10px] text-gray-400 text-center mt-3">
+              Wähle links Stil und Raumtyp, dann klicke auf Generieren.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
