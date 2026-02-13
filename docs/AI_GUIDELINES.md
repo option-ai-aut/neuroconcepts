@@ -89,29 +89,42 @@ Datum:    {{date.today}}, {{date.year}}
 
 ## 🛠 Jarvis Tools (Function Calling)
 
-Jarvis hat Zugriff auf folgende Tools:
+Jarvis hat Zugriff auf **63+ Tools** mit **Multi-Round Tool Calls** (bis zu 8 Runden pro Antwort). Vollständige Dokumentation in [JARVIS_CAPABILITIES.md](./JARVIS_CAPABILITIES.md).
 
 ### CRM Tools
-- `createLead`: Neuen Lead anlegen
-- `updateLead`: Lead-Daten aktualisieren
-- `createProperty`: Neues Objekt anlegen
-- `updateProperty`: Objekt-Daten aktualisieren
-- `searchLeads`: Leads durchsuchen
-- `searchProperties`: Objekte durchsuchen
+- `create_lead` / `update_lead` / `delete_lead` / `get_leads` / `get_lead`
+- `create_property` / `update_property` / `delete_property` / `get_properties` / `get_property` / `search_properties`
+- `upload_images_to_property` / `get_property_images` / `delete_property_image` / `move_image_to_floorplan`
+- `add_video_to_property` / `set_virtual_tour`
+- `search_contacts` / `get_team_members`
+
+**Property-Felder (vollständig):** Adresse, Preise, Flächen, Räume, Gebäude, Energie (inkl. `heatingType`), Features, Beschreibungen, Medien, Status, Priorität
+
+### Virtual Staging
+- `virtual_staging`: KI-Möblierung via Google Gemini — Bilder aus Chat-Upload oder Property, Stil/Raumtyp/Prompt konfigurierbar, Ergebnis auf S3, optional zur Property hinzufügen. Ergebnis-Bilder werden inline im Chat angezeigt.
 
 ### Kalender Tools
-- `getAvailability`: Verfügbare Termine abrufen
-- `createAppointment`: Termin erstellen
-- `cancelAppointment`: Termin absagen
+- `get_calendar_availability` (✅ aktiv)
+- `get_calendar_events` / `create_calendar_event` / `update_calendar_event` / `delete_calendar_event` (🚧 Coming Soon)
 
 ### Exposé Tools
-- `createExpose`: Neues Exposé erstellen
-- `updateExposeBlock`: Block bearbeiten
-- `addExposeBlock`: Block hinzufügen
-- `removeExposeBlock`: Block entfernen
-- `generatePDF`: PDF generieren
+- `get_exposes` / `create_expose_from_template` / `delete_expose` / `generate_expose_pdf`
+- `get_expose_templates` / `create_expose_template` / `update_expose_template` / `delete_expose_template`
+- `get_template` / `update_template`
+- **Editor-Tools:** `create_expose_block` / `update_expose_block` / `delete_expose_block` / `reorder_expose_blocks` / `create_full_expose` / `set_expose_theme` / `clear_expose_blocks` / `generate_expose_text` / `get_expose_status` / `set_expose_status`
 
 ### Kommunikation Tools
-- `sendEmail`: E-Mail senden
-- `createDraft`: Entwurf erstellen
-- `escalateToHuman`: An Makler eskalieren
+- `get_emails` / `get_email` / `draft_email` / `send_email` / `reply_to_email` (🚧 Coming Soon)
+- `get_email_templates` (✅ aktiv)
+- `get_channels` / `get_channel_messages` / `send_channel_message` / `send_team_message`
+
+### Gedächtnis & Kontext
+- `search_chat_history` / `get_conversation_context` / `get_memory_summary` / `get_last_conversation`
+
+### Statistiken
+- `get_dashboard_stats` / `get_lead_statistics` / `get_property_statistics`
+
+### Antwortformat-Regeln
+- **Kein JSON-Leak:** Jarvis gibt niemals Tool-Argumente, Funktionsnamen oder internen Kontext als Text aus
+- **Kein "Noisy Thinking":** Keine Sätze wie "Ich werde jetzt..." oder "Die aktuelle Seite ist..."
+- **Saubere Multi-Round-Ausgabe:** Bei mehreren Tool-Aufrufen wird still gearbeitet und am Ende eine Zusammenfassung gegeben

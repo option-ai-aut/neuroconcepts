@@ -197,8 +197,8 @@ export class ImmivoStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_22_X,
       entry: path.join(__dirname, '../../src/services/orchestrator/src/index.ts'),
       handler: 'handler',
-      timeout: cdk.Duration.seconds(30),
-      memorySize: 512,
+      timeout: cdk.Duration.seconds(29), // API Gateway max is 29s
+      memorySize: 1024, // More memory = faster cold starts + Prisma init
       vpc: lambdaVpc,
       vpcSubnets: props.stageName === 'dev' ? undefined : { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: lambdaSg,
@@ -285,7 +285,28 @@ export class ImmivoStack extends cdk.Stack {
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: apigateway.Cors.ALL_METHODS,
+        allowHeaders: ['Content-Type', 'Authorization', 'X-Admin-Secret'],
       }
+    });
+
+    // Gateway Responses: Add CORS headers to ALL error responses (4XX, 5XX)
+    // Without this, API Gateway errors (502, 429, etc.) lack CORS headers
+    // and the browser blocks the response entirely.
+    api.addGatewayResponse('Default4XX', {
+      type: apigateway.ResponseType.DEFAULT_4XX,
+      responseHeaders: {
+        'Access-Control-Allow-Origin': "'*'",
+        'Access-Control-Allow-Headers': "'Content-Type,Authorization,X-Admin-Secret'",
+        'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,PATCH,OPTIONS'",
+      },
+    });
+    api.addGatewayResponse('Default5XX', {
+      type: apigateway.ResponseType.DEFAULT_5XX,
+      responseHeaders: {
+        'Access-Control-Allow-Origin': "'*'",
+        'Access-Control-Allow-Headers': "'Content-Type,Authorization,X-Admin-Secret'",
+        'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,PATCH,OPTIONS'",
+      },
     });
 
     // --- 5. E-Mail Intake (S3 + Lambda) ---

@@ -12,8 +12,8 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 
 ### Hauptfunktionen (Ticket 1 - MVP)
 - **Lead Intake:** Automatische Erfassung aus E-Mail-Weiterleitungen (ImmoScout, Willhaben) und Web-Formularen.
-- **Jarvis-Kommunikation:** OpenAI GPT-5-mini erstellt personalisierte Exposés und beantwortet Rückfragen in Echtzeit (DE/EN/FR/ES).
-- **KI-Bildstudio:** Virtual Staging mit Google Gemini (Möblierung, Renovierung, Umgestaltung).
+- **Jarvis-Kommunikation:** OpenAI GPT-5-mini mit 63+ Tools, Multi-Round Tool Calls (bis zu 8 Runden), Live Tool-Tags, Inline-Bilder im Chat, Virtual Staging direkt im Chat.
+- **KI-Bildstudio:** Virtual Staging mit Google Gemini (Möblierung). Settings-Sidebar links, Bildvorschau rechts. Auch direkt via Jarvis-Chat nutzbar.
 - **E-Mail Thread Intelligence:** Ordnet Antworten korrekt zu und führt den Dialog kontextbezogen fort.
 - **Kalender:** AWS WorkMail Kalender via CalDAV mit Google Meet Integration (geplant).
 - **White-Labeling:** Versand über OAuth (Gmail/Outlook) mit Makler-Domain.
@@ -56,8 +56,12 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 ├── docs/                 # Detaillierte Dokumentation
 │   ├── ADMIN_ACCESS.md   # Anleitung für Admin-Zugriff
 │   ├── ARCHITECTURE.md   # Technische Architektur & Datenflüsse
-│   ├── ONBOARDING.md     # Checklisten für neue Kunden
 │   ├── AI_GUIDELINES.md  # Prompting-Strategien & Sicherheitsregeln
+│   ├── JARVIS_CAPABILITIES.md # Alle Jarvis-Tools & Fähigkeiten (63+ Tools)
+│   ├── ONBOARDING.md     # Checklisten für neue Kunden
+│   ├── PROPERTY_FIELDS_RESEARCH.md # Property-Felder Spezifikation
+│   ├── FILE_PROCESSING.md # Datei-Import (CSV, Excel, PDF)
+│   ├── CONVERSATION_MEMORY.md # Jarvis Gedächtnis-System
 │   └── DEV_ENVIRONMENT_SETUP.md # Anleitung für Dev-Environment & Stack Updates
 ├── frontend/             # Next.js Frontend App (Dockerized)
 ├── infra/                # AWS CDK Infrastructure Code
@@ -71,15 +75,18 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 - [x] AWS Infrastruktur Setup (VPC, RDS, Lambda, S3)
 - [x] E-Mail Inbound Parser & DB Schema
 - [x] Jarvis-Engine Integration (OpenAI GPT-5-mini)
-- [x] KI-Bildstudio (Google Gemini Virtual Staging)
+- [x] KI-Bildstudio (Google Gemini Virtual Staging + Jarvis-Integration)
 - [x] Exposé-Editor mit KI-Unterstützung
-- [x] CRM (Leads, Objekte, Bildupload zu S3)
+- [x] CRM (Leads, Objekte, Bildupload zu S3, erweiterte Property-Felder)
 - [x] Dashboard & Admin Panel (real data)
 - [x] Frontend Deployment (AWS Lambda + Docker)
 - [x] Authentication (Cognito)
 - [x] System-E-Mails via Resend
 - [x] Bug Reports mit Screenshot + Console-Log-Capture
 - [x] Dark Mode
+- [x] Jarvis Multi-Round Tool Calls (bis zu 8 Runden)
+- [x] Virtual Staging via Jarvis-Chat
+- [x] Live Tool-Tags & Inline-Bilder im Chat
 
 ### Phase 2: Kalender & Automatisierung
 - [ ] AWS WorkMail CalDAV Integration

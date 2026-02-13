@@ -74,15 +74,20 @@ graph TD
 *   **pgvector:** Speichert Embeddings von Exposés und vergangenen Konversationen, um der KI ein "Langzeitgedächtnis" zu geben (RAG - Retrieval Augmented Generation).
 
 ### 4. AI Engine
-*   **Chat & Tools:** OpenAI GPT-5-mini — Jarvis-Assistent für Lead-Kommunikation, CRM-Aktionen, Exposé-Erstellung.
-*   **Image Editing:** Google Gemini (gemini-2.5-flash-image) — Virtual Staging im KI-Bildstudio.
+*   **Chat & Tools:** OpenAI GPT-5-mini — Jarvis-Assistent für Lead-Kommunikation, CRM-Aktionen, Exposé-Erstellung. Unterstützt **Multi-Round Tool Calls** (bis zu 8 Runden pro Antwort) für komplexe Aufgaben.
+*   **Image Editing:** Google Gemini (gemini-2.5-flash-image) — Virtual Staging im KI-Bildstudio und direkt im Jarvis-Chat via `virtual_staging`-Tool.
+*   **63+ Tools:** Leads, Properties (inkl. aller Felder), Exposés, Templates, Team-Chat, Statistiken, Virtual Staging, Gedächtnis u.v.m.
 *   **Aufgaben:**
     *   **Intent Recognition:** Was will der Lead? (Besichtigung, Frage, Absage?)
     *   **Response Generation:** Erstellen von natürlichen, mehrsprachigen Antworten.
     *   **Extraction:** Strukturierte Daten aus Freitext ziehen (z.B. Terminwunsch "nächsten Dienstag").
     *   **Exposé-Erstellung:** Live-Bearbeitung von Exposés im Editor via Tool-Calls.
-    *   **Virtual Staging:** KI-basierte Bildbearbeitung (Möblierung, Renovierung) im Bildstudio.
+    *   **Virtual Staging:** KI-basierte Bildbearbeitung (Möblierung) im Bildstudio und direkt im Jarvis-Chat. Bilder können von Properties oder Chat-Uploads stammen. Ergebnisse werden inline im Chat angezeigt und optional einer Property zugewiesen.
     *   **Datei-Verarbeitung:** CSV/Excel-Import, PDF-Analyse, Bild-Erkennung.
+*   **Chat UX:**
+    *   **Live Tool-Tags:** Pulsierende blaue Tags während der Tool-Ausführung, statisch nach Abschluss.
+    *   **Inline-Bilder:** Ergebnis-Bilder (z.B. Virtual Staging) direkt im Chat als klickbare Bilder.
+    *   **Saubere Antworten:** Kein JSON-Leak, keine internen Gedanken — nur die finale Antwort.
 
 ### 5. Integration Layer
 *   **E-Mail Outbound:**
