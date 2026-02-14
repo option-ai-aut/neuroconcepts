@@ -1337,8 +1337,9 @@ export class AiToolExecutor {
       case 'update_lead': {
         const { leadId, ...updateData } = args;
         
-        // Get current lead to compare changes
-        const currentLead = await getPrisma().lead.findUnique({ where: { id: leadId } });
+        // Verify tenant ownership
+        const currentLead = await getPrisma().lead.findFirst({ where: { id: leadId, tenantId } });
+        if (!currentLead) return 'Der Lead wurde nicht gefunden.';
         
         const updatedLead = await getPrisma().lead.update({
           where: { id: leadId },
@@ -1374,6 +1375,9 @@ export class AiToolExecutor {
       case 'delete_lead': {
         const { leadId } = args;
         const db = getPrisma();
+        // Verify tenant ownership
+        const leadToDelete = await db.lead.findFirst({ where: { id: leadId, tenantId } });
+        if (!leadToDelete) return 'Der Lead wurde nicht gefunden.';
         // Explicitly delete all dependent records, then delete the lead
         await db.$transaction([
           db.message.deleteMany({ where: { leadId } }),
@@ -1382,7 +1386,8 @@ export class AiToolExecutor {
           db.jarvisPendingAction.updateMany({ where: { leadId }, data: { leadId: null } }),
           db.lead.delete({ where: { id: leadId } }),
         ]);
-        return `Der Lead wurde gelöscht.`;
+        const deletedName = [leadToDelete.firstName, leadToDelete.lastName].filter(Boolean).join(' ') || leadToDelete.email;
+        return `Der Lead "${deletedName}" wurde gelöscht.`;
       }
 
       case 'delete_all_leads': {
@@ -2555,6 +2560,9 @@ export class AiToolExecutor {
 
       case 'get_channel_messages': {
         const { channelId, limit = 50 } = args;
+        // Verify channel belongs to user's tenant
+        const msgChannel = await getPrisma().channel.findFirst({ where: { id: channelId, tenantId } });
+        if (!msgChannel) return 'Channel nicht gefunden.';
         return await getPrisma().channelMessage.findMany({
           where: { channelId },
           include: { user: { select: { firstName: true, lastName: true, email: true } } },
@@ -2577,6 +2585,10 @@ export class AiToolExecutor {
             return 'Kein Standard-Channel gefunden. Bitte Channel-ID angeben.';
           }
           channelId = defaultChannel.id;
+        } else {
+          // Verify channel belongs to user's tenant
+          const sendChannel = await getPrisma().channel.findFirst({ where: { id: channelId, tenantId } });
+          if (!sendChannel) return 'Channel nicht gefunden oder kein Zugriff.';
         }
 
         await getPrisma().channelMessage.create({
@@ -2718,6 +2730,9 @@ export class AiToolExecutor {
 
       case 'set_virtual_tour': {
         const { propertyId, tourUrl } = args;
+        // Verify tenant ownership
+        const tourProp = await getPrisma().property.findFirst({ where: { id: propertyId, tenantId } });
+        if (!tourProp) return 'Das Objekt wurde nicht gefunden.';
         return await getPrisma().property.update({
           where: { id: propertyId },
           data: { virtualTour: tourUrl }
