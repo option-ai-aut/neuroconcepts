@@ -100,67 +100,73 @@ export default function SalesPage() {
         />
       </div>
 
-      {/* Tenants Grid */}
+      {/* Tenants List */}
       {filteredTenants.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <Building2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <p className="text-sm text-gray-500">{tenants.length === 0 ? 'Noch keine Tenants' : 'Keine Treffer'}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredTenants.map((tenant) => (
-            <div key={tenant.id} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900">{tenant.name}</h3>
-                  {tenant.address && <p className="text-[10px] text-gray-400 mt-0.5">{tenant.address}</p>}
-                </div>
-                <button
-                  onClick={() => handleDelete(tenant.id, tenant.name)}
-                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <div className="flex items-center gap-1.5">
-                  <Users className="w-3 h-3 text-gray-400" />
-                  <span className="text-xs text-gray-600">{tenant.userCount} User</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Home className="w-3 h-3 text-gray-400" />
-                  <span className="text-xs text-gray-600">{tenant.propertyCount} Objekte</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <FileText className="w-3 h-3 text-gray-400" />
-                  <span className="text-xs text-gray-600">{tenant.leadCount} Leads</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <FileText className="w-3 h-3 text-gray-400" />
-                  <span className="text-xs text-gray-600">{tenant.templateCount} Vorlagen</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                <span className="text-[10px] text-gray-400">Erstellt: {formatDate(tenant.createdAt)}</span>
-                <div className="flex items-center gap-1.5">
-                  {tenant.autoReply ? (
-                    <ToggleRight className="w-3.5 h-3.5 text-emerald-500" />
-                  ) : (
-                    <ToggleLeft className="w-3.5 h-3.5 text-gray-300" />
-                  )}
-                  <span className="text-[10px] text-gray-400">Auto-Reply</span>
-                </div>
-              </div>
-              {tenant.inboundEmail && (
-                <div className="flex items-center gap-1.5 mt-2">
-                  <Mail className="w-3 h-3 text-gray-400" />
-                  <span className="text-[10px] font-mono text-gray-400">{tenant.inboundEmail}</span>
-                </div>
-              )}
-            </div>
-          ))}
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Tenant</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">User</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Objekte</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Leads</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Erstellt</th>
+                <th className="text-right px-4 py-3 font-medium text-gray-600">Aktionen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredTenants.map((tenant) => (
+                <tr key={tenant.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                  <td className="px-4 py-3">
+                    <div>
+                      <p className="font-medium text-gray-900">{tenant.name}</p>
+                      {tenant.address && <p className="text-xs text-gray-400">{tenant.address}</p>}
+                      {tenant.inboundEmail && (
+                        <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                          <Mail className="w-3 h-3" />{tenant.inboundEmail}
+                        </p>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="flex items-center gap-1 text-gray-600">
+                      <Users className="w-3.5 h-3.5 text-gray-400" />
+                      {tenant.userCount}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="flex items-center gap-1 text-gray-600">
+                      <Home className="w-3.5 h-3.5 text-gray-400" />
+                      {tenant.propertyCount}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">{tenant.leadCount}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center gap-1 text-xs font-medium ${tenant.autoReply ? 'text-emerald-600' : 'text-gray-400'}`}>
+                      {tenant.autoReply ? <ToggleRight className="w-3.5 h-3.5" /> : <ToggleLeft className="w-3.5 h-3.5" />}
+                      {tenant.autoReply ? 'Auto-Reply an' : 'Auto-Reply aus'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-gray-400">{formatDate(tenant.createdAt)}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => handleDelete(tenant.id, tenant.name)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Löschen"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 

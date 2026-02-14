@@ -92,7 +92,7 @@ export default function AdminCalendarPage() {
     return d;
   });
 
-  const hours = Array.from({ length: 14 }, (_, i) => i + 7); // 07:00 - 20:00
+  const hours = Array.from({ length: 24 }, (_, i) => i); // 00:00 - 23:00
 
   // Determine which events to show based on view mode
   const getVisibleEvents = (): Record<string, CalEvent[]> => {
@@ -141,7 +141,7 @@ export default function AdminCalendarPage() {
     const end = new Date(ev.end);
     const startMinutes = start.getHours() * 60 + start.getMinutes();
     const endMinutes = end.getHours() * 60 + end.getMinutes();
-    const top = ((startMinutes - 7 * 60) / 60) * 56;
+    const top = (startMinutes / 60) * 56;
     const height = Math.max(((endMinutes - startMinutes) / 60) * 56, 20);
     return { top, height };
   };
@@ -153,9 +153,18 @@ export default function AdminCalendarPage() {
     return 'bg-gray-400';
   };
 
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const isToday = (d: Date) => {
-    const today = new Date();
-    return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+    return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  };
+
+  const getNowLineTop = () => {
+    return (now.getHours() * 60 + now.getMinutes()) / 60 * 56;
   };
 
   const handleCreateEvent = async () => {
@@ -285,7 +294,13 @@ export default function AdminCalendarPage() {
           </div>
 
           {/* Time Grid */}
-          <div className="grid grid-cols-[60px_repeat(7,1fr)] max-h-[600px] overflow-y-auto">
+          <div className="grid grid-cols-[60px_repeat(7,1fr)] max-h-[700px] overflow-y-auto relative" ref={(el) => {
+            // Auto-scroll to ~07:00 on mount
+            if (el && !el.dataset.scrolled) {
+              el.scrollTop = 7 * 56;
+              el.dataset.scrolled = 'true';
+            }
+          }}>
             {hours.map((hour) => (
               <div key={hour} className="contents">
                 <div className="h-14 flex items-start justify-end pr-2 pt-0.5 text-[10px] text-gray-400 font-medium border-t border-gray-50">
@@ -295,6 +310,15 @@ export default function AdminCalendarPage() {
                   const events = hour === hours[0] ? getEventsForDay(day) : [];
                   return (
                     <div key={dayIdx} className={`h-14 border-l border-t border-gray-50 relative ${isToday(day) ? 'bg-blue-50/30' : ''}`}>
+                      {/* Now line */}
+                      {hour === hours[0] && isToday(day) && (
+                        <div className="absolute left-0 right-0 z-30 pointer-events-none" style={{ top: `${getNowLineTop()}px` }}>
+                          <div className="flex items-center">
+                            <div className="w-2 h-2 bg-red-500 rounded-full -ml-1" />
+                            <div className="flex-1 h-[2px] bg-red-500" />
+                          </div>
+                        </div>
+                      )}
                       {hour === hours[0] && events.map((ev, evIdx) => {
                         const { top, height } = getEventPosition(ev);
                         const color = getTeamColor(ev.ownerEmail);
@@ -360,7 +384,7 @@ export default function AdminCalendarPage() {
                 Wird automatisch in deinem und im Office-Kalender eingetragen
               </p>
             </div>
-            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50">
+            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
               <button onClick={() => setShowNewEvent(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg">Abbrechen</button>
               <button onClick={handleCreateEvent} disabled={newEventSaving || !newEventSubject || !newEventDate}
                 className="px-4 py-2 text-sm font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 flex items-center gap-2">

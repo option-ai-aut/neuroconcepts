@@ -549,25 +549,52 @@ export default function GlobalDrawer() {
       // Capture screenshot (with small delay so drawer doesn't appear in it)
       const timer = setTimeout(async () => {
         try {
-          const html2canvas = (await import('html2canvas')).default;
-          const mainContent = document.querySelector('main') || document.body;
-          const canvas = await html2canvas(mainContent as HTMLElement, {
-            useCORS: true,
-            allowTaint: true,
-            scale: 0.75, // Lower res for smaller payload
-            logging: false,
-            ignoreElements: (el) => {
-              // Ignore the drawer itself and overlays
-              return el.getAttribute('data-drawer') === 'true' || el.classList.contains('fixed');
-            },
-          });
-          setBugScreenshot(canvas.toDataURL('image/png', 0.7));
+          // Try html2canvas first
+          try {
+            const html2canvas = (await import('html2canvas')).default;
+            const mainContent = document.querySelector('main') || document.body;
+            const canvas = await html2canvas(mainContent as HTMLElement, {
+              useCORS: true,
+              allowTaint: true,
+              scale: 0.75,
+              logging: false,
+              backgroundColor: '#ffffff',
+              removeContainer: true,
+              ignoreElements: (el: Element) => {
+                return el.getAttribute('data-drawer') === 'true' || 
+                       el.classList?.contains('fixed') ||
+                       el.tagName === 'IFRAME';
+              },
+            });
+            const dataUrl = canvas.toDataURL('image/png', 0.7);
+            if (dataUrl && dataUrl.length > 100) {
+              setBugScreenshot(dataUrl);
+            }
+          } catch {
+            // Fallback: try native browser API if available
+            if (typeof navigator !== 'undefined' && 'mediaDevices' in navigator) {
+              try {
+                const stream = await (navigator.mediaDevices as any).getDisplayMedia({ video: true });
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                await video.play();
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d')?.drawImage(video, 0, 0);
+                stream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+                setBugScreenshot(canvas.toDataURL('image/png', 0.7));
+              } catch {
+                console.warn('Screenshot fallback also failed');
+              }
+            }
+          }
         } catch (err) {
           console.error('Screenshot capture failed:', err);
         } finally {
           setBugCapturing(false);
         }
-      }, 100);
+      }, 300);
 
       return () => clearTimeout(timer);
     }

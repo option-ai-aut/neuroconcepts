@@ -845,6 +845,8 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
     for (const [variable, value] of Object.entries(replacements)) {
       result = result.replace(new RegExp(variable.replace(/[{}]/g, '\\$&'), 'g'), value);
     }
+    // Clean up HTML entities that show as literal text (e.g. &nbsp; from contentEditable)
+    result = result.replace(/&nbsp;/g, ' ');
     return result;
   }, [isTemplate, previewProperty]);
 
@@ -1245,7 +1247,8 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
           </span>
         );
       }
-      return part || null;
+      // Clean up &nbsp; entities from contentEditable
+      return part ? part.replace(/&nbsp;/g, '\u00A0') : null;
     });
   };
 

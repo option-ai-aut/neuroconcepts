@@ -16,6 +16,7 @@ import {
   Loader2,
   Trash2,
   Save,
+  X,
 } from 'lucide-react';
 
 interface BlogPost {
@@ -296,8 +297,8 @@ export default function BlogEditorPage() {
 
   return (
     <div className="h-full flex overflow-hidden bg-white dark:bg-gray-950">
-      {/* Left Panel - Blog List */}
-      <div className="w-80 flex flex-col border-r border-gray-200 dark:border-gray-800 shrink-0">
+      {/* Blog List - Full Width */}
+      <div className={`flex flex-col shrink-0 transition-all duration-300 ${selectedId ? 'w-80 border-r border-gray-200 dark:border-gray-800' : 'flex-1'}`}>
         <div className="p-4 flex items-center justify-between shrink-0">
           <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Blog</h1>
           <button
@@ -353,9 +354,16 @@ export default function BlogEditorPage() {
         </div>
       </div>
 
-      {/* Right Panel - Editor */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {(selectedId && (selectedPost || isNew)) ? (
+      {/* Drawer - Editor */}
+      {(selectedId && (selectedPost || isNew)) && (
+      <div className="fixed inset-y-0 right-0 z-40 flex">
+        <div className="w-screen max-w-2xl bg-white dark:bg-gray-950 shadow-2xl border-l border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 dark:border-gray-800 shrink-0">
+            <h3 className="font-semibold text-gray-900 dark:text-white text-sm">{isNew ? 'Neuer Artikel' : 'Artikel bearbeiten'}</h3>
+            <button onClick={() => setSelectedId(null)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
           <div className="flex-1 overflow-y-auto p-6">
             <div className="max-w-3xl mx-auto space-y-5">
               <input
@@ -560,23 +568,9 @@ export default function BlogEditorPage() {
               </div>
             </div>
           </div>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-            <FileText className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Kein Artikel ausgewählt</h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-sm">
-              Wähle einen Artikel aus der Liste oder erstelle einen neuen.
-            </p>
-            <button
-              onClick={handleNewPost}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              Neuer Artikel
-            </button>
-          </div>
-        )}
+        </div>
       </div>
+      )}
 
       {/* Toast */}
       {toast && (

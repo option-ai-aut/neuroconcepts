@@ -17,6 +17,7 @@ import {
   MapPin,
   Building2,
   Users,
+  X,
 } from 'lucide-react';
 
 const DEPARTMENTS = [
@@ -397,7 +398,7 @@ export default function KarriereAdminPage() {
   return (
     <div className="h-full flex overflow-hidden bg-white dark:bg-gray-950">
       {/* Left Panel - Job List */}
-      <div className="w-80 flex flex-col border-r border-gray-200 dark:border-gray-800 shrink-0">
+      <div className="flex-1 flex flex-col shrink-0">
         <div className="p-4 flex items-center justify-between shrink-0">
           <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
             Stellenanzeigen
@@ -471,13 +472,16 @@ export default function KarriereAdminPage() {
         </div>
       </div>
 
-      {/* Right Panel - Job Editor */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {(!selectedId || (selectedId !== 'new' && !selectedJob)) && !isNew ? (
-          <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
-            Wähle eine Stelle oder erstelle eine neue
+      {/* Drawer - Job Editor */}
+      {(selectedId || isNew) && (selectedJob || isNew) && (
+      <div className="fixed inset-y-0 right-0 z-40 flex">
+        <div className="w-screen max-w-2xl bg-white dark:bg-gray-950 shadow-2xl border-l border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 dark:border-gray-800 shrink-0">
+            <h3 className="font-semibold text-gray-900 dark:text-white text-sm">{isNew ? 'Neue Stelle' : 'Stelle bearbeiten'}</h3>
+            <button onClick={() => setSelectedId(null)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+              <X className="w-5 h-5" />
+            </button>
           </div>
-        ) : (
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             {error && (
               <div className="px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm">
@@ -752,8 +756,9 @@ export default function KarriereAdminPage() {
               </div>
             )}
           </div>
-        )}
+        </div>
       </div>
+      )}
     </div>
   );
 }

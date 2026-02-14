@@ -20,7 +20,11 @@ const getApiUrl = () => {
 const getStreamUrl = () => {
   const config = getRuntimeConfig();
   const streamUrl = config.streamUrl || '';
-  if (streamUrl) return streamUrl.replace(/\/+$/, '');
+  if (streamUrl) {
+    console.log('[Chat] Using Lambda Function URL for streaming');
+    return streamUrl.replace(/\/+$/, '');
+  }
+  console.log('[Chat] No stream URL configured, falling back to API Gateway');
   return getApiUrl(); // fallback to API Gateway
 };
 
@@ -578,7 +582,24 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         // Regular chat endpoint with STREAMING
         // Use Lambda Function URL (no 29s timeout) if available, else API Gateway
         const streamBaseUrl = getStreamUrl();
+        const apiBaseUrl = getApiUrl();
         const authHeaders = await getAuthHeaders();
+        
+        // Helper to try a fetch, with fallback to API Gateway if stream URL fails
+        const tryFetch = async (url: string, opts: RequestInit): Promise<Response> => {
+          try {
+            const response = await fetch(url, opts);
+            return response;
+          } catch (err) {
+            // If stream URL failed and it's different from API URL, try API Gateway as fallback
+            if (streamBaseUrl !== apiBaseUrl && url.startsWith(streamBaseUrl)) {
+              console.warn('Stream URL failed, falling back to API Gateway:', err);
+              const fallbackUrl = url.replace(streamBaseUrl, apiBaseUrl);
+              return fetch(fallbackUrl, opts);
+            }
+            throw err;
+          }
+        };
         
         // Use FormData if we have files, otherwise JSON
         let res: Response;
@@ -591,7 +612,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
             formData.append('files', f.file);
           });
           
-          res = await fetch(`${streamBaseUrl}/chat/stream`, {
+          res = await tryFetch(`${streamBaseUrl}/chat/stream`, {
             method: 'POST',
             headers: {
               'Authorization': (authHeaders as Record<string, string>)['Authorization'] || '',
@@ -601,7 +622,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           });
         } else {
           const pageContext = getPageContext(pathname, activeExposeContext);
-          res = await fetch(`${streamBaseUrl}/chat/stream`, {
+          res = await tryFetch(`${streamBaseUrl}/chat/stream`, {
             method: 'POST',
             headers: authHeaders,
             body: JSON.stringify({
@@ -612,6 +633,10 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           });
         }
 
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Server-Fehler (${res.status})`);
+        }
         if (!res.body) throw new Error('No response body');
 
         // Add empty assistant message that we'll update
@@ -722,7 +747,10 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         return;
       }
       console.error('Chat error:', error);
-      setMessages(prev => [...prev, { role: 'ASSISTANT', content: 'Fehler bei der Verbindung zu Jarvis.' }]);
+      const errMsg = error instanceof Error && error.message === 'Failed to fetch'
+        ? 'Verbindung zum Server fehlgeschlagen. Bitte prüfe deine Internetverbindung und versuche es erneut.'
+        : 'Fehler bei der Verbindung zu Jarvis.';
+      setMessages(prev => [...prev, { role: 'ASSISTANT', content: errMsg }]);
       setIsLoading(false);
     }
   };
@@ -784,7 +812,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white" style={{ overscrollBehavior: 'contain' }}>
+      <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-3 bg-white" style={{ overscrollBehavior: 'contain' }}>
         {/* Pending Jarvis Actions */}
         {pendingActions.length > 0 && (
           <div className="space-y-3 mb-4">
@@ -865,7 +893,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           // Regular messages
           return (
             <div key={index} className={`flex ${msg.role === 'USER' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-lg p-3 text-sm ${
+              <div className={`max-w-[92%] rounded-lg p-3 text-sm ${
                 msg.role === 'USER' 
                   ? 'bg-gray-900 text-white rounded-br-none' 
                   : 'bg-white text-gray-800 rounded-bl-none'

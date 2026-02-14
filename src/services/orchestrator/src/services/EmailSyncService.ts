@@ -477,6 +477,39 @@ export class EmailSyncService {
       totalEmails
     };
   }
+  /**
+   * Mark a Gmail message as read/unread by modifying labels
+   */
+  static async markGmailAsRead(tenantId: string, messageId: string, isRead: boolean): Promise<boolean> {
+    const prisma = getPrisma();
+    const config = getGoogleEmailConfig();
+    
+    try {
+      const settings = await prisma.tenantSettings.findUnique({ where: { tenantId } });
+      const gmailConfig = settings?.gmailConfig as any;
+      if (!gmailConfig?.refreshToken) return false;
+      
+      const { google } = await import('googleapis');
+      const oauth2Client = new google.auth.OAuth2(config.clientId, config.clientSecret, config.redirectUri);
+      oauth2Client.setCredentials({ refresh_token: gmailConfig.refreshToken });
+      
+      const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+      
+      await gmail.users.messages.modify({
+        userId: 'me',
+        id: messageId,
+        requestBody: {
+          addLabelIds: isRead ? [] : ['UNREAD'],
+          removeLabelIds: isRead ? ['UNREAD'] : [],
+        },
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to mark Gmail message as read:', error);
+      return false;
+    }
+  }
 }
 
 export default EmailSyncService;

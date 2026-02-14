@@ -5674,13 +5674,33 @@ app.patch('/emails/:id/read', authMiddleware, async (req: any, res) => {
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
     const { isRead } = req.body;
+    const readState = isRead ?? true;
 
-    const email = await db.email.updateMany({
+    // Update in database
+    const emailRecord = await db.email.findFirst({
       where: { id: req.params.id, tenantId: user.tenantId },
-      data: { isRead: isRead ?? true }
+    });
+    
+    if (!emailRecord) {
+      return res.json({ success: false });
+    }
+
+    await db.email.update({
+      where: { id: req.params.id },
+      data: { isRead: readState }
     });
 
-    res.json({ success: email.count > 0 });
+    // Sync read status to Gmail if it's a Gmail email
+    if (emailRecord.provider === 'GMAIL' && emailRecord.messageId) {
+      try {
+        const { default: EmailSyncService } = await import('./services/EmailSyncService');
+        await EmailSyncService.markGmailAsRead(user.tenantId, emailRecord.messageId, readState);
+      } catch (gmailErr) {
+        console.error('Gmail read sync failed (non-critical):', gmailErr);
+      }
+    }
+
+    res.json({ success: true });
   } catch (error: any) {
     console.error('Error updating email:', error);
     res.status(500).json({ error: error.message });
@@ -6210,7 +6230,7 @@ app.get('/activities', authMiddleware, async (req: any, res) => {
 // ============================================
 // Admin: Backfill activities for existing leads
 // ============================================
-app.post('/admin/backfill-activities', authMiddleware, async (req: any, res) => {
+app.post('/admin/backfill-activities', adminAuthMiddleware, async (req: any, res) => {
   try {
     const db = await initializePrisma();
     const userEmail = req.user!.email;
@@ -6444,6 +6464,7 @@ app.delete('/admin/platform/tenants/:id', adminAuthMiddleware, async (req, res) 
 });
 
 // --- Admin: All Users (platform-wide) ---
+// All platform users (for tenant management)
 app.get('/admin/platform/users', adminAuthMiddleware, async (_req, res) => {
   try {
     const db = await initializePrisma();
@@ -6467,6 +6488,152 @@ app.get('/admin/platform/users', adminAuthMiddleware, async (_req, res) => {
     })));
   } catch (error: any) {
     console.error('Admin users error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Immivo team members (SUPER_ADMIN, ADMIN, AGENT with @immivo.ai emails)
+app.get('/admin/team/members', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const db = await initializePrisma();
+    const members = await db.user.findMany({
+      where: {
+        OR: [
+          { email: { endsWith: '@immivo.ai' } },
+          { role: { in: ['SUPER_ADMIN', 'ADMIN'] } },
+        ],
+      },
+      orderBy: { email: 'asc' },
+    });
+    res.json(members.map(u => ({
+      id: u.id,
+      email: u.email,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      phone: u.phone,
+      role: u.role,
+    })));
+  } catch (error: any) {
+    console.error('Admin team members error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Admin: Team Chat (Channels) ---
+
+// List admin channels
+app.get('/admin/team/channels', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const db = await initializePrisma();
+    // Use a special "admin" tenant or global channels
+    const channels = await db.channel.findMany({
+      where: { type: 'PUBLIC' },
+      orderBy: { createdAt: 'asc' },
+      include: { _count: { select: { messages: true, members: true } } },
+    });
+    res.json({ channels });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create admin channel
+app.post('/admin/team/channels', adminAuthMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: 'Name erforderlich' });
+    
+    // Find or create a system tenant for admin channels
+    let adminTenant = await db.tenant.findFirst({ where: { name: 'Immivo Admin' } });
+    if (!adminTenant) {
+      adminTenant = await db.tenant.create({ data: { name: 'Immivo Admin' } });
+    }
+    
+    const channel = await db.channel.create({
+      data: { name, type: 'PUBLIC', tenantId: adminTenant.id },
+    });
+    res.json({ channel });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update admin channel
+app.patch('/admin/team/channels/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { name } = req.body;
+    const channel = await db.channel.update({
+      where: { id: req.params.id },
+      data: { ...(name ? { name } : {}) },
+    });
+    res.json({ channel });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete admin channel
+app.delete('/admin/team/channels/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    // Delete messages first, then channel
+    await db.channelMessage.deleteMany({ where: { channelId: req.params.id } });
+    await db.channelMember.deleteMany({ where: { channelId: req.params.id } });
+    await db.channel.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get channel messages
+app.get('/admin/team/channels/:id/messages', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const messages = await db.channelMessage.findMany({
+      where: { channelId: req.params.id },
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+      include: { user: { select: { firstName: true, lastName: true, email: true } } },
+    });
+    res.json({ messages });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Send message to channel
+app.post('/admin/team/channels/:id/messages', adminAuthMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const { content } = req.body;
+    if (!content) return res.status(400).json({ error: 'Content erforderlich' });
+    
+    // Find admin user by email from JWT
+    const email = req.user?.email;
+    let user = email ? await db.user.findFirst({ where: { email } }) : null;
+    
+    // If admin user doesn't exist in users table, create one
+    if (!user && email) {
+      let adminTenant = await db.tenant.findFirst({ where: { name: 'Immivo Admin' } });
+      if (!adminTenant) {
+        adminTenant = await db.tenant.create({ data: { name: 'Immivo Admin' } });
+      }
+      user = await db.user.create({
+        data: { email, firstName: req.user?.given_name || 'Admin', lastName: req.user?.family_name || '', tenantId: adminTenant.id, role: 'SUPER_ADMIN' },
+      });
+    }
+    
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    
+    const message = await db.channelMessage.create({
+      data: { content, channelId: req.params.id, userId: user.id },
+      include: { user: { select: { firstName: true, lastName: true, email: true } } },
+    });
+    res.json({ message });
+  } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
@@ -7737,7 +7904,7 @@ app.post('/jobs/:id/apply', async (req, res) => {
 });
 
 // --- Admin: Blog CRUD ---
-app.get('/admin/blog', authMiddleware, async (req, res) => {
+app.get('/admin/blog', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     const posts = await db.blogPost.findMany({ orderBy: { createdAt: 'desc' } });
@@ -7747,7 +7914,7 @@ app.get('/admin/blog', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/admin/blog', authMiddleware, async (req, res) => {
+app.post('/admin/blog', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     const { title, slug, excerpt, content, coverImage, author, category, tags, published } = req.body;
@@ -7765,7 +7932,7 @@ app.post('/admin/blog', authMiddleware, async (req, res) => {
   }
 });
 
-app.put('/admin/blog/:id', authMiddleware, async (req, res) => {
+app.put('/admin/blog/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     const { title, slug, excerpt, content, coverImage, author, category, tags, published } = req.body;
@@ -7791,7 +7958,7 @@ app.put('/admin/blog/:id', authMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/admin/blog/:id', authMiddleware, async (req, res) => {
+app.delete('/admin/blog/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     await db.blogPost.delete({ where: { id: req.params.id } });
@@ -7802,10 +7969,15 @@ app.delete('/admin/blog/:id', authMiddleware, async (req, res) => {
 });
 
 // --- Admin: Newsletter ---
-app.get('/admin/newsletter/subscribers', authMiddleware, async (req, res) => {
+app.get('/admin/newsletter/subscribers', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
-    const subscribers = await db.newsletterSubscriber.findMany({ orderBy: { createdAt: 'desc' } });
+    const raw = await db.newsletterSubscriber.findMany({ orderBy: { createdAt: 'desc' } });
+    const subscribers = raw.map(s => ({
+      ...s,
+      status: s.unsubscribed ? 'unsubscribed' : s.confirmed ? 'confirmed' : 'pending',
+      subscribedAt: s.createdAt,
+    }));
     res.json({ subscribers });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -7813,7 +7985,7 @@ app.get('/admin/newsletter/subscribers', authMiddleware, async (req, res) => {
 });
 
 // Add single subscriber manually
-app.post('/admin/newsletter/subscribers', authMiddleware, async (req, res) => {
+app.post('/admin/newsletter/subscribers', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     const { email, name } = req.body;
@@ -7828,7 +8000,8 @@ app.post('/admin/newsletter/subscribers', authMiddleware, async (req, res) => {
       data: {
         email: email.toLowerCase().trim(),
         name: name?.trim() || null,
-        status: 'confirmed',
+        confirmed: true,
+        unsubscribed: false,
         source: 'admin',
       },
     });
@@ -7839,7 +8012,7 @@ app.post('/admin/newsletter/subscribers', authMiddleware, async (req, res) => {
 });
 
 // Bulk import subscribers from CSV
-app.post('/admin/newsletter/subscribers/import', authMiddleware, async (req, res) => {
+app.post('/admin/newsletter/subscribers/import', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     const { subscribers: rows } = req.body;
@@ -7858,7 +8031,8 @@ app.post('/admin/newsletter/subscribers/import', authMiddleware, async (req, res
           data: {
             email,
             name: (row.name || '').trim() || null,
-            status: 'confirmed',
+            confirmed: true,
+            unsubscribed: false,
             source: 'csv-import',
           },
         });
@@ -7874,7 +8048,7 @@ app.post('/admin/newsletter/subscribers/import', authMiddleware, async (req, res
 });
 
 // Delete subscriber
-app.delete('/admin/newsletter/subscribers/:id', authMiddleware, async (req, res) => {
+app.delete('/admin/newsletter/subscribers/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     await db.newsletterSubscriber.delete({ where: { id: req.params.id } });
@@ -7884,7 +8058,7 @@ app.delete('/admin/newsletter/subscribers/:id', authMiddleware, async (req, res)
   }
 });
 
-app.get('/admin/newsletter/campaigns', authMiddleware, async (req, res) => {
+app.get('/admin/newsletter/campaigns', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     const campaigns = await db.newsletterCampaign.findMany({ orderBy: { createdAt: 'desc' } });
@@ -7894,7 +8068,7 @@ app.get('/admin/newsletter/campaigns', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/admin/newsletter/campaigns', authMiddleware, async (req, res) => {
+app.post('/admin/newsletter/campaigns', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     const { subject, content, previewText } = req.body;
@@ -7908,7 +8082,7 @@ app.post('/admin/newsletter/campaigns', authMiddleware, async (req, res) => {
   }
 });
 
-app.put('/admin/newsletter/campaigns/:id', authMiddleware, async (req, res) => {
+app.put('/admin/newsletter/campaigns/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     const { subject, content, previewText } = req.body;
@@ -7922,7 +8096,7 @@ app.put('/admin/newsletter/campaigns/:id', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/admin/newsletter/campaigns/:id/send', authMiddleware, async (req, res) => {
+app.post('/admin/newsletter/campaigns/:id/send', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     const campaign = await db.newsletterCampaign.findUnique({ where: { id: req.params.id } });
@@ -7952,7 +8126,7 @@ app.post('/admin/newsletter/campaigns/:id/send', authMiddleware, async (req, res
   }
 });
 
-app.delete('/admin/newsletter/campaigns/:id', authMiddleware, async (req, res) => {
+app.delete('/admin/newsletter/campaigns/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     await db.newsletterCampaign.delete({ where: { id: req.params.id } });
@@ -7963,7 +8137,7 @@ app.delete('/admin/newsletter/campaigns/:id', authMiddleware, async (req, res) =
 });
 
 // --- Admin: Jobs ---
-app.get('/admin/jobs', authMiddleware, async (req, res) => {
+app.get('/admin/jobs', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     const jobs = await db.jobPosting.findMany({ orderBy: { createdAt: 'desc' }, include: { applications: { select: { id: true } } } });
@@ -7973,7 +8147,7 @@ app.get('/admin/jobs', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/admin/jobs', authMiddleware, async (req, res) => {
+app.post('/admin/jobs', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     const { title, department, location, type, remote, description, requirements, benefits, salary, published } = req.body;
@@ -7987,7 +8161,7 @@ app.post('/admin/jobs', authMiddleware, async (req, res) => {
   }
 });
 
-app.put('/admin/jobs/:id', authMiddleware, async (req, res) => {
+app.put('/admin/jobs/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     const { title, department, location, type, remote, description, requirements, benefits, salary, published } = req.body;
@@ -8014,7 +8188,7 @@ app.put('/admin/jobs/:id', authMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/admin/jobs/:id', authMiddleware, async (req, res) => {
+app.delete('/admin/jobs/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     await db.jobPosting.delete({ where: { id: req.params.id } });
@@ -8024,7 +8198,7 @@ app.delete('/admin/jobs/:id', authMiddleware, async (req, res) => {
   }
 });
 
-app.get('/admin/jobs/:id/applications', authMiddleware, async (req, res) => {
+app.get('/admin/jobs/:id/applications', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     const applications = await db.jobApplication.findMany({ where: { jobId: req.params.id }, orderBy: { createdAt: 'desc' } });
@@ -8034,7 +8208,7 @@ app.get('/admin/jobs/:id/applications', authMiddleware, async (req, res) => {
   }
 });
 
-app.put('/admin/jobs/applications/:id', authMiddleware, async (req, res) => {
+app.put('/admin/jobs/applications/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     const { status, notes } = req.body;
@@ -8049,7 +8223,7 @@ app.put('/admin/jobs/applications/:id', authMiddleware, async (req, res) => {
 });
 
 // --- Admin: Contact Submissions ---
-app.get('/admin/contacts', authMiddleware, async (req, res) => {
+app.get('/admin/contacts', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     const submissions = await db.contactSubmission.findMany({ orderBy: { createdAt: 'desc' } });
@@ -8059,7 +8233,7 @@ app.get('/admin/contacts', authMiddleware, async (req, res) => {
   }
 });
 
-app.put('/admin/contacts/:id', authMiddleware, async (req, res) => {
+app.put('/admin/contacts/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     const { status, notes } = req.body;

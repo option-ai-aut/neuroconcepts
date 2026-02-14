@@ -9,7 +9,7 @@ import Image from 'next/image';
 import { 
   Loader2, LayoutDashboard, Users, MessageSquare, Calendar, 
   HeadphonesIcon, DollarSign, Activity, TrendingUp, 
-  ClipboardList, Settings, LogOut, ChevronLeft, ChevronRight,
+  ClipboardList, Settings, LogOut,
   Shield, Bell, Search, Command, Mail, Inbox,
   Newspaper, Briefcase, Megaphone
 } from 'lucide-react';
@@ -63,7 +63,7 @@ const NAV_SECTIONS = [
   },
 ];
 
-function AdminSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+function AdminSidebar() {
   const pathname = usePathname();
 
   const isActive = (href: string) => {
@@ -72,41 +72,33 @@ function AdminSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
   };
 
   return (
-    <div className={`flex flex-col bg-gray-950 h-screen fixed z-30 border-r border-gray-800/50 transition-all duration-300 ${collapsed ? 'w-[68px]' : 'w-64'}`}>
+    <div className="flex flex-col bg-gray-950 h-screen fixed z-30 border-r border-gray-800/50 w-52">
       {/* Logo */}
-      <div className="flex items-center h-14 px-4 shrink-0 border-b border-gray-800/50">
-        <div className="w-8 h-8 shrink-0">
-          <Image src="/logo-icon-only.png" alt="Immivo" width={32} height={32} />
+      <div className="flex items-center h-14 px-3 shrink-0 border-b border-gray-800/50">
+        <div className="w-7 h-7 shrink-0">
+          <Image src="/logo-icon-only.png" alt="Immivo" width={28} height={28} />
         </div>
-        {!collapsed && (
-          <div className="ml-3 flex items-center gap-2">
-            <span className="text-white font-bold text-sm tracking-tight">Admin</span>
-            <span className="text-[9px] font-medium text-red-400 bg-red-500/10 border border-red-500/20 rounded px-1.5 py-0.5">SUPER</span>
-          </div>
-        )}
+        <span className="ml-2.5 text-white font-bold text-sm tracking-tight">Immivo</span>
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 overflow-y-auto py-3 px-2 space-y-5 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto py-3 px-1.5 space-y-4 scrollbar-thin">
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
-            {!collapsed && (
-              <p className="px-3 mb-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{section.label}</p>
-            )}
+            <p className="px-2.5 mb-1 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{section.label}</p>
             <div className="space-y-0.5">
               {section.items.map((item) => (
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg transition-all ${
+                  className={`flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] font-medium rounded-lg transition-all ${
                     isActive(item.href)
-                      ? 'bg-white text-gray-950 border border-transparent'
-                      : 'text-gray-500 hover:bg-gray-800/50 hover:text-gray-200 border border-transparent'
+                      ? 'bg-white text-gray-950'
+                      : 'text-gray-500 hover:bg-gray-800/50 hover:text-gray-200'
                   }`}
-                  title={collapsed ? item.name : undefined}
                 >
                   <item.icon className={`w-4 h-4 shrink-0 ${isActive(item.href) ? 'text-gray-950' : 'text-gray-500'}`} />
-                  {!collapsed && <span>{item.name}</span>}
+                  <span>{item.name}</span>
                 </Link>
               ))}
             </div>
@@ -115,22 +107,16 @@ function AdminSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: (
       </div>
 
       {/* Bottom */}
-      <div className="p-2 space-y-1 border-t border-gray-800/50">
-        <button
-          onClick={onToggle}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[13px] text-gray-500 hover:text-gray-300 hover:bg-gray-800/50 rounded-lg transition-all"
-        >
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <><ChevronLeft className="w-4 h-4" /><span>Einklappen</span></>}
-        </button>
+      <div className="p-1.5 border-t border-gray-800/50">
         <button
           onClick={async () => {
             await signOut();
             window.location.href = '/admin/login';
           }}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[13px] text-gray-500 hover:text-white hover:bg-gray-800/50 rounded-lg transition-all"
+          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] text-gray-500 hover:text-white hover:bg-gray-800/50 rounded-lg transition-all"
         >
           <LogOut className="w-4 h-4" />
-          {!collapsed && <span>Abmelden</span>}
+          <span>Abmelden</span>
         </button>
       </div>
     </div>
@@ -192,7 +178,6 @@ export default function AdminLayout({
   const pathname = usePathname();
   const config = useRuntimeConfig();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Configure Amplify with Admin User Pool
   useEffect(() => {
@@ -251,8 +236,8 @@ export default function AdminLayout({
 
   return (
     <div className="app-shell flex h-screen bg-gray-50">
-      <AdminSidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${sidebarCollapsed ? 'ml-[68px]' : 'ml-64'}`}>
+      <AdminSidebar />
+      <div className="flex-1 flex flex-col overflow-hidden ml-52">
         <AdminTopBar />
         <main className="flex-1 overflow-x-hidden overflow-y-auto">
           {children}

@@ -331,12 +331,13 @@ export default function ActivitiesPage() {
                           : 'Unbekannt';
 
                         return (
-                          <div 
+                          <Link 
                             key={activity.id}
-                            className={`p-4 rounded-xl border transition-all ${
+                            href={`/dashboard/crm/leads/${activity.leadId}`}
+                            className={`block p-4 rounded-xl border transition-all cursor-pointer ${
                               isMine 
-                                ? 'bg-gray-50/50 border-gray-200' 
-                                : 'bg-white border-gray-100 hover:border-gray-200'
+                                ? 'bg-gray-50/50 border-gray-200 hover:border-gray-300' 
+                                : 'bg-white border-gray-100 hover:border-gray-200 hover:shadow-sm'
                             } ${isPending ? 'ring-2 ring-amber-200' : ''}`}
                           >
                             <div className="flex items-start gap-4">
@@ -399,23 +400,17 @@ export default function ActivitiesPage() {
                                   )}
                                   
                                   {activity.lead && (
-                                    <Link 
-                                      href={`/dashboard/crm/leads/${activity.leadId}`}
-                                      className="flex items-center gap-1 hover:text-blue-600 transition-colors"
-                                    >
+                                    <span className="flex items-center gap-1 text-blue-600">
                                       <User className="w-3 h-3" />
                                       {leadName}
-                                    </Link>
+                                    </span>
                                   )}
                                   
                                   {activity.property && (
-                                    <Link 
-                                      href={`/dashboard/crm/properties/${activity.propertyId}`}
-                                      className="flex items-center gap-1 hover:text-blue-600 transition-colors"
-                                    >
+                                    <span className="flex items-center gap-1 text-blue-600">
                                       <Building2 className="w-3 h-3" />
                                       {activity.property.title}
-                                    </Link>
+                                    </span>
                                   )}
                                 </div>
 
@@ -446,14 +441,11 @@ export default function ActivitiesPage() {
                               </div>
 
                               {/* Arrow */}
-                              <Link 
-                                href={`/dashboard/crm/leads/${activity.leadId}`}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                              >
+                              <div className="p-2">
                                 <ChevronRight className="w-5 h-5 text-gray-400" />
-                              </Link>
+                              </div>
                             </div>
-                          </div>
+                          </Link>
                         );
                       })}
                   </div>
