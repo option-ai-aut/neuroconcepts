@@ -147,6 +147,7 @@ export interface BugReportsResponse {
 export const getAdminStats = () => adminFetch<PlatformStats>('/admin/platform/stats');
 export const getAdminHealth = () => adminFetch<HealthCheck>('/admin/platform/health');
 export const getAdminTenants = () => adminFetch<AdminTenant[]>('/admin/platform/tenants');
+export const getAdminTenantDetail = (id: string) => adminFetch<any>(`/admin/platform/tenants/${id}`);
 export const createAdminTenant = (data: { name: string; address?: string }) =>
   adminFetch<AdminTenant>('/admin/platform/tenants', { method: 'POST', body: JSON.stringify(data) });
 export const deleteAdminTenant = (id: string) =>

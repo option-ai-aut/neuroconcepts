@@ -6437,6 +6437,49 @@ app.get('/admin/platform/tenants', adminAuthMiddleware, async (_req, res) => {
   }
 });
 
+// --- Admin: Tenant Detail ---
+app.get('/admin/platform/tenants/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const tenant: any = await (db.tenant as any).findUnique({
+      where: { id: req.params.id },
+      include: {
+        users: { orderBy: { email: 'asc' } },
+        settings: true,
+        _count: { select: { users: true, leads: true, properties: true, exposeTemplates: true } },
+      }
+    });
+    if (!tenant) return res.status(404).json({ error: 'Tenant nicht gefunden' });
+    
+    const recentLeads = await db.lead.count({
+      where: { tenantId: tenant.id, createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } }
+    });
+    
+    res.json({
+      id: tenant.id,
+      name: tenant.name,
+      address: tenant.address,
+      createdAt: tenant.createdAt,
+      users: (tenant.users || []).map((u: any) => ({ id: u.id, email: u.email, firstName: u.firstName, lastName: u.lastName, role: u.role, phone: u.phone, createdAt: u.createdAt })),
+      settings: tenant.settings ? {
+        autoReplyEnabled: tenant.settings.autoReplyEnabled,
+        inboundLeadEmail: tenant.settings.inboundLeadEmail,
+        language: tenant.settings.language,
+      } : null,
+      stats: {
+        userCount: tenant._count.users,
+        leadCount: tenant._count.leads,
+        propertyCount: tenant._count.properties,
+        templateCount: tenant._count.exposeTemplates,
+        recentLeads,
+      },
+    });
+  } catch (error: any) {
+    console.error('Admin tenant detail error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // --- Admin: Create Tenant ---
 app.post('/admin/platform/tenants', adminAuthMiddleware, async (req, res) => {
   try {
@@ -6633,6 +6676,95 @@ app.get('/admin/team/members', adminAuthMiddleware, async (_req, res) => {
     })));
   } catch (error: any) {
     console.error('Admin team members error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create new team member (+ optional Cognito admin user + optional WorkMail email)
+app.post('/admin/team/members', adminAuthMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const { email, firstName, lastName, phone, role, createEmail } = req.body;
+    if (!email || typeof email !== 'string') return res.status(400).json({ error: 'E-Mail ist erforderlich' });
+
+    const existing = await db.adminStaff.findUnique({ where: { email: email.toLowerCase().trim() } });
+    if (existing) return res.status(409).json({ error: 'Mitarbeiter mit dieser E-Mail existiert bereits' });
+
+    // 1. Create AdminStaff record
+    const member = await db.adminStaff.create({
+      data: {
+        email: email.toLowerCase().trim(),
+        firstName: firstName?.trim() || null,
+        lastName: lastName?.trim() || null,
+        phone: phone?.trim() || null,
+        role: role || 'ADMIN',
+      },
+    });
+
+    // 2. Create Cognito Admin user (so they can log in to admin panel)
+    let cognitoCreated = false;
+    try {
+      await cognito.adminCreateUser({
+        UserPoolId: process.env.ADMIN_USER_POOL_ID!,
+        Username: email.toLowerCase().trim(),
+        UserAttributes: [
+          { Name: 'email', Value: email.toLowerCase().trim() },
+          { Name: 'email_verified', Value: 'true' },
+          ...(firstName ? [{ Name: 'given_name', Value: firstName.trim() }] : []),
+          ...(lastName ? [{ Name: 'family_name', Value: lastName.trim() }] : []),
+        ],
+        DesiredDeliveryMediums: ['EMAIL'],
+      }).promise();
+      cognitoCreated = true;
+      console.log('Created Cognito admin user:', email);
+    } catch (cognitoErr: any) {
+      if (cognitoErr.code === 'UsernameExistsException') {
+        cognitoCreated = true; // Already exists, that's fine
+      } else {
+        console.error('Cognito admin user creation failed:', cognitoErr.message);
+      }
+    }
+
+    // 3. Create WorkMail mailbox if requested and email is @immivo.ai
+    let workmailCreated = false;
+    if (createEmail && email.toLowerCase().includes('@immivo.ai')) {
+      try {
+        const workmail = new AWS.WorkMail({ region: 'eu-west-1' });
+        const orgId = 'm-86d4b51a0bb44c66bccc44c92bfed800';
+        
+        // Create user in WorkMail
+        const displayName = [firstName, lastName].filter(Boolean).join(' ') || email.split('@')[0];
+        const wmUser = await workmail.createUser({
+          OrganizationId: orgId,
+          Name: email.split('@')[0],
+          DisplayName: displayName,
+          Password: 'Immivo2026!Temp', // Temporary password
+        }).promise();
+        
+        // Register the user for mail (assigns mailbox)
+        if (wmUser.UserId) {
+          await workmail.registerToWorkMail({
+            OrganizationId: orgId,
+            EntityId: wmUser.UserId,
+            Email: email.toLowerCase().trim(),
+          }).promise();
+          workmailCreated = true;
+          console.log('Created WorkMail mailbox:', email);
+        }
+      } catch (wmErr: any) {
+        console.error('WorkMail creation failed:', wmErr.message);
+        // Don't fail the whole request if WorkMail fails
+      }
+    }
+
+    res.json({ 
+      member, 
+      cognitoCreated, 
+      workmailCreated,
+      message: `Mitarbeiter erstellt${cognitoCreated ? ' + Admin-Login' : ''}${workmailCreated ? ' + E-Mail-Postfach' : ''}` 
+    });
+  } catch (error: any) {
+    console.error('Create team member error:', error);
     res.status(500).json({ error: error.message });
   }
 });
