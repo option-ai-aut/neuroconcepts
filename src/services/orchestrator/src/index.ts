@@ -138,6 +138,9 @@ async function initializePrisma() {
   // Auto-apply pending schema migrations (safe: uses IF NOT EXISTS / IF EXISTS)
   await applyPendingMigrations(prisma);
   
+  // Auto-create missing tables (Admin, Blog, Newsletter, Jobs, etc.)
+  await ensureAdminTables(prisma);
+  
   return prisma;
 }
 
@@ -6497,7 +6500,110 @@ app.get('/admin/platform/users', adminAuthMiddleware, async (_req, res) => {
 // ═══════════════════════════════════════════════════════════════
 
 // Helper: ensure known Immivo founders exist in AdminStaff
+let _tablesEnsured = false;
+
+async function ensureAdminTables(db: any) {
+  // Only run once per Lambda cold start
+  if (_tablesEnsured) return;
+  
+  try {
+    const tables = await db.$queryRaw`SELECT tablename FROM pg_tables WHERE schemaname = 'public'`;
+    const existing = new Set((tables as any[]).map((t: any) => t.tablename));
+    
+    let created = 0;
+    
+    // --- Admin Staff & Chat ---
+    if (!existing.has('AdminStaff')) {
+      console.log('🔧 Creating AdminStaff table...');
+      await db.$executeRawUnsafe(`CREATE TYPE "AdminRole" AS ENUM ('SUPER_ADMIN', 'ADMIN', 'SUPPORT')`).catch(() => {});
+      await db.$executeRawUnsafe(`CREATE TABLE "AdminStaff" ("id" TEXT NOT NULL DEFAULT gen_random_uuid(), "email" TEXT NOT NULL, "firstName" TEXT, "lastName" TEXT, "phone" TEXT, "role" "AdminRole" NOT NULL DEFAULT 'ADMIN', "avatarUrl" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "AdminStaff_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "AdminStaff_email_key" ON "AdminStaff"("email")`);
+      created++;
+    }
+    if (!existing.has('AdminChannel')) {
+      console.log('🔧 Creating AdminChannel table...');
+      await db.$executeRawUnsafe(`CREATE TABLE "AdminChannel" ("id" TEXT NOT NULL DEFAULT gen_random_uuid(), "name" TEXT NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "AdminChannel_pkey" PRIMARY KEY ("id"))`);
+      created++;
+    }
+    if (!existing.has('AdminChatMessage')) {
+      console.log('🔧 Creating AdminChatMessage table...');
+      await db.$executeRawUnsafe(`CREATE TABLE "AdminChatMessage" ("id" TEXT NOT NULL DEFAULT gen_random_uuid(), "channelId" TEXT NOT NULL, "staffId" TEXT NOT NULL, "content" TEXT NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "AdminChatMessage_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "AdminChatMessage_channelId_createdAt_idx" ON "AdminChatMessage"("channelId", "createdAt")`);
+      await db.$executeRawUnsafe(`ALTER TABLE "AdminChatMessage" ADD CONSTRAINT "AdminChatMessage_channelId_fkey" FOREIGN KEY ("channelId") REFERENCES "AdminChannel"("id") ON DELETE CASCADE ON UPDATE CASCADE`).catch(() => {});
+      await db.$executeRawUnsafe(`ALTER TABLE "AdminChatMessage" ADD CONSTRAINT "AdminChatMessage_staffId_fkey" FOREIGN KEY ("staffId") REFERENCES "AdminStaff"("id") ON DELETE RESTRICT ON UPDATE CASCADE`).catch(() => {});
+      created++;
+    }
+    
+    // --- Blog ---
+    if (!existing.has('BlogPost')) {
+      console.log('🔧 Creating BlogPost table...');
+      await db.$executeRawUnsafe(`CREATE TABLE "BlogPost" ("id" TEXT NOT NULL DEFAULT gen_random_uuid(), "slug" TEXT NOT NULL, "title" TEXT NOT NULL, "excerpt" TEXT, "content" TEXT NOT NULL, "coverImage" TEXT, "author" TEXT NOT NULL DEFAULT 'Immivo Team', "category" TEXT, "tags" JSONB, "published" BOOLEAN NOT NULL DEFAULT false, "publishedAt" TIMESTAMP(3), "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "BlogPost_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "BlogPost_slug_key" ON "BlogPost"("slug")`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BlogPost_published_publishedAt_idx" ON "BlogPost"("published", "publishedAt")`);
+      created++;
+    }
+    
+    // --- Newsletter ---
+    if (!existing.has('NewsletterSubscriber')) {
+      console.log('🔧 Creating NewsletterSubscriber table...');
+      await db.$executeRawUnsafe(`CREATE TABLE "NewsletterSubscriber" ("id" TEXT NOT NULL DEFAULT gen_random_uuid(), "email" TEXT NOT NULL, "name" TEXT, "confirmed" BOOLEAN NOT NULL DEFAULT false, "confirmToken" TEXT, "unsubscribed" BOOLEAN NOT NULL DEFAULT false, "source" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "NewsletterSubscriber_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "NewsletterSubscriber_email_key" ON "NewsletterSubscriber"("email")`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "NewsletterSubscriber_confirmed_unsubscribed_idx" ON "NewsletterSubscriber"("confirmed", "unsubscribed")`);
+      created++;
+    }
+    if (!existing.has('NewsletterCampaign')) {
+      console.log('🔧 Creating NewsletterCampaign table...');
+      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "NewsletterStatus" AS ENUM ('DRAFT', 'SCHEDULED', 'SENDING', 'SENT'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`CREATE TABLE "NewsletterCampaign" ("id" TEXT NOT NULL DEFAULT gen_random_uuid(), "subject" TEXT NOT NULL, "content" TEXT NOT NULL, "previewText" TEXT, "sentAt" TIMESTAMP(3), "sentCount" INTEGER NOT NULL DEFAULT 0, "status" "NewsletterStatus" NOT NULL DEFAULT 'DRAFT', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "NewsletterCampaign_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "NewsletterCampaign_status_idx" ON "NewsletterCampaign"("status")`);
+      created++;
+    }
+    
+    // --- Jobs ---
+    if (!existing.has('JobPosting')) {
+      console.log('🔧 Creating JobPosting table...');
+      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "JobType" AS ENUM ('FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'FREELANCE'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`CREATE TABLE "JobPosting" ("id" TEXT NOT NULL DEFAULT gen_random_uuid(), "title" TEXT NOT NULL, "department" TEXT, "location" TEXT, "type" "JobType" NOT NULL DEFAULT 'FULL_TIME', "remote" BOOLEAN NOT NULL DEFAULT false, "description" TEXT NOT NULL, "requirements" TEXT, "benefits" TEXT, "salary" TEXT, "published" BOOLEAN NOT NULL DEFAULT false, "publishedAt" TIMESTAMP(3), "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "JobPosting_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "JobPosting_published_publishedAt_idx" ON "JobPosting"("published", "publishedAt")`);
+      created++;
+    }
+    if (!existing.has('JobApplication')) {
+      console.log('🔧 Creating JobApplication table...');
+      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "ApplicationStatus" AS ENUM ('NEW', 'REVIEWING', 'INTERVIEW', 'OFFER', 'HIRED', 'REJECTED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`CREATE TABLE "JobApplication" ("id" TEXT NOT NULL DEFAULT gen_random_uuid(), "jobId" TEXT NOT NULL, "firstName" TEXT NOT NULL, "lastName" TEXT NOT NULL, "email" TEXT NOT NULL, "phone" TEXT, "coverLetter" TEXT, "resumeUrl" TEXT, "status" "ApplicationStatus" NOT NULL DEFAULT 'NEW', "notes" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "JobApplication_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`ALTER TABLE "JobApplication" ADD CONSTRAINT "JobApplication_jobId_fkey" FOREIGN KEY ("jobId") REFERENCES "JobPosting"("id") ON DELETE CASCADE ON UPDATE CASCADE`).catch(() => {});
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "JobApplication_jobId_status_idx" ON "JobApplication"("jobId", "status")`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "JobApplication_email_idx" ON "JobApplication"("email")`);
+      created++;
+    }
+    
+    // --- Contact Submissions ---
+    if (!existing.has('ContactSubmission')) {
+      console.log('🔧 Creating ContactSubmission table...');
+      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "ContactStatus" AS ENUM ('NEW', 'READ', 'REPLIED', 'ARCHIVED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`CREATE TABLE "ContactSubmission" ("id" TEXT NOT NULL DEFAULT gen_random_uuid(), "firstName" TEXT NOT NULL, "lastName" TEXT NOT NULL, "email" TEXT NOT NULL, "subject" TEXT NOT NULL, "message" TEXT NOT NULL, "status" "ContactStatus" NOT NULL DEFAULT 'NEW', "notes" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "ContactSubmission_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ContactSubmission_status_createdAt_idx" ON "ContactSubmission"("status", "createdAt")`);
+      created++;
+    }
+    
+    // --- Fix Message cascade FK ---
+    try {
+      await db.$executeRawUnsafe(`ALTER TABLE "Message" DROP CONSTRAINT IF EXISTS "Message_leadId_fkey"`);
+      await db.$executeRawUnsafe(`ALTER TABLE "Message" ADD CONSTRAINT "Message_leadId_fkey" FOREIGN KEY ("leadId") REFERENCES "Lead"("id") ON DELETE CASCADE ON UPDATE CASCADE`);
+    } catch {}
+    
+    if (created > 0) console.log(`✅ Created ${created} missing table(s)`);
+    _tablesEnsured = true;
+    
+  } catch (err: any) {
+    console.error('⚠️ ensureAdminTables error:', err.message);
+  }
+}
+
 async function ensureAdminStaff(db: any) {
+  // First ensure tables exist
+  await ensureAdminTables(db);
+  
   const founders = [
     { email: 'dennis.kral@immivo.ai', firstName: 'Dennis', lastName: 'Kral', role: 'SUPER_ADMIN' as const },
     { email: 'josef.leutgeb@immivo.ai', firstName: 'Josef', lastName: 'Leutgeb', role: 'ADMIN' as const },
@@ -6585,6 +6691,7 @@ async function getOrCreateStaff(db: any, email: string, givenName?: string, fami
 app.get('/admin/team/channels', adminAuthMiddleware, async (_req, res) => {
   try {
     const db = await initializePrisma();
+    await ensureAdminTables(db);
     const channels = await db.adminChannel.findMany({
       orderBy: { createdAt: 'asc' },
       include: { _count: { select: { messages: true } } },
