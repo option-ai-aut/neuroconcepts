@@ -151,6 +151,13 @@ async function applyPendingMigrations(db: PrismaClient) {
     // 2026-02-13: Add missing columns
     'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lastSeenAt" TIMESTAMP(3)',
     'ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "heatingType" TEXT',
+    // 2026-02-14: Channel table fixes
+    'ALTER TABLE "Channel" ADD COLUMN IF NOT EXISTS "description" TEXT',
+    'ALTER TABLE "Channel" ADD COLUMN IF NOT EXISTS "isDefault" BOOLEAN NOT NULL DEFAULT false',
+    // ChannelMessage fixes
+    'ALTER TABLE "ChannelMessage" ADD COLUMN IF NOT EXISTS "isJarvis" BOOLEAN NOT NULL DEFAULT false',
+    'ALTER TABLE "ChannelMessage" ADD COLUMN IF NOT EXISTS "mentions" JSONB',
+    'ALTER TABLE "ChannelMessage" ADD COLUMN IF NOT EXISTS "editedAt" TIMESTAMP(3)',
   ];
   
   for (const sql of migrations) {
