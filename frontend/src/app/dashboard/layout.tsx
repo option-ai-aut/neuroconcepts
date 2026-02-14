@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { fetchAuthSession } from 'aws-amplify/auth';
+import { fetchAuthSession, signOut } from 'aws-amplify/auth';
 import Sidebar from '@/components/Sidebar';
 import AiChatSidebar from '@/components/AiChatSidebar';
 import GlobalDrawer from '@/components/GlobalDrawer';
@@ -172,6 +172,18 @@ export default function DashboardLayout({
           router.replace(`/login${redirect}`);
         }
       } catch {
+        // Clear stale tokens so the login page doesn't encounter them again
+        try {
+          const keysToRemove: string[] = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.startsWith('CognitoIdentityServiceProvider.') || key.startsWith('amplify-') || key.includes('cognito') || key.includes('Cognito'))) {
+              keysToRemove.push(key);
+            }
+          }
+          keysToRemove.forEach(k => localStorage.removeItem(k));
+          try { await signOut(); } catch {}
+        } catch {}
         const redirect = pathname && pathname !== '/dashboard' ? `?redirect=${encodeURIComponent(pathname)}` : '';
         router.replace(`/login${redirect}`);
       }

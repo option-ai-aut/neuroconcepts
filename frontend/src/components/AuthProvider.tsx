@@ -1,8 +1,7 @@
 'use client';
 
 import { Amplify } from 'aws-amplify';
-import { fetchAuthSession, signOut } from 'aws-amplify/auth';
-import { Authenticator } from '@aws-amplify/ui-react';
+import { fetchAuthSession } from 'aws-amplify/auth';
 import { useEnv } from './EnvProvider';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
@@ -30,24 +29,18 @@ export function useAuth() {
   return { session };
 }
 
-/** Clear all Cognito tokens from localStorage to prevent stale token 400 errors */
-function clearCognitoStorage() {
-  try {
-    const keysToRemove: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (
-        key.startsWith('CognitoIdentityServiceProvider.') ||
-        key.startsWith('amplify-') ||
-        key.includes('cognito')
-      )) {
-        keysToRemove.push(key);
-      }
-    }
-    keysToRemove.forEach(k => localStorage.removeItem(k));
-  } catch {}
-}
-
+/**
+ * AuthProvider — configures Amplify with the correct Cognito User Pool.
+ *
+ * IMPORTANT: We intentionally do NOT use <Authenticator.Provider> because:
+ * 1. The app uses custom login pages (signIn/signUp from aws-amplify/auth), not <Authenticator>
+ * 2. Authenticator.Provider auto-restores sessions on mount, which causes 400 errors
+ *    when stale refresh tokens exist in localStorage (e.g. after password resets)
+ * 3. No component in the app uses useAuthenticator()
+ *
+ * Admin routes (/admin/*) are skipped here — they configure their own Amplify
+ * instance with the separate Admin User Pool in admin/layout.tsx.
+ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const config = useEnv();
   const pathname = usePathname();
@@ -58,7 +51,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isAdminRoute) {
-      // Don't configure Amplify with user pool for admin routes
       setConfigured(true);
       return;
     }
@@ -71,28 +63,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       });
-
-      // Validate cached session — if tokens are stale, clear them
-      fetchAuthSession().catch(() => {
-        clearCognitoStorage();
-      });
-
       setConfigured(true);
     }
   }, [config, isAdminRoute]);
 
-  // Always render children - don't block the entire app.
-  // Pages that need auth (login, dashboard) handle their own loading state.
-  // Public pages (landing page, legal) render instantly.
   return (
     <AuthConfigContext.Provider value={configured}>
-      {configured && !isAdminRoute ? (
-        <Authenticator.Provider>
-          {children}
-        </Authenticator.Provider>
-      ) : (
-        <>{children}</>
-      )}
+      {children}
     </AuthConfigContext.Provider>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { signIn, fetchAuthSession, confirmSignIn } from 'aws-amplify/auth';
+import { signIn, signOut, fetchAuthSession, confirmSignIn } from 'aws-amplify/auth';
 import { Amplify } from 'aws-amplify';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2, Shield } from 'lucide-react';
@@ -55,7 +55,18 @@ export default function AdminLoginPage() {
           router.push('/admin');
         }
       } catch {
-        // Not authenticated
+        // Stale admin tokens — clear them
+        try {
+          const keysToRemove: string[] = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.startsWith('CognitoIdentityServiceProvider.') || key.startsWith('amplify-') || key.includes('cognito') || key.includes('Cognito'))) {
+              keysToRemove.push(key);
+            }
+          }
+          keysToRemove.forEach(k => localStorage.removeItem(k));
+          try { await signOut(); } catch {}
+        } catch {}
       }
     };
     if (config.adminUserPoolId) {
@@ -69,6 +80,9 @@ export default function AdminLoginPage() {
     setIsLoading(true);
 
     try {
+      // Clear any stale auth state before sign-in
+      try { await signOut(); } catch {}
+
       const result = await signIn({ username: email, password });
 
       if (result.nextStep?.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {

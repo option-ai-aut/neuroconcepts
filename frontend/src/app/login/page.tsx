@@ -1,14 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { signIn, signUp, confirmSignUp, resetPassword, confirmResetPassword, fetchAuthSession, confirmSignIn } from 'aws-amplify/auth';
-import { Amplify } from 'aws-amplify';
+import { signIn, signUp, signOut, confirmSignUp, resetPassword, confirmResetPassword, fetchAuthSession, confirmSignIn } from 'aws-amplify/auth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { syncUser } from '@/lib/api';
-import { useRuntimeConfig } from '@/components/RuntimeConfigProvider';
+import { useAuthConfigured } from '@/components/AuthProvider';
 
 // Countries with dial codes
 const COUNTRIES = [
@@ -20,23 +19,28 @@ const COUNTRIES = [
 
 type AuthView = 'signIn' | 'signUp' | 'confirmSignUp' | 'forgotPassword' | 'confirmReset' | 'onboarding' | 'newPasswordRequired';
 
+/** Clear all Cognito tokens from localStorage to prevent stale token 400 errors */
+function clearCognitoStorage() {
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (
+        key.startsWith('CognitoIdentityServiceProvider.') ||
+        key.startsWith('amplify-') ||
+        key.includes('cognito') ||
+        key.includes('Cognito')
+      )) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+  } catch {}
+}
+
 export default function LoginPage() {
   const router = useRouter();
-  const config = useRuntimeConfig();
-  
-  // Configure Amplify
-  useEffect(() => {
-    if (config.userPoolId && config.userPoolClientId) {
-      Amplify.configure({
-        Auth: {
-          Cognito: {
-            userPoolId: config.userPoolId,
-            userPoolClientId: config.userPoolClientId,
-          }
-        }
-      });
-    }
-  }, [config]);
+  const authConfigured = useAuthConfigured();
 
   const [checkingSession, setCheckingSession] = useState(true);
   const searchParams = useSearchParams();
@@ -53,39 +57,28 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Check if already authenticated - redirect to dashboard or original URL
+  // Single auth check: wait for Amplify config, then check session once
   useEffect(() => {
+    if (!authConfigured) return;
+
     const checkExisting = async () => {
       try {
         const session = await fetchAuthSession();
         if (session.tokens?.idToken) {
-          // Redirect to original page if provided, otherwise dashboard
-          const params = new URLSearchParams(window.location.search);
-          const redirectTo = params.get('redirect') || '/dashboard';
-          router.replace(redirectTo);
+          router.replace(getRedirectTarget());
           return;
         }
       } catch {
-        // Not authenticated or stale tokens — clear storage to prevent 400 loops
-        try {
-          const keysToRemove: string[] = [];
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && (key.startsWith('CognitoIdentityServiceProvider.') || key.startsWith('amplify-') || key.includes('cognito'))) {
-              keysToRemove.push(key);
-            }
-          }
-          keysToRemove.forEach(k => localStorage.removeItem(k));
-        } catch {}
+        // Stale/invalid tokens — clear ALL Cognito storage to prevent 400 loops
+        clearCognitoStorage();
+        // Also clear Amplify's internal auth state
+        try { await signOut(); } catch {}
       }
       setCheckingSession(false);
     };
-    if (config.userPoolId && config.userPoolClientId) {
-      checkExisting();
-    } else {
-      setCheckingSession(false);
-    }
-  }, [config, router]);
+    checkExisting();
+  }, [authConfigured, router]);
+
   const [showPassword, setShowPassword] = useState(false);
   
   // Form fields
@@ -108,20 +101,6 @@ export default function LoginPage() {
   const [onboardingFirstName, setOnboardingFirstName] = useState('');
   const [onboardingLastName, setOnboardingLastName] = useState('');
 
-  // Check if already authenticated
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const session = await fetchAuthSession();
-        if (session.tokens) {
-          router.push(getRedirectTarget());
-        }
-      } catch {
-        // Not authenticated
-      }
-    };
-    checkAuth();
-  }, [router]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,6 +108,11 @@ export default function LoginPage() {
     setIsLoading(true);
     
     try {
+      // Clear any stale auth state before attempting sign-in
+      // This prevents "There is already a signed in user" errors
+      clearCognitoStorage();
+      try { await signOut(); } catch {}
+
       const signInResult = await signIn({ username: email, password });
       
       // Check if new password is required (invited user first login)
