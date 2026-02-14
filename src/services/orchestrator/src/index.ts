@@ -6492,50 +6492,32 @@ app.get('/admin/platform/users', adminAuthMiddleware, async (_req, res) => {
   }
 });
 
-// Immivo team members (only @immivo.ai emails)
+// ═══════════════════════════════════════════════════════════════
+// Admin: Team Members (AdminStaff table - separate from User!)
+// ═══════════════════════════════════════════════════════════════
+
+// Helper: ensure known Immivo founders exist in AdminStaff
+async function ensureAdminStaff(db: any) {
+  const founders = [
+    { email: 'dennis.kral@immivo.ai', firstName: 'Dennis', lastName: 'Kral', role: 'SUPER_ADMIN' as const },
+    { email: 'josef.leutgeb@immivo.ai', firstName: 'Josef', lastName: 'Leutgeb', role: 'ADMIN' as const },
+  ];
+  for (const f of founders) {
+    const existing = await db.adminStaff.findUnique({ where: { email: f.email } });
+    if (!existing) {
+      await db.adminStaff.create({ data: f });
+    }
+  }
+}
+
+// List all Immivo team members
 app.get('/admin/team/members', adminAuthMiddleware, async (_req, res) => {
   try {
     const db = await initializePrisma();
+    await ensureAdminStaff(db);
     
-    // Ensure Immivo Admin tenant exists
-    let adminTenant = await db.tenant.findFirst({ where: { name: 'Immivo Admin' } });
-    if (!adminTenant) {
-      adminTenant = await db.tenant.create({ data: { name: 'Immivo Admin' } });
-    }
-    
-    // Auto-create known Immivo team members if they don't exist yet
-    const immivoTeam = [
-      { email: 'dennis.kral@immivo.ai', firstName: 'Dennis', lastName: 'Kral', role: 'SUPER_ADMIN' as const },
-      { email: 'josef.leutgeb@immivo.ai', firstName: 'Josef', lastName: 'Leutgeb', role: 'ADMIN' as const },
-    ];
-    
-    for (const member of immivoTeam) {
-      const existing = await db.user.findFirst({ where: { email: member.email } });
-      if (!existing) {
-        await db.user.create({
-          data: {
-            email: member.email,
-            firstName: member.firstName,
-            lastName: member.lastName,
-            role: member.role,
-            tenantId: adminTenant.id,
-          },
-        });
-      } else if (existing.role !== member.role) {
-        // Ensure correct role (e.g. dennis.kral@immivo.ai must be SUPER_ADMIN)
-        await db.user.update({
-          where: { id: existing.id },
-          data: { role: member.role, firstName: member.firstName, lastName: member.lastName },
-        });
-      }
-    }
-    
-    // Only return @immivo.ai team members
-    const members = await db.user.findMany({
-      where: { email: { endsWith: '@immivo.ai' } },
-      orderBy: { email: 'asc' },
-    });
-    res.json(members.map(u => ({
+    const members = await db.adminStaff.findMany({ orderBy: { email: 'asc' } });
+    res.json(members.map((u: any) => ({
       id: u.id,
       email: u.email,
       firstName: u.firstName,
@@ -6549,17 +6531,63 @@ app.get('/admin/team/members', adminAuthMiddleware, async (_req, res) => {
   }
 });
 
-// --- Admin: Team Chat (Channels) ---
+// Update team member
+app.patch('/admin/team/members/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { firstName, lastName, phone, role } = req.body;
+    const member = await db.adminStaff.update({
+      where: { id: req.params.id },
+      data: {
+        ...(firstName !== undefined ? { firstName } : {}),
+        ...(lastName !== undefined ? { lastName } : {}),
+        ...(phone !== undefined ? { phone } : {}),
+        ...(role !== undefined ? { role } : {}),
+      },
+    });
+    res.json(member);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete team member (cannot delete SUPER_ADMIN)
+app.delete('/admin/team/members/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const member = await db.adminStaff.findUnique({ where: { id: req.params.id } });
+    if (!member) return res.status(404).json({ error: 'Nicht gefunden' });
+    if (member.role === 'SUPER_ADMIN') return res.status(403).json({ error: 'Super Admins können nicht gelöscht werden' });
+    
+    await db.adminStaff.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Admin: Team Chat (AdminChannel + AdminChatMessage - separate from tenant Channel!)
+// ═══════════════════════════════════════════════════════════════
+
+// Helper: find or create AdminStaff from JWT email
+async function getOrCreateStaff(db: any, email: string, givenName?: string, familyName?: string) {
+  let staff = await db.adminStaff.findUnique({ where: { email } });
+  if (!staff) {
+    staff = await db.adminStaff.create({
+      data: { email, firstName: givenName || 'Admin', lastName: familyName || '' },
+    });
+  }
+  return staff;
+}
 
 // List admin channels
 app.get('/admin/team/channels', adminAuthMiddleware, async (_req, res) => {
   try {
     const db = await initializePrisma();
-    // Use a special "admin" tenant or global channels
-    const channels = await db.channel.findMany({
-      where: { type: 'PUBLIC' },
+    const channels = await db.adminChannel.findMany({
       orderBy: { createdAt: 'asc' },
-      include: { _count: { select: { messages: true, members: true } } },
+      include: { _count: { select: { messages: true } } },
     });
     res.json({ channels });
   } catch (error: any) {
@@ -6574,15 +6602,7 @@ app.post('/admin/team/channels', adminAuthMiddleware, async (req: any, res) => {
     const { name } = req.body;
     if (!name) return res.status(400).json({ error: 'Name erforderlich' });
     
-    // Find or create a system tenant for admin channels
-    let adminTenant = await db.tenant.findFirst({ where: { name: 'Immivo Admin' } });
-    if (!adminTenant) {
-      adminTenant = await db.tenant.create({ data: { name: 'Immivo Admin' } });
-    }
-    
-    const channel = await db.channel.create({
-      data: { name, type: 'PUBLIC', tenantId: adminTenant.id },
-    });
+    const channel = await db.adminChannel.create({ data: { name } });
     res.json({ channel });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -6594,7 +6614,7 @@ app.patch('/admin/team/channels/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
     const { name } = req.body;
-    const channel = await db.channel.update({
+    const channel = await db.adminChannel.update({
       where: { id: req.params.id },
       data: { ...(name ? { name } : {}) },
     });
@@ -6604,14 +6624,11 @@ app.patch('/admin/team/channels/:id', adminAuthMiddleware, async (req, res) => {
   }
 });
 
-// Delete admin channel
+// Delete admin channel (cascades messages)
 app.delete('/admin/team/channels/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
-    // Delete messages first, then channel
-    await db.channelMessage.deleteMany({ where: { channelId: req.params.id } });
-    await db.channelMember.deleteMany({ where: { channelId: req.params.id } });
-    await db.channel.delete({ where: { id: req.params.id } });
+    await db.adminChannel.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -6622,13 +6639,14 @@ app.delete('/admin/team/channels/:id', adminAuthMiddleware, async (req, res) => 
 app.get('/admin/team/channels/:id/messages', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
-    const messages = await db.channelMessage.findMany({
+    const messages = await db.adminChatMessage.findMany({
       where: { channelId: req.params.id },
       orderBy: { createdAt: 'asc' },
       take: 100,
-      include: { user: { select: { firstName: true, lastName: true, email: true } } },
+      include: { staff: { select: { firstName: true, lastName: true, email: true } } },
     });
-    res.json({ messages });
+    // Map staff -> user for frontend compatibility
+    res.json({ messages: messages.map((m: any) => ({ ...m, user: m.staff, staff: undefined })) });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -6641,28 +6659,17 @@ app.post('/admin/team/channels/:id/messages', adminAuthMiddleware, async (req: a
     const { content } = req.body;
     if (!content) return res.status(400).json({ error: 'Content erforderlich' });
     
-    // Find admin user by email from JWT
     const email = req.user?.email;
-    let user = email ? await db.user.findFirst({ where: { email } }) : null;
+    if (!email) return res.status(401).json({ error: 'Unauthorized' });
     
-    // If admin user doesn't exist in users table, create one
-    if (!user && email) {
-      let adminTenant = await db.tenant.findFirst({ where: { name: 'Immivo Admin' } });
-      if (!adminTenant) {
-        adminTenant = await db.tenant.create({ data: { name: 'Immivo Admin' } });
-      }
-      user = await db.user.create({
-        data: { email, firstName: req.user?.given_name || 'Admin', lastName: req.user?.family_name || '', tenantId: adminTenant.id, role: 'SUPER_ADMIN' },
-      });
-    }
+    const staff = await getOrCreateStaff(db, email, req.user?.given_name, req.user?.family_name);
     
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
-    
-    const message = await db.channelMessage.create({
-      data: { content, channelId: req.params.id, userId: user.id },
-      include: { user: { select: { firstName: true, lastName: true, email: true } } },
+    const message = await db.adminChatMessage.create({
+      data: { content, channelId: req.params.id, staffId: staff.id },
+      include: { staff: { select: { firstName: true, lastName: true, email: true } } },
     });
-    res.json({ message });
+    // Map staff -> user for frontend compatibility
+    res.json({ message: { ...message, user: message.staff, staff: undefined } });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

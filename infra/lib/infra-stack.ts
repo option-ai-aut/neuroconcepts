@@ -279,13 +279,10 @@ export class ImmivoStack extends cdk.Stack {
     appSecret.grantRead(orchestratorLambda);
 
     // Lambda Function URL for streaming endpoints (bypasses API Gateway 29s timeout)
+    // NOTE: CORS is handled by Express middleware — do NOT configure cors here
+    // to avoid duplicate Access-Control-Allow-Origin headers
     const functionUrl = orchestratorLambda.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
-      cors: {
-        allowedOrigins: ['*'],
-        allowedMethods: [lambda.HttpMethod.ALL],
-        allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Secret'],
-      },
       invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
     });
 

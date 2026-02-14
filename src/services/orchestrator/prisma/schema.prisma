@@ -453,7 +453,7 @@ enum PropertyPriority {
 model Message {
   id        String   @id @default(uuid())
   leadId    String
-  lead      Lead     @relation(fields: [leadId], references: [id])
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   
   role      MessageRole // SYSTEM, USER, ASSISTANT
   content   String
@@ -1125,4 +1125,51 @@ enum ContactStatus {
   READ
   REPLIED
   ARCHIVED
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Admin Staff (Immivo internal team - completely separate from User/Tenant)
+// ═══════════════════════════════════════════════════════════════
+
+model AdminStaff {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  firstName String?
+  lastName  String?
+  phone     String?
+  role      AdminRole @default(ADMIN)
+  avatarUrl String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  chatMessages AdminChatMessage[]
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  SUPPORT
+}
+
+// --- Admin Team Chat (separate from tenant Channel/ChannelMessage) ---
+
+model AdminChannel {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages AdminChatMessage[]
+}
+
+model AdminChatMessage {
+  id        String       @id @default(uuid())
+  channelId String
+  channel   AdminChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  staffId   String
+  staff     AdminStaff   @relation(fields: [staffId], references: [id])
+  content   String       @db.Text
+  createdAt DateTime     @default(now())
+
+  @@index([channelId, createdAt])
 }

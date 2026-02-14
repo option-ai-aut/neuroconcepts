@@ -1373,7 +1373,15 @@ export class AiToolExecutor {
 
       case 'delete_lead': {
         const { leadId } = args;
-        await getPrisma().lead.delete({ where: { id: leadId } });
+        const db = getPrisma();
+        // Explicitly delete all dependent records, then delete the lead
+        await db.$transaction([
+          db.message.deleteMany({ where: { leadId } }),
+          db.leadActivity.deleteMany({ where: { leadId } }),
+          db.email.updateMany({ where: { leadId }, data: { leadId: null } }),
+          db.jarvisPendingAction.updateMany({ where: { leadId }, data: { leadId: null } }),
+          db.lead.delete({ where: { id: leadId } }),
+        ]);
         return `Der Lead wurde gelöscht.`;
       }
 
@@ -1382,8 +1390,22 @@ export class AiToolExecutor {
         if (!confirmed) {
           return 'Löschung abgebrochen. Bitte bestätige mit confirmed: true.';
         }
-        const result = await getPrisma().lead.deleteMany({ where: { tenantId } });
-        return `${result.count} Lead(s) wurden gelöscht.`;
+        const db = getPrisma();
+        // Get all lead IDs for this tenant
+        const leads = await db.lead.findMany({ where: { tenantId }, select: { id: true } });
+        const leadIds = leads.map(l => l.id);
+        if (leadIds.length === 0) {
+          return 'Es gibt keine Leads zum Löschen.';
+        }
+        // Explicitly delete all dependent records, then delete leads
+        await db.$transaction([
+          db.message.deleteMany({ where: { leadId: { in: leadIds } } }),
+          db.leadActivity.deleteMany({ where: { leadId: { in: leadIds } } }),
+          db.email.updateMany({ where: { leadId: { in: leadIds } }, data: { leadId: null } }),
+          db.jarvisPendingAction.updateMany({ where: { leadId: { in: leadIds } }, data: { leadId: null } }),
+          db.lead.deleteMany({ where: { tenantId } }),
+        ]);
+        return `${leadIds.length} Lead(s) wurden gelöscht.`;
       }
 
       case 'create_property':

@@ -104,7 +104,7 @@ export default function TeamMembersPage() {
     if (!editingMember) return;
     setSaving(true);
     try {
-      await adminFetch(`/admin/platform/users/${editingMember.id}`, {
+      await adminFetch(`/admin/team/members/${editingMember.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
           role: editRole,
@@ -127,7 +127,7 @@ export default function TeamMembersPage() {
     if (!deletingMember) return;
     setDeleting(true);
     try {
-      await adminFetch(`/admin/platform/users/${deletingMember.id}`, { method: 'DELETE' });
+      await adminFetch(`/admin/team/members/${deletingMember.id}`, { method: 'DELETE' });
       showToast('success', 'Mitarbeiter entfernt');
       setDeletingMember(null);
       fetchMembers();
