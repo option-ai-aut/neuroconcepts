@@ -66,7 +66,17 @@ export default function LoginPage() {
           return;
         }
       } catch {
-        // Not authenticated - show login
+        // Not authenticated or stale tokens — clear storage to prevent 400 loops
+        try {
+          const keysToRemove: string[] = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.startsWith('CognitoIdentityServiceProvider.') || key.startsWith('amplify-') || key.includes('cognito'))) {
+              keysToRemove.push(key);
+            }
+          }
+          keysToRemove.forEach(k => localStorage.removeItem(k));
+        } catch {}
       }
       setCheckingSession(false);
     };

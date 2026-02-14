@@ -180,15 +180,19 @@ export default function AdminLayout({
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [amplifyReady, setAmplifyReady] = useState(false);
 
-  // Configure Amplify with Admin User Pool — must clear user-pool tokens first
+  // Configure Amplify with Admin User Pool — clear ALL Cognito tokens first
   useEffect(() => {
     if (config.adminUserPoolId && config.adminUserPoolClientId) {
-      // Clear any cached tokens from the regular user pool to avoid 400 errors
+      // Clear ALL cached Cognito tokens to prevent cross-pool 400 errors
       try {
         const keysToRemove: string[] = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key && key.startsWith('CognitoIdentityServiceProvider.') && !key.includes(config.adminUserPoolClientId)) {
+          if (key && (
+            key.startsWith('CognitoIdentityServiceProvider.') ||
+            key.startsWith('amplify-') ||
+            key.includes('cognito')
+          ) && !key.includes(config.adminUserPoolClientId)) {
             keysToRemove.push(key);
           }
         }
@@ -225,6 +229,17 @@ export default function AdminLayout({
           router.replace('/admin/login');
         }
       } catch {
+        // Clear stale tokens on auth failure
+        try {
+          const keysToRemove: string[] = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.startsWith('CognitoIdentityServiceProvider.') || key.startsWith('amplify-') || key.includes('cognito'))) {
+              keysToRemove.push(key);
+            }
+          }
+          keysToRemove.forEach(k => localStorage.removeItem(k));
+        } catch {}
         router.replace('/admin/login');
       }
     };
