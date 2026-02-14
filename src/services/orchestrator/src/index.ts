@@ -6492,17 +6492,47 @@ app.get('/admin/platform/users', adminAuthMiddleware, async (_req, res) => {
   }
 });
 
-// Immivo team members (SUPER_ADMIN, ADMIN, AGENT with @immivo.ai emails)
+// Immivo team members (only @immivo.ai emails)
 app.get('/admin/team/members', adminAuthMiddleware, async (_req, res) => {
   try {
     const db = await initializePrisma();
+    
+    // Ensure Immivo Admin tenant exists
+    let adminTenant = await db.tenant.findFirst({ where: { name: 'Immivo Admin' } });
+    if (!adminTenant) {
+      adminTenant = await db.tenant.create({ data: { name: 'Immivo Admin' } });
+    }
+    
+    // Auto-create known Immivo team members if they don't exist yet
+    const immivoTeam = [
+      { email: 'dennis.kral@immivo.ai', firstName: 'Dennis', lastName: 'Kral', role: 'SUPER_ADMIN' as const },
+      { email: 'josef.leutgeb@immivo.ai', firstName: 'Josef', lastName: 'Leutgeb', role: 'ADMIN' as const },
+    ];
+    
+    for (const member of immivoTeam) {
+      const existing = await db.user.findFirst({ where: { email: member.email } });
+      if (!existing) {
+        await db.user.create({
+          data: {
+            email: member.email,
+            firstName: member.firstName,
+            lastName: member.lastName,
+            role: member.role,
+            tenantId: adminTenant.id,
+          },
+        });
+      } else if (existing.role !== member.role) {
+        // Ensure correct role (e.g. dennis.kral@immivo.ai must be SUPER_ADMIN)
+        await db.user.update({
+          where: { id: existing.id },
+          data: { role: member.role, firstName: member.firstName, lastName: member.lastName },
+        });
+      }
+    }
+    
+    // Only return @immivo.ai team members
     const members = await db.user.findMany({
-      where: {
-        OR: [
-          { email: { endsWith: '@immivo.ai' } },
-          { role: { in: ['SUPER_ADMIN', 'ADMIN'] } },
-        ],
-      },
+      where: { email: { endsWith: '@immivo.ai' } },
       orderBy: { email: 'asc' },
     });
     res.json(members.map(u => ({
