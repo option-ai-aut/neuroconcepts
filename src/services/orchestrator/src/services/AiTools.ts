@@ -1429,6 +1429,9 @@ export class AiToolExecutor {
 
       case 'update_property': {
         const { propertyId, ...updateData } = args;
+        // Verify tenant ownership
+        const propToUpdate = await getPrisma().property.findFirst({ where: { id: propertyId, tenantId } });
+        if (!propToUpdate) return 'Das Objekt wurde nicht gefunden.';
         return await getPrisma().property.update({
           where: { id: propertyId },
           data: updateData
@@ -1437,14 +1440,18 @@ export class AiToolExecutor {
 
       case 'delete_property': {
         const { propertyId } = args;
-        // Delete related data first
-        await getPrisma().expose.deleteMany({ where: { propertyId } });
-        await getPrisma().lead.updateMany({ 
-          where: { propertyId },
-          data: { propertyId: null }
-        });
-        await getPrisma().property.delete({ where: { id: propertyId } });
-        return `Das Objekt wurde gelöscht.`;
+        const db = getPrisma();
+        // Verify tenant ownership
+        const prop = await db.property.findFirst({ where: { id: propertyId, tenantId } });
+        if (!prop) return 'Das Objekt wurde nicht gefunden.';
+        // Clean up references, then delete
+        await db.$transaction([
+          db.expose.deleteMany({ where: { propertyId } }),
+          db.lead.updateMany({ where: { propertyId }, data: { propertyId: null } }),
+          db.leadActivity.updateMany({ where: { propertyId }, data: { propertyId: null } }),
+          db.property.delete({ where: { id: propertyId } }),
+        ]);
+        return `Das Objekt "${prop.title}" wurde gelöscht.`;
       }
 
       case 'delete_all_properties': {
@@ -1453,26 +1460,30 @@ export class AiToolExecutor {
           return 'Löschung abgebrochen. Bitte bestätige mit confirmed: true.';
         }
         
-        // Delete related data first (cascade)
-        const properties = await getPrisma().property.findMany({ 
+        const db = getPrisma();
+        const properties = await db.property.findMany({ 
           where: { tenantId },
           select: { id: true }
         });
         const propertyIds = properties.map(p => p.id);
         
-        if (propertyIds.length > 0) {
-          // Delete exposes linked to these properties
-          await getPrisma().expose.deleteMany({ 
-            where: { propertyId: { in: propertyIds } } 
-          });
-          // Delete leads linked to these properties
-          await getPrisma().lead.deleteMany({ 
-            where: { propertyId: { in: propertyIds } } 
-          });
+        if (propertyIds.length === 0) {
+          return 'Es gibt keine Objekte zum Löschen.';
         }
         
-        const result = await getPrisma().property.deleteMany({ where: { tenantId } });
-        return `${result.count} Objekt(e) wurden gelöscht (inkl. verknüpfter Exposés und Leads).`;
+        // Clean up references in a transaction
+        await db.$transaction([
+          // Delete exposes linked to these properties
+          db.expose.deleteMany({ where: { propertyId: { in: propertyIds } } }),
+          // Unlink leads (DON'T delete them!)
+          db.lead.updateMany({ where: { propertyId: { in: propertyIds } }, data: { propertyId: null } }),
+          // Unlink lead activities from properties
+          db.leadActivity.updateMany({ where: { propertyId: { in: propertyIds } }, data: { propertyId: null } }),
+          // Delete properties (PropertyAssignment cascades automatically)
+          db.property.deleteMany({ where: { tenantId } }),
+        ]);
+        
+        return `${propertyIds.length} Objekt(e) wurden gelöscht. Verknüpfte Leads wurden beibehalten.`;
       }
 
       case 'upload_images_to_property': {
@@ -1658,18 +1669,25 @@ export class AiToolExecutor {
       case 'search_properties': {
         const { query, minPrice, maxPrice } = args;
         
+        const where: any = { tenantId };
+        if (query) {
+          where.OR = [
+            { title: { contains: query, mode: 'insensitive' } },
+            { address: { contains: query, mode: 'insensitive' } },
+            { city: { contains: query, mode: 'insensitive' } },
+            { description: { contains: query, mode: 'insensitive' } },
+          ];
+        }
+        if (minPrice !== undefined || maxPrice !== undefined) {
+          where.price = {};
+          if (minPrice !== undefined) where.price.gte = minPrice;
+          if (maxPrice !== undefined) where.price.lte = maxPrice;
+        }
+        
         return await getPrisma().property.findMany({
-          where: {
-            tenantId,
-            OR: [
-              { title: { contains: query || '', mode: 'insensitive' } },
-              { address: { contains: query || '', mode: 'insensitive' } }
-            ],
-            price: {
-              gte: minPrice,
-              lte: maxPrice
-            }
-          }
+          where,
+          take: 50,
+          orderBy: { createdAt: 'desc' }
         });
       }
 
@@ -1911,9 +1929,13 @@ export class AiToolExecutor {
           finalBody = body + '\n\n' + user.settings.emailSignature;
         }
         
-        if (!settings?.gmailConfig && !settings?.smtpConfig) {
+        if (!settings?.gmailConfig && !(settings as any)?.outlookMailConfig && !settings?.smtpConfig) {
           return { error: "Kein E-Mail-Konto verbunden. Bitte verbinde dein Postfach unter Einstellungen." };
         }
+        
+        const htmlBody = finalBody.replace(/\n/g, '<br>');
+        let sendSuccess = false;
+        let provider: 'GMAIL' | 'OUTLOOK' | 'SMTP' = 'GMAIL';
         
         // Try Gmail first
         if (settings?.gmailConfig) {
@@ -1942,7 +1964,7 @@ export class AiToolExecutor {
               'MIME-Version: 1.0',
               'Content-Type: text/html; charset=utf-8',
               '',
-              finalBody.replace(/\n/g, '<br>')
+              htmlBody
             ];
             
             const rawMessage = Buffer.from(emailLines.join('\r\n'))
@@ -1956,58 +1978,108 @@ export class AiToolExecutor {
               requestBody: { raw: rawMessage }
             });
             
-            // Save to sent folder
-            await getPrisma().email.create({
-              data: {
-                tenantId,
-                from: user?.email || 'noreply@immivo.ai',
-                fromName: senderName || undefined,
-                to: [to],
-                subject,
-                bodyText: finalBody,
-                bodyHtml: finalBody.replace(/\n/g, '<br>'),
-                folder: 'SENT',
-                isRead: true,
-                provider: 'GMAIL',
-                leadId: leadId || undefined,
-                sentAt: new Date(),
-                providerData: { aiGenerated: true, generatedBy: 'jarvis' },
-              }
-            });
-            
-            // If linked to a lead, create a message record and activity
-            if (leadId) {
-              await getPrisma().message.create({
-                data: {
-                  leadId,
-                  role: 'ASSISTANT',
-                  content: `Subject: ${subject}\n\n${finalBody}`,
-                  status: 'SENT'
-                }
-              });
-              
-              // Create activity for email sent
-              await getPrisma().leadActivity.create({
-                data: {
-                  leadId,
-                  type: 'EMAIL_SENT',
-                  description: `E-Mail gesendet: "${subject}"`,
-                  createdBy: userId
-                }
-              });
-            }
-            
-            return { 
-              success: true, 
-              message: `Email erfolgreich gesendet an ${to} mit Betreff "${subject}".`
-            };
+            sendSuccess = true;
+            provider = 'GMAIL';
           } catch (gmailError: any) {
-            console.error('Gmail send error:', gmailError);
-            return { error: `Die Email konnte leider nicht gesendet werden. Versuche es nochmal.` };
+            console.error('Gmail send error, trying next provider:', gmailError.message);
           }
         }
         
-        return { error: "Email konnte nicht gesendet werden." };
+        // Outlook fallback
+        if (!sendSuccess && (settings as any)?.outlookMailConfig) {
+          try {
+            const outlookConfig = (settings as any).outlookMailConfig;
+            let accessToken = outlookConfig.accessToken;
+            try { accessToken = encryptionService.decrypt(accessToken); } catch {}
+            
+            const { EmailService } = require('./EmailService');
+            await EmailService.sendOutlookEmail(
+              accessToken,
+              to,
+              subject,
+              finalBody,
+              htmlBody
+            );
+            
+            sendSuccess = true;
+            provider = 'OUTLOOK';
+          } catch (outlookError: any) {
+            console.error('Outlook send error, trying SMTP:', outlookError.message);
+          }
+        }
+        
+        // SMTP fallback
+        if (!sendSuccess && settings?.smtpConfig) {
+          try {
+            const smtpConfig = settings.smtpConfig as any;
+            let smtpPass = smtpConfig.pass;
+            try { smtpPass = encryptionService.decrypt(smtpPass); } catch {}
+            
+            const { EmailService } = require('./EmailService');
+            await EmailService.sendSmtpEmail(
+              { ...smtpConfig, pass: smtpPass },
+              to,
+              subject,
+              finalBody,
+              htmlBody
+            );
+            
+            sendSuccess = true;
+            provider = 'SMTP';
+          } catch (smtpError: any) {
+            console.error('SMTP send error:', smtpError.message);
+            return { error: 'Die Email konnte weder über Gmail noch über SMTP gesendet werden. Prüfe die Einstellungen.' };
+          }
+        }
+        
+        if (!sendSuccess) {
+          return { error: 'Die Email konnte leider nicht gesendet werden. Versuche es nochmal.' };
+        }
+        
+        // Save to sent folder
+        await getPrisma().email.create({
+          data: {
+            tenantId,
+            from: user?.email || 'noreply@immivo.ai',
+            fromName: senderName || undefined,
+            to: [to],
+            subject,
+            bodyText: finalBody,
+            bodyHtml: htmlBody,
+            folder: 'SENT',
+            isRead: true,
+            provider: provider,
+            leadId: leadId || undefined,
+            sentAt: new Date(),
+            providerData: { aiGenerated: true, generatedBy: 'jarvis' },
+          }
+        });
+        
+        // If linked to a lead, create a message record and activity
+        if (leadId) {
+          await getPrisma().message.create({
+            data: {
+              leadId,
+              role: 'ASSISTANT',
+              content: `Subject: ${subject}\n\n${finalBody}`,
+              status: 'SENT'
+            }
+          });
+          
+          await getPrisma().leadActivity.create({
+            data: {
+              leadId,
+              type: 'EMAIL_SENT',
+              description: `E-Mail gesendet: "${subject}"`,
+              createdBy: userId
+            }
+          });
+        }
+        
+        return { 
+          success: true, 
+          message: `Email erfolgreich gesendet an ${to} mit Betreff "${subject}".`
+        };
       }
 
       case 'reply_to_email': {
@@ -2448,6 +2520,11 @@ export class AiToolExecutor {
 
       case 'delete_expose': {
         const { exposeId } = args;
+        // Verify tenant ownership
+        const exposeToDelete = await getPrisma().expose.findFirst({
+          where: { id: exposeId, property: { tenantId } }
+        });
+        if (!exposeToDelete) return 'Das Exposé wurde nicht gefunden.';
         await getPrisma().expose.delete({ where: { id: exposeId } });
         return `Das Exposé wurde gelöscht.`;
       }
@@ -2559,7 +2636,7 @@ export class AiToolExecutor {
           period,
           total: leads.length,
           byStatus,
-          conversionRate: byStatus.QUALIFIED ? (byStatus.QUALIFIED / leads.length * 100).toFixed(1) + '%' : '0%'
+          conversionRate: byStatus.BOOKED ? (byStatus.BOOKED / leads.length * 100).toFixed(1) + '%' : '0%'
         };
       }
 
