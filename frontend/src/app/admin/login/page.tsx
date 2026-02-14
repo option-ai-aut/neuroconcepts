@@ -12,9 +12,20 @@ export default function AdminLoginPage() {
   const router = useRouter();
   const config = useRuntimeConfig();
 
-  // Configure Amplify with ADMIN User Pool
+  // Configure Amplify with ADMIN User Pool — clear any regular user pool tokens first
   useEffect(() => {
     if (config.adminUserPoolId && config.adminUserPoolClientId) {
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('CognitoIdentityServiceProvider.') && !key.includes(config.adminUserPoolClientId)) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+      } catch {}
+
       Amplify.configure({
         Auth: {
           Cognito: {

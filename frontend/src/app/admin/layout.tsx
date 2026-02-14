@@ -178,10 +178,23 @@ export default function AdminLayout({
   const pathname = usePathname();
   const config = useRuntimeConfig();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [amplifyReady, setAmplifyReady] = useState(false);
 
-  // Configure Amplify with Admin User Pool
+  // Configure Amplify with Admin User Pool — must clear user-pool tokens first
   useEffect(() => {
     if (config.adminUserPoolId && config.adminUserPoolClientId) {
+      // Clear any cached tokens from the regular user pool to avoid 400 errors
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('CognitoIdentityServiceProvider.') && !key.includes(config.adminUserPoolClientId)) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+      } catch {}
+
       Amplify.configure({
         Auth: {
           Cognito: {
@@ -190,12 +203,14 @@ export default function AdminLayout({
           }
         }
       });
+      setAmplifyReady(true);
     }
   }, [config]);
 
   const isLoginPage = pathname === '/admin/login';
 
   useEffect(() => {
+    if (!amplifyReady) return;
     if (isLoginPage) {
       setIsAuthenticated(true);
       return;
@@ -214,10 +229,8 @@ export default function AdminLayout({
       }
     };
 
-    if (config.adminUserPoolId) {
-      checkAuth();
-    }
-  }, [router, config, isLoginPage]);
+    checkAuth();
+  }, [router, amplifyReady, isLoginPage]);
 
   if (isLoginPage) {
     return <>{children}</>;
