@@ -23,7 +23,6 @@ const MOBILE_ALLOWED_PREFIXES = [
   '/dashboard/crm',
   '/dashboard/calendar',
   '/dashboard/assistant',
-  '/dashboard/marketing',
 ];
 
 function isMobileAllowedRoute(pathname: string): boolean {

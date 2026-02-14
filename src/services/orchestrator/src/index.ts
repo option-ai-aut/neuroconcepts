@@ -7812,6 +7812,78 @@ app.get('/admin/newsletter/subscribers', authMiddleware, async (req, res) => {
   }
 });
 
+// Add single subscriber manually
+app.post('/admin/newsletter/subscribers', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { email, name } = req.body;
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ error: 'E-Mail ist erforderlich' });
+    }
+    const existing = await db.newsletterSubscriber.findUnique({ where: { email: email.toLowerCase().trim() } });
+    if (existing) {
+      return res.status(409).json({ error: 'Diese E-Mail ist bereits registriert' });
+    }
+    const subscriber = await db.newsletterSubscriber.create({
+      data: {
+        email: email.toLowerCase().trim(),
+        name: name?.trim() || null,
+        status: 'confirmed',
+        source: 'admin',
+      },
+    });
+    res.json({ subscriber });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Bulk import subscribers from CSV
+app.post('/admin/newsletter/subscribers/import', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { subscribers: rows } = req.body;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ error: 'Keine Abonnenten zum Importieren' });
+    }
+    let imported = 0;
+    let skipped = 0;
+    for (const row of rows) {
+      const email = (row.email || '').toLowerCase().trim();
+      if (!email || !email.includes('@')) { skipped++; continue; }
+      try {
+        const existing = await db.newsletterSubscriber.findUnique({ where: { email } });
+        if (existing) { skipped++; continue; }
+        await db.newsletterSubscriber.create({
+          data: {
+            email,
+            name: (row.name || '').trim() || null,
+            status: 'confirmed',
+            source: 'csv-import',
+          },
+        });
+        imported++;
+      } catch {
+        skipped++;
+      }
+    }
+    res.json({ imported, skipped, total: rows.length });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete subscriber
+app.delete('/admin/newsletter/subscribers/:id', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    await db.newsletterSubscriber.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/admin/newsletter/campaigns', authMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();

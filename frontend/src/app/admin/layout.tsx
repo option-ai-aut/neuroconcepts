@@ -10,7 +10,8 @@ import {
   Loader2, LayoutDashboard, Users, MessageSquare, Calendar, 
   HeadphonesIcon, DollarSign, Activity, TrendingUp, 
   ClipboardList, Settings, LogOut, ChevronLeft, ChevronRight,
-  Shield, Bell, Search, Command, Mail, Inbox
+  Shield, Bell, Search, Command, Mail, Inbox,
+  Newspaper, Briefcase, Megaphone
 } from 'lucide-react';
 import { useRuntimeConfig } from '@/components/RuntimeConfigProvider';
 
@@ -26,6 +27,14 @@ const NAV_SECTIONS = [
     items: [
       { name: 'Posteingang', href: '/admin/inbox', icon: Inbox },
       { name: 'Kontaktanfragen', href: '/admin/contacts', icon: Mail },
+    ],
+  },
+  {
+    label: 'Marketing',
+    items: [
+      { name: 'Blog', href: '/admin/blog', icon: Newspaper },
+      { name: 'Newsletter', href: '/admin/newsletter', icon: Megaphone },
+      { name: 'Karriere', href: '/admin/karriere', icon: Briefcase },
     ],
   },
   {

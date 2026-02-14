@@ -23,6 +23,7 @@ export default function BlogPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
+  const [subscribeName, setSubscribeName] = useState('');
   const [subscribeStatus, setSubscribeStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [subscribeError, setSubscribeError] = useState<string | null>(null);
 
@@ -58,7 +59,7 @@ export default function BlogPage() {
       const res = await fetch(`${getApiUrl()}/newsletter/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), source: 'blog' }),
+        body: JSON.stringify({ email: email.trim(), name: subscribeName.trim() || undefined, source: 'blog' }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -66,6 +67,7 @@ export default function BlogPage() {
       }
       setSubscribeStatus('success');
       setEmail('');
+      setSubscribeName('');
     } catch (err: any) {
       setSubscribeStatus('error');
       setSubscribeError(err.message || 'Bitte versuche es später erneut.');
@@ -192,29 +194,39 @@ export default function BlogPage() {
           {subscribeStatus === 'success' ? (
             <p className="text-green-600 font-medium">Erfolgreich angemeldet! Du erhältst bald unsere besten Inhalte.</p>
           ) : (
-            <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-3 sm:gap-4 max-w-md mx-auto">
+            <form onSubmit={handleSubscribe} className="flex flex-col gap-3 max-w-md mx-auto">
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="deine@email.de"
+                type="text"
+                value={subscribeName}
+                onChange={(e) => setSubscribeName(e.target.value)}
+                placeholder="Dein Name"
                 disabled={subscribeStatus === 'loading'}
-                className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 disabled:opacity-70"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 disabled:opacity-70"
               />
-              <button
-                type="submit"
-                disabled={subscribeStatus === 'loading'}
-                className="px-6 py-3 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
-              >
-                {subscribeStatus === 'loading' ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Wird gesendet...
-                  </>
-                ) : (
-                  'Abonnieren'
-                )}
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="deine@email.de"
+                  disabled={subscribeStatus === 'loading'}
+                  className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 disabled:opacity-70"
+                />
+                <button
+                  type="submit"
+                  disabled={subscribeStatus === 'loading'}
+                  className="px-6 py-3 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
+                >
+                  {subscribeStatus === 'loading' ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Wird gesendet...
+                    </>
+                  ) : (
+                    'Abonnieren'
+                  )}
+                </button>
+              </div>
             </form>
           )}
           {subscribeError && (

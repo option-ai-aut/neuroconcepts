@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getApiUrl } from '@/lib/api';
-import { useAuth } from '@/components/AuthProvider';
+import { fetchAuthSession } from 'aws-amplify/auth';
+import { getRuntimeConfig } from '@/components/EnvProvider';
 import {
   Plus,
   FileText,
@@ -63,9 +63,22 @@ function formatDate(dateStr: string | null): string {
   }
 }
 
+function getApiUrl(): string {
+  const config = getRuntimeConfig();
+  return (config.apiUrl || process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+}
+
+async function getAdminToken(): Promise<string | undefined> {
+  try {
+    const session = await fetchAuthSession();
+    return session.tokens?.idToken?.toString();
+  } catch { return undefined; }
+}
+
 export default function BlogEditorPage() {
-  const { session } = useAuth();
-  const token = session?.getIdToken?.()?.getJwtToken?.();
+  const [token, setToken] = useState<string | undefined>();
+
+  useEffect(() => { getAdminToken().then(setToken); }, []);
 
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getApiUrl } from '@/lib/api';
-import { useAuth } from '@/components/AuthProvider';
+import { fetchAuthSession } from 'aws-amplify/auth';
+import { getRuntimeConfig } from '@/components/EnvProvider';
 import {
   Plus,
   Bold,
@@ -156,9 +156,22 @@ function RichTextEditor({
   );
 }
 
+function getApiUrl(): string {
+  const config = getRuntimeConfig();
+  return (config.apiUrl || process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+}
+
+async function getAdminToken(): Promise<string | undefined> {
+  try {
+    const session = await fetchAuthSession();
+    return session.tokens?.idToken?.toString();
+  } catch { return undefined; }
+}
+
 export default function KarriereAdminPage() {
-  const { session } = useAuth();
-  const token = session?.getIdToken?.()?.getJwtToken?.();
+  const [token, setToken] = useState<string | undefined>();
+
+  useEffect(() => { getAdminToken().then(setToken); }, []);
 
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [loading, setLoading] = useState(true);
