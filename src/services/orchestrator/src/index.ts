@@ -154,6 +154,12 @@ async function applyPendingMigrations(db: PrismaClient) {
     // 2026-02-14: Channel table fixes
     'ALTER TABLE "Channel" ADD COLUMN IF NOT EXISTS "description" TEXT',
     'ALTER TABLE "Channel" ADD COLUMN IF NOT EXISTS "isDefault" BOOLEAN NOT NULL DEFAULT false',
+    `DO $$ BEGIN CREATE TYPE "ChannelType" AS ENUM ('PUBLIC', 'PRIVATE', 'DM'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    'ALTER TABLE "Channel" ADD COLUMN IF NOT EXISTS "type" "ChannelType" NOT NULL DEFAULT \'PUBLIC\'',
+    // ChannelMember fixes
+    `DO $$ BEGIN CREATE TYPE "ChannelRole" AS ENUM ('ADMIN', 'MEMBER'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    'ALTER TABLE "ChannelMember" ADD COLUMN IF NOT EXISTS "role" "ChannelRole" NOT NULL DEFAULT \'MEMBER\'',
+    'ALTER TABLE "ChannelMember" ADD COLUMN IF NOT EXISTS "joinedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
     // ChannelMessage fixes
     'ALTER TABLE "ChannelMessage" ADD COLUMN IF NOT EXISTS "isJarvis" BOOLEAN NOT NULL DEFAULT false',
     'ALTER TABLE "ChannelMessage" ADD COLUMN IF NOT EXISTS "mentions" JSONB',
