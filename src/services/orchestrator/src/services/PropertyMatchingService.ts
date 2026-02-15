@@ -1,11 +1,12 @@
 /**
  * PropertyMatchingService - Matches incoming leads to properties
  * 
- * Uses OpenImmo externalIds (from FTP sync) and address matching
- * to find the correct property for an incoming lead.
+ * Uses OpenImmo externalIds, address matching, rule-based filtering,
+ * and pgvector semantic similarity for property recommendations.
  */
 
 import { PrismaClient, Property } from '@prisma/client';
+import { EmbeddingService } from './EmbeddingService';
 
 let prisma: PrismaClient;
 
@@ -198,6 +199,160 @@ function calculateAddressScore(property: Property, query: string): number {
   }
 
   return score;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Phase 3.2: Intelligent Property Recommendations
+// Combines rule-based filtering + pgvector semantic similarity
+// ═══════════════════════════════════════════════════════════
+
+export interface PropertyRecommendation {
+  property: {
+    id: string;
+    title: string;
+    address: string;
+    price: any;
+    rooms: number | null;
+    area: number | null;
+    propertyType: string;
+    marketingType: string;
+    status: string;
+  };
+  score: number; // 0-100
+  reasons: string[];
+}
+
+/**
+ * Get property recommendations for a lead based on their preferences
+ */
+export async function getPropertyRecommendations(
+  tenantId: string,
+  leadId: string,
+  limit: number = 5
+): Promise<PropertyRecommendation[]> {
+  const db = getPrisma();
+
+  const lead = await db.lead.findUnique({
+    where: { id: leadId },
+    select: {
+      budgetMin: true, budgetMax: true, preferredType: true,
+      preferredLocation: true, minRooms: true, minArea: true,
+      notes: true, timeFrame: true,
+    }
+  });
+
+  if (!lead) return [];
+
+  // Step 1: Get all active properties for tenant
+  const properties = await db.property.findMany({
+    where: { tenantId, status: 'ACTIVE' },
+    select: {
+      id: true, title: true, address: true, price: true, salePrice: true,
+      rentCold: true, rooms: true, area: true, livingArea: true,
+      propertyType: true, marketingType: true, status: true,
+      city: true, district: true, zipCode: true,
+    }
+  });
+
+  // Step 2: Rule-based scoring
+  const scored = properties.map(prop => {
+    let score = 0;
+    const reasons: string[] = [];
+
+    // Budget match (max 30 points)
+    const propPrice = parseFloat(String(prop.salePrice || prop.rentCold || prop.price || 0));
+    if (propPrice > 0 && (lead.budgetMin || lead.budgetMax)) {
+      const min = lead.budgetMin ? parseFloat(String(lead.budgetMin)) : 0;
+      const max = lead.budgetMax ? parseFloat(String(lead.budgetMax)) : Infinity;
+      if (propPrice >= min && propPrice <= max) {
+        score += 30;
+        reasons.push('Budget passt');
+      } else if (propPrice <= max * 1.15) {
+        score += 15;
+        reasons.push('Budget knapp passend');
+      }
+    }
+
+    // Property type match (max 25 points)
+    if (lead.preferredType && prop.propertyType === lead.preferredType) {
+      score += 25;
+      reasons.push('Objekttyp passt');
+    }
+
+    // Location match (max 20 points)
+    if (lead.preferredLocation) {
+      const loc = lead.preferredLocation.toLowerCase();
+      if (prop.city?.toLowerCase().includes(loc) || prop.district?.toLowerCase().includes(loc) || prop.zipCode?.includes(loc) || prop.address?.toLowerCase().includes(loc)) {
+        score += 20;
+        reasons.push('Lage passt');
+      }
+    }
+
+    // Rooms match (max 15 points)
+    const propRooms = prop.rooms || 0;
+    if (lead.minRooms && propRooms >= lead.minRooms) {
+      score += 15;
+      reasons.push(`${propRooms} Zimmer (min. ${lead.minRooms})`);
+    }
+
+    // Area match (max 10 points)
+    const propArea = prop.livingArea || prop.area || 0;
+    if (lead.minArea && propArea >= lead.minArea) {
+      score += 10;
+      reasons.push(`${propArea}m² (min. ${lead.minArea}m²)`);
+    }
+
+    return {
+      property: {
+        id: prop.id,
+        title: prop.title,
+        address: prop.address,
+        price: prop.salePrice || prop.rentCold || prop.price,
+        rooms: prop.rooms,
+        area: prop.livingArea || prop.area,
+        propertyType: prop.propertyType,
+        marketingType: prop.marketingType,
+        status: prop.status,
+      },
+      score,
+      reasons,
+    };
+  });
+
+  // Step 3: If lead has notes/preferences text, boost with semantic similarity
+  if (lead.notes || lead.preferredLocation || lead.preferredType) {
+    const queryText = [
+      lead.preferredType ? `Typ: ${lead.preferredType}` : '',
+      lead.preferredLocation ? `Lage: ${lead.preferredLocation}` : '',
+      lead.minRooms ? `Zimmer: ${lead.minRooms}+` : '',
+      lead.minArea ? `Fläche: ${lead.minArea}m²+` : '',
+      lead.notes || '',
+    ].filter(Boolean).join('. ');
+
+    try {
+      const semanticResults = await EmbeddingService.semanticSearch(queryText, tenantId, {
+        entityType: 'property', limit: 10, minScore: 0.2,
+      });
+
+      // Boost scores for semantically matching properties
+      for (const sr of semanticResults) {
+        const match = scored.find(s => s.property.id === sr.entityId);
+        if (match) {
+          const semanticBoost = Math.round(sr.score * 20); // up to 20 bonus points
+          match.score += semanticBoost;
+          if (semanticBoost >= 10) match.reasons.push(`Semantisch relevant (${(sr.score * 100).toFixed(0)}%)`);
+        }
+      }
+    } catch {
+      // Semantic search is optional, don't fail if embeddings aren't available
+    }
+  }
+
+  // Sort by score, return top N
+  return scored
+    .filter(s => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
 }
 
 /**

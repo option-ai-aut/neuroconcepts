@@ -2,13 +2,30 @@
 
 ## Übersicht
 
-Jarvis ist der zentrale KI-Assistent für Immivo, basierend auf **OpenAI GPT-5-mini**, mit Zugriff auf das **gesamte System**. Für Bildbearbeitung (Virtual Staging) wird **Google Gemini** verwendet.
+Jarvis ist der zentrale KI-Assistent für Immivo, basierend auf **OpenAI GPT-5.2** (flagship, Dec 2025, knowledge cutoff Aug 2025), mit Zugriff auf das **gesamte System**. Für Bildbearbeitung (Virtual Staging) wird **Google Gemini** verwendet. **gpt-5-mini** wird für E-Mail-Parsing/-Lesen, Intent-Klassifikation (AgentRouter) und Smalltalk genutzt; E-Mail-Antwortgenerierung nutzt gpt-5.2.
 
 ### Architektur-Highlights
+- **Chat Completions API:** Jarvis uses the **Chat Completions API** with routed tool subsets. The Assistants API was deprecated by OpenAI (sunset Aug 2026); the Responses API is the recommended successor for potential future migration.
 - **Multi-Round Tool Calls:** Jarvis kann bis zu **8 aufeinanderfolgende Tool-Runden** in einer Antwort ausführen (z.B. 3 Properties anlegen → Exposés erstellen → PDFs generieren)
 - **Saubere Antworten:** Keine internen Gedanken, kein JSON-Leak, keine Tool-Argumente — nur die finale Antwort
 - **Live Tool-Tags:** Während Jarvis arbeitet, sieht der User pulsende Aktions-Tags (z.B. "🏠 Objekt erstellt"), die nach Abschluss statisch werden
 - **Inline-Bilder im Chat:** Ergebnis-Bilder (z.B. Virtual Staging) werden direkt im Chat angezeigt
+
+### Multi-Agent Router
+
+Before processing each message, a fast **gpt-5-mini** classifier routes the request to the optimal tool set:
+
+| Route | Tools Enabled | Use Case |
+|-------|---------------|----------|
+| `smalltalk` | None | Greetings, chitchat—fastest, cheapest path |
+| `crm` | Lead + Property tools only | Lead/property management |
+| `email` | Email tools only | Email reading, drafting, sending |
+| `calendar` | Calendar tools only | Events and availability |
+| `expose` | Exposé tools only | Exposé creation and PDF generation |
+| `memory` | Chat history tools | "What did we discuss about...?" |
+| `multi` | All tools | Complex, multi-domain requests |
+
+This reduces latency and cost for simple queries (e.g. smalltalk) while keeping full power for complex tasks.
 
 ## Vollständige Tool-Liste
 
@@ -25,6 +42,8 @@ Jarvis ist der zentrale KI-Assistent für Immivo, basierend auf **OpenAI GPT-5-m
 | `get_lead_statistics` | Lead-Statistiken | "Wie ist unsere Conversion-Rate diesen Monat?" |
 | `search_contacts` | Kontakte durchsuchen | "Suche nach Kontakt Müller" |
 
+**Lead Scoring:** Lead data now includes scores (0–100) with factor breakdowns, visible to Jarvis for prioritization and follow-up. **Lead Enrichment** adds completeness score (0–100%), duplicate flags, and normalized phone numbers. **Sentiment** from email messages (buying/risk signals) is stored as activity for context.
+
 **Lead-Felder:**
 - `salutation`: Anrede (NONE, MR/Herr, MS/Frau, DIVERSE/Divers)
 - `formalAddress`: Du/Sie Toggle (true = Sie, false = Du)
@@ -32,7 +51,7 @@ Jarvis ist der zentrale KI-Assistent für Immivo, basierend auf **OpenAI GPT-5-m
 - `budgetMin`, `budgetMax`, `preferredType`, `preferredLocation`
 - `minRooms`, `minArea`, `timeFrame`, `financingStatus`, `source`
 
-### 🏠 IMMOBILIEN (14 Tools)
+### 🏠 IMMOBILIEN (15 Tools)
 
 | Tool | Beschreibung | Beispiel |
 |------|--------------|----------|
@@ -43,6 +62,7 @@ Jarvis ist der zentrale KI-Assistent für Immivo, basierend auf **OpenAI GPT-5-m
 | `delete_property` | Property löschen | "Lösche Property XYZ-789" |
 | `delete_all_properties` | Alle Properties löschen | "Lösche alle Test-Objekte" |
 | `search_properties` | Properties suchen | "Suche Wohnungen in Berlin unter 500k" |
+| `semantic_search` | **RAG:** Properties/Leads by meaning (pgvector) | "Große Wohnung in Wien mit Balkon unter 500000" |
 | `get_property_statistics` | Property-Statistiken | "Wie viele Objekte haben wir verkauft?" |
 | `upload_images_to_property` | Bilder zu Property hochladen | "Lade diese Bilder zum Objekt hoch" |
 | `get_property_images` | Bilder einer Property abrufen | "Zeig mir die Bilder von Property ABC" |
@@ -175,13 +195,15 @@ Datum:    {{date.today}}, {{date.year}}
 | `get_memory_summary` | Gedächtnis-Zusammenfassung | "Was weißt du über mich?" |
 | `get_last_conversation` | Letzte Unterhaltung abrufen | "Was war unser letztes Gespräch?" |
 
-### 📊 STATISTIKEN (3 Tools)
+### 📊 STATISTIKEN & ANALYTICS (3 Tools + API)
 
 | Tool | Beschreibung | Beispiel |
 |------|--------------|----------|
 | `get_dashboard_stats` | Dashboard-Übersicht | "Zeig mir die Stats dieser Woche" |
 | `get_lead_statistics` | Lead-Statistiken | "Wie ist die Conversion-Rate?" |
 | `get_property_statistics` | Property-Statistiken | "Wie viele Objekte haben wir?" |
+
+**Predictive & Analytics APIs** (für Frontend/Admin): `GET /leads/:id/prediction` — Conversion-Wahrscheinlichkeit; `GET /analytics/contact-time` — optimale Kontaktzeit; `POST /analytics/price-estimate` — Preis-Schätzung. A/B-Tests: `GET/POST /admin/ab-tests`, Start/Ende, Results mit Signifikanz. Cache/Queue Stats: `GET /admin/platform/cache-stats`.
 
 ### 👥 TEAM (1 Tool)
 
@@ -206,9 +228,9 @@ Datum:    {{date.today}}, {{date.year}}
 - ✅ Zeile-für-Zeile mit Fortschritts-Updates
 - ✅ Fehlertoleranz und Duplikat-Erkennung
 
-## Gesamt: 63+ Tools
+## Gesamt: 64+ Tools
 
-- ✅ **52 Tools aktiv**
+- ✅ **53 Tools aktiv**
 - 🚧 **9 Tools in Entwicklung** (E-Mail & Kalender-Integration)
 - 🎨 **1 Virtual Staging Tool** (Google Gemini)
 - ✨ **Native Datei-Verarbeitung** (CSV, Excel, PDF, Bilder, etc.)
@@ -225,6 +247,14 @@ Wenn Jarvis Tools ausführt, sieht der User pulsierende Aktions-Tags:
 
 ### Inline-Bilder
 Ergebnis-Bilder (z.B. von Virtual Staging) werden direkt als klickbare Bilder im Chat angezeigt, nicht als Text-URLs.
+
+### Semantic Search (RAG)
+
+The `semantic_search` tool finds properties and leads by meaning using **pgvector** embeddings, not just keywords. Example: *"große Wohnung in Wien mit Balkon unter 500000"* matches relevant properties even without exact field matches (e.g. "große" → `livingArea`, "Balkon" → `features`).
+
+### Thread Reset
+
+When the user starts **"Neuer Chat"**, the current OpenAI thread is deleted and a new one is created. This gives a fresh context without old conversation history.
 
 ### Multi-Round Execution
 Bei komplexen Aufgaben (z.B. "Lege 3 Objekte an und erstelle Exposés") führt Jarvis bis zu 8 Tool-Runden automatisch aus und gibt am Ende eine zusammenfassende Antwort. Kein JSON-Leak, keine internen Gedanken.
@@ -319,7 +349,7 @@ Bei kritischen Operationen (Löschen, E-Mail-Versand) fragt Jarvis nach Bestäti
 
 - **Streaming**: Antworten erscheinen live
 - **Multi-Round**: Bis zu 8 Tool-Runden pro Antwort für komplexe Aufgaben
-- **Conversation Memory**: Lange Gespräche bleiben schnell
+- **Conversation History:** Long conversations stay fast; history is managed efficiently with Chat Completions
 - **Smart Caching**: Häufige Abfragen werden optimiert
 
 ## Roadmap
@@ -336,8 +366,11 @@ Bei kritischen Operationen (Löschen, E-Mail-Versand) fragt Jarvis nach Bestäti
 - 🚧 Kalender-Integration (Google/Outlook)
 
 ### Q2 2026
+- ✅ Predictive Analytics (Conversion-Wahrscheinlichkeit, optimale Kontaktzeit, Preis-Schätzung)
+- ✅ A/B Testing Framework
+- ✅ Smart Email Processing (AutoClick, LeadEnrichment, Sentiment)
+- ✅ Cache & Queue Infrastructure
 - 🔮 Automatische Lead-Qualifizierung
-- 🔮 Predictive Analytics (Verkaufschancen)
 - 🔮 Automatische Termin-Vorschläge
 - 🔮 Multi-Language Support
 

@@ -74,9 +74,9 @@ export default function DatenschutzPage() {
                 Die Verarbeitung Ihrer personenbezogenen Daten erfolgt auf folgenden Rechtsgrundlagen gemäß Art. 6 DSGVO:
               </p>
               <ul className="list-disc pl-6 space-y-2 text-gray-600">
-                <li><strong>Art. 6 Abs. 1 lit. b DSGVO</strong> – Erfüllung eines Vertrags bzw. Durchführung vorvertraglicher Maßnahmen (z. B. Registrierung, Nutzung unserer SaaS-Plattform)</li>
+                <li><strong>Art. 6 Abs. 1 lit. b DSGVO</strong> – Erfüllung eines Vertrags bzw. Durchführung vorvertraglicher Maßnahmen (z. B. Registrierung, Nutzung unserer SaaS-Plattform)</li>
                 <li><strong>Art. 6 Abs. 1 lit. f DSGVO</strong> – Berechtigtes Interesse an der Verbesserung unserer Dienste, IT-Sicherheit und Kundenservice</li>
-                <li><strong>Art. 6 Abs. 1 lit. a DSGVO</strong> – Ihre ausdrückliche Einwilligung (z. B. für Marketing-E-Mails oder optionale KI-Funktionen)</li>
+                <li><strong>Art. 6 Abs. 1 lit. a DSGVO</strong> – Ihre ausdrückliche Einwilligung (z. B. für Marketing-E-Mails oder optionale KI-Funktionen)</li>
               </ul>
             </section>
 
@@ -92,11 +92,11 @@ export default function DatenschutzPage() {
                 <li>CRM und Lead-Management</li>
                 <li>E-Mail-Kommunikation und Terminverwaltung</li>
                 <li>Immobilienmanagement, Exposé-Erstellung und -Bearbeitung</li>
-                <li>KI-gestützte Datenverarbeitung (z. B. E-Mail-Klassifizierung, Lead-Qualifizierung, Bildbearbeitung)</li>
+                <li>KI-gestützte Datenverarbeitung (z. B. E-Mail-Klassifizierung, Lead-Qualifizierung, Bildbearbeitung)</li>
               </ul>
             </section>
 
-            {/* 5. KI und automatisierte Verarbeitung – CRITICAL */}
+            {/* 5. KI und automatisierte Verarbeitung */}
             <section>
               <h2 className="text-xl font-bold text-gray-900 mb-4">
                 5. Künstliche Intelligenz und automatisierte Verarbeitung
@@ -106,22 +106,25 @@ export default function DatenschutzPage() {
               </p>
 
               <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-2">
-                5.1 OpenAI („Jarvis“)
+                5.1 OpenAI ({'\u201E'}Jarvis{'\u201C'})
               </h3>
               <p className="text-gray-600 leading-relaxed mb-2">
-                Wir setzen <strong>OpenAI (GPT-4.1)</strong> für unseren KI-Assistenten „Jarvis“ ein. Dieser verarbeitet insbesondere:
+                Wir setzen <strong>OpenAI (GPT-5 und GPT-5-mini)</strong> für unseren KI-Assistenten {'\u201E'}Jarvis{'\u201C'} ein. Dieser verarbeitet insbesondere:
               </p>
               <ul className="list-disc pl-6 space-y-1 text-gray-600 mb-4">
-                <li>E-Mail-Texte zur Klassifizierung und Kategorisierung</li>
-                <li>Lead-Qualifizierung und priorisierte Auflistungen</li>
+                <li>E-Mail-Texte zur Klassifizierung und Kategorisierung (GPT-5-mini)</li>
+                <li>Lead-Qualifizierung, priorisierte Auflistungen und CRM-Aktionen (GPT-5)</li>
                 <li>Terminvorschläge und -formulierungen</li>
+                <li>Exposé-Erstellung und -Bearbeitung</li>
+                <li>Gesprächszusammenfassungen und Kontextspeicherung</li>
+                <li>E-Mail-Signatur-Generierung</li>
               </ul>
 
               <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-2">
                 5.2 Google Gemini (Bildbearbeitung)
               </h3>
               <p className="text-gray-600 leading-relaxed mb-4">
-                Für die Funktion „Virtuelle Einrichtung“ (Virtual Staging) verwenden wir <strong>Google Gemini</strong>. Dabei werden von Ihnen hochgeladene Immobilienfotos an Google übermittelt und zur Bildbearbeitung verarbeitet.
+                Für die Funktion {'\u201E'}Virtuelle Einrichtung{'\u201C'} (Virtual Staging) verwenden wir <strong>Google Gemini</strong>. Dabei werden von Ihnen hochgeladene Immobilienfotos an Google übermittelt und zur Bildbearbeitung verarbeitet.
               </p>
 
               <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-2">
@@ -145,8 +148,31 @@ export default function DatenschutzPage() {
               <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-2">
                 5.5 Opt-out
               </h3>
+              <p className="text-gray-600 leading-relaxed mb-4">
+                Sie können die KI-Verarbeitung in den Einstellungen deaktivieren. In diesem Fall werden keine Texte oder Bilder an OpenAI oder Google übermittelt. Bestimmte Funktionen (z. B. Jarvis oder virtuelle Einrichtung) stehen dann nicht mehr zur Verfügung.
+              </p>
+
+              <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-2">
+                5.6 KI-Nutzungsprotokollierung
+              </h3>
+              <p className="text-gray-600 leading-relaxed mb-4">
+                Zur Kostentransparenz und Qualitätssicherung protokollieren wir anonymisiert die Nutzung der KI-Dienste. Dabei werden folgende Metadaten erfasst:
+              </p>
+              <ul className="list-disc pl-6 space-y-1 text-gray-600 mb-4">
+                <li>Verwendeter KI-Anbieter und Modell (z. B. GPT-5, Gemini)</li>
+                <li>Art der Anfrage (z. B. Chat, E-Mail-Parsing, Bildbearbeitung)</li>
+                <li>Anzahl der verarbeiteten Tokens (Ein-/Ausgabe)</li>
+                <li>Dauer der Verarbeitung</li>
+              </ul>
+              <p className="text-gray-600 leading-relaxed mb-4">
+                <strong>Keine Speicherung von Inhalten:</strong> Es werden ausschließlich Metadaten protokolliert – die tatsächlichen Inhalte Ihrer Anfragen oder KI-Antworten werden nicht gespeichert. Die Protokolldaten dienen der internen Kostenüberwachung und werden nicht an Dritte weitergegeben.
+              </p>
+
+              <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-2">
+                5.7 Echtzeitbenachrichtigungen
+              </h3>
               <p className="text-gray-600 leading-relaxed">
-                Sie können die KI-Verarbeitung in den Einstellungen deaktivieren. In diesem Fall werden keine Texte oder Bilder an OpenAI oder Google übermittelt. Bestimmte Funktionen (z. B. Jarvis oder virtuelle Einrichtung) stehen dann nicht mehr zur Verfügung.
+                Unsere Plattform nutzt Server-Sent Events (SSE) für Echtzeitbenachrichtigungen (z. B. neue Leads, Objektzuweisungen). Dabei werden kurzlebige Ereignisdaten (Typ und zugehörige IDs) temporär gespeichert und nach Zustellung automatisch verarbeitet. Es werden keine personenbezogenen Inhalte über diesen Kanal übertragen.
               </p>
             </section>
 
@@ -170,7 +196,7 @@ export default function DatenschutzPage() {
                 7. E-Mail-Dienste
               </h2>
               <p className="text-gray-600 leading-relaxed">
-                Für transaktionale E-Mails (z. B. Registrierung, Passwort-Reset, Benachrichtigungen) setzen wir <strong>Resend</strong> sowie <strong>Amazon SES</strong> ein. E-Mail-Inhalte werden ausschließlich zur Zustellung verarbeitet und nicht für werbliche Zwecke ausgewertet.
+                Für transaktionale E-Mails (z. B. Registrierung, Passwort-Reset, Benachrichtigungen) setzen wir <strong>Resend</strong> sowie <strong>Amazon SES</strong> ein. E-Mail-Inhalte werden ausschließlich zur Zustellung verarbeitet und nicht für werbliche Zwecke ausgewertet.
               </p>
             </section>
 
@@ -200,7 +226,7 @@ export default function DatenschutzPage() {
                 10. Cookies und Tracking
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
-                Wir setzen ausschließlich technisch notwendige Cookies ein, die für den Betrieb der Plattform erforderlich sind (z. B. Session-Management, Authentifizierung). Auf Marketing- oder Analyse-Cookies von Drittanbietern verzichten wir; es findet kein Third-Party-Tracking statt. Ihre Einwilligung wird im Rahmen unseres Cookie-Consent-Banners eingeholt, soweit gesetzlich vorgesehen.
+                Wir setzen ausschließlich technisch notwendige Cookies ein, die für den Betrieb der Plattform erforderlich sind (z. B. Session-Management, Authentifizierung). Auf Marketing- oder Analyse-Cookies von Drittanbietern verzichten wir; es findet kein Third-Party-Tracking statt. Ihre Einwilligung wird im Rahmen unseres Cookie-Consent-Banners eingeholt, soweit gesetzlich vorgesehen.
               </p>
             </section>
 
@@ -213,10 +239,11 @@ export default function DatenschutzPage() {
                 Wir arbeiten mit folgenden Auftragsverarbeitern (Auftragsverarbeitungsverträge gemäß Art. 28 DSGVO):
               </p>
               <ul className="list-disc pl-6 space-y-1 text-gray-600">
-                <li><strong>OpenAI, Inc.</strong> (USA) – KI-Assistent Jarvis</li>
+                <li><strong>OpenAI, Inc.</strong> (USA) – KI-Assistent Jarvis (GPT-5, GPT-5-mini)</li>
                 <li><strong>Google Cloud / Google LLC</strong> (USA/EU) – Bildbearbeitung (Gemini)</li>
-                <li><strong>Amazon Web Services</strong> (EU) – Hosting, Speicherung, E-Mail (SES), Cognito</li>
+                <li><strong>Amazon Web Services</strong> (EU) – Hosting, Speicherung, E-Mail (SES, WorkMail), Cognito</li>
                 <li><strong>Resend</strong> (USA) – Transaktionale E-Mails</li>
+                <li><strong>Stripe, Inc.</strong> (USA/EU) – Zahlungsabwicklung</li>
               </ul>
             </section>
 
@@ -232,6 +259,8 @@ export default function DatenschutzPage() {
                 <li>SSL/TLS-Verschlüsselung für alle Verbindungen</li>
                 <li>Verschlüsselung ruhender Daten (AES-256)</li>
                 <li>Zugriffskontrolle, Rollen und Berechtigungen</li>
+                <li>Mandantentrennung (Tenant-Isolation) – jeder Kunde hat Zugriff ausschließlich auf seine eigenen Daten</li>
+                <li>Regelmäßige Sicherheitsüberprüfungen und Updates</li>
               </ul>
             </section>
 
@@ -256,7 +285,7 @@ export default function DatenschutzPage() {
               <ul className="list-disc pl-6 space-y-2 text-gray-600">
                 <li><strong>Auskunft</strong> (Art. 15 DSGVO) – Recht auf Auskunft über Ihre bei uns gespeicherten Daten</li>
                 <li><strong>Berichtigung</strong> (Art. 16 DSGVO) – Recht auf Berichtigung unrichtiger Daten</li>
-                <li><strong>Löschung</strong> (Art. 17 DSGVO) – Recht auf Löschung („Recht auf Vergessenwerden“)</li>
+                <li><strong>Löschung</strong> (Art. 17 DSGVO) – Recht auf Löschung ({'\u201E'}Recht auf Vergessenwerden{'\u201C'})</li>
                 <li><strong>Einschränkung</strong> (Art. 18 DSGVO) – Recht auf Einschränkung der Verarbeitung</li>
                 <li><strong>Datenübertragbarkeit</strong> (Art. 20 DSGVO) – Recht auf Übermittlung Ihrer Daten in einem strukturierten, gängigen Format</li>
                 <li><strong>Widerspruch</strong> (Art. 21 DSGVO) – Recht, der Verarbeitung zu widersprechen</li>
@@ -293,7 +322,7 @@ export default function DatenschutzPage() {
               </address>
             </section>
 
-            {/* 16. Änderungen */}
+            {/* 16. Aenderungen */}
             <section>
               <h2 className="text-xl font-bold text-gray-900 mb-4">
                 16. Änderungen dieser Datenschutzerklärung

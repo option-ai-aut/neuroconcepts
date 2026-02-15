@@ -6,6 +6,7 @@ import { Bell, Check, CheckCheck, X, AlertCircle, MessageSquare, UserPlus, Mail,
 import useSWR from 'swr';
 import { useEnv } from './EnvProvider';
 import { fetchWithAuth } from '@/lib/api';
+import { useRealtimeEvents } from './RealtimeEventProvider';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 
@@ -34,11 +35,20 @@ export default function NotificationBell() {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
 
+  const { eventVersion } = useRealtimeEvents();
+
   const { data, mutate } = useSWR<{ notifications: Notification[]; unreadCount: number }>(
     `${apiUrl}/notifications?limit=20`,
     (url: string) => fetchWithAuth(url),
-    { refreshInterval: 30000 }
+    { refreshInterval: 0 } // No polling! SSE pushes updates
   );
+
+  // Re-fetch when SSE event arrives
+  useEffect(() => {
+    if (eventVersion > 0) {
+      mutate();
+    }
+  }, [eventVersion, mutate]);
 
   const notifications = data?.notifications || [];
   const unreadCount = data?.unreadCount || 0;

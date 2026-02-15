@@ -1,145 +1,124 @@
 # Conversation Memory System
 
-## Problem
+## Current Architecture (Chat Completions API)
 
-Bei langen Gesprächen mit Jarvis entstehen folgende Probleme:
+### Overview
 
-1. **Performance**: Jede Nachricht wird langsamer, da die komplette History an Gemini gesendet wird
-2. **Kosten**: Mehr Input-Tokens = höhere API-Kosten
-3. **Context-Limit**: Gemini hat ein Token-Limit (~1M Tokens), irgendwann ist Schluss
-4. **User Experience**: User wartet länger auf Antworten
+The primary chat flow uses the **Chat Completions API** with routed tool subsets. The OpenAI Assistants API was deprecated (sunset Aug 2026); we migrated to Chat Completions. The Responses API is OpenAI's recommended successor for potential future migration. Conversation history is managed per user within our system.
 
-## Lösung: Sliding Window + Conversation Summary
-
-### Konzept
+### How It Works
 
 ```
-Alle Nachrichten (z.B. 50):
+┌─────────────────────────────────────────────────────────────┐
+│                 Chat Completions API + Routed Tools           │
+│                                                              │
+│  User 1  ──►  Conversation A  ──►  History managed per user │
+│  User 2  ──►  Conversation B  ──►  History managed per user  │
+│  User 3  ──►  Conversation C  ──►  History managed per user  │
+│                                                              │
+│  AgentRouter (gpt-5-mini) filters tools before each request   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Benefits
+
+- **Routed tool subsets**: Intent classification (gpt-5-mini) routes to optimal tool set; main responses use gpt-5.2
+- **Cost optimization**: Smalltalk and parsing use gpt-5-mini; complex tasks use gpt-5.2
+- **No deprecated APIs**: Avoids Assistants API (sunset Aug 2026)
+- **Migration path**: Responses API available for future migration
+
+### Data Flow
+
+1. **Active chat**: Messages are processed via Chat Completions with appropriate tool subsets
+2. **Persistence**: Messages are saved to the `UserChat` table for search and archival
+3. **New chat ("Neuer Chat")**: Conversation is reset and previous messages are archived
+
+---
+
+## ConversationMemory Class — Legacy Fallback & Search
+
+The `ConversationMemory` class is kept for:
+
+| Method | Purpose |
+|--------|---------|
+| `searchChatHistory()` | Memory Jarvis tool — semantic search over past conversations |
+| `getLastArchivedConversation()` | Past conversation recall |
+| `getContextAroundTopic()` | Topic-based context retrieval |
+
+**Not used in main chat flow anymore (with Chat Completions):**
+- `getOptimizedHistory()` — replaced by Chat Completions flow
+- `autoSummarizeIfNeeded()` — no longer needed for active chats
+
+---
+
+## UserChat Table — Search & Archive
+
+Chat messages continue to be saved to the `UserChat` table for:
+- **Search**: Powering the memory search tool
+- **Archival**: When "Neuer Chat" is started, messages are archived for future recall
+- **Analytics**: Conversation history for reporting and insights
+
+---
+
+## Legacy Implementation (Historical Context)
+
+> The following describes the previous sliding-window approach, kept for reference and for any legacy fallback scenarios.
+
+### Problem (Original)
+
+Long conversations with Jarvis caused:
+1. **Performance**: Each message slowed down as full history was sent
+2. **Cost**: More input tokens = higher API costs
+3. **Context limit**: Token limits eventually reached
+4. **User experience**: Slower response times
+
+### Previous Solution: Sliding Window + Conversation Summary
+
+```
+All messages (e.g. 50):
 ┌─────────────────────────────────────────────────────────┐
-│ [1-40: Alte Nachrichten]  │  [41-50: Letzte 10]        │
-│                            │                             │
-│ ↓ Zusammenfassung          │  ↓ Volle Details           │
-│                            │                             │
-│ "User fragte nach Objekt   │  USER: Wie ist der Status? │
-│  in Berlin, Jarvis zeigte  │  ASSISTANT: Das Objekt...  │
-│  3 Optionen, User wählte   │  USER: Perfekt, danke!     │
-│  Objekt #2..."             │  ASSISTANT: Gerne!         │
+│ [1-40: Old messages]  │  [41-50: Last 10]               │
+│                       │                                 │
+│ ↓ Summary              │  ↓ Full details                 │
+│                       │                                 │
+│ "User asked about      │  USER: What's the status?      │
+│  property in Berlin,   │  ASSISTANT: The property...    │
+│  Jarvis showed 3       │  USER: Perfect, thanks!        │
+│  options..."           │  ASSISTANT: You're welcome!    │
 └─────────────────────────────────────────────────────────┘
-         ↓                              ↓
-    An Gemini gesendet als Context
+         ↓                            ↓
+    Sent to model as context
 ```
 
-### Wie es funktioniert
-
-1. **Erste 20 Nachrichten**: Alles wird normal gespeichert und an Gemini gesendet
-2. **Ab 20 Nachrichten**: 
-   - Alte Nachrichten (1-40) werden zu einer Zusammenfassung komprimiert
-   - Letzte 10 Nachrichten bleiben in voller Länge
-   - Gemini bekommt: `[Summary] + [Letzte 10 Nachrichten]`
-3. **Caching**: Zusammenfassungen werden in DB gespeichert (nicht jedes Mal neu generieren)
-
-## Implementierung
-
-### ConversationMemory Service
-
-```typescript
-// Optimierte History abrufen
-const { recentMessages, summary } = await ConversationMemory.getOptimizedHistory(userId);
-
-// Für Gemini formatieren
-const history = ConversationMemory.formatForGemini(recentMessages, summary);
-
-// An Gemini senden
-gemini.chatStream(message, tenantId, history);
-```
-
-### Datenbank-Schema
+### Database Schema (Still Present)
 
 ```prisma
 model ConversationSummary {
   id           String   @id @default(uuid())
   userId       String
   summary      String   @db.Text
-  messageCount Int      // Wie viele Nachrichten wurden zusammengefasst
+  messageCount Int      // How many messages were summarized
   createdAt    DateTime @default(now())
 }
 ```
 
-### Konfiguration
+### Previous Configuration
 
 ```typescript
 // ConversationMemory.ts
-private static RECENT_MESSAGES_COUNT = 10;  // Letzte 10 Nachrichten in voller Länge
-private static SUMMARY_THRESHOLD = 20;      // Ab 20 Nachrichten wird zusammengefasst
+private static RECENT_MESSAGES_COUNT = 10;  // Last 10 messages in full length
+private static SUMMARY_THRESHOLD = 20;      // Summarize from 20 messages onward
 ```
 
-## Performance-Vergleich
-
-### Ohne Optimization (50 Nachrichten)
-
-```
-Input Tokens: ~5000 Tokens
-Response Time: ~3-5 Sekunden
-Cost per Request: ~$0.0075
-```
-
-### Mit Optimization (50 Nachrichten)
-
-```
-Input Tokens: ~1000 Tokens (Summary) + ~500 Tokens (Letzte 10) = ~1500 Tokens
-Response Time: ~1-2 Sekunden
-Cost per Request: ~$0.0023
-```
-
-**Ersparnis: ~70% Kosten, ~60% schneller**
-
-## Beispiel-Zusammenfassung
-
-**Original (40 Nachrichten, ~4000 Tokens):**
-```
-USER: Hallo Jarvis
-ASSISTANT: Hallo! Wie kann ich helfen?
-USER: Zeig mir Objekte in Berlin
-ASSISTANT: Ich habe 5 Objekte gefunden...
-[... 36 weitere Nachrichten ...]
-```
-
-**Zusammenfassung (~200 Tokens):**
-```
-Der User suchte nach Immobilien in Berlin mit 3 Zimmern und Budget bis 500k€.
-Jarvis zeigte 5 Optionen, User interessierte sich für Objekt #2 (Prenzlauer Berg).
-User fragte nach Finanzierungsoptionen, Jarvis erklärte verschiedene Modelle.
-User möchte Besichtigung vereinbaren, Termin wurde für nächsten Dienstag vorgeschlagen.
-Offene Aufgabe: Exposé für Objekt #2 erstellen.
-```
-
-## Vorteile
-
-✅ **Schneller**: Weniger Tokens = schnellere Antworten
-✅ **Günstiger**: 70% weniger API-Kosten bei langen Gesprächen
-✅ **Skalierbar**: Funktioniert auch bei 100+ Nachrichten
-✅ **Smart**: KI behält wichtigen Kontext, vergisst unwichtiges
-✅ **Cached**: Zusammenfassungen werden wiederverwendet
-
-## Nachteile & Mitigation
-
-❌ **Informationsverlust**: Alte Details gehen verloren
-   → Mitigation: Wichtige Infos (Namen, IDs) werden in Summary behalten
-
-❌ **Summary-Kosten**: Zusammenfassung kostet auch API-Calls
-   → Mitigation: Wird gecached, nur einmal pro 20 Nachrichten
-
-❌ **Latenz bei erster Summary**: Erste Zusammenfassung dauert ~2 Sekunden
-   → Mitigation: Passiert asynchron im Hintergrund
+---
 
 ## Best Practices
 
-### 1. Wichtige Informationen explizit speichern
+### 1. Store important information explicitly
 
-Für kritische Daten (Lead-IDs, Property-IDs) nicht auf Summary verlassen:
+For critical data (Lead IDs, Property IDs), don't rely on conversation context alone:
 
 ```typescript
-// Besser: Explizit in DB speichern
 await prisma.userContext.upsert({
   where: { userId },
   update: { currentPropertyId: 'prop-123' },
@@ -147,37 +126,6 @@ await prisma.userContext.upsert({
 });
 ```
 
-### 2. Summary-Threshold anpassen
+### 2. Memory search usage
 
-Für Power-User die viel chatten:
-```typescript
-RECENT_MESSAGES_COUNT = 15;  // Mehr Details behalten
-SUMMARY_THRESHOLD = 30;      // Später zusammenfassen
-```
-
-### 3. Monitoring
-
-Überwache die Performance:
-```typescript
-console.log(`[Memory] User ${userId}: ${allMessages.length} messages, using summary: ${!!summary}`);
-```
-
-## Testing
-
-```bash
-# Test 1: Kurzes Gespräch (< 20 Nachrichten)
-# Erwartung: Keine Summary, alle Nachrichten in voller Länge
-
-# Test 2: Langes Gespräch (> 20 Nachrichten)
-# Erwartung: Summary + letzte 10 Nachrichten
-
-# Test 3: Performance
-# Messe Response-Zeit mit/ohne Optimization
-```
-
-## Future Improvements
-
-1. **Semantic Search in History**: Relevante alte Nachrichten basierend auf aktueller Frage abrufen
-2. **Adaptive Window**: Window-Size basierend auf Kontext-Wichtigkeit anpassen
-3. **Multi-Level Summaries**: Hierarchische Zusammenfassungen für sehr lange Gespräche
-4. **Redis Caching**: Summaries in Redis statt nur DB für noch schnelleren Zugriff
+When users ask about past conversations, use `searchChatHistory()` or `getContextAroundTopic()` to retrieve relevant context for the AI tools.

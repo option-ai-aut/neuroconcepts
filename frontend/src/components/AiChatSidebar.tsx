@@ -6,6 +6,7 @@ import NextImage from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { getRuntimeConfig } from '@/components/EnvProvider';
+import { useRealtimeEvents } from '@/components/RealtimeEventProvider';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
 // Helper to get API URL without trailing slash
@@ -333,7 +334,10 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     }
   };
 
-  // Load pending actions on mount and when AI performs actions
+  // SSE: reload pending actions when realtime events arrive
+  const { eventVersion } = useRealtimeEvents();
+
+  // Load pending actions on mount, when AI performs actions, and when SSE events arrive
   useEffect(() => {
     loadPendingActions();
   }, [loadPendingActions]);
@@ -343,6 +347,13 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
       loadPendingActions();
     }
   }, [aiActionPerformed, loadPendingActions]);
+
+  // Re-fetch on SSE event (no polling needed)
+  useEffect(() => {
+    if (eventVersion > 0) {
+      loadPendingActions();
+    }
+  }, [eventVersion, loadPendingActions]);
 
   // Determine current context and show relevant tip
   useEffect(() => {

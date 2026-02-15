@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.13.2",
+    "@microsoft/fetch-event-source": "^2.0.1",
     "aws-amplify": "^6.16.0",
     "date-fns": "^4.1.0",
     "html2canvas": "^1.4.1",
@@ -17,6 +18,7 @@
     "next": "16.1.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "recharts": "^3.7.0",
     "swr": "^2.3.8"
   },
   "devDependencies": {

@@ -12,6 +12,7 @@ import MobileBottomNav from '@/components/MobileBottomNav';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { useAuthConfigured } from '@/components/AuthProvider';
 import { DarkModeProvider, useDarkMode } from '@/context/DarkModeContext';
+import { RealtimeEventProvider } from '@/components/RealtimeEventProvider';
 import { sendPresenceHeartbeat } from '@/lib/api';
 import { Loader2, Monitor } from 'lucide-react';
 import Image from 'next/image';
@@ -207,7 +208,9 @@ export default function DashboardLayout({
   // Authenticated - show dashboard
   return (
     <DarkModeProvider>
-      <DashboardContent>{children}</DashboardContent>
+      <RealtimeEventProvider>
+        <DashboardContent>{children}</DashboardContent>
+      </RealtimeEventProvider>
     </DarkModeProvider>
   );
 }

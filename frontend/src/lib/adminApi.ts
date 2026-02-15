@@ -197,3 +197,104 @@ export const getAdminUnreadCounts = () =>
   adminFetch<{ counts: Record<string, number> }>('/admin/emails/unread-counts');
 export const markAdminEmailRead = (id: string, isRead: boolean) =>
   adminFetch<{ success: boolean }>(`/admin/emails/${id}/read`, { method: 'PATCH', body: JSON.stringify({ isRead }) });
+
+// Finance / Cost Tracking
+export interface FinanceSummary {
+  period: { from: string; to: string };
+  totalCostCents: number;
+  totalCostUsd: number;
+  aws: {
+    totalCents: number;
+    byService: Record<string, number>;
+    error?: string;
+  };
+  ai: {
+    totalCostCents: number;
+    totalCostUsd: number;
+    totalCalls: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    byProvider: { provider: string; costCents: number; calls: number }[];
+  };
+  leads: {
+    total: number;
+    costPerLeadCents: number;
+    costPerLeadUsd: number;
+  };
+}
+
+export interface AiCostByModel {
+  provider: string;
+  model: string;
+  totalCostCents: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCalls: number;
+  avgCostPerCall: number;
+}
+
+export interface AiCostByDay {
+  date: string;
+  provider: string;
+  model: string;
+  totalCostCents: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCalls: number;
+}
+
+export interface AiCostByEndpoint {
+  endpoint: string;
+  totalCostCents: number;
+  totalCalls: number;
+  avgCostPerCall: number;
+}
+
+export interface AwsCostData {
+  period: { from: string; to: string };
+  granularity: string;
+  totalCostCents: number;
+  totalCostUsd: number;
+  serviceBreakdown: Record<string, number>;
+  periods: { start: string; end: string; services: Record<string, { cost: number; usage: number }> }[];
+}
+
+export interface CostPerLead {
+  period: { from: string; to: string };
+  totalCostCents: number;
+  totalLeads: number;
+  costPerLeadCents: number;
+  awsCostCents: number;
+  aiCostCents: number;
+  dailyTrend: { date: string; leads: number; aiCostCents: number; costPerLeadCents: number }[];
+}
+
+export const getFinanceSummary = (from?: string, to?: string) => {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  return adminFetch<FinanceSummary>(`/admin/finance/summary?${params}`);
+};
+
+export const getAiCosts = (view: 'model' | 'day' | 'endpoint' | 'tenant' = 'model', from?: string, to?: string) => {
+  const params = new URLSearchParams({ view });
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  return adminFetch<{ period: { from: string; to: string }; view: string; data: any[] }>(`/admin/finance/ai-costs?${params}`);
+};
+
+export const getAwsCosts = (granularity: 'DAILY' | 'MONTHLY' = 'MONTHLY', from?: string, to?: string) => {
+  const params = new URLSearchParams({ granularity });
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  return adminFetch<AwsCostData>(`/admin/finance/aws-costs?${params}`);
+};
+
+export const getCostPerLead = (from?: string, to?: string) => {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  return adminFetch<CostPerLead>(`/admin/finance/cost-per-lead?${params}`);
+};
+
+export const getAiPricing = () => adminFetch<{ pricing: Record<string, { input: number; output: number }> }>('/admin/finance/pricing');

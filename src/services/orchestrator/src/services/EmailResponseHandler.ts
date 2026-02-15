@@ -7,6 +7,7 @@ import { PrismaClient, LeadStatus } from '@prisma/client';
 import JarvisActionService from './JarvisActionService';
 import NotificationService from './NotificationService';
 import OpenAI from 'openai';
+import { AiCostService } from './AiCostService';
 
 let prisma: PrismaClient;
 
@@ -200,14 +201,26 @@ Antworte im folgenden JSON-Format:
 }`;
 
   try {
+    const responseModel = 'gpt-5.2';
+    const responseStart = Date.now();
     const completion = await getOpenAI().chat.completions.create({
-      model: 'gpt-5-mini',
+      model: responseModel,
       messages: [
         { role: 'system', content: 'Du bist ein präziser E-Mail-Analyse-Assistent. Antworte nur mit validem JSON.' },
         { role: 'user', content: prompt }
       ],
-      temperature: 0.3
+      max_completion_tokens: 2000
     });
+
+    // Log AI usage for email response analysis
+    if (completion.usage) {
+      AiCostService.logUsage({
+        provider: 'openai', model: responseModel, endpoint: 'email-response',
+        inputTokens: completion.usage.prompt_tokens || 0,
+        outputTokens: completion.usage.completion_tokens || 0,
+        durationMs: Date.now() - responseStart,
+      }).catch(() => {});
+    }
 
     const response = completion.choices[0]?.message?.content || '';
 

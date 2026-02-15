@@ -1,22 +1,28 @@
 import OpenAI from 'openai';
+import { PrismaClient } from '@prisma/client';
 import { CRM_TOOLS, EXPOSE_TOOLS, AiToolExecutor } from './AiTools';
 import { AiSafetyMiddleware } from '../middleware/aiSafety';
+import { AiCostService } from './AiCostService';
+import { AgentRouter, AgentCategory } from './AgentRouter';
 
 // Combine all tools
 const ALL_TOOLS = { ...CRM_TOOLS, ...EXPOSE_TOOLS };
 
+// Prisma client injected from index.ts
+let prisma: PrismaClient;
+export function setOpenAIServicePrisma(client: PrismaClient) {
+  prisma = client;
+}
+
 // Convert our tool definitions to OpenAI function format
 function convertPropertyToOpenAI(value: any): any {
   const result: any = { type: value.type?.toLowerCase() || 'string', description: value.description };
-  // Support array items
   if (result.type === 'array' && value.items) {
     result.items = { type: value.items.type?.toLowerCase() || 'string' };
   }
-  // Support enum
   if (value.enum) {
     result.enum = value.enum;
   }
-  // Support nested object properties
   if (result.type === 'object' && value.properties) {
     result.properties = Object.fromEntries(
       Object.entries(value.properties).map(([k, v]: [string, any]) => [k, convertPropertyToOpenAI(v)])
@@ -46,17 +52,35 @@ function convertToolsToOpenAI(tools: Record<string, any>): OpenAI.Chat.ChatCompl
   }));
 }
 
-// Model to use - GPT-5 mini is fast, capable and cost-efficient
-const MODEL = 'gpt-5-mini';
+// Convert tools to Assistants API format
+function convertToolsToAssistant(tools: Record<string, any>): OpenAI.Beta.AssistantTool[] {
+  return Object.values(tools).map((tool: any) => ({
+    type: 'function' as const,
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: {
+        type: 'object' as const,
+        properties: Object.fromEntries(
+          Object.entries(tool.parameters?.properties || {}).map(([key, value]: [string, any]) => [
+            key,
+            convertPropertyToOpenAI(value)
+          ])
+        ),
+        required: tool.parameters?.required || [],
+      },
+    },
+  }));
+}
 
-// Generate system prompt with current date
+// Model to use
+const MODEL = 'gpt-5.2';
+
+// System prompt for Jarvis
 function getSystemPrompt(): string {
   const today = new Date();
   const currentDateStr = today.toLocaleDateString('de-DE', { 
-    weekday: 'long', 
-    day: 'numeric', 
-    month: 'long', 
-    year: 'numeric' 
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' 
   });
   const isoDate = today.toISOString().split('T')[0];
   
@@ -90,7 +114,7 @@ FÄHIGKEITEN (nutze Tools still im Hintergrund):
 - Exposés: Vorlagen erstellen (sei kreativ, frag nicht), Exposés generieren, Blöcke bearbeiten
 - Team-Chat: lesen, Nachrichten senden
 - Statistiken: Dashboard, Lead-Conversion, Objekt-Stats
-- Gedächtnis: du erinnerst dich an vergangene Gespräche
+- Gedächtnis: du erinnerst dich an vergangene Gespräche (Thread-basiert)
 
 SICHERHEIT: Nur eigene Tenant-Daten. Bei Löschungen: kurze Bestätigung. Leads immer mit vollständigem Namen.
 
@@ -134,10 +158,88 @@ VARIABLEN: {{property.title}}, {{property.address}}, {{property.city}}, {{proper
 
 STIL: Deutsch, du-Form, max 1-3 kurze Sätze. Keine Floskeln, Emojis, Ausrufezeichen, Semikolons. Nie IDs oder technische Details. Kurz sagen was du gemacht hast.`;
 
+// ═══════════════════════════════════════════════════════════════
+// Assistants API: Global Jarvis Assistant (created once, reused)
+// ═══════════════════════════════════════════════════════════════
+
+let _cachedAssistantId: string | null = null;
+
+async function getOrCreateAssistant(client: OpenAI): Promise<string> {
+  // Return cached
+  if (_cachedAssistantId) return _cachedAssistantId;
+
+  // Check env var (set after first creation)
+  if (process.env.OPENAI_ASSISTANT_ID) {
+    _cachedAssistantId = process.env.OPENAI_ASSISTANT_ID;
+    return _cachedAssistantId;
+  }
+
+  // Try to find existing assistant by name
+  try {
+    const assistants = await client.beta.assistants.list({ limit: 20 });
+    const existing = assistants.data.find(a => a.name === 'Jarvis Immivo');
+    if (existing) {
+      _cachedAssistantId = existing.id;
+      console.log(`✅ Assistants API: Found existing Jarvis (${existing.id})`);
+      
+      // Update tools + instructions (in case they changed)
+      await client.beta.assistants.update(existing.id, {
+        instructions: getSystemPrompt(),
+        tools: convertToolsToAssistant(CRM_TOOLS),
+        model: MODEL,
+      });
+      
+      return _cachedAssistantId;
+    }
+  } catch (err) {
+    console.warn('Could not list assistants:', err);
+  }
+
+  // Create new assistant
+  console.log('🔧 Creating Jarvis assistant via Assistants API...');
+  const assistant = await client.beta.assistants.create({
+    name: 'Jarvis Immivo',
+    instructions: getSystemPrompt(),
+    model: MODEL,
+    tools: convertToolsToAssistant(CRM_TOOLS),
+  });
+  
+  _cachedAssistantId = assistant.id;
+  console.log(`✅ Assistants API: Created Jarvis (${assistant.id})`);
+  return _cachedAssistantId;
+}
+
+async function getOrCreateThread(client: OpenAI, userId: string): Promise<string> {
+  if (!prisma) throw new Error('Prisma not injected into OpenAIService');
+
+  // Check if user has a thread
+  const user = await prisma.user.findUnique({ 
+    where: { id: userId },
+    select: { assistantThreadId: true }
+  });
+
+  if (user?.assistantThreadId) {
+    return user.assistantThreadId;
+  }
+
+  // Create new thread
+  const thread = await client.beta.threads.create();
+  
+  // Save thread ID
+  await prisma.user.update({
+    where: { id: userId },
+    data: { assistantThreadId: thread.id }
+  });
+
+  console.log(`🧵 New thread created for user ${userId}: ${thread.id}`);
+  return thread.id;
+}
+
+
 export class OpenAIService {
   private client: OpenAI;
-  private uploadedFiles: string[] = []; // Files uploaded in current chat session
-  private currentUserId?: string; // Current user ID for memory tools
+  private uploadedFiles: string[] = [];
+  private currentUserId?: string;
 
   constructor() {
     this.client = new OpenAI({
@@ -145,22 +247,73 @@ export class OpenAIService {
     });
   }
 
-  async chat(message: string, tenantId: string, history: any[] = [], userContext?: { name: string; email: string; role: string; pageContext?: string }) {
-    // Filter out messages with null/empty content
+  // ═══════════════════════════════════════════════════════════
+  // NEW: Assistants API streaming chat with Multi-Agent Router
+  // ═══════════════════════════════════════════════════════════
+  async *chatStream(
+    message: string, 
+    tenantId: string, 
+    history: any[] = [],  // Ignored with Assistants API (thread has history)
+    uploadedFiles: string[] = [], 
+    userId?: string, 
+    userContext?: { name: string; email: string; role: string; pageContext?: string }
+  ): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean; toolsUsed?: string[] }> {
+    this.uploadedFiles = uploadedFiles;
+    this.currentUserId = userId;
+
+    const streamStartTime = Date.now();
+    const allToolNames: string[] = [];
+    let hadAnyFunctionCalls = false;
+
+    // If no userId or prisma not available, fall back to Chat Completions
+    if (!userId || !prisma) {
+      console.warn('⚠️ No userId or Prisma — falling back to Chat Completions API');
+      yield* this.chatStreamLegacy(message, tenantId, history, uploadedFiles, userId, userContext);
+      return;
+    }
+
+    // ── Step 1: Route with gpt-5-mini (fast, cheap ~100ms) ──
+    const category = await AgentRouter.classify(message, tenantId);
+
+    // ── Step 2: Smalltalk → gpt-5-mini directly (no thread, no tools) ──
+    if (category === 'smalltalk') {
+      yield* this.handleSmalltalk(message, tenantId, userId, userContext);
+      return;
+    }
+
+    // ── Step 3: GPT-5 uses Chat Completions with routed tool subsets ──
+    // (GPT-5 is a reasoning model — Assistants API doesn't support it)
+    const filteredTools = AgentRouter.filterTools(category);
+    const categoryHint = AgentRouter.getCategoryPromptHint(category);
+
+    yield* this.chatStreamRouted(message, tenantId, history, uploadedFiles, userId, userContext, filteredTools, categoryHint);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // Routed Chat Completions (GPT-5 + filtered tool subset)
+  // ═══════════════════════════════════════════════════════════
+  private async *chatStreamRouted(
+    message: string, tenantId: string, history: any[] = [],
+    uploadedFiles: string[] = [], userId?: string,
+    userContext?: { name: string; email: string; role: string; pageContext?: string },
+    filteredTools?: Record<string, any> | null,
+    categoryHint?: string
+  ): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean; toolsUsed?: string[] }> {
+    const streamStartTime = Date.now();
+    this.uploadedFiles = uploadedFiles;
+    this.currentUserId = userId;
     const validHistory = history.filter(h => h.content != null && h.content !== '');
     
     const contextParts: string[] = [];
     if (userContext) {
       contextParts.push(`\n\n[Interner Kontext — NICHT proaktiv erwähnen, nur nutzen wenn relevant]`);
       contextParts.push(`Benutzer: ${userContext.name} (${userContext.email}, ${userContext.role})`);
-      if (userContext.pageContext) {
-        contextParts.push(`Seite: ${userContext.pageContext}`);
-      }
+      if (userContext.pageContext) contextParts.push(`Seite: ${userContext.pageContext}`);
     }
-    const userContextStr = contextParts.length > 0 ? contextParts.join('\n') : '';
+    const streamContextStr = contextParts.length > 0 ? contextParts.join('\n') : '';
 
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      { role: 'system', content: getSystemPrompt() + userContextStr },
+      { role: 'system', content: getSystemPrompt() + streamContextStr + (categoryHint || '') },
       ...validHistory.map(h => ({
         role: (h.role === 'assistant' || h.role === 'ASSISTANT' ? 'assistant' : 'user') as 'assistant' | 'user',
         content: h.content || '',
@@ -168,43 +321,142 @@ export class OpenAIService {
       { role: 'user', content: message },
     ];
 
-    const response = await this.client.chat.completions.create({
-      model: MODEL,
-      messages,
-      tools: convertToolsToOpenAI(CRM_TOOLS),
-      tool_choice: 'auto',
-    });
+    // Use filtered tools (from router) or all CRM tools
+    const toolsToUse = filteredTools || CRM_TOOLS;
+    const openAITools = convertToolsToOpenAI(toolsToUse);
+    
+    const allToolNames: string[] = [];
+    let hadAnyFunctionCalls = false;
+    let currentMessages = [...messages];
+    const MAX_TOOL_ROUNDS = 4;
+    let totalStreamInputTokens = 0;
+    let totalStreamOutputTokens = 0;
 
-    const responseMessage = response.choices[0].message;
+    console.log(`🧭 Routed chat: ${Object.keys(toolsToUse).length} tools (${Object.keys(CRM_TOOLS).length} total available)`);
 
-    // Handle tool calls
-    if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
-      const toolResults = await this.executeToolCalls(responseMessage.tool_calls, tenantId);
-      
-      // Send tool results back
-      const followUpMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-        ...messages,
-        responseMessage,
-        ...toolResults,
-      ];
-
-      const finalResponse = await this.client.chat.completions.create({
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      const stream = await this.client.chat.completions.create({
         model: MODEL,
-        messages: followUpMessages,
+        messages: currentMessages,
+        tools: openAITools,
+        tool_choice: 'auto',
+        stream: true,
+        stream_options: { include_usage: true },
       });
 
-      return finalResponse.choices[0].message.content || '';
+      let roundContent = '';
+      const toolCallsInProgress: Map<number, { id: string; type: 'function'; function: { name: string; arguments: string } }> = new Map();
+
+      for await (const chunk of stream) {
+        if ((chunk as any).usage) {
+          totalStreamInputTokens += (chunk as any).usage.prompt_tokens || 0;
+          totalStreamOutputTokens += (chunk as any).usage.completion_tokens || 0;
+        }
+        const delta = chunk.choices[0]?.delta;
+        if (!delta) continue;
+        if (delta?.content) roundContent += delta.content;
+        if (delta?.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            if (tc.index !== undefined) {
+              if (!toolCallsInProgress.has(tc.index)) {
+                toolCallsInProgress.set(tc.index, { id: tc.id || '', type: 'function', function: { name: '', arguments: '' } });
+              }
+              const existing = toolCallsInProgress.get(tc.index)!;
+              if (tc.id) existing.id = tc.id;
+              if (tc.function?.name) existing.function.name += tc.function.name;
+              if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
+            }
+          }
+        }
+      }
+
+      const roundToolCalls: OpenAI.Chat.ChatCompletionMessageToolCall[] = [];
+      for (const [_, tc] of toolCallsInProgress) {
+        if (tc.id && tc.function.name) roundToolCalls.push(tc as OpenAI.Chat.ChatCompletionMessageToolCall);
+      }
+
+      if (roundToolCalls.length > 0) {
+        hadAnyFunctionCalls = true;
+        const toolNames = roundToolCalls.map(tc => (tc as any).function.name as string);
+        allToolNames.push(...toolNames);
+        yield { chunk: roundContent || '', hadFunctionCalls: true, toolsUsed: allToolNames };
+
+        const toolResults = await this.executeToolCalls(roundToolCalls, tenantId);
+        currentMessages.push({ role: 'assistant', content: roundContent || null, tool_calls: roundToolCalls } as any);
+        currentMessages.push(...toolResults);
+      } else {
+        if (roundContent) yield { chunk: roundContent, hadFunctionCalls: hadAnyFunctionCalls };
+        break;
+      }
     }
 
-    return responseMessage.content || '';
+    if (totalStreamInputTokens > 0 || totalStreamOutputTokens > 0) {
+      AiCostService.logUsage({
+        provider: 'openai', model: MODEL, endpoint: 'chat-stream-routed',
+        inputTokens: totalStreamInputTokens, outputTokens: totalStreamOutputTokens,
+        durationMs: Date.now() - streamStartTime, tenantId, userId,
+      }).catch(() => {});
+    }
   }
 
-  // Streaming version of chat with Function Calling support
-  async *chatStream(message: string, tenantId: string, history: any[] = [], uploadedFiles: string[] = [], userId?: string, userContext?: { name: string; email: string; role: string; pageContext?: string }): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean; toolsUsed?: string[] }> {
-    // Store uploaded files and userId for tool access
+  // ═══════════════════════════════════════════════════════════
+  // Smalltalk: gpt-5-mini, no tools, fast + cheap
+  // ═══════════════════════════════════════════════════════════
+  private async *handleSmalltalk(
+    message: string, tenantId: string, userId: string,
+    userContext?: { name: string; email: string; role: string; pageContext?: string }
+  ): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean; toolsUsed?: string[] }> {
+    const startTime = Date.now();
+    const contextStr = userContext 
+      ? `\n\n[Kontext: ${userContext.name}]`
+      : '';
+
+    const stream = await this.client.chat.completions.create({
+      model: 'gpt-5-mini',
+      messages: [
+        { role: 'system', content: getSystemPrompt() + contextStr },
+        { role: 'user', content: message },
+      ],
+      stream: true,
+      stream_options: { include_usage: true },
+      max_completion_tokens: 200,
+    });
+
+    let totalIn = 0, totalOut = 0;
+    for await (const chunk of stream) {
+      if ((chunk as any).usage) {
+        totalIn += (chunk as any).usage.prompt_tokens || 0;
+        totalOut += (chunk as any).usage.completion_tokens || 0;
+      }
+      const content = chunk.choices[0]?.delta?.content;
+      if (content) {
+        yield { chunk: content };
+      }
+    }
+
+    if (totalIn > 0 || totalOut > 0) {
+      AiCostService.logUsage({
+        provider: 'openai', model: 'gpt-5-mini', endpoint: 'smalltalk',
+        inputTokens: totalIn, outputTokens: totalOut,
+        durationMs: Date.now() - startTime, tenantId, userId,
+      }).catch(() => {});
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // Legacy Chat Completions (fallback)
+  // ═══════════════════════════════════════════════════════════
+  private async *chatStreamLegacy(
+    message: string, 
+    tenantId: string, 
+    history: any[] = [], 
+    uploadedFiles: string[] = [], 
+    userId?: string, 
+    userContext?: { name: string; email: string; role: string; pageContext?: string }
+  ): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean; toolsUsed?: string[] }> {
+    const streamStartTime = Date.now();
     this.uploadedFiles = uploadedFiles;
     this.currentUserId = userId;
-    // Filter out messages with null/empty content
     const validHistory = history.filter(h => h.content != null && h.content !== '');
     
     const contextParts: string[] = [];
@@ -229,41 +481,42 @@ export class OpenAIService {
     const allToolNames: string[] = [];
     let hadAnyFunctionCalls = false;
     let currentMessages = [...messages];
-    const MAX_TOOL_ROUNDS = 4; // Keep low to stay within API GW 29s timeout
+    const MAX_TOOL_ROUNDS = 4;
     const openAITools = convertToolsToOpenAI(CRM_TOOLS);
+    let totalStreamInputTokens = 0;
+    let totalStreamOutputTokens = 0;
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      const isFirstRound = round === 0;
-
       const stream = await this.client.chat.completions.create({
         model: MODEL,
         messages: currentMessages,
         tools: openAITools,
         tool_choice: 'auto',
         stream: true,
+        stream_options: { include_usage: true },
       });
 
       let roundContent = '';
       const toolCallsInProgress: Map<number, { id: string; type: 'function'; function: { name: string; arguments: string } }> = new Map();
 
       for await (const chunk of stream) {
+        if ((chunk as any).usage) {
+          totalStreamInputTokens += (chunk as any).usage.prompt_tokens || 0;
+          totalStreamOutputTokens += (chunk as any).usage.completion_tokens || 0;
+        }
+
         const delta = chunk.choices[0]?.delta;
+        if (!delta) continue;
         
-        // Collect content — only stream to client on final round (when no more tool calls)
         if (delta?.content) {
           roundContent += delta.content;
         }
         
-        // Collect tool calls
         if (delta?.tool_calls) {
           for (const tc of delta.tool_calls) {
             if (tc.index !== undefined) {
               if (!toolCallsInProgress.has(tc.index)) {
-                toolCallsInProgress.set(tc.index, {
-                  id: tc.id || '',
-                  type: 'function',
-                  function: { name: '', arguments: '' }
-                });
+                toolCallsInProgress.set(tc.index, { id: tc.id || '', type: 'function', function: { name: '', arguments: '' } });
               }
               const existing = toolCallsInProgress.get(tc.index)!;
               if (tc.id) existing.id = tc.id;
@@ -274,7 +527,6 @@ export class OpenAIService {
         }
       }
 
-      // Convert collected tool calls
       const roundToolCalls: OpenAI.Chat.ChatCompletionMessageToolCall[] = [];
       for (const [_, tc] of toolCallsInProgress) {
         if (tc.id && tc.function.name) {
@@ -283,12 +535,10 @@ export class OpenAIService {
       }
 
       if (roundToolCalls.length > 0) {
-        // More tool calls to execute
         hadAnyFunctionCalls = true;
         const toolNames = roundToolCalls.map(tc => (tc as any).function.name as string);
         allToolNames.push(...toolNames);
         
-        // Stream any intermediate text (e.g. "Ich erstelle die Leads...") immediately
         if (roundContent) {
           yield { chunk: roundContent, hadFunctionCalls: true, toolsUsed: allToolNames };
         } else {
@@ -296,35 +546,73 @@ export class OpenAIService {
         }
 
         const toolResults = await this.executeToolCalls(roundToolCalls, tenantId);
-
-        // Add this round's assistant message + tool results to conversation
-        currentMessages.push({
-          role: 'assistant',
-          content: roundContent || null,
-          tool_calls: roundToolCalls,
-        } as any);
+        currentMessages.push({ role: 'assistant', content: roundContent || null, tool_calls: roundToolCalls } as any);
         currentMessages.push(...toolResults);
-
-        // Continue loop for next round
       } else {
-        // No more tool calls — stream the final text content to client
         if (roundContent) {
           yield { chunk: roundContent, hadFunctionCalls: hadAnyFunctionCalls };
         }
-        break; // Done
+        break;
       }
+    }
+
+    if (totalStreamInputTokens > 0 || totalStreamOutputTokens > 0) {
+      AiCostService.logUsage({
+        provider: 'openai', model: MODEL, endpoint: 'chat-stream',
+        inputTokens: totalStreamInputTokens, outputTokens: totalStreamOutputTokens,
+        durationMs: Date.now() - streamStartTime, tenantId, userId,
+      }).catch(() => {});
     }
   }
 
-  // Exposé/Template-specific chat with full tool access
+  // Non-streaming chat (legacy, used rarely)
+  async chat(message: string, tenantId: string, history: any[] = [], userContext?: { name: string; email: string; role: string; pageContext?: string }) {
+    const startTime = Date.now();
+    const validHistory = history.filter(h => h.content != null && h.content !== '');
+    
+    const contextParts: string[] = [];
+    if (userContext) {
+      contextParts.push(`\n\n[Interner Kontext]`);
+      contextParts.push(`Benutzer: ${userContext.name} (${userContext.email}, ${userContext.role})`);
+      if (userContext.pageContext) contextParts.push(`Seite: ${userContext.pageContext}`);
+    }
+    const userContextStr = contextParts.length > 0 ? contextParts.join('\n') : '';
+
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      { role: 'system', content: getSystemPrompt() + userContextStr },
+      ...validHistory.map(h => ({
+        role: (h.role === 'assistant' || h.role === 'ASSISTANT' ? 'assistant' : 'user') as 'assistant' | 'user',
+        content: h.content || '',
+      })),
+      { role: 'user', content: message },
+    ];
+
+    const response = await this.client.chat.completions.create({ model: MODEL, messages, tools: convertToolsToOpenAI(CRM_TOOLS), tool_choice: 'auto' });
+
+    if (response.usage) {
+      AiCostService.logUsage({ provider: 'openai', model: MODEL, endpoint: 'chat', inputTokens: response.usage.prompt_tokens || 0, outputTokens: response.usage.completion_tokens || 0, durationMs: Date.now() - startTime, tenantId }).catch(() => {});
+    }
+
+    const responseMessage = response.choices[0].message;
+
+    if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+      const toolResults = await this.executeToolCalls(responseMessage.tool_calls, tenantId);
+      const followUpMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [...messages, responseMessage, ...toolResults];
+      const finalResponse = await this.client.chat.completions.create({ model: MODEL, messages: followUpMessages });
+      if (finalResponse.usage) {
+        AiCostService.logUsage({ provider: 'openai', model: MODEL, endpoint: 'chat', inputTokens: finalResponse.usage.prompt_tokens || 0, outputTokens: finalResponse.usage.completion_tokens || 0, durationMs: Date.now() - startTime, tenantId }).catch(() => {});
+      }
+      return finalResponse.choices[0].message.content || '';
+    }
+
+    return responseMessage.content || '';
+  }
+
+  // Expose chat (still uses Chat Completions — different assistant with different tools)
   async exposeChat(
-    message: string, 
-    tenantId: string, 
-    exposeId: string | null, 
-    templateId: string | null = null,
-    currentBlocks: any[] = [],
-    history: any[] = [],
-    pageContext?: string
+    message: string, tenantId: string, exposeId: string | null, 
+    templateId: string | null = null, currentBlocks: any[] = [],
+    history: any[] = [], pageContext?: string
   ): Promise<{ text: string; actionsPerformed: string[] }> {
     const isTemplate = !!templateId;
     const targetId = exposeId || templateId;
@@ -337,30 +625,18 @@ export class OpenAIService {
 
     const pageInfo = pageContext 
       ? `\n\nAKTUELLE SEITE: ${pageContext}`
-      : isTemplate 
-        ? '\n\nAKTUELLE SEITE: Exposé-Vorlagen-Editor'
-        : '\n\nAKTUELLE SEITE: Exposé-Editor';
+      : isTemplate ? '\n\nAKTUELLE SEITE: Exposé-Vorlagen-Editor' : '\n\nAKTUELLE SEITE: Exposé-Editor';
 
     const systemContext = isTemplate 
-      ? `Du arbeitest gerade an einer EXPOSÉ-VORLAGE (templateId=${targetId}).
-Dies ist eine wiederverwendbare Vorlage, keine echte Immobilie.
-Verwende Platzhalter wie {{property.title}}, {{property.price}}, {{property.area}} etc.
-${blocksDescription}${pageInfo}
-
-WICHTIG: Nutze IMMER templateId="${targetId}" bei allen Tool-Aufrufen, NICHT exposeId!`
-      : `Du arbeitest gerade an einem EXPOSÉ für eine echte Immobilie (exposeId=${targetId}).
-${blocksDescription}${pageInfo}
-
-WICHTIG: Nutze IMMER exposeId="${targetId}" bei allen Tool-Aufrufen!`;
+      ? `Du arbeitest gerade an einer EXPOSÉ-VORLAGE (templateId=${targetId}).\n${blocksDescription}${pageInfo}\n\nWICHTIG: Nutze IMMER templateId="${targetId}" bei allen Tool-Aufrufen, NICHT exposeId!`
+      : `Du arbeitest gerade an einem EXPOSÉ für eine echte Immobilie (exposeId=${targetId}).\n${blocksDescription}${pageInfo}\n\nWICHTIG: Nutze IMMER exposeId="${targetId}" bei allen Tool-Aufrufen!`;
 
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: 'system', content: EXPOSE_SYSTEM_PROMPT + '\n\n' + systemContext },
-      ...history
-        .filter(h => h.content && h.content.trim() && h.role !== 'SYSTEM')
-        .map(h => ({
-          role: (h.role === 'assistant' || h.role === 'ASSISTANT' ? 'assistant' : 'user') as 'assistant' | 'user',
-          content: h.content.trim(),
-        })),
+      ...history.filter(h => h.content && h.content.trim() && h.role !== 'SYSTEM').map(h => ({
+        role: (h.role === 'assistant' || h.role === 'ASSISTANT' ? 'assistant' : 'user') as 'assistant' | 'user',
+        content: h.content.trim(),
+      })),
       { role: 'user', content: message },
     ];
 
@@ -368,28 +644,20 @@ WICHTIG: Nutze IMMER exposeId="${targetId}" bei allen Tool-Aufrufen!`;
     const maxIterations = 5;
     const actionsPerformed: string[] = [];
     let currentMessages = [...messages];
+    const exposeStartTime = Date.now();
 
     while (iterations < maxIterations) {
-      const response = await this.client.chat.completions.create({
-        model: MODEL,
-        messages: currentMessages,
-        tools: convertToolsToOpenAI(ALL_TOOLS),
-        tool_choice: 'auto',
-      });
-
+      const response = await this.client.chat.completions.create({ model: MODEL, messages: currentMessages, tools: convertToolsToOpenAI(ALL_TOOLS), tool_choice: 'auto' });
+      if (response.usage) {
+        AiCostService.logUsage({ provider: 'openai', model: MODEL, endpoint: 'expose', inputTokens: response.usage.prompt_tokens || 0, outputTokens: response.usage.completion_tokens || 0, durationMs: Date.now() - exposeStartTime, tenantId }).catch(() => {});
+      }
       const responseMessage = response.choices[0].message;
-
       if (!responseMessage.tool_calls || responseMessage.tool_calls.length === 0) {
         return { text: responseMessage.content || '', actionsPerformed };
       }
-
-      // Track and execute tool calls
       for (const call of responseMessage.tool_calls) {
-        if (call.type === 'function') {
-          actionsPerformed.push(call.function.name);
-        }
+        if (call.type === 'function') actionsPerformed.push(call.function.name);
       }
-
       const toolResults = await this.executeToolCalls(responseMessage.tool_calls, tenantId);
       currentMessages = [...currentMessages, responseMessage, ...toolResults];
       iterations++;
@@ -398,59 +666,53 @@ WICHTIG: Nutze IMMER exposeId="${targetId}" bei allen Tool-Aufrufen!`;
     return { text: 'Maximale Iterationen erreicht.', actionsPerformed };
   }
 
-  // Generate text for a property
-  async generatePropertyText(propertyId: string, textType: string, tenantId: string, options: {
-    tone?: string;
-    maxLength?: number;
-  } = {}) {
-    const result = await AiToolExecutor.execute('generate_expose_text', {
-      propertyId,
-      textType,
-      tone: options.tone || 'professional',
-      maxLength: options.maxLength || 500
-    }, tenantId);
+  async generatePropertyText(propertyId: string, textType: string, tenantId: string, options: { tone?: string; maxLength?: number } = {}) {
+    return AiToolExecutor.execute('generate_expose_text', { propertyId, textType, tone: options.tone || 'professional', maxLength: options.maxLength || 500 }, tenantId);
+  }
 
-    return result;
+  // Reset user's thread (for "Neu starten" / new conversation)
+  async resetThread(userId: string): Promise<void> {
+    if (!prisma) return;
+    try {
+      const user = await prisma.user.findUnique({ where: { id: userId }, select: { assistantThreadId: true } });
+      if (user?.assistantThreadId) {
+        // Delete thread at OpenAI
+        try { await this.client.beta.threads.delete(user.assistantThreadId); } catch {}
+      }
+      // Clear from DB — new thread will be created on next message
+      await prisma.user.update({ where: { id: userId }, data: { assistantThreadId: null } });
+      console.log(`🗑️ Thread reset for user ${userId}`);
+    } catch (err) {
+      console.error('Thread reset error:', err);
+    }
   }
 
   private async executeToolCalls(
     toolCalls: OpenAI.Chat.ChatCompletionMessageToolCall[], 
     tenantId: string
   ): Promise<OpenAI.Chat.ChatCompletionToolMessageParam[]> {
-    // Execute all tool calls IN PARALLEL for speed (critical for API GW 29s limit)
     const functionCalls = toolCalls.filter(call => call.type === 'function');
     
     const resultPromises = functionCalls.map(async (call): Promise<OpenAI.Chat.ChatCompletionToolMessageParam> => {
       try {
-        console.log(`Executing tool ${call.function.name} for tenant ${tenantId}`);
+        console.log(`🔧 Tool: ${call.function.name} (tenant: ${tenantId})`);
         
-        // Tool rate limiting / guardrails
         const toolCheck = AiSafetyMiddleware.checkToolLimit(call.function.name, this.currentUserId || tenantId);
         if (!toolCheck.allowed) {
-          console.warn(`[AI Safety] Tool rate limit hit: ${call.function.name}`);
           return { role: 'tool', tool_call_id: call.id, content: JSON.stringify({ error: toolCheck.reason }) };
         }
 
         const args = JSON.parse(call.function.arguments);
         
-        // Pass uploaded files to upload tools and virtual staging
         if ((call.function.name === 'upload_images_to_property' || call.function.name === 'upload_documents_to_lead' || call.function.name === 'virtual_staging') && this.uploadedFiles.length > 0) {
           args._uploadedFiles = this.uploadedFiles;
         }
         
         const output = await AiToolExecutor.execute(call.function.name, args, tenantId, this.currentUserId);
-        return {
-          role: 'tool',
-          tool_call_id: call.id,
-          content: typeof output === 'string' ? output : JSON.stringify(output),
-        };
+        return { role: 'tool', tool_call_id: call.id, content: typeof output === 'string' ? output : JSON.stringify(output) };
       } catch (error: any) {
         console.error(`Tool ${call.function.name} error:`, error);
-        return {
-          role: 'tool',
-          tool_call_id: call.id,
-          content: JSON.stringify({ error: error.message }),
-        };
+        return { role: 'tool', tool_call_id: call.id, content: JSON.stringify({ error: error.message }) };
       }
     });
 

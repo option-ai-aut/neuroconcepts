@@ -10,27 +10,36 @@ import ConsoleCaptureInit from "@/components/ConsoleCaptureInit";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
 });
 
+// Expose-only fonts: preload=false to avoid blocking initial page load
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
+  preload: false, // Only used in ExposeEditor
 });
 
 const playfairDisplay = Playfair_Display({
   variable: "--font-playfair",
   subsets: ["latin"],
+  display: "swap",
+  preload: false, // Only used in ExposeEditor
 });
 
 const cormorantGaramond = Cormorant_Garamond({
   variable: "--font-cormorant",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
+  preload: false, // Only used in ExposeEditor
 });
 
 const SITE_URL = 'https://immivo.ai';

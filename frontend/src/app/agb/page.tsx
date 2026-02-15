@@ -204,7 +204,8 @@ export default function AGBPage() {
                 § 8 KI-Dienste und Haftung
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
-                Die Plattform umfasst KI-gestützte Dienste (insbesondere Jarvis und Bildbearbeitung).
+                Die Plattform umfasst KI-gestützte Dienste (insbesondere den KI-Assistenten Jarvis,
+                Bildbearbeitung/Virtual Staging und Exposé-Erstellung).
                 Diese Dienste dienen ausschließlich als <strong>unterstützende Hilfsmittel</strong> und
                 ersetzen nicht die eigenverantwortliche fachliche Beurteilung des Nutzers.
               </p>

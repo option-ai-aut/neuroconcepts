@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getAuthHeaders, getApiUrl } from '@/lib/api';
 import { useGlobalState } from '@/context/GlobalStateContext';
+import { useRealtimeEvents } from '@/components/RealtimeEventProvider';
 import { 
   Activity, 
   Filter, 
@@ -108,6 +109,7 @@ export default function ActivitiesPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   const { aiActionPerformed } = useGlobalState();
+  const { eventVersion } = useRealtimeEvents();
 
   const loadData = async () => {
     try {
@@ -156,6 +158,13 @@ export default function ActivitiesPage() {
       loadData();
     }
   }, [aiActionPerformed]);
+
+  // Re-fetch on SSE event (no polling needed)
+  useEffect(() => {
+    if (eventVersion > 0) {
+      loadData();
+    }
+  }, [eventVersion]);
 
   const handleRespondToAction = async (actionId: string, response: string) => {
     setRespondingTo(actionId);

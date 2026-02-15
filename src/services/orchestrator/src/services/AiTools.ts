@@ -19,6 +19,7 @@ type FunctionDeclarationSchema = {
 };
 import { randomUUID } from 'crypto';
 import { ConversationMemory } from './ConversationMemory';
+import { EmbeddingService } from './EmbeddingService';
 import { CalendarService } from './CalendarService';
 import { encryptionService } from './EncryptionService';
 import { google } from 'googleapis';
@@ -46,6 +47,21 @@ function getPrisma(): PrismaClient {
 }
 
 export const CRM_TOOLS = {
+  // === SEMANTIC SEARCH (RAG) ===
+  semantic_search: {
+    name: "semantic_search",
+    description: "Semantische Suche über Immobilien und Leads. Findet passende Einträge basierend auf Bedeutung, nicht nur exakten Texttreffer. Nutze dies wenn der User nach Immobilien mit bestimmten Eigenschaften sucht, passende Leads finden will, oder allgemein nach Daten sucht die zum Kontext passen.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        query: { type: SchemaType.STRING, description: "Suchanfrage in natürlicher Sprache, z.B. 'große Wohnung in Wien mit Balkon unter 500000' oder 'Lead der sich für Einfamilienhäuser interessiert'" } as FunctionDeclarationSchema,
+        entityType: { type: SchemaType.STRING, description: "Typ der Suche: 'property' für Immobilien, 'lead' für Leads, 'all' für beides. Default: 'all'", enum: ['property', 'lead', 'all'] } as FunctionDeclarationSchema,
+        limit: { type: SchemaType.NUMBER, description: "Maximale Anzahl Ergebnisse (1-20). Default: 5" } as FunctionDeclarationSchema,
+      },
+      required: ["query"]
+    }
+  },
+
   // === MEMORY & CONTEXT TOOLS ===
   search_chat_history: {
     name: "search_chat_history",
@@ -1115,6 +1131,50 @@ export class AiToolExecutor {
     console.log(`Executing tool ${toolName} for tenant ${tenantId} with args:`, args);
 
     switch (toolName) {
+      // === SEMANTIC SEARCH (RAG) ===
+      case 'semantic_search': {
+        const { query, entityType = 'all', limit = 5 } = args;
+        
+        const results = await EmbeddingService.semanticSearch(query, tenantId, {
+          entityType: entityType as 'property' | 'lead' | 'all',
+          limit: Math.min(limit, 20),
+          minScore: 0.25,
+        });
+
+        if (results.length === 0) {
+          return { message: `Keine semantisch passenden Ergebnisse für "${query}" gefunden.` };
+        }
+
+        // Enrich results with full entity data
+        const enriched = await Promise.all(results.map(async (r) => {
+          if (r.entityType === 'property') {
+            const prop = await prisma.property.findUnique({ 
+              where: { id: r.entityId },
+              select: { id: true, title: true, address: true, city: true, price: true, rooms: true, area: true, status: true, propertyType: true }
+            });
+            return { ...r, entity: prop };
+          } else if (r.entityType === 'lead') {
+            const lead = await prisma.lead.findUnique({ 
+              where: { id: r.entityId },
+              select: { id: true, firstName: true, lastName: true, email: true, phone: true, status: true, source: true, budgetMin: true, budgetMax: true }
+            });
+            return { ...r, entity: lead };
+          }
+          return r;
+        }));
+
+        return {
+          message: `${results.length} Ergebnisse gefunden (Relevanz ${(results[0].score * 100).toFixed(0)}%-${(results[results.length - 1].score * 100).toFixed(0)}%):`,
+          results: enriched.map(r => ({
+            type: r.entityType,
+            id: r.entityId,
+            score: `${(r.score * 100).toFixed(0)}%`,
+            entity: (r as any).entity || null,
+            summary: r.content.substring(0, 200),
+          }))
+        };
+      }
+
       // === MEMORY & CONTEXT TOOLS ===
       case 'search_chat_history': {
         if (!userId) return { error: 'Kein Benutzer-Kontext verfügbar.' };

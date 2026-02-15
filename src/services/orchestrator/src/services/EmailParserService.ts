@@ -11,6 +11,7 @@
  */
 
 import OpenAI from 'openai';
+import { AiCostService } from './AiCostService';
 
 // Lazy-init to avoid crash before secrets are loaded
 let _openai: OpenAI | null = null;
@@ -184,15 +185,26 @@ Inhalt:
 ${content || '(Kein Text-Inhalt)'}
 `.trim();
 
+    const emailParseStart = Date.now();
+    const emailModel = 'gpt-5-mini'; // Mini only for email reading/parsing
     const response = await getOpenAI().chat.completions.create({
-      model: 'gpt-4.1-mini',
+      model: emailModel,
       messages: [
         { role: 'system', content: CLASSIFY_AND_PARSE_PROMPT },
         { role: 'user', content: emailContent }
       ],
-      temperature: 0,
       response_format: { type: 'json_object' }
     });
+
+    // Log AI usage for email parsing
+    if (response.usage) {
+      AiCostService.logUsage({
+        provider: 'openai', model: emailModel, endpoint: 'email-parse',
+        inputTokens: response.usage.prompt_tokens || 0,
+        outputTokens: response.usage.completion_tokens || 0,
+        durationMs: Date.now() - emailParseStart,
+      }).catch(() => {});
+    }
 
     const result = JSON.parse(response.choices[0].message.content || '{}');
 

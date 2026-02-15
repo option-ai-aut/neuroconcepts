@@ -1,12 +1,13 @@
 import { PrismaClient, MessageRole } from '@prisma/client';
 import OpenAI from 'openai';
+import { AiCostService } from './AiCostService';
 
 // Prisma client will be injected from index.ts
 let prisma: PrismaClient;
 
-// Use OpenAI GPT-5-mini for all AI operations
+// Use OpenAI GPT-5 for all AI operations
 const getOpenAI = () => new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
-const MODEL = 'gpt-5-mini';
+const MODEL = 'gpt-5.2';
 
 export function setPrismaClient(client: PrismaClient) {
   prisma = client;
@@ -125,15 +126,25 @@ export class ConversationMemory {
         setTimeout(() => reject(new Error('Summary generation timed out')), 15000)
       );
       
+      const memoryStart = Date.now();
       const resultPromise = openai.chat.completions.create({
         model: MODEL,
         messages: [
           { role: 'system', content: 'Du bist ein Zusammenfassungs-Assistent für ein Immobilien-CRM. Sei präzise und kurz (max. 200 Wörter).' },
           { role: 'user', content: `Fasse diese Konversation zusammen. Fokussiere auf: Wichtige Informationen (Namen, Objekte, Präferenzen), offene Aufgaben, und Kontext für die Fortsetzung.\n\n${conversationText}` }
         ],
-        max_tokens: 500,
-        temperature: 0.3,
-      }).then(r => r.choices[0]?.message?.content || '');
+        max_completion_tokens: 500,
+      }).then(r => {
+        if (r.usage) {
+          AiCostService.logUsage({
+            provider: 'openai', model: MODEL, endpoint: 'memory',
+            inputTokens: r.usage.prompt_tokens || 0,
+            outputTokens: r.usage.completion_tokens || 0,
+            durationMs: Date.now() - memoryStart,
+          }).catch(() => {});
+        }
+        return r.choices[0]?.message?.content || '';
+      });
       
       return await Promise.race([resultPromise, timeoutPromise]);
     } catch (error) {
@@ -395,15 +406,25 @@ export class ConversationMemory {
         setTimeout(() => reject(new Error('Long-term memory update timed out')), 20000)
       );
       
+      const memoryUpdateStart = Date.now();
       const resultPromise = openai.chat.completions.create({
         model: MODEL,
         messages: [
           { role: 'system', content: 'Du bist ein Gedächtnis-Assistent für ein Immobilien-CRM. Aktualisiere die Langzeit-Zusammenfassung basierend auf neuen Gesprächen.' },
           { role: 'user', content: userContent }
         ],
-        max_tokens: 700,
-        temperature: 0.3,
-      }).then(r => r.choices[0]?.message?.content || '');
+        max_completion_tokens: 700,
+      }).then(r => {
+        if (r.usage) {
+          AiCostService.logUsage({
+            provider: 'openai', model: MODEL, endpoint: 'memory',
+            inputTokens: r.usage.prompt_tokens || 0,
+            outputTokens: r.usage.completion_tokens || 0,
+            durationMs: Date.now() - memoryUpdateStart,
+          }).catch(() => {});
+        }
+        return r.choices[0]?.message?.content || '';
+      });
       
       newSummary = await Promise.race([resultPromise, timeoutPromise]);
     } catch (error) {

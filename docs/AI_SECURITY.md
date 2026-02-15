@@ -2,7 +2,7 @@
 
 ## Übersicht
 
-Dieses Dokument beschreibt die Sicherheitsmaßnahmen für Jarvis (unseren KI-Assistenten, basierend auf OpenAI GPT-5-mini) und die Bildbearbeitung (Google Gemini) in der Immivo-Plattform.
+Dieses Dokument beschreibt die Sicherheitsmaßnahmen für Jarvis (unseren KI-Assistenten, basierend auf OpenAI GPT-5.2 für Hauptantworten; gpt-5-mini für E-Mail-Parsing, Intent-Routing und Smalltalk) und die Bildbearbeitung (Google Gemini) in der Immivo-Plattform.
 
 ## Sicherheitsebenen
 
@@ -151,10 +151,84 @@ function sanitizeResponse(text: string): string {
 }
 ```
 
+### 7. Multi-Agent Router Safety
+
+**Problem:** Prompt injection could attempt to bypass intent classification and gain unauthorized access to sensitive tools.
+
+**Solution:**
+- ✅ Router uses `gpt-5-mini` for intent classification
+- ✅ Tool access is filtered per-category
+- ✅ A smalltalk message never touches CRM tools
+- ✅ Reduced attack surface for prompt injection
+
+**Implementation:**
+The AgentRouter classifies each message before routing. Messages classified as smalltalk, general questions, or non-CRM intents are never passed to CRM, property, or lead-management tools.
+
+### 8. Security Headers
+
+**Problem:** API responses without proper security headers are vulnerable to XSS, clickjacking, and MIME-sniffing attacks.
+
+**Solution:**
+Standard security headers are added to all API responses:
+
+| Header | Value | Purpose |
+|--------|-------|---------|
+| `X-Content-Type-Options` | `nosniff` | Prevents MIME-type sniffing |
+| `X-Frame-Options` | `DENY` | Prevents clickjacking |
+| `X-XSS-Protection` | `1; mode=block` | Legacy XSS filter (Chrome) |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | Enforces HTTPS |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Controls referrer information |
+| `X-Powered-By` | _(removed)_ | Prevents fingerprinting |
+
+### 9. Connection Pooling
+
+**Problem:** Lambda cold starts and concurrent invocations can exhaust database connections without proper pooling.
+
+**Solution:**
+- ✅ Optimized for Lambda with small connection pools
+- ✅ 3 connections for Lambda environments
+- ✅ 10 connections for local development
+- ✅ Short timeouts to prevent connection exhaustion
+
+**Implementation:**
+```typescript
+// Connection pool configuration
+const poolConfig = {
+  max: process.env.AWS_LAMBDA_FUNCTION_NAME ? 3 : 10,
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: 5000,
+};
+```
+
+### 10. Structured Logging
+
+**Problem:** Without request tracking, debugging and security forensics are difficult.
+
+**Solution:**
+- ✅ All requests tracked with unique request IDs
+- ✅ Duration logged for each request
+- ✅ Slow requests (>3s) logged as warnings with full context
+- ✅ Enables CloudWatch alerting on performance degradation
+
+**Implementation:**
+```
+[REQUEST] id=req-abc123 | duration=125ms | status=200
+[WARNING] id=req-def456 | duration=3200ms | status=200 | SLOW REQUEST
+```
+
+### 11. CORS
+
+**Problem:** Wildcard CORS allows any origin to make cross-origin requests, increasing risk of CSRF and unauthorized API access.
+
+**Solution:**
+- ✅ Hardened with explicit origin whitelist
+- ✅ No wildcard origins allowed
+- ✅ Only permitted frontend domains can make API requests
+
 ## AI Provider Safety Settings
 
 ### OpenAI (Chat & Tools)
-OpenAI GPT-5-mini wird für Jarvis-Chat und Tool-Aufrufe verwendet. OpenAI hat eingebaute Content-Moderation.
+OpenAI GPT-5.2 wird für Jarvis-Hauptchat und Tool-Aufrufe verwendet; gpt-5-mini für E-Mail-Parsing, AgentRouter (Intent) und Smalltalk. OpenAI hat eingebaute Content-Moderation. **Pricing:** gpt-5.2 $1.75/$14 per 1M tokens (input/output), gpt-5-mini $0.25/$2.
 
 ### Google Gemini (Bildbearbeitung)
 Google Gemini wird für Virtual Staging im KI-Bildstudio verwendet. Gemini hat eingebaute Safety-Filter:

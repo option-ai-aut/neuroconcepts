@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-cost-explorer": "^3.990.0",
     "@aws-sdk/client-scheduler": "^3.983.0",
     "@aws-sdk/client-ses": "^3.983.0",
     "@azure/msal-node": "^5.0.3",
@@ -37,7 +38,8 @@
     "puppeteer": "^24.36.1",
     "qrcode": "^1.5.4",
     "resend": "^6.9.2",
-    "serverless-http": "^3.2.0"
+    "serverless-http": "^3.2.0",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.133",
@@ -48,6 +50,7 @@
     "@types/node": "^20.11.19",
     "@types/pg": "^8.11.0",
     "@types/qrcode": "^1.5.6",
+    "@types/sharp": "^0.31.1",
     "nodemon": "^3.0.3",
     "prisma": "^5.10.2",
     "ts-node": "^10.9.2",

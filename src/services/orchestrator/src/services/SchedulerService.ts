@@ -203,6 +203,36 @@ export async function cancelAutoReply(leadId: string) {
   return deleteSchedule(`auto-reply-${leadId}`);
 }
 
+/**
+ * Schedule follow-up reminder for a lead
+ */
+export async function scheduleFollowUp(params: {
+  leadId: string;
+  tenantId: string;
+  assignedUserId: string;
+  step: number;
+  scheduleAt: Date;
+}) {
+  const { leadId, tenantId, step, scheduleAt } = params;
+
+  return createSchedule({
+    name: `follow-up-${leadId}-step${step}`,
+    scheduleAt,
+    endpoint: '/internal/scheduler/follow-up',
+    payload: { leadId, tenantId, step },
+    description: `Follow-up step ${step} for lead ${leadId}`
+  });
+}
+
+/**
+ * Cancel follow-up sequence for a lead
+ */
+export async function cancelFollowUps(leadId: string) {
+  await deleteSchedule(`follow-up-${leadId}-step0`);
+  await deleteSchedule(`follow-up-${leadId}-step1`);
+  await deleteSchedule(`follow-up-${leadId}-step2`);
+}
+
 export default {
   createSchedule,
   deleteSchedule,
@@ -211,5 +241,7 @@ export default {
   scheduleReminder,
   scheduleEscalation,
   cancelActionSchedules,
-  cancelAutoReply
+  cancelAutoReply,
+  scheduleFollowUp,
+  cancelFollowUps,
 };

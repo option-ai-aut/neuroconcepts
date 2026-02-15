@@ -11,7 +11,17 @@ import morgan from 'morgan';
 import serverless from 'serverless-http';
 import { PrismaClient, Prisma, ActivityType, PortalConnectionType } from '@prisma/client';
 import { TemplateService, setPrismaClient as setTemplatePrisma } from './services/TemplateService';
-import { OpenAIService } from './services/OpenAIService';
+import { OpenAIService, setOpenAIServicePrisma } from './services/OpenAIService';
+import { EmbeddingService, setEmbeddingPrisma } from './services/EmbeddingService';
+import { LeadScoringService, setLeadScoringPrisma } from './services/LeadScoringService';
+import { FollowUpService, setFollowUpPrisma } from './services/FollowUpService';
+import { AutoClickService } from './services/AutoClickService';
+import { LeadEnrichmentService, setLeadEnrichmentPrisma } from './services/LeadEnrichmentService';
+import { SentimentService } from './services/SentimentService';
+import { CacheService } from './services/CacheService';
+import { QueueService } from './services/QueueService';
+import { PredictiveService, setPredictivePrisma } from './services/PredictiveService';
+import { ABTestService } from './services/ABTestService';
 import { PdfService } from './services/PdfService';
 import { encryptionService } from './services/EncryptionService';
 import { ConversationMemory, setPrismaClient as setConversationPrisma } from './services/ConversationMemory';
@@ -24,15 +34,86 @@ import { setPropertyMatchingPrisma } from './services/PropertyMatchingService';
 import { setNotificationPrisma } from './services/NotificationService';
 import { authMiddleware, adminAuthMiddleware } from './middleware/auth';
 import { AiSafetyMiddleware, wrapAiResponse } from './middleware/aiSafety';
+import { AiCostService } from './services/AiCostService';
 import * as AWS from 'aws-sdk';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import sharp from 'sharp';
 
 const app = express();
 
+// ═══════════════════════════════════════════════════════════
+// Structured Logging + Request Tracking
+// ═══════════════════════════════════════════════════════════
+const IS_LAMBDA = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+function structuredLog(level: 'info' | 'warn' | 'error', message: string, meta?: Record<string, any>) {
+  if (IS_LAMBDA) {
+    // CloudWatch structured JSON logs
+    const logEntry = {
+      level,
+      message,
+      timestamp: new Date().toISOString(),
+      service: 'immivo-orchestrator',
+      ...meta,
+    };
+    if (level === 'error') console.error(JSON.stringify(logEntry));
+    else if (level === 'warn') console.warn(JSON.stringify(logEntry));
+    else console.log(JSON.stringify(logEntry));
+  } else {
+    // Local dev: human-readable
+    const prefix = level === 'error' ? '❌' : level === 'warn' ? '⚠️' : '📋';
+    console.log(`${prefix} ${message}`, meta ? JSON.stringify(meta) : '');
+  }
+}
+
+// Request duration tracking middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  const requestId = req.headers['x-request-id'] as string || Math.random().toString(36).substring(7);
+  (req as any).requestId = requestId;
+
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    // Log slow requests (>3s)
+    if (duration > 3000) {
+      structuredLog('warn', 'Slow request', {
+        method: req.method,
+        path: req.path,
+        statusCode: res.statusCode,
+        durationMs: duration,
+        requestId,
+      });
+    }
+  });
+
+  next();
+});
+
 // Initialize Prisma - will be set up after getting DB credentials
 let prisma: PrismaClient;
+
+// Prisma Connection Pool settings (optimized for Lambda)
+const PRISMA_OPTIONS = {
+  log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] as const : ['error'] as const,
+  // Connection pool is managed via DATABASE_URL params:
+  // ?connection_limit=5&pool_timeout=10
+  // For Lambda: small pool (5), short timeout (10s), quick connect (5s)
+};
+
+function createOptimizedPrismaClient(): PrismaClient {
+  // Append connection pool params to DATABASE_URL if not present
+  const url = process.env.DATABASE_URL || '';
+  if (url && !url.includes('connection_limit')) {
+    const separator = url.includes('?') ? '&' : '?';
+    const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+    const poolSize = isLambda ? 3 : 10; // Small pool for Lambda, larger for local
+    const timeout = isLambda ? 10 : 30;
+    process.env.DATABASE_URL = `${url}${separator}connection_limit=${poolSize}&pool_timeout=${timeout}&connect_timeout=5`;
+  }
+  return new PrismaClient(PRISMA_OPTIONS as any);
+}
 
 // Cache for app secrets
 let appSecretsLoaded = false;
@@ -97,6 +178,13 @@ function injectPrismaIntoServices(client: PrismaClient) {
   setEmailSyncPrisma(client);
   setPropertyMatchingPrisma(client);
   setNotificationPrisma(client);
+  AiCostService.setPrisma(client);
+  setOpenAIServicePrisma(client);
+  setEmbeddingPrisma(client);
+  setLeadScoringPrisma(client);
+  setFollowUpPrisma(client);
+  setLeadEnrichmentPrisma(client);
+  setPredictivePrisma(client);
 }
 
 // Function to initialize Prisma with DATABASE_URL from AWS Secrets Manager
@@ -108,7 +196,7 @@ async function initializePrisma() {
   
   // If DATABASE_URL is already set (from app secrets or local dev), use it
   if (process.env.DATABASE_URL) {
-    prisma = new PrismaClient();
+    prisma = createOptimizedPrismaClient();
     injectPrismaIntoServices(prisma);
   }
   
@@ -121,7 +209,7 @@ async function initializePrisma() {
         const credentials = JSON.parse(secret.SecretString);
         const dbUrl = `postgresql://${credentials.username}:${credentials.password}@${credentials.host}:${credentials.port}/postgres?schema=public`;
         process.env.DATABASE_URL = dbUrl;
-        prisma = new PrismaClient();
+        prisma = createOptimizedPrismaClient();
         injectPrismaIntoServices(prisma);
       }
     } catch (error) {
@@ -131,7 +219,7 @@ async function initializePrisma() {
   }
   
   if (!prisma) {
-    prisma = new PrismaClient();
+    prisma = createOptimizedPrismaClient();
     injectPrismaIntoServices(prisma);
   }
   
@@ -146,7 +234,30 @@ async function initializePrisma() {
 
 // Auto-migration: Apply missing columns/tables that exist in Prisma schema but not in DB
 // Each statement uses IF NOT EXISTS / IF EXISTS so it's safe to run multiple times
+// Version-gated: Only runs full migration set when version changes
+const MIGRATION_VERSION = 9; // Increment when adding new migrations
+let _migrationsApplied = false;
+
 async function applyPendingMigrations(db: PrismaClient) {
+  if (_migrationsApplied) return;
+
+  try {
+    // Check if we already ran this version (fast single-query check)
+    await db.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "_MigrationMeta" ("key" TEXT PRIMARY KEY, "value" TEXT NOT NULL, "updatedAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP)`);
+    const result: any[] = await db.$queryRawUnsafe(`SELECT "value" FROM "_MigrationMeta" WHERE "key" = 'schema_version'`);
+    const currentVersion = result.length > 0 ? parseInt(result[0].value, 10) : 0;
+
+    if (currentVersion >= MIGRATION_VERSION) {
+      _migrationsApplied = true;
+      console.log(`✅ Migrations up to date (v${MIGRATION_VERSION})`);
+      return;
+    }
+
+    console.log(`🔧 Running migrations v${currentVersion} → v${MIGRATION_VERSION}...`);
+  } catch {
+    // If _MigrationMeta doesn't exist or fails, run all migrations
+  }
+
   const migrations = [
     // 2026-02-13: Add missing columns
     'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lastSeenAt" TIMESTAMP(3)',
@@ -164,6 +275,103 @@ async function applyPendingMigrations(db: PrismaClient) {
     'ALTER TABLE "ChannelMessage" ADD COLUMN IF NOT EXISTS "isJarvis" BOOLEAN NOT NULL DEFAULT false',
     'ALTER TABLE "ChannelMessage" ADD COLUMN IF NOT EXISTS "mentions" JSONB',
     'ALTER TABLE "ChannelMessage" ADD COLUMN IF NOT EXISTS "editedAt" TIMESTAMP(3)',
+    // 2026-02-12: AI Usage & Cost Tracking
+    `CREATE TABLE IF NOT EXISTS "AiUsageLog" (
+      "id" TEXT NOT NULL DEFAULT gen_random_uuid(),
+      "tenantId" TEXT,
+      "userId" TEXT,
+      "provider" TEXT NOT NULL,
+      "model" TEXT NOT NULL,
+      "endpoint" TEXT NOT NULL,
+      "inputTokens" INTEGER NOT NULL DEFAULT 0,
+      "outputTokens" INTEGER NOT NULL DEFAULT 0,
+      "totalTokens" INTEGER NOT NULL DEFAULT 0,
+      "costCentsUsd" DOUBLE PRECISION NOT NULL DEFAULT 0,
+      "durationMs" INTEGER NOT NULL DEFAULT 0,
+      "metadata" JSONB,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "AiUsageLog_pkey" PRIMARY KEY ("id")
+    )`,
+    'CREATE INDEX IF NOT EXISTS "AiUsageLog_tenantId_createdAt_idx" ON "AiUsageLog"("tenantId", "createdAt")',
+    'CREATE INDEX IF NOT EXISTS "AiUsageLog_provider_createdAt_idx" ON "AiUsageLog"("provider", "createdAt")',
+    'CREATE INDEX IF NOT EXISTS "AiUsageLog_createdAt_idx" ON "AiUsageLog"("createdAt")',
+    'CREATE INDEX IF NOT EXISTS "AiUsageLog_model_createdAt_idx" ON "AiUsageLog"("model", "createdAt")',
+    // 2026-02-12: Realtime Event System
+    `CREATE TABLE IF NOT EXISTS "RealtimeEvent" (
+      "id" TEXT NOT NULL DEFAULT gen_random_uuid(),
+      "tenantId" TEXT NOT NULL,
+      "userId" TEXT,
+      "type" TEXT NOT NULL,
+      "data" JSONB NOT NULL DEFAULT '{}',
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "RealtimeEvent_pkey" PRIMARY KEY ("id")
+    )`,
+    'CREATE INDEX IF NOT EXISTS "RealtimeEvent_tenantId_createdAt_idx" ON "RealtimeEvent"("tenantId", "createdAt")',
+    'CREATE INDEX IF NOT EXISTS "RealtimeEvent_tenantId_userId_createdAt_idx" ON "RealtimeEvent"("tenantId", "userId", "createdAt")',
+    // 2026-02-15: Performance composite indexes (Phase 1 Roadmap)
+    'CREATE INDEX IF NOT EXISTS "Lead_tenantId_status_idx" ON "Lead"("tenantId", "status")',
+    'CREATE INDEX IF NOT EXISTS "Lead_tenantId_createdAt_idx" ON "Lead"("tenantId", "createdAt")',
+    'CREATE INDEX IF NOT EXISTS "Lead_tenantId_assignedToId_idx" ON "Lead"("tenantId", "assignedToId")',
+    'CREATE INDEX IF NOT EXISTS "Lead_assignedToId_idx" ON "Lead"("assignedToId")',
+    'CREATE INDEX IF NOT EXISTS "Lead_propertyId_idx" ON "Lead"("propertyId")',
+    'CREATE INDEX IF NOT EXISTS "Property_tenantId_status_idx" ON "Property"("tenantId", "status")',
+    'CREATE INDEX IF NOT EXISTS "Property_tenantId_createdAt_idx" ON "Property"("tenantId", "createdAt")',
+    'CREATE INDEX IF NOT EXISTS "Property_tenantId_propertyType_idx" ON "Property"("tenantId", "propertyType")',
+    'CREATE INDEX IF NOT EXISTS "Property_tenantId_marketingType_idx" ON "Property"("tenantId", "marketingType")',
+    'CREATE INDEX IF NOT EXISTS "User_tenantId_idx" ON "User"("tenantId")',
+    'CREATE INDEX IF NOT EXISTS "User_email_idx" ON "User"("email")',
+    // 2026-02-15: OpenAI Assistants API - persistent thread per user
+    'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "assistantThreadId" TEXT',
+    // 2026-02-15: pgvector RAG - semantic search for properties/leads
+    'CREATE EXTENSION IF NOT EXISTS vector',
+    `CREATE TABLE IF NOT EXISTS "Embedding" (
+      "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      "tenantId" TEXT NOT NULL,
+      "entityType" TEXT NOT NULL,
+      "entityId" TEXT NOT NULL,
+      "content" TEXT NOT NULL,
+      "embedding" vector(1536),
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE("entityType", "entityId")
+    )`,
+    'CREATE INDEX IF NOT EXISTS "Embedding_tenantId_entityType_idx" ON "Embedding"("tenantId", "entityType")',
+    'CREATE INDEX IF NOT EXISTS "Embedding_entityId_idx" ON "Embedding"("entityId")',
+    // 2026-02-15: Lead Scoring
+    'ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "score" INTEGER',
+    'ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "scoreFactors" JSONB',
+    // 2026-02-15: Full-Text Search with tsvector
+    `ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "searchVector" tsvector`,
+    `CREATE INDEX IF NOT EXISTS "Property_search_idx" ON "Property" USING GIN("searchVector")`,
+    `ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "searchVector" tsvector`,
+    `CREATE INDEX IF NOT EXISTS "Lead_search_idx" ON "Lead" USING GIN("searchVector")`,
+    // Trigger to auto-update tsvector on Property changes
+    `CREATE OR REPLACE FUNCTION property_search_update() RETURNS trigger AS $$
+     BEGIN
+       NEW."searchVector" := 
+         setweight(to_tsvector('german', coalesce(NEW.title, '')), 'A') ||
+         setweight(to_tsvector('german', coalesce(NEW.address, '')), 'B') ||
+         setweight(to_tsvector('german', coalesce(NEW.city, '')), 'B') ||
+         setweight(to_tsvector('german', coalesce(NEW.description, '')), 'C') ||
+         setweight(to_tsvector('german', coalesce(NEW."zipCode", '')), 'B');
+       RETURN NEW;
+     END $$ LANGUAGE plpgsql`,
+    `DROP TRIGGER IF EXISTS property_search_trigger ON "Property"`,
+    `CREATE TRIGGER property_search_trigger BEFORE INSERT OR UPDATE ON "Property"
+     FOR EACH ROW EXECUTE FUNCTION property_search_update()`,
+    // Trigger to auto-update tsvector on Lead changes
+    `CREATE OR REPLACE FUNCTION lead_search_update() RETURNS trigger AS $$
+     BEGIN
+       NEW."searchVector" := 
+         setweight(to_tsvector('german', coalesce(NEW."firstName", '') || ' ' || coalesce(NEW."lastName", '')), 'A') ||
+         setweight(to_tsvector('german', coalesce(NEW.email, '')), 'A') ||
+         setweight(to_tsvector('german', coalesce(NEW.phone, '')), 'B') ||
+         setweight(to_tsvector('german', coalesce(NEW.notes, '')), 'C');
+       RETURN NEW;
+     END $$ LANGUAGE plpgsql`,
+    `DROP TRIGGER IF EXISTS lead_search_trigger ON "Lead"`,
+    `CREATE TRIGGER lead_search_trigger BEFORE INSERT OR UPDATE ON "Lead"
+     FOR EACH ROW EXECUTE FUNCTION lead_search_update()`,
   ];
   
   for (const sql of migrations) {
@@ -172,18 +380,44 @@ async function applyPendingMigrations(db: PrismaClient) {
     } catch (err: any) {
       // Ignore "already exists" errors, log others
       if (!err.message?.includes('already exists')) {
-        console.warn('Migration warning:', sql, err.message);
+        console.warn('Migration warning:', err.message);
       }
     }
   }
-  console.log(`✅ Auto-migrations checked (${migrations.length} statements)`);
+
+  // Update version flag
+  try {
+    await db.$executeRawUnsafe(
+      `INSERT INTO "_MigrationMeta" ("key", "value", "updatedAt") VALUES ('schema_version', '${MIGRATION_VERSION}', CURRENT_TIMESTAMP) ON CONFLICT ("key") DO UPDATE SET "value" = '${MIGRATION_VERSION}', "updatedAt" = CURRENT_TIMESTAMP`
+    );
+  } catch {}
+
+  _migrationsApplied = true;
+  console.log(`✅ Migrations applied (v${MIGRATION_VERSION}, ${migrations.length} statements)`);
 }
 
 // Initialize Prisma on startup for local dev
 if (!process.env.AWS_LAMBDA_FUNCTION_NAME && process.env.DATABASE_URL) {
-  prisma = new PrismaClient();
+  prisma = createOptimizedPrismaClient();
   injectPrismaIntoServices(prisma);
 }
+
+// ── Register Queue Handlers ──
+QueueService.registerHandler('auto-click', async (payload: { leadId: string; tenantId: string; url: string; portal?: string }) => {
+  const result = await AutoClickService.clickAndExtract(payload.url, payload.portal);
+  if (result.success && result.extractedData && prisma) {
+    const updateData: Record<string, any> = {};
+    if (result.extractedData.email) updateData.email = result.extractedData.email;
+    if (result.extractedData.firstName) updateData.firstName = result.extractedData.firstName;
+    if (result.extractedData.lastName) updateData.lastName = result.extractedData.lastName;
+    if (result.extractedData.phone) updateData.phone = result.extractedData.phone;
+    if (result.extractedData.message) updateData.notes = result.extractedData.message;
+    if (Object.keys(updateData).length > 0) {
+      await prisma.lead.update({ where: { id: payload.leadId }, data: updateData });
+      console.log(`🔗 AutoClick: Updated lead ${payload.leadId} with extracted data`);
+    }
+  }
+});
 
 const cognito = new AWS.CognitoIdentityServiceProvider({
   region: process.env.AWS_REGION || 'eu-central-1'
@@ -349,11 +583,25 @@ app.use(cors({
 }));
 
 app.use(morgan('combined'));
+
+// Security Headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // Remove server header
+  res.removeHeader('X-Powered-By');
+  next();
+});
+
 app.use(express.json({ limit: '20mb' }));
 
 // Multer setup for file uploads (memory storage for S3 upload)
 const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 const MEDIA_BUCKET = process.env.MEDIA_BUCKET_NAME || '';
+const MEDIA_CDN_URL = process.env.MEDIA_CDN_URL || ''; // CloudFront CDN URL for media (e.g. https://media.immivo.ai)
 
 // Use memory storage — files go to S3, not disk
 const upload = multer({ 
@@ -383,6 +631,62 @@ function isS3Url(url: string): boolean {
   return /\.s3(?:\.[a-z0-9-]+)?\.amazonaws\.com\//.test(url);
 }
 
+// Image optimization: Resize, compress, convert to WebP where possible
+const MAX_IMAGE_DIMENSION = 1920; // Max width/height
+const JPEG_QUALITY = 82;
+const WEBP_QUALITY = 80;
+const THUMBNAIL_SIZE = 400;
+
+async function optimizeImage(buffer: Buffer, contentType: string): Promise<{ buffer: Buffer; contentType: string; extension: string }> {
+  try {
+    const image = sharp(buffer);
+    const metadata = await image.metadata();
+
+    // Skip if not a processable image format
+    if (!metadata.format || !['jpeg', 'png', 'webp', 'tiff', 'avif'].includes(metadata.format)) {
+      return { buffer, contentType, extension: metadata.format || 'bin' };
+    }
+
+    // Determine if image needs resize
+    const needsResize = (metadata.width && metadata.width > MAX_IMAGE_DIMENSION) || 
+                        (metadata.height && metadata.height > MAX_IMAGE_DIMENSION);
+
+    let pipeline = image.rotate(); // Auto-rotate based on EXIF
+
+    if (needsResize) {
+      pipeline = pipeline.resize(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, { fit: 'inside', withoutEnlargement: true });
+    }
+
+    // Convert to WebP for best compression (except PNGs with transparency)
+    const hasAlpha = metadata.hasAlpha && metadata.format === 'png';
+    
+    if (hasAlpha) {
+      // Keep PNG for transparency but optimize
+      const optimized = await pipeline.png({ quality: 85, compressionLevel: 8 }).toBuffer();
+      return { buffer: optimized, contentType: 'image/png', extension: 'png' };
+    } else {
+      // Convert to WebP for everything else
+      const optimized = await pipeline.webp({ quality: WEBP_QUALITY }).toBuffer();
+      return { buffer: optimized, contentType: 'image/webp', extension: 'webp' };
+    }
+  } catch (err) {
+    // If sharp fails (e.g. SVG, GIF), return original
+    console.warn('Image optimization skipped:', (err as Error).message);
+    return { buffer, contentType, extension: contentType.split('/')[1] || 'bin' };
+  }
+}
+
+async function generateThumbnail(buffer: Buffer): Promise<Buffer | null> {
+  try {
+    return await sharp(buffer)
+      .resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE, { fit: 'cover' })
+      .webp({ quality: 70 })
+      .toBuffer();
+  } catch {
+    return null;
+  }
+}
+
 // S3 helper: upload buffer to S3 and return public URL
 async function uploadToS3(buffer: Buffer, filename: string, contentType: string, folder: string): Promise<string> {
   const key = `${folder}/${filename}`;
@@ -395,7 +699,10 @@ async function uploadToS3(buffer: Buffer, filename: string, contentType: string,
       ContentType: contentType,
     }).promise();
     
-    // Return public S3 URL (with region for non-us-east-1 buckets)
+    // Return CDN URL if available, otherwise S3 URL
+    if (MEDIA_CDN_URL) {
+      return `${MEDIA_CDN_URL}/${key}`;
+    }
     const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'eu-central-1';
     return `https://${MEDIA_BUCKET}.s3.${region}.amazonaws.com/${key}`;
   }
@@ -421,19 +728,25 @@ async function uploadToS3(buffer: Buffer, filename: string, contentType: string,
  */
 function normalizeFileUrl(url: string, tenantId: string, propertyId: string, type: 'images' | 'floorplans' = 'images'): string {
   if (!url) return '';
-  // Already a full URL — return as-is
-  if (url.startsWith('http')) return url;
-  // Legacy /uploads/ path — convert to S3 URL
-  if (url.startsWith('/uploads/') && MEDIA_BUCKET) {
-    const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'eu-central-1';
+  // Already a full URL — rewrite S3 URLs to CDN if available
+  if (url.startsWith('http')) {
+    if (MEDIA_CDN_URL && url.includes('.s3.') && url.includes('amazonaws.com')) {
+      const s3Key = extractS3Key(url);
+      if (s3Key) return `${MEDIA_CDN_URL}/${s3Key}`;
+    }
+    return url;
+  }
+  // Legacy /uploads/ path — convert to CDN or S3 URL
+  if (url.startsWith('/uploads/') && (MEDIA_CDN_URL || MEDIA_BUCKET)) {
+    const baseUrl = MEDIA_CDN_URL || `https://${MEDIA_BUCKET}.s3.${process.env.AWS_REGION || 'eu-central-1'}.amazonaws.com`;
     const stripped = url.replace(/^\/uploads\//, '');
     // If path already contains the full folder structure, use it directly
     if (stripped.startsWith('properties/')) {
-      return `https://${MEDIA_BUCKET}.s3.${region}.amazonaws.com/${stripped}`;
+      return `${baseUrl}/${stripped}`;
     }
     // Otherwise, reconstruct the S3 key from just the filename
     const filename = stripped.split('/').pop() || stripped;
-    return `https://${MEDIA_BUCKET}.s3.${region}.amazonaws.com/properties/${tenantId}/${propertyId}/${type}/${filename}`;
+    return `${baseUrl}/properties/${tenantId}/${propertyId}/${type}/${filename}`;
   }
   return url;
 }
@@ -447,19 +760,20 @@ if (!isLambda) {
   }
   app.use('/uploads', express.static(localUploadDir));
 } else {
-  // Lambda: redirect /uploads/* to S3 (handles legacy /uploads/ URLs still in DB)
+  // Lambda: redirect /uploads/* to CDN or S3 (handles legacy /uploads/ URLs still in DB)
   app.get('/uploads/*', async (req, res) => {
     const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'eu-central-1';
     const rawPath = req.path.replace(/^\/uploads\//, '');
+    const baseUrl = MEDIA_CDN_URL || (MEDIA_BUCKET ? `https://${MEDIA_BUCKET}.s3.${region}.amazonaws.com` : '');
 
-    if (!MEDIA_BUCKET) {
+    if (!baseUrl) {
       return res.status(404).json({ error: 'Storage not configured' });
     }
 
     // Try direct key first (e.g. /uploads/properties/tenant/prop/images/file.jpg)
     try {
       await s3Client.headObject({ Bucket: MEDIA_BUCKET, Key: rawPath }).promise();
-      return res.redirect(301, `https://${MEDIA_BUCKET}.s3.${region}.amazonaws.com/${rawPath}`);
+      return res.redirect(301, `${baseUrl}/${rawPath}`);
     } catch { /* not found at this key, try filename search */ }
 
     // Try searching by filename across common prefixes
@@ -471,7 +785,7 @@ if (!isLambda) {
       }).promise();
       const match = result.Contents?.find(obj => obj.Key?.endsWith(`/${filename}`));
       if (match?.Key) {
-        return res.redirect(301, `https://${MEDIA_BUCKET}.s3.${region}.amazonaws.com/${match.Key}`);
+        return res.redirect(301, `${baseUrl}/${match.Key}`);
       }
     } catch { /* search failed */ }
 
@@ -670,75 +984,58 @@ app.get('/dashboard/stats', authMiddleware, async (req, res) => {
     startOfWeek.setHours(0, 0, 0, 0);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // Get all leads for this tenant
-    const leads = await prisma.lead.findMany({
-      where: { tenantId },
-      include: { property: true },
-      orderBy: { createdAt: 'desc' }
-    });
+    // All queries in parallel — no more sequential fetching
+    const [
+      totalLeads,
+      newLeadsToday,
+      newLeadsThisWeek,
+      newLeadsThisMonth,
+      leadStatusCounts,
+      totalProperties,
+      propertyStatusCounts,
+      recentLeads,
+      leadsNeedingAttention,
+      recentActivities
+    ] = await Promise.all([
+      // Lead counts
+      prisma.lead.count({ where: { tenantId } }),
+      prisma.lead.count({ where: { tenantId, createdAt: { gte: startOfToday } } }),
+      prisma.lead.count({ where: { tenantId, createdAt: { gte: startOfWeek } } }),
+      prisma.lead.count({ where: { tenantId, createdAt: { gte: startOfMonth } } }),
+      // Lead status breakdown
+      prisma.lead.groupBy({ by: ['status'], where: { tenantId }, _count: { status: true } }),
+      // Property counts
+      prisma.property.count({ where: { tenantId } }),
+      prisma.property.groupBy({ by: ['status'], where: { tenantId }, _count: { status: true } }),
+      // Recent leads (last 5)
+      prisma.lead.findMany({
+        where: { tenantId },
+        include: { property: { select: { title: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 5
+      }),
+      // Leads needing attention (NEW, oldest first, limit 5)
+      prisma.lead.findMany({
+        where: { tenantId, status: 'NEW' },
+        include: { property: { select: { title: true } } },
+        orderBy: { createdAt: 'asc' },
+        take: 5
+      }),
+      // Recent activities (last 10)
+      prisma.leadActivity.findMany({
+        where: { lead: { tenantId } },
+        include: { lead: { select: { firstName: true, lastName: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 10
+      })
+    ]);
 
-    // Get all properties for this tenant
-    const properties = await prisma.property.findMany({
-      where: { tenantId },
-      orderBy: { createdAt: 'desc' }
-    });
+    // Build status maps from groupBy results
+    const leadsByStatus: Record<string, number> = { NEW: 0, CONTACTED: 0, CONVERSATION: 0, BOOKED: 0, LOST: 0 };
+    for (const g of leadStatusCounts) { leadsByStatus[g.status] = g._count.status; }
 
-    // Get recent activities (last 10)
-    const recentActivities = await prisma.leadActivity.findMany({
-      where: {
-        lead: { tenantId }
-      },
-      include: {
-        lead: { select: { firstName: true, lastName: true, email: true } }
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 10
-    });
-
-    // Calculate stats
-    const totalLeads = leads.length;
-    const newLeadsToday = leads.filter(l => l.createdAt >= startOfToday).length;
-    const newLeadsThisWeek = leads.filter(l => l.createdAt >= startOfWeek).length;
-    const newLeadsThisMonth = leads.filter(l => l.createdAt >= startOfMonth).length;
-
-    // Lead status breakdown (matches LeadStatus enum: NEW, CONTACTED, CONVERSATION, BOOKED, LOST)
-    const leadsByStatus = {
-      NEW: leads.filter(l => l.status === 'NEW').length,
-      CONTACTED: leads.filter(l => l.status === 'CONTACTED').length,
-      CONVERSATION: leads.filter(l => l.status === 'CONVERSATION').length,
-      BOOKED: leads.filter(l => l.status === 'BOOKED').length,
-      LOST: leads.filter(l => l.status === 'LOST').length,
-    };
-
-    // Property stats
-    const totalProperties = properties.length;
-    const activeProperties = properties.filter(p => p.status === 'ACTIVE').length;
-    const reservedProperties = properties.filter(p => p.status === 'RESERVED').length;
-    const soldProperties = properties.filter(p => p.status === 'SOLD').length;
-
-    // Recent leads (last 5)
-    const recentLeads = leads.slice(0, 5).map(l => ({
-      id: l.id,
-      name: `${l.firstName || ''} ${l.lastName || ''}`.trim() || l.email,
-      email: l.email,
-      status: l.status,
-      propertyTitle: l.property?.title || null,
-      createdAt: l.createdAt
-    }));
-
-    // Leads needing attention (NEW status, oldest first)
-    const leadsNeedingAttention = leads
-      .filter(l => l.status === 'NEW')
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-      .slice(0, 5)
-      .map(l => ({
-        id: l.id,
-        name: `${l.firstName || ''} ${l.lastName || ''}`.trim() || l.email,
-        email: l.email,
-        propertyTitle: l.property?.title || null,
-        createdAt: l.createdAt,
-        daysSinceCreated: Math.floor((now.getTime() - l.createdAt.getTime()) / (1000 * 60 * 60 * 24))
-      }));
+    const propStatusMap: Record<string, number> = { ACTIVE: 0, RESERVED: 0, SOLD: 0, RENTED: 0, ARCHIVED: 0 };
+    for (const g of propertyStatusCounts) { propStatusMap[g.status] = g._count.status; }
 
     res.json({
       user: {
@@ -754,14 +1051,28 @@ app.get('/dashboard/stats', authMiddleware, async (req, res) => {
         newThisWeek: newLeadsThisWeek,
         newThisMonth: newLeadsThisMonth,
         byStatus: leadsByStatus,
-        needingAttention: leadsNeedingAttention,
-        recent: recentLeads
+        needingAttention: leadsNeedingAttention.map(l => ({
+          id: l.id,
+          name: `${l.firstName || ''} ${l.lastName || ''}`.trim() || l.email,
+          email: l.email,
+          propertyTitle: l.property?.title || null,
+          createdAt: l.createdAt,
+          daysSinceCreated: Math.floor((now.getTime() - l.createdAt.getTime()) / (1000 * 60 * 60 * 24))
+        })),
+        recent: recentLeads.map(l => ({
+          id: l.id,
+          name: `${l.firstName || ''} ${l.lastName || ''}`.trim() || l.email,
+          email: l.email,
+          status: l.status,
+          propertyTitle: l.property?.title || null,
+          createdAt: l.createdAt
+        }))
       },
       properties: {
         total: totalProperties,
-        active: activeProperties,
-        reserved: reservedProperties,
-        sold: soldProperties
+        active: propStatusMap.ACTIVE || 0,
+        reserved: propStatusMap.RESERVED || 0,
+        sold: propStatusMap.SOLD || 0
       },
       activities: recentActivities.map(a => ({
         id: a.id,
@@ -1666,6 +1977,12 @@ app.put('/properties/:id', authMiddleware, async (req, res) => {
     });
     
     res.json(property);
+
+    // Update embedding async
+    EmbeddingService.upsertEmbedding(
+      currentUser.tenantId, 'property', id,
+      EmbeddingService.buildPropertyText(property)
+    ).catch(e => console.error('Embedding error:', e));
   } catch (error) {
     console.error('Error updating property:', error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -1692,11 +2009,28 @@ app.post('/properties/:id/images', authMiddleware, upload.array('images', 10), a
       return res.status(404).json({ error: 'Property nicht gefunden' });
     }
 
-    // Upload to S3 (or local fallback)
+    // Upload to S3 with image optimization
     const folder = `properties/${currentUser.tenantId}/${id}/${isFloorplan ? 'floorplans' : 'images'}`;
+    const thumbFolder = `properties/${currentUser.tenantId}/${id}/thumbnails`;
     const imageUrls = await Promise.all(
       files.map(async (f) => {
-        const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(f.originalname)}`;
+        const baseName = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        
+        // Optimize image (resize, compress, convert to WebP)
+        if (f.mimetype.startsWith('image/')) {
+          const optimized = await optimizeImage(f.buffer, f.mimetype);
+          const uniqueName = `${baseName}.${optimized.extension}`;
+          
+          // Generate thumbnail in background (fire-and-forget)
+          generateThumbnail(optimized.buffer).then(thumb => {
+            if (thumb) uploadToS3(thumb, `${baseName}.webp`, 'image/webp', thumbFolder).catch(() => {});
+          });
+          
+          return uploadToS3(optimized.buffer, uniqueName, optimized.contentType, folder);
+        }
+        
+        // Non-image files: upload as-is
+        const uniqueName = `${baseName}${path.extname(f.originalname)}`;
         return uploadToS3(f.buffer, uniqueName, f.mimetype, folder);
       })
     );
@@ -2116,6 +2450,12 @@ app.post('/properties', authMiddleware, async (req, res) => {
     });
 
     res.status(201).json(property);
+
+    // Generate embedding async (fire-and-forget)
+    EmbeddingService.upsertEmbedding(
+      property.tenantId, 'property', property.id,
+      EmbeddingService.buildPropertyText(property)
+    ).catch(e => console.error('Embedding error:', e));
   } catch (error) {
     console.error('Error creating property:', error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -2280,6 +2620,22 @@ app.post('/leads', authMiddleware, async (req, res) => {
       autoReplyScheduled: tenantSettings?.autoReplyEnabled && !!emailDraft,
       jarvisQuestionCreated: !tenantSettings?.autoReplyEnabled && !!emailDraft
     });
+
+    // Generate lead embedding + score async (fire-and-forget)
+    EmbeddingService.upsertEmbedding(
+      tenantId, 'lead', lead.id,
+      EmbeddingService.buildLeadText({ ...lead, message })
+    ).catch(e => console.error('Embedding error:', e));
+
+    LeadScoringService.scoreAndSave(lead.id).catch(e => console.error('Scoring error:', e));
+
+    // Schedule follow-up sequence
+    FollowUpService.scheduleSequence({
+      leadId: lead.id, tenantId,
+      assignedUserId: assignedToId || currentUser.id,
+      leadName: [firstName, lastName].filter(Boolean).join(' ') || email,
+      propertyTitle: property?.title,
+    }).catch(e => console.error('Follow-up scheduling error:', e));
   } catch (error) {
     console.error('Error creating lead:', error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -2793,7 +3149,11 @@ app.post('/chat/new', authMiddleware, async (req, res) => {
       data: { archived: true }
     });
 
-    console.log(`🆕 Neuer Chat gestartet für User ${currentUser.id}`);
+    // Reset OpenAI Assistants thread (new conversation = new thread)
+    const openai = new OpenAIService();
+    await openai.resetThread(currentUser.id);
+
+    console.log(`🆕 Neuer Chat + Thread reset für User ${currentUser.id}`);
     res.json({ success: true });
   } catch (error) {
     console.error('Error starting new chat:', error);
@@ -2824,16 +3184,31 @@ Antworte NUR mit dem HTML-Code, ohne Erklärungen.`;
 
     const OpenAILib = require('openai');
     const openaiClient = new OpenAILib.default({ apiKey: process.env.OPENAI_API_KEY });
+    const sigModel = 'gpt-5.2';
+    const sigStart = Date.now();
     
     const result = await openaiClient.chat.completions.create({
-      model: 'gpt-5-mini',
+      model: sigModel,
       messages: [
         { role: 'system', content: 'Du generierst professionelle HTML-E-Mail-Signaturen. Antworte NUR mit dem HTML-Code, ohne Erklärungen.' },
         { role: 'user', content: prompt }
       ],
-      max_tokens: 1000,
-      temperature: 0.5,
+      max_completion_tokens: 1000,
     });
+
+    // Log AI usage for signature generation
+    if (result.usage) {
+      const currentUser = (req as any).user;
+      AiCostService.logUsage({
+        provider: 'openai', model: sigModel, endpoint: 'signature',
+        inputTokens: result.usage.prompt_tokens || 0,
+        outputTokens: result.usage.completion_tokens || 0,
+        durationMs: Date.now() - sigStart,
+        tenantId: currentUser?.tenantId,
+        userId: currentUser?.id,
+      }).catch(() => {});
+    }
+
     let signature = result.choices[0]?.message?.content || '';
     
     // Clean up response
@@ -2950,10 +3325,8 @@ app.post('/chat/stream',
         (req as any).uploadedFiles = uploadedFileUrls;
       }
 
-      // Get optimized history (recent messages + summary)
-      const { recentMessages, summary } = await ConversationMemory.getOptimizedHistory(userId);
-      const optimizedHistory = ConversationMemory.formatForOpenAI(recentMessages, summary);
-
+      // Assistants API: Thread stores history automatically
+      // Legacy history only used as fallback if Assistants API fails
       const openai = new OpenAIService();
       let fullResponse = '';
       let hadFunctionCalls = false;
@@ -2979,7 +3352,7 @@ app.post('/chat/stream',
       }, 5000);
 
       try {
-        for await (const result of openai.chatStream(fullMessage, tenantId, optimizedHistory, uploadedFileUrls, currentUser.id, userContext)) {
+        for await (const result of openai.chatStream(fullMessage, tenantId, [], uploadedFileUrls, currentUser.id, userContext)) {
           lastDataTime = Date.now();
           fullResponse += result.chunk;
           if (result.hadFunctionCalls) hadFunctionCalls = true;
@@ -3008,8 +3381,8 @@ app.post('/chat/stream',
       });
       console.log(`💾 Chat gespeichert für User ${userId}`);
       
-      // Auto-summarize if needed (async, don't await)
-      ConversationMemory.autoSummarizeIfNeeded(userId).catch(console.error);
+      // ConversationMemory summary no longer needed (Assistants API threads store full history)
+      // Kept for legacy search: ConversationMemory.autoSummarizeIfNeeded(userId).catch(console.error);
     } catch (error) {
       console.error('Chat stream error:', error);
       res.write(`data: ${JSON.stringify({ error: 'AI Error' })}\n\n`);
@@ -5331,6 +5704,7 @@ app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, asyn
     console.log(`🎨 Virtual staging: model=${modelId}, style=${style}, room=${roomType}, aspect=${geminiAspectRatio}, imageSize=${Math.round(imageData.length / 1024)}KB, prompt="${stagingPrompt.substring(0, 80)}..."`);
 
     // Use flat contents format matching official docs for image editing
+    const geminiStart = Date.now();
     const response = await ai.models.generateContent({
       model: modelId,
       contents: [
@@ -5344,6 +5718,16 @@ app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, asyn
         },
       },
     });
+
+    // Log Gemini usage for virtual staging
+    AiCostService.logUsage({
+      provider: 'gemini', model: modelId, endpoint: 'virtual-staging',
+      inputTokens: (response as any).usageMetadata?.promptTokenCount || 0,
+      outputTokens: (response as any).usageMetadata?.candidatesTokenCount || 0,
+      durationMs: Date.now() - geminiStart,
+      tenantId: currentUser.tenantId, userId: currentUser.id,
+      metadata: { imageSize: Math.round(imageData.length / 1024), style, roomType },
+    }).catch(() => {});
 
     // Extract generated image from response
     let generatedImage: string | null = null;
@@ -6387,10 +6771,14 @@ app.get('/admin/platform/health', adminAuthMiddleware, async (_req, res) => {
     detail: process.env.ADMIN_USER_POOL_ID ? 'Configured' : 'Not configured',
   };
 
-  // S3 Media Bucket
+  // S3 Media Bucket + CDN
   results['s3_media'] = {
     status: process.env.MEDIA_BUCKET_NAME ? 'healthy' : 'warning',
     detail: process.env.MEDIA_BUCKET_NAME || 'Not configured (local fallback)',
+  };
+  results['media_cdn'] = {
+    status: MEDIA_CDN_URL ? 'healthy' : 'info',
+    detail: MEDIA_CDN_URL || 'Not configured (using direct S3 URLs)',
   };
 
   // OpenAI / AI
@@ -6994,6 +7382,7 @@ app.get('/admin/platform/settings', adminAuthMiddleware, async (_req, res) => {
       },
       storage: {
         mediaBucket: process.env.MEDIA_BUCKET_NAME || '',
+        mediaCdn: MEDIA_CDN_URL || 'not configured',
       },
       environment: process.env.AWS_LAMBDA_FUNCTION_NAME ? 'production' : 'development',
       region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'eu-central-1',
@@ -7698,6 +8087,23 @@ app.post('/internal/scheduler/auto-reply', async (req, res) => {
   }
 });
 
+// Internal endpoint for follow-up sequence
+app.post('/internal/scheduler/follow-up', async (req, res) => {
+  try {
+    const { leadId, tenantId, step } = req.body;
+    console.log(`📅 Follow-up step ${step} triggered for lead ${leadId}`);
+    
+    const { FollowUpService } = await import('./services/FollowUpService');
+    const result = await FollowUpService.executeFollowUp(leadId, tenantId, step);
+    
+    console.log(`📅 Follow-up result: ${result.action} (skipped: ${result.skipped})`);
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('Follow-up error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Internal endpoint for reminder
 app.post('/internal/scheduler/reminder', async (req, res) => {
   try {
@@ -7810,6 +8216,38 @@ app.post('/internal/ingest-lead', async (req, res) => {
 
     console.log(`✅ Lead created: ${lead.id}`);
 
+    // 4b. Async: Lead Enrichment + Sentiment + Auto-Click (fire-and-forget)
+    LeadEnrichmentService.enrichLead(lead.id, tenantId).then(enrichment => {
+      console.log(`🔍 Enrichment: Score ${enrichment.completenessScore}%, duplicate: ${enrichment.isDuplicate}`);
+    }).catch(e => console.warn('Enrichment error:', e.message));
+
+    if (leadData.message) {
+      SentimentService.analyze(leadData.message).then(async sentiment => {
+        console.log(`💬 Sentiment: ${sentiment.sentiment} (${sentiment.sentimentScore}), urgency: ${sentiment.urgency}`);
+        // Store sentiment in lead activity
+        await db.leadActivity.create({
+          data: {
+            leadId: lead.id,
+            type: 'NOTE_ADDED',
+            description: `Sentiment: ${sentiment.emotionalTone} (${sentiment.sentiment}, Score: ${sentiment.sentimentScore})` +
+              (sentiment.buyingSignals.length > 0 ? ` | Kaufsignale: ${sentiment.buyingSignals.join(', ')}` : '') +
+              (sentiment.riskSignals.length > 0 ? ` | Risiken: ${sentiment.riskSignals.join(', ')}` : ''),
+            metadata: sentiment as any,
+          }
+        }).catch(() => {});
+      }).catch(e => console.warn('Sentiment error:', e.message));
+    }
+
+    if (parseResult.hasClickLink && parseResult.clickLinkUrl) {
+      // Queue auto-click via QueueService (async, with retry)
+      QueueService.enqueue('auto-click', {
+        leadId: lead.id,
+        tenantId,
+        url: parseResult.clickLinkUrl,
+        portal: parseResult.portal,
+      }).catch(e => console.warn('AutoClick queue error:', e.message));
+    }
+
     // 5. Try to match property
     let matchedProperty = null;
     let assignedUserIds: string[] = [];
@@ -7913,6 +8351,30 @@ app.post('/internal/ingest-lead', async (req, res) => {
       });
     }
 
+    // 9b. Create RealtimeEvents for SSE push to frontend (no polling!)
+    for (const userId of usersToNotify) {
+      try {
+        await db.realtimeEvent.create({
+          data: {
+            tenantId,
+            userId,
+            type: parseResult.hasClickLink ? 'LINK_CLICK_REQUIRED' : (matchedProperty ? 'PROPERTY_MATCHED' : 'NEW_LEAD'),
+            data: {
+              leadId: lead.id,
+              leadName,
+              portal: parseResult.portal,
+              propertyId: matchedProperty?.id,
+              propertyTitle: matchedProperty?.title,
+              activityId: activity.id,
+              notificationType,
+            },
+          }
+        });
+      } catch (rtErr: any) {
+        console.warn('RealtimeEvent creation failed:', rtErr.message);
+      }
+    }
+
     // 10. If no property matched, create JarvisQuery for assignment
     let jarvisAction = null;
     if (!matchedProperty && !parseResult.hasClickLink) {
@@ -7950,6 +8412,16 @@ app.post('/internal/ingest-lead', async (req, res) => {
         });
 
         console.log(`❓ JarvisQuery created for property assignment: ${jarvisAction.id}`);
+        
+        // Emit SSE event for pending action
+        try {
+          await db.realtimeEvent.create({
+            data: {
+              tenantId, userId: targetUser, type: 'PENDING_ACTION',
+              data: { actionId: jarvisAction.id, actionType: 'ASSIGN_PROPERTY', leadId: lead.id, leadName },
+            }
+          });
+        } catch (e: any) { console.warn('RealtimeEvent error:', e.message); }
       }
     }
 
@@ -7984,6 +8456,16 @@ app.post('/internal/ingest-lead', async (req, res) => {
         });
 
         console.log(`❓ JarvisQuery created for link click: ${jarvisAction.id}`);
+        
+        // Emit SSE event for link click required
+        try {
+          await db.realtimeEvent.create({
+            data: {
+              tenantId, userId: targetUser, type: 'PENDING_ACTION',
+              data: { actionId: jarvisAction.id, actionType: 'LINK_CLICK_REQUIRED', leadId: lead.id, leadName },
+            }
+          });
+        } catch (e: any) { console.warn('RealtimeEvent error:', e.message); }
       }
     }
 
@@ -8698,6 +9180,547 @@ app.post('/calendar/events/sync-to-office', authMiddleware, async (req: any, res
     console.error('Calendar sync to office error:', error);
     res.json({ success: false, error: error.message });
   }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Realtime Events via Server-Sent Events (SSE) — No Polling!
+// ═══════════════════════════════════════════════════════════════════
+
+app.get('/events/stream', authMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const currentUser = await db.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+    // Resume from last event ID (EventSource sends this on reconnect)
+    const lastEventId = req.headers['last-event-id'] as string || '';
+    let lastCheckedAt = lastEventId
+      ? new Date(0) // Will use ID-based filtering
+      : new Date();
+
+    const tenantId = currentUser.tenantId;
+    const userId = currentUser.id;
+    const startTime = Date.now();
+    const MAX_DURATION_MS = 100_000; // 100s, leave 20s buffer for Lambda 120s timeout
+    const CHECK_INTERVAL_MS = 2_000; // Check for new events every 2s
+
+    // Send initial heartbeat
+    res.write(`: connected\n\n`);
+
+    const checkForEvents = async () => {
+      try {
+        const whereClause: any = {
+          tenantId,
+          OR: [{ userId }, { userId: null }], // User-specific or broadcast
+        };
+
+        if (lastEventId) {
+          // Use ID for precise resume
+          whereClause.id = { gt: lastEventId };
+        } else {
+          whereClause.createdAt = { gt: lastCheckedAt };
+        }
+
+        const events = await db.realtimeEvent.findMany({
+          where: whereClause,
+          orderBy: { createdAt: 'asc' },
+          take: 50, // Max 50 events per check to avoid overwhelming client
+        });
+
+        for (const event of events) {
+          const data = JSON.stringify({ type: event.type, data: event.data, createdAt: event.createdAt });
+          res.write(`id: ${event.id}\nevent: ${event.type}\ndata: ${data}\n\n`);
+          lastCheckedAt = event.createdAt;
+        }
+      } catch (err: any) {
+        console.warn('SSE event check error:', err.message);
+      }
+    };
+
+    // Main SSE loop
+    const interval = setInterval(async () => {
+      if (Date.now() - startTime > MAX_DURATION_MS) {
+        clearInterval(interval);
+        res.write(`: timeout\n\n`);
+        res.end();
+        return;
+      }
+
+      await checkForEvents();
+
+      // Send heartbeat to keep connection alive
+      res.write(`: heartbeat\n\n`);
+    }, CHECK_INTERVAL_MS);
+
+    // Client disconnected
+    req.on('close', () => {
+      clearInterval(interval);
+    });
+
+  } catch (error: any) {
+    console.error('SSE stream error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// Full-Text Search (PostgreSQL tsvector/tsquery)
+// ═══════════════════════════════════════════════════════════
+app.get('/search', authMiddleware, async (req, res) => {
+  try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { q, type = 'all', limit = '20' } = req.query;
+    if (!q || typeof q !== 'string' || q.trim().length < 2) {
+      return res.json({ properties: [], leads: [], total: 0 });
+    }
+
+    const tenantId = currentUser.tenantId;
+    const maxResults = Math.min(parseInt(limit as string) || 20, 50);
+    
+    // Convert search query to tsquery format (supports German)
+    // "Wohnung Wien Balkon" → "Wohnung & Wien & Balkon"
+    const tsQuery = q.trim().split(/\s+/).map(w => `${w}:*`).join(' & ');
+
+    const results: { properties: any[]; leads: any[]; total: number } = { properties: [], leads: [], total: 0 };
+
+    if (type === 'all' || type === 'properties') {
+      const properties: any[] = await prisma.$queryRawUnsafe(`
+        SELECT id, title, address, city, price, rooms, area, status, "propertyType",
+               ts_rank("searchVector", to_tsquery('german', $1)) as rank
+        FROM "Property"
+        WHERE "tenantId" = $2 AND "searchVector" @@ to_tsquery('german', $1)
+        ORDER BY rank DESC
+        LIMIT $3
+      `, tsQuery, tenantId, maxResults);
+      
+      results.properties = properties.map(p => ({ ...p, rank: parseFloat(p.rank) }));
+    }
+
+    if (type === 'all' || type === 'leads') {
+      const leads: any[] = await prisma.$queryRawUnsafe(`
+        SELECT id, "firstName", "lastName", email, phone, status, source, score,
+               ts_rank("searchVector", to_tsquery('german', $1)) as rank
+        FROM "Lead"
+        WHERE "tenantId" = $2 AND "searchVector" @@ to_tsquery('german', $1)
+        ORDER BY rank DESC
+        LIMIT $3
+      `, tsQuery, tenantId, maxResults);
+      
+      results.leads = leads.map(l => ({ ...l, rank: parseFloat(l.rank) }));
+    }
+
+    results.total = results.properties.length + results.leads.length;
+    res.json(results);
+  } catch (error) {
+    console.error('Search error:', error);
+    res.status(500).json({ error: 'Search failed' });
+  }
+});
+
+// Admin: RAG — Bulk embed existing data
+app.post('/admin/embeddings/rebuild', adminAuthMiddleware, async (req, res) => {
+  try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const tenantId = currentUser.tenantId;
+    
+    // Run in background — return immediately
+    res.json({ message: 'Embedding-Rebuild gestartet. Läuft im Hintergrund.' });
+
+    const [propCount, leadCount] = await Promise.all([
+      EmbeddingService.embedAllProperties(tenantId),
+      EmbeddingService.embedAllLeads(tenantId),
+    ]);
+
+    console.log(`✅ Embedding rebuild complete: ${propCount} properties, ${leadCount} leads`);
+  } catch (error) {
+    console.error('Embedding rebuild error:', error);
+    if (!res.headersSent) res.status(500).json({ error: 'Embedding rebuild failed' });
+  }
+});
+
+// Admin: Fine-Tuning Data Export — Export chat data as JSONL for OpenAI fine-tuning
+app.get('/admin/fine-tuning/export', adminAuthMiddleware, async (req, res) => {
+  try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const tenantId = currentUser.tenantId;
+    const { format = 'jsonl', minPairs = '5' } = req.query;
+
+    // Get all users for this tenant
+    const users = await prisma.user.findMany({
+      where: { tenantId },
+      select: { id: true }
+    });
+
+    const trainingExamples: any[] = [];
+
+    for (const user of users) {
+      // Get non-archived chat messages grouped by user
+      const messages = await prisma.userChat.findMany({
+        where: { userId: user.id, archived: false },
+        orderBy: { createdAt: 'asc' },
+        select: { role: true, content: true }
+      });
+
+      // Convert to training pairs (user → assistant)
+      let currentPair: { user: string; assistant: string } | null = null;
+      
+      for (const msg of messages) {
+        if (msg.role === 'USER') {
+          if (currentPair && currentPair.assistant) {
+            trainingExamples.push(currentPair);
+          }
+          currentPair = { user: msg.content, assistant: '' };
+        } else if (msg.role === 'ASSISTANT' && currentPair) {
+          currentPair.assistant = msg.content;
+        }
+      }
+      if (currentPair && currentPair.assistant) {
+        trainingExamples.push(currentPair);
+      }
+    }
+
+    // Filter: minimum number of pairs per conversation
+    const minPairsNum = parseInt(minPairs as string) || 5;
+    
+    if (trainingExamples.length < minPairsNum) {
+      return res.json({ 
+        message: `Nur ${trainingExamples.length} Trainingspaare gefunden (Minimum: ${minPairsNum})`,
+        count: trainingExamples.length,
+        ready: false
+      });
+    }
+
+    if (format === 'jsonl') {
+      // OpenAI fine-tuning JSONL format
+      res.setHeader('Content-Type', 'application/jsonl');
+      res.setHeader('Content-Disposition', `attachment; filename=immivo-training-${new Date().toISOString().split('T')[0]}.jsonl`);
+      
+      for (const example of trainingExamples) {
+        const line = JSON.stringify({
+          messages: [
+            { role: 'system', content: 'Du bist Jarvis, der KI-Assistent von Immivo — ein Immobilien-CRM. Sei natürlich, kurz, auf Deutsch.' },
+            { role: 'user', content: example.user },
+            { role: 'assistant', content: example.assistant },
+          ]
+        });
+        res.write(line + '\n');
+      }
+      res.end();
+    } else {
+      // JSON summary
+      res.json({
+        count: trainingExamples.length,
+        ready: trainingExamples.length >= minPairsNum,
+        sampleSize: Math.min(3, trainingExamples.length),
+        samples: trainingExamples.slice(0, 3).map(e => ({
+          user: e.user.substring(0, 100) + '...',
+          assistant: e.assistant.substring(0, 100) + '...',
+        })),
+        estimatedCost: `~$${(trainingExamples.length * 0.008).toFixed(2)} für gpt-5-mini Fine-Tuning`,
+      });
+    }
+  } catch (error) {
+    console.error('Fine-tuning export error:', error);
+    res.status(500).json({ error: 'Export failed' });
+  }
+});
+
+// Admin: Finance — AWS Costs + AI Costs + Cost per Lead
+// ═══════════════════════════════════════════════════════════════════
+
+// Helper: parse date range from query params (defaults to current month)
+function parseFinanceDateRange(query: any): { from: Date; to: Date } {
+  const now = new Date();
+  const from = query.from ? new Date(query.from as string) : new Date(now.getFullYear(), now.getMonth(), 1);
+  const to = query.to ? new Date(query.to as string) : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  return { from, to };
+}
+
+// GET /admin/finance/summary — Overall cost summary (AI + AWS)
+app.get('/admin/finance/summary', adminAuthMiddleware, async (req, res) => {
+  try {
+    const { from, to } = parseFinanceDateRange(req.query);
+    const db = await initializePrisma();
+    
+    // AI costs from our database (real-time)
+    const aiSummary = await AiCostService.getSummary(from, to);
+    
+    // AWS costs from Cost Explorer (24h delay)
+    let awsCosts: any = null;
+    try {
+      const { CostExplorerClient, GetCostAndUsageCommand } = await import('@aws-sdk/client-cost-explorer');
+      const ceClient = new CostExplorerClient({ region: process.env.AWS_REGION || 'eu-central-1' });
+      
+      const awsFrom = from.toISOString().split('T')[0];
+      const awsTo = to.toISOString().split('T')[0];
+      
+      const awsResult = await ceClient.send(new GetCostAndUsageCommand({
+        TimePeriod: { Start: awsFrom, End: awsTo },
+        Granularity: 'MONTHLY',
+        Metrics: ['UnblendedCost'],
+        GroupBy: [{ Type: 'DIMENSION', Key: 'SERVICE' }],
+      }));
+      
+      const services: Record<string, number> = {};
+      let totalAwsCents = 0;
+      
+      for (const group of awsResult.ResultsByTime || []) {
+        for (const g of group.Groups || []) {
+          const serviceName = g.Keys?.[0] || 'Unknown';
+          const amount = parseFloat(g.Metrics?.UnblendedCost?.Amount || '0');
+          const cents = amount * 100;
+          services[serviceName] = (services[serviceName] || 0) + cents;
+          totalAwsCents += cents;
+        }
+      }
+      
+      awsCosts = { totalCents: totalAwsCents, byService: services };
+    } catch (awsErr: any) {
+      console.warn('⚠️ AWS Cost Explorer not available:', awsErr.message);
+      awsCosts = { totalCents: 0, byService: {}, error: 'Cost Explorer nicht verfügbar (IAM-Berechtigung fehlt oder noch keine Daten)' };
+    }
+    
+    // Lead count for cost-per-lead
+    const leadCount = await db.lead.count({
+      where: { createdAt: { gte: from, lte: to } },
+    });
+    
+    const totalCostCents = (awsCosts?.totalCents || 0) + aiSummary.totalCostCents;
+    const costPerLeadCents = leadCount > 0 ? totalCostCents / leadCount : 0;
+    
+    res.json({
+      period: { from: from.toISOString(), to: to.toISOString() },
+      totalCostCents,
+      totalCostUsd: totalCostCents / 100,
+      aws: awsCosts,
+      ai: {
+        totalCostCents: aiSummary.totalCostCents,
+        totalCostUsd: aiSummary.totalCostCents / 100,
+        totalCalls: aiSummary.totalCalls,
+        totalInputTokens: aiSummary.totalInputTokens,
+        totalOutputTokens: aiSummary.totalOutputTokens,
+        byProvider: aiSummary.byProvider,
+      },
+      leads: {
+        total: leadCount,
+        costPerLeadCents,
+        costPerLeadUsd: costPerLeadCents / 100,
+      },
+    });
+  } catch (error: any) {
+    console.error('Finance summary error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /admin/finance/ai-costs — Detailed AI cost breakdown
+app.get('/admin/finance/ai-costs', adminAuthMiddleware, async (req, res) => {
+  try {
+    const { from, to } = parseFinanceDateRange(req.query);
+    const view = (req.query.view as string) || 'model'; // model, day, endpoint, tenant
+    
+    let data;
+    switch (view) {
+      case 'day':
+        data = await AiCostService.getCostsByDay(from, to);
+        break;
+      case 'endpoint':
+        data = await AiCostService.getCostsByEndpoint(from, to);
+        break;
+      case 'tenant':
+        data = await AiCostService.getCostsByTenant(from, to);
+        break;
+      case 'model':
+      default:
+        data = await AiCostService.getCostsByModel(from, to);
+        break;
+    }
+    
+    res.json({ period: { from: from.toISOString(), to: to.toISOString() }, view, data });
+  } catch (error: any) {
+    console.error('AI costs error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /admin/finance/aws-costs — AWS costs by service (24h delay)
+app.get('/admin/finance/aws-costs', adminAuthMiddleware, async (req, res) => {
+  try {
+    const { from, to } = parseFinanceDateRange(req.query);
+    const granularity = (req.query.granularity as string) === 'DAILY' ? 'DAILY' : 'MONTHLY';
+    
+    const { CostExplorerClient, GetCostAndUsageCommand } = await import('@aws-sdk/client-cost-explorer');
+    const ceClient = new CostExplorerClient({ region: process.env.AWS_REGION || 'eu-central-1' });
+    
+    const awsFrom = from.toISOString().split('T')[0];
+    // AWS Cost Explorer end date is exclusive, add 1 day
+    const endDate = new Date(to);
+    endDate.setDate(endDate.getDate() + 1);
+    const awsTo = endDate.toISOString().split('T')[0];
+    
+    const result = await ceClient.send(new GetCostAndUsageCommand({
+      TimePeriod: { Start: awsFrom, End: awsTo },
+      Granularity: granularity as any,
+      Metrics: ['UnblendedCost', 'UsageQuantity'],
+      GroupBy: [{ Type: 'DIMENSION', Key: 'SERVICE' }],
+    }));
+    
+    const periods: { start: string; end: string; services: Record<string, { cost: number; usage: number }> }[] = [];
+    let totalCostCents = 0;
+    const serviceBreakdown: Record<string, number> = {};
+    
+    for (const period of result.ResultsByTime || []) {
+      const periodData: Record<string, { cost: number; usage: number }> = {};
+      for (const g of period.Groups || []) {
+        const name = g.Keys?.[0] || 'Unknown';
+        const cost = parseFloat(g.Metrics?.UnblendedCost?.Amount || '0') * 100;
+        const usage = parseFloat(g.Metrics?.UsageQuantity?.Amount || '0');
+        periodData[name] = { cost, usage };
+        totalCostCents += cost;
+        serviceBreakdown[name] = (serviceBreakdown[name] || 0) + cost;
+      }
+      periods.push({
+        start: period.TimePeriod?.Start || '',
+        end: period.TimePeriod?.End || '',
+        services: periodData,
+      });
+    }
+    
+    res.json({
+      period: { from: awsFrom, to: awsTo },
+      granularity,
+      totalCostCents,
+      totalCostUsd: totalCostCents / 100,
+      serviceBreakdown,
+      periods,
+    });
+  } catch (error: any) {
+    console.error('AWS costs error:', error);
+    res.status(500).json({ error: error.message, hint: 'Stellen Sie sicher, dass die Lambda-Funktion ce:GetCostAndUsage Berechtigung hat.' });
+  }
+});
+
+// GET /admin/finance/cost-per-lead — Cost per lead trend
+app.get('/admin/finance/cost-per-lead', adminAuthMiddleware, async (req, res) => {
+  try {
+    const { from, to } = parseFinanceDateRange(req.query);
+    const data = await AiCostService.getCostPerLead(from, to);
+    
+    res.json({
+      period: { from: from.toISOString(), to: to.toISOString() },
+      ...data,
+    });
+  } catch (error: any) {
+    console.error('Cost per lead error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /admin/finance/pricing — Current AI pricing table
+app.get('/admin/finance/pricing', adminAuthMiddleware, async (_req, res) => {
+  res.json({ pricing: AiCostService.getPricingTable() });
+});
+
+// ============================================
+// PREDICTIVE ANALYTICS ENDPOINTS
+// ============================================
+
+// GET /leads/:id/prediction — Conversion prediction for a lead
+app.get('/leads/:id/prediction', authMiddleware, async (req: any, res) => {
+  try {
+    const prediction = await PredictiveService.predictConversion(req.params.id, req.user.tenantId);
+    res.json(prediction);
+  } catch (error: any) {
+    console.error('Prediction error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /analytics/contact-time — Optimal contact time prediction
+app.get('/analytics/contact-time', authMiddleware, async (req: any, res) => {
+  try {
+    const prediction = await PredictiveService.predictContactTime(req.user.tenantId);
+    res.json(prediction);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /analytics/price-estimate — Property price estimation
+app.post('/analytics/price-estimate', authMiddleware, express.json(), async (req: any, res) => {
+  try {
+    const estimation = await PredictiveService.estimatePrice({
+      tenantId: req.user.tenantId,
+      ...req.body,
+    });
+    res.json(estimation);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// CACHE & QUEUE STATS (Admin)
+// ============================================
+
+app.get('/admin/platform/cache-stats', adminAuthMiddleware, async (_req, res) => {
+  res.json({ cache: CacheService.getStats(), queue: QueueService.getStats() });
+});
+
+// ============================================
+// A/B TESTING ENDPOINTS (Admin)
+// ============================================
+
+app.get('/admin/ab-tests', adminAuthMiddleware, async (_req, res) => {
+  res.json({ experiments: ABTestService.listExperiments() });
+});
+
+app.post('/admin/ab-tests', adminAuthMiddleware, express.json(), async (req, res) => {
+  try {
+    const experiment = ABTestService.createExperiment(req.body);
+    res.json(experiment);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/admin/ab-tests/:id/start', adminAuthMiddleware, async (req, res) => {
+  try {
+    ABTestService.startExperiment(req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/admin/ab-tests/:id/end', adminAuthMiddleware, async (req, res) => {
+  try {
+    ABTestService.endExperiment(req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/admin/ab-tests/:id/results', adminAuthMiddleware, async (req, res) => {
+  const results = ABTestService.getResults(req.params.id);
+  if (!results) return res.status(404).json({ error: 'Experiment not found' });
+  res.json(results);
 });
 
 export const handler = serverless(app, {

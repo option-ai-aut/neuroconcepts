@@ -3,10 +3,26 @@ const nextConfig = {
   output: 'standalone', // Required for Docker
 
   // Fix: Tell Turbopack that the frontend folder is the root (not the monorepo root)
-  // Without this, Turbopack picks up the root package-lock.json and looks for
-  // tailwindcss in /NeuroConcepts.ai/node_modules instead of /frontend/node_modules
   turbopack: {
     root: import.meta.dirname,
+  },
+
+  // Tree-shake heavy packages (only import what's actually used)
+  experimental: {
+    optimizePackageImports: [
+      'aws-amplify',
+      '@aws-amplify/ui-react',
+      'lucide-react',
+      'recharts',
+    ],
+  },
+
+  // Production optimizations
+  compiler: {
+    // Remove console.log in production (keep error/warn)
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn'],
+    } : false,
   },
 
   async redirects() {
@@ -14,7 +30,7 @@ const nextConfig = {
       {
         source: '/integrationen',
         destination: '/#features',
-        permanent: true, // 301 redirect
+        permanent: true,
       },
     ];
   },

@@ -12,6 +12,11 @@ import * as apprunner from 'aws-cdk-lib/aws-apprunner';
 import * as assets from 'aws-cdk-lib/aws-ecr-assets';
 import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
+import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as path from 'path';
 
 export interface ImmivoStackProps extends cdk.StackProps {
@@ -278,6 +283,12 @@ export class ImmivoStack extends cdk.Stack {
     this.dbSecret.grantRead(orchestratorLambda);
     appSecret.grantRead(orchestratorLambda);
 
+    // Grant Cost Explorer access for the finance dashboard
+    orchestratorLambda.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+      actions: ['ce:GetCostAndUsage', 'ce:GetCostForecast', 'ce:GetDimensionValues'],
+      resources: ['*'],
+    }));
+
     // Lambda Function URL for streaming endpoints (bypasses API Gateway 29s timeout)
     // NOTE: CORS is handled by Express middleware — do NOT configure cors here
     // to avoid duplicate Access-Control-Allow-Origin headers
@@ -395,11 +406,76 @@ export class ImmivoStack extends cdk.Stack {
       },
     });
 
+    // --- 7. DNS & CDN (Route53, ACM, CloudFront) ---
+    // NOTE: Route53 Hosted Zone and ACM certificate were created manually in AWS Console.
+    // Existing CloudFront distributions (also manual):
+    //   - E1E8VMUP3UA4TJ: app.immivo.ai  -> Frontend Lambda URL
+    //   - E1F9SS8QE17ZZP: api.immivo.ai  -> API Gateway
+    //   - E1XYO1OK2QOZQA: admin.immivo.ai -> Frontend Lambda URL
+    //   - E24ZLYKGX22SZJ: immivo.ai      -> Frontend Lambda URL
+    //
+    // This section adds: S3 Media CDN (media.immivo.ai) — the only missing piece.
+
+    // Import existing Route53 Hosted Zone (created manually, contains Resend DNS etc.)
+    const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'ImmivoZone', {
+      hostedZoneId: 'Z10381383JI4OXGQXAULB',
+      zoneName: 'immivo.ai',
+    });
+
+    // Import existing ACM certificate (us-east-1, wildcard — created manually)
+    const certificate = acm.Certificate.fromCertificateArn(
+      this, 'ImmivoCert',
+      'arn:aws:acm:us-east-1:463090596988:certificate/b61f08cd-54f2-4f62-8e0a-9a69264e0436'
+    );
+
+    // CloudFront Origin Access Control for S3 (replaces public read access)
+    const mediaOac = new cloudfront.S3OriginAccessControl(this, 'MediaOAC', {
+      description: 'OAC for Immivo Media Bucket',
+    });
+
+    // CloudFront Distribution for S3 Media Bucket
+    const mediaDistribution = new cloudfront.Distribution(this, 'MediaCDN', {
+      comment: `Immivo Media CDN (${props.stageName})`,
+      domainNames: props.stageName === 'prod' ? ['media.immivo.ai'] : [],
+      certificate: props.stageName === 'prod' ? certificate : undefined,
+      defaultBehavior: {
+        origin: origins.S3BucketOrigin.withOriginAccessControl(mediaBucket, {
+          originAccessControl: mediaOac,
+        }),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        compress: true,
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+      },
+      httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
+      priceClass: cloudfront.PriceClass.PRICE_CLASS_100, // EU + NA (cheapest)
+      minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+    });
+
+    // Route53 A record for media.immivo.ai -> CloudFront (prod only)
+    if (props.stageName === 'prod') {
+      new route53.ARecord(this, 'MediaDnsRecord', {
+        zone: hostedZone,
+        recordName: 'media',
+        target: route53.RecordTarget.fromAlias(
+          new route53Targets.CloudFrontTarget(mediaDistribution)
+        ),
+      });
+    }
+
+    // Pass Media CDN URL to orchestrator so it generates CDN URLs instead of S3 URLs
+    const mediaCdnDomain = props.stageName === 'prod'
+      ? 'media.immivo.ai'
+      : mediaDistribution.distributionDomainName;
+    orchestratorLambda.addEnvironment('MEDIA_CDN_URL', `https://${mediaCdnDomain}`);
+
     // --- Outputs ---
     new cdk.CfnOutput(this, 'VpcId', { value: this.vpc.vpcId });
     new cdk.CfnOutput(this, 'DBEndpoint', { value: this.dbEndpoint });
     new cdk.CfnOutput(this, 'EmailBucketName', { value: emailBucket.bucketName });
     new cdk.CfnOutput(this, 'MediaBucketName', { value: mediaBucket.bucketName });
+    new cdk.CfnOutput(this, 'MediaCDNUrl', { value: `https://${mediaCdnDomain}` });
+    new cdk.CfnOutput(this, 'MediaDistributionId', { value: mediaDistribution.distributionId });
     new cdk.CfnOutput(this, 'OrchestratorApiUrl', { value: api.url });
     new cdk.CfnOutput(this, 'FrontendUrl', { value: frontendUrl.url });
     new cdk.CfnOutput(this, 'UserPoolId', { value: this.userPool.userPoolId });
