@@ -235,7 +235,7 @@ async function initializePrisma() {
 // Auto-migration: Apply missing columns/tables that exist in Prisma schema but not in DB
 // Each statement uses IF NOT EXISTS / IF EXISTS so it's safe to run multiple times
 // Version-gated: Only runs full migration set when version changes
-const MIGRATION_VERSION = 9; // Increment when adding new migrations
+const MIGRATION_VERSION = 10; // Increment when adding new migrations
 let _migrationsApplied = false;
 
 async function applyPendingMigrations(db: PrismaClient) {
@@ -372,6 +372,17 @@ async function applyPendingMigrations(db: PrismaClient) {
     `DROP TRIGGER IF EXISTS lead_search_trigger ON "Lead"`,
     `CREATE TRIGGER lead_search_trigger BEFORE INSERT OR UPDATE ON "Lead"
      FOR EACH ROW EXECUTE FUNCTION lead_search_update()`,
+    // 2026-02-15: Tenant Company Profile (for Jarvis context)
+    'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "description" TEXT',
+    'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "phone" TEXT',
+    'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "email" TEXT',
+    'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "website" TEXT',
+    'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "logoUrl" TEXT',
+    'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "services" TEXT[] DEFAULT \'{}\'',
+    'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "regions" TEXT[] DEFAULT \'{}\'',
+    'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "slogan" TEXT',
+    'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "foundedYear" INTEGER',
+    'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "teamSize" INTEGER',
   ];
   
   for (const sql of migrations) {
