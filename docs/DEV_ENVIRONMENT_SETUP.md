@@ -102,13 +102,32 @@ Für lokale Entwicklung empfehlen wir **Neon.tech** (kostenlose serverless Postg
 3. Connection String kopieren
 4. In `.env.local` einfügen
 
-### Prisma Migrationen lokal ausführen
+### Prisma Schema lokal synchronisieren
+
+**Wichtig:** Wir nutzen `prisma db push` (nicht `prisma migrate dev`) fuer die lokale Entwicklung. In Production laufen Migrationen automatisch ueber das In-App-System (`applyPendingMigrations()` in `index.ts`). Siehe `docs/ARCHITECTURE.md` → "Datenbank-Migrationen".
 
 ```bash
 cd src/services/orchestrator
-DATABASE_URL="postgresql://..." npx prisma migrate dev
+
+# Schema zur lokalen DB pushen (erstellt/aktualisiert Tabellen):
+npx prisma db push
+
+# Prisma Client neu generieren (nach Schema-Aenderungen):
 npx prisma generate
+
+# Optional: Prisma Studio oeffnen (DB-GUI):
+npx prisma studio
 ```
+
+### Neue Spalte/Tabelle hinzufuegen
+
+1. Zum Prisma-Schema (`prisma/schema.prisma`) hinzufuegen
+2. `npx prisma db push` lokal ausfuehren
+3. SQL-Statement zum `migrations`-Array in `applyPendingMigrations()` (index.ts) hinzufuegen
+4. `MIGRATION_VERSION` in `index.ts` erhoehen
+5. `npx prisma generate` ausfuehren
+
+**Hinweis:** Manche DB-Objekte (pgvector Embeddings, tsvector Spalten, Trigger) sind **nicht** im Prisma-Schema, da Prisma die Typen nicht nativ unterstuetzt. Diese werden nur per Raw SQL in den Migrationen verwaltet. Siehe Kommentar oben in `schema.prisma`.
 
 ## 7. AWS Secrets Manager (Production)
 

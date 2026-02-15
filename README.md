@@ -26,7 +26,7 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 ### Infrastructure & Backend
 - **Cloud:** AWS (Region: `eu-central-1` Frankfurt)
 - **Compute:** AWS Lambda (Serverless) + API Gateway
-- **Database:** PostgreSQL (RDS t4g.micro for Dev/Stage, Aurora Serverless for Prod)
+- **Database:** PostgreSQL 16 (RDS t4g.micro for Dev/Stage, Aurora Serverless v2 for Prod, Neon.tech lokal)
 - **Language:** Node.js / TypeScript
 - **IaC:** AWS CDK
 
@@ -40,6 +40,7 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 - **Cache & Queue:** In-Memory Cache (Redis-kompatibel) und Job-Queue (SQS-kompatibel) mit Retry/Backoff
 - **A/B Testing:** In-Memory Framework mit gewichteten Varianten, Z-Test Signifikanz
 - **Full-Text Search:** PostgreSQL tsvector/tsquery mit deutscher Stemming
+- **DB Migrations:** Versionsbasiertes In-App-System (`applyPendingMigrations`, v10), laeuft automatisch auf Lambda Cold Start
 - **Features:** Semantische Suche, Multi-Language, Context-Awareness, Follow-Up Automatisierung
 
 ### Integrations

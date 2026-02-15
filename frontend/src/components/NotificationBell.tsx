@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { Bell, Check, CheckCheck, X, AlertCircle, MessageSquare, UserPlus, Mail, Clock } from 'lucide-react';
 import useSWR from 'swr';
 import { useEnv } from './EnvProvider';
@@ -31,6 +32,7 @@ const notificationIcons: Record<string, React.ReactNode> = {
 
 export default function NotificationBell() {
   const { apiUrl } = useEnv();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
@@ -99,6 +101,40 @@ export default function NotificationBell() {
     }
   };
 
+  const getNotificationLink = (notification: Notification): string => {
+    const meta = notification.metadata;
+    const leadId = meta?.leadId;
+    const propertyId = meta?.propertyId;
+    const actionId = meta?.actionId;
+
+    switch (notification.type) {
+      case 'NEW_LEAD':
+      case 'LEAD_RESPONSE':
+        if (leadId) return `/dashboard/leads/${leadId}`;
+        return '/dashboard/leads';
+      case 'JARVIS_QUESTION':
+      case 'ESCALATION':
+        if (leadId) return `/dashboard/leads/${leadId}`;
+        return '/dashboard/activities';
+      case 'REMINDER':
+        if (leadId) return `/dashboard/leads/${leadId}`;
+        return '/dashboard/activities';
+      default:
+        if (leadId) return `/dashboard/leads/${leadId}`;
+        if (propertyId) return `/dashboard/properties/${propertyId}`;
+        return '/dashboard/activities';
+    }
+  };
+
+  const handleNotificationClick = (notification: Notification) => {
+    if (!notification.read) {
+      markAsRead(notification.id);
+    }
+    const link = getNotificationLink(notification);
+    setIsOpen(false);
+    router.push(link);
+  };
+
   const dropdownContent = isOpen ? createPortal(
     <>
       {/* Backdrop — closes dropdown on click */}
@@ -137,11 +173,7 @@ export default function NotificationBell() {
                 className={`px-4 py-3 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer ${
                   !notification.read ? 'bg-blue-50/50 dark:bg-gray-800/30' : ''
                 }`}
-                onClick={() => {
-                  if (!notification.read) {
-                    markAsRead(notification.id);
-                  }
-                }}
+                onClick={() => handleNotificationClick(notification)}
               >
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5">
@@ -174,7 +206,13 @@ export default function NotificationBell() {
         {/* Footer */}
         {notifications.length > 0 && (
           <div className="px-4 py-2 border-t border-gray-100 dark:border-gray-700">
-            <button className="w-full text-center text-sm text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 py-1">
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                router.push('/dashboard/activities');
+              }}
+              className="w-full text-center text-sm text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 py-1"
+            >
               Alle anzeigen
             </button>
           </div>

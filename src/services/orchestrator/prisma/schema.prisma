@@ -1,5 +1,17 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
+//
+// HINWEIS: Nicht alle DB-Objekte sind hier definiert!
+// Folgende werden per Raw-SQL in applyPendingMigrations() (index.ts) verwaltet,
+// da Prisma die PostgreSQL-Typen nicht nativ unterstuetzt:
+//
+//   - "Embedding" Tabelle       → pgvector vector(1536), abgefragt via $queryRaw
+//   - "Property.searchVector"   → tsvector, auto-gefuellt via DB-Trigger
+//   - "Lead.searchVector"       → tsvector, auto-gefuellt via DB-Trigger
+//   - pgvector Extension        → CREATE EXTENSION IF NOT EXISTS vector
+//   - Full-Text-Search Trigger  → property_search_update(), lead_search_update()
+//
+// Siehe auch: docs/ARCHITECTURE.md → "Datenbank-Migrationen"
 
 generator client {
   provider = "prisma-client-js"

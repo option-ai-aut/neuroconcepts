@@ -84,13 +84,62 @@ graph TD
 *   **Calendar Service:** OAuth-Integration für Google Calendar und Microsoft Outlook Calendar.
 
 ### 3. Data Layer
-*   **PostgreSQL:** Speichert relationale Daten: Tenants, Users, Leads, Properties, CalendarEvents.
-    *   **Dev/Stage:** RDS Single Instance (`t4g.micro`) zur Kostenoptimierung.
-    *   **Lokal:** Neon.tech (serverless Postgres) für lokale Entwicklung.
-    *   **Prod:** Aurora Serverless v2 für Skalierbarkeit und HA.
-*   **pgvector:** Speichert Embeddings von Exposés und vergangenen Konversationen, um der KI ein "Langzeitgedächtnis" zu geben (RAG - Retrieval Augmented Generation).
-    *   **Embedding Table (Phase 2.2):** Custom `Embedding` table with pgvector `vector(1536)` column for semantic search. Uses OpenAI `text-embedding-3-small` (1536 dimensions). Embeddings are auto-generated on Property/Lead create/update.
-*   **Full-Text Search (Phase 5.1):** PostgreSQL `tsvector`/`tsquery` with German stemming. Auto-updated via database triggers on Property and Lead tables. Weighted ranking: title=A, address=B, description=C. Exposed via `/search` API endpoint.
+
+#### Datenbank-Infrastruktur
+*   **Dev/Stage:** RDS PostgreSQL 16 Single Instance (`t4g.micro`), **oeffentlich erreichbar** (Security Group erlaubt 0.0.0.0/0:5432). Lambda laeuft **ausserhalb** des VPC fuer schnellere Cold Starts.
+*   **Prod:** Aurora Serverless v2 (PostgreSQL 16.6), **privates Subnetz** (nicht oeffentlich erreichbar). Lambda laeuft **innerhalb** des VPC mit Security Group die nur DB-Zugriff erlaubt. Datenbankname: `immivo`.
+*   **Lokal:** Neon.tech (serverless Postgres) fuer lokale Entwicklung.
+*   **Connection Pooling:** Wird dynamisch an die `DATABASE_URL` angehaengt:
+    *   Lambda: `connection_limit=3&pool_timeout=10&connect_timeout=5`
+    *   Lokal: `connection_limit=10&pool_timeout=30&connect_timeout=5`
+*   **Credentials:** Dev/Stage: `.env`/`.env.local` | Prod: AWS Secrets Manager (`Immivo-DB-Secret-prod` fuer DB, `Immivo-App-Secret-prod` fuer App-Keys).
+
+#### Prisma Schema & Models
+Die Datenschicht nutzt **Prisma ORM** (`schema.prisma`). Aktuelle Models:
+
+| Bereich | Models |
+|---|---|
+| **Multi-Tenancy** | `Tenant`, `TenantSettings`, `User`, `UserSettings` |
+| **CRM** | `Lead`, `LeadActivity`, `Property`, `PropertyAssignment`, `Message` |
+| **Kommunikation** | `UserChat`, `Channel`, `ChannelMember`, `ChannelMessage`, `Email` |
+| **Orchestrierung** | `EmailTemplate`, `ExposeTemplate`, `Expose` |
+| **Portal-Integration** | `Portal`, `PortalConnection`, `PortalSyncLog` |
+| **Automatisierung** | `JarvisPendingAction`, `Notification`, `ConversationSummary` |
+| **AI Tracking** | `AiUsageLog`, `AiAuditLog`, `RealtimeEvent` |
+| **Admin (intern)** | `AdminStaff`, `AdminChannel`, `AdminChatMessage` |
+| **Website/Marketing** | `BlogPost`, `NewsletterSubscriber`, `NewsletterCampaign` |
+| **Karriere** | `JobPosting`, `JobApplication` |
+| **Sonstiges** | `ContactSubmission`, `BugReport` |
+
+#### Datenbank-Migrationen
+**Wichtig:** Wir nutzen **nicht** `prisma migrate` in Production. Stattdessen verwenden wir ein eigenes, versionsbasiertes In-App-Migrationssystem:
+
+*   **Funktion:** `applyPendingMigrations()` in `index.ts`
+*   **Ausfuehrung:** Automatisch beim Lambda Cold Start (und beim lokalen Server-Start)
+*   **Versionierung:** `MIGRATION_VERSION` (aktuell: 10) wird in `_MigrationMeta`-Tabelle gespeichert. Migrationen laufen nur wenn die Version aelter ist.
+*   **Sicherheit:** Alle SQL-Statements nutzen `IF NOT EXISTS`/`IF EXISTS` — idempotent und sicher bei mehrfacher Ausfuehrung.
+*   **Ablauf:**
+    1. Lambda startet → `initializeApp()` → Prisma Client wird erstellt
+    2. `applyPendingMigrations()` prueft `_MigrationMeta.schema_version`
+    3. Falls Version < `MIGRATION_VERSION`: Alle SQL-Statements werden sequentiell ausgefuehrt
+    4. Version wird in `_MigrationMeta` aktualisiert
+
+**Neue Spalten/Tabellen hinzufuegen:**
+1. Zum Prisma-Schema (`schema.prisma`) hinzufuegen
+2. SQL-Statement zum `migrations`-Array in `applyPendingMigrations()` hinzufuegen
+3. `MIGRATION_VERSION` erhoehen
+4. Lokal: `npx prisma db push` zum Testen
+5. Bei Deploy: Migration laeuft automatisch auf Lambda Cold Start
+
+#### Nicht-Prisma DB-Objekte (Raw SQL)
+Folgende Objekte werden **nur** per Raw SQL verwaltet (Prisma unterstuetzt die Typen nicht nativ):
+
+*   **`Embedding`-Tabelle:** pgvector `vector(1536)` Spalte fuer semantische Suche. Abgefragt via `$queryRaw`/`$executeRaw` in `EmbeddingService.ts`. Nutzt OpenAI `text-embedding-3-small` (1536 Dimensionen).
+*   **`searchVector`-Spalten:** PostgreSQL `tsvector` auf `Property` und `Lead`. Automatisch aktualisiert durch DB-Trigger (`property_search_update()`, `lead_search_update()`). Deutsche Stemming mit gewichtetem Ranking (Titel=A, Adresse=B, Beschreibung=C).
+*   **`pgvector`-Extension:** `CREATE EXTENSION IF NOT EXISTS vector` — erforderlich fuer Embedding-Suche.
+
+#### Full-Text Search (Phase 5.1)
+PostgreSQL `tsvector`/`tsquery` mit deutscher Stemming. Auto-updated via Database-Trigger auf Property- und Lead-Tabellen. Exposed via `/search` API-Endpoint.
 
 ### New API Endpoints (Phases 4–5)
 *   **Predictive:** `GET /leads/:id/prediction` — conversion prediction; `GET /analytics/contact-time` — optimal contact time; `POST /analytics/price-estimate` — property price estimation.

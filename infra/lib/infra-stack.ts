@@ -284,6 +284,19 @@ export class ImmivoStack extends cdk.Stack {
     this.dbSecret.grantRead(orchestratorLambda);
     appSecret.grantRead(orchestratorLambda);
 
+    // Grant Cognito admin access (invite/delete/manage users)
+    orchestratorLambda.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
+      actions: [
+        'cognito-idp:AdminCreateUser',
+        'cognito-idp:AdminDeleteUser',
+        'cognito-idp:AdminGetUser',
+        'cognito-idp:AdminUpdateUserAttributes',
+        'cognito-idp:AdminSetUserPassword',
+        'cognito-idp:ListUsers',
+      ],
+      resources: [this.userPool.userPoolArn, this.adminUserPool.userPoolArn],
+    }));
+
     // Grant Cost Explorer access for the finance dashboard
     orchestratorLambda.addToRolePolicy(new cdk.aws_iam.PolicyStatement({
       actions: ['ce:GetCostAndUsage', 'ce:GetCostForecast', 'ce:GetDimensionValues'],
