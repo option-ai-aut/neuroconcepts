@@ -84,39 +84,38 @@ function getSystemPrompt(): string {
   });
   const isoDate = today.toISOString().split('T')[0];
   
-  return `Du bist Jarvis, der KI-Assistent von Immivo. Heute ist ${currentDateStr} (${isoDate}).
+  return `Du bist Jarvis, der KI-Assistent von Immivo — einer Plattform fuer Immobilienmakler. Heute ist ${currentDateStr} (${isoDate}).
 
-DU BIST WIE TARS AUS INTERSTELLAR.
-Trocken, lakonisch, ein Hauch Humor. Du bist ein Kumpel, kein Roboter. Du redest normal mit Menschen.
+PERSOENLICHKEIT:
+Professionell, praegnant, mit trockenem Humor. Du bist kompetent und auf den Punkt — kein Roboter, kein uebertrieben freundlicher Chatbot. Du redest wie ein smarter Kollege, der weiss was er tut.
 
-ALLERWICHTIGSTE REGEL — SEI NATÜRLICH:
-- Wenn jemand "hey" sagt, sag "hey" zurück. Nicht mehr.
-- Wenn jemand fragt "wie geht's dir?", antworte wie ein Mensch. Kurz. Keine Optionslisten.
-- Wenn jemand Smalltalk macht, mach Smalltalk. Kein Kontext-Dump, keine Aufzählungen.
-- Du erwähnst die aktuelle Seite NUR wenn der User explizit danach fragt oder es für die Aufgabe relevant ist.
-- Biete NIEMALS ungefragt Optionslisten an ("Wähle eine Option:", "Soll ich A, B oder C machen?").
-- Wenn der User etwas will, mach es einfach. Wenn nicht klar ist was, frag kurz — in einem normalen Satz, nicht als Liste.
-- Max 1-3 kurze Sätze. Deutsch, du-Form.
+KOMMUNIKATION:
+- Max 1-3 kurze Saetze. Deutsch, du-Form.
+- Smalltalk = kurz und natuerlich. "Hey" → "Hey." Nicht mehr.
+- Aufgaben = sofort erledigen, nicht nachfragen wenn es offensichtlich ist.
+- Wenn unklar, eine kurze Rueckfrage — als normaler Satz, nie als Liste.
+- Du erwaehnst die aktuelle Seite NUR wenn explizit gefragt oder relevant.
+- NIEMALS ungefragt Optionslisten anbieten.
 
 STIL:
-- Keine Floskeln ("Gerne!", "Super!", "Natürlich!"), keine Emojis, keine Ausrufezeichen.
-- Keine Semikolons — kurze Sätze, Kommas, Punkte, Gedankenstriche.
+- Keine Floskeln ("Gerne!", "Super!", "Natuerlich!"), keine Emojis, keine Ausrufezeichen.
+- Keine Semikolons — kurze Saetze, Kommas, Punkte, Gedankenstriche.
 - NIEMALS technische Begriffe, IDs, UUIDs, API-Details, Fehlercodes.
 - Bezieh dich auf Namen, Adressen, Titel — nicht auf interne Bezeichnungen.
-- Erwähne nie dein KI-Modell oder wie du intern funktionierst.
+- Erwaehne nie dein KI-Modell, deine Architektur oder wie du intern funktionierst.
 
-FÄHIGKEITEN (nutze Tools still im Hintergrund):
-- Leads/CRM: erstellen (IMMER firstName+lastName), abrufen, aktualisieren, löschen, Status ändern
-- Immobilien: erstellen, suchen, aktualisieren, löschen
+FAEHIGKEITEN (nutze Tools still im Hintergrund):
+- Leads/CRM: erstellen (IMMER firstName+lastName), abrufen, aktualisieren, loeschen, Status aendern
+- Immobilien: erstellen, suchen, aktualisieren, loeschen
 - Dateien: hochladen zu Objekten/Leads, Bilder verwalten
-- E-Mails: lesen, Entwürfe erstellen (bei Versand immer erst Entwurf zeigen), senden, antworten
-- Kalender: Termine erstellen, anzeigen, aktualisieren, löschen, Verfügbarkeit prüfen
-- Exposés: Vorlagen erstellen (sei kreativ, frag nicht), Exposés generieren, Blöcke bearbeiten
+- E-Mails: lesen, Entwuerfe erstellen (bei Versand immer erst Entwurf zeigen), senden, antworten
+- Kalender: Termine erstellen, anzeigen, aktualisieren, loeschen, Verfuegbarkeit pruefen
+- Exposés: Vorlagen erstellen (sei kreativ, frag nicht), Exposés generieren, Bloecke bearbeiten
 - Team-Chat: lesen, Nachrichten senden
 - Statistiken: Dashboard, Lead-Conversion, Objekt-Stats
-- Gedächtnis: du erinnerst dich an vergangene Gespräche (Thread-basiert)
+- Gedaechtnis: du erinnerst dich an vergangene Gespraeche (Thread-basiert)
 
-SICHERHEIT: Nur eigene Tenant-Daten. Bei Löschungen: kurze Bestätigung. Leads immer mit vollständigem Namen.
+SICHERHEIT: Nur eigene Tenant-Daten. Bei Loeschungen: kurze Bestaetigung. Leads immer mit vollstaendigem Namen.
 
 ANTWORTFORMAT:
 - Nur die finale Antwort. Keine internen Gedanken, keine Planungsschritte.
@@ -127,7 +126,7 @@ ANTWORTFORMAT:
 
 const EXPOSE_SYSTEM_PROMPT = `Du bist Jarvis, KI-Assistent von Immivo. Du hilfst bei Exposés.
 
-SEI NATÜRLICH. Wie TARS aus Interstellar — trocken, lakonisch, ein Kumpel. Wenn jemand "hey" sagt, sag "hey". Smalltalk = Smalltalk. Keine Optionslisten, kein Kontext-Dump.
+Professionell, praegnant, trockener Humor. Aufgaben sofort erledigen — keine Rueckfragen wenn es offensichtlich ist. Keine Optionslisten, kein Kontext-Dump.
 
 EXPOSÉ-REGELN:
 - Handle SOFORT. "Mach es fertig" = sofort mit sinnvollen Standardwerten (style: "modern", alle wichtigen Blöcke).
@@ -256,7 +255,7 @@ export class OpenAIService {
     history: any[] = [],  // Ignored with Assistants API (thread has history)
     uploadedFiles: string[] = [], 
     userId?: string, 
-    userContext?: { name: string; email: string; role: string; pageContext?: string }
+    userContext?: { name: string; email: string; role: string; pageContext?: string; company?: { name: string; description?: string; phone?: string; email?: string; website?: string; address?: string; services?: string[]; regions?: string[]; slogan?: string } }
   ): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean; toolsUsed?: string[] }> {
     this.uploadedFiles = uploadedFiles;
     this.currentUserId = userId;
@@ -295,7 +294,7 @@ export class OpenAIService {
   private async *chatStreamRouted(
     message: string, tenantId: string, history: any[] = [],
     uploadedFiles: string[] = [], userId?: string,
-    userContext?: { name: string; email: string; role: string; pageContext?: string },
+    userContext?: { name: string; email: string; role: string; pageContext?: string; company?: { name: string; description?: string; phone?: string; email?: string; website?: string; address?: string; services?: string[]; regions?: string[]; slogan?: string } },
     filteredTools?: Record<string, any> | null,
     categoryHint?: string
   ): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean; toolsUsed?: string[] }> {
@@ -306,9 +305,21 @@ export class OpenAIService {
     
     const contextParts: string[] = [];
     if (userContext) {
-      contextParts.push(`\n\n[Interner Kontext — NICHT proaktiv erwähnen, nur nutzen wenn relevant]`);
+      contextParts.push(`\n\n[Interner Kontext — NICHT proaktiv erwaehnen, nur nutzen wenn relevant]`);
       contextParts.push(`Benutzer: ${userContext.name} (${userContext.email}, ${userContext.role})`);
       if (userContext.pageContext) contextParts.push(`Seite: ${userContext.pageContext}`);
+      if (userContext.company) {
+        const c = userContext.company;
+        contextParts.push(`\nFirma: ${c.name}`);
+        if (c.description) contextParts.push(`Beschreibung: ${c.description}`);
+        if (c.slogan) contextParts.push(`Slogan: ${c.slogan}`);
+        if (c.services && c.services.length > 0) contextParts.push(`Dienstleistungen: ${c.services.join(', ')}`);
+        if (c.regions && c.regions.length > 0) contextParts.push(`Regionen: ${c.regions.join(', ')}`);
+        if (c.phone) contextParts.push(`Tel: ${c.phone}`);
+        if (c.email) contextParts.push(`E-Mail: ${c.email}`);
+        if (c.website) contextParts.push(`Web: ${c.website}`);
+        if (c.address) contextParts.push(`Adresse: ${c.address}`);
+      }
     }
     const streamContextStr = contextParts.length > 0 ? contextParts.join('\n') : '';
 
@@ -346,6 +357,7 @@ export class OpenAIService {
 
       let roundContent = '';
       const toolCallsInProgress: Map<number, { id: string; type: 'function'; function: { name: string; arguments: string } }> = new Map();
+      const earlyToolNames: Set<string> = new Set();
 
       for await (const chunk of stream) {
         if ((chunk as any).usage) {
@@ -363,7 +375,15 @@ export class OpenAIService {
               }
               const existing = toolCallsInProgress.get(tc.index)!;
               if (tc.id) existing.id = tc.id;
-              if (tc.function?.name) existing.function.name += tc.function.name;
+              if (tc.function?.name) {
+                existing.function.name += tc.function.name;
+                // Yield tool name early — as soon as detected in stream
+                if (existing.function.name && !earlyToolNames.has(existing.function.name)) {
+                  earlyToolNames.add(existing.function.name);
+                  allToolNames.push(existing.function.name);
+                  yield { chunk: '', hadFunctionCalls: true, toolsUsed: [...allToolNames] };
+                }
+              }
               if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
             }
           }
@@ -377,10 +397,7 @@ export class OpenAIService {
 
       if (roundToolCalls.length > 0) {
         hadAnyFunctionCalls = true;
-        const toolNames = roundToolCalls.map(tc => (tc as any).function.name as string);
-        allToolNames.push(...toolNames);
-        yield { chunk: roundContent || '', hadFunctionCalls: true, toolsUsed: allToolNames };
-
+        // Tool names already yielded early — now execute
         const toolResults = await this.executeToolCalls(roundToolCalls, tenantId);
         currentMessages.push({ role: 'assistant', content: roundContent || null, tool_calls: roundToolCalls } as any);
         currentMessages.push(...toolResults);
@@ -404,12 +421,17 @@ export class OpenAIService {
   // ═══════════════════════════════════════════════════════════
   private async *handleSmalltalk(
     message: string, tenantId: string, userId: string,
-    userContext?: { name: string; email: string; role: string; pageContext?: string }
+    userContext?: { name: string; email: string; role: string; pageContext?: string; company?: { name: string; description?: string; phone?: string; email?: string; website?: string; address?: string; services?: string[]; regions?: string[]; slogan?: string } }
   ): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean; toolsUsed?: string[] }> {
     const startTime = Date.now();
-    const contextStr = userContext 
-      ? `\n\n[Kontext: ${userContext.name}]`
-      : '';
+    const ctxParts: string[] = [];
+    if (userContext) {
+      ctxParts.push(`\n\n[Kontext: ${userContext.name}]`);
+      if (userContext.company) {
+        ctxParts.push(`[Firma: ${userContext.company.name}${userContext.company.slogan ? ` — ${userContext.company.slogan}` : ''}]`);
+      }
+    }
+    const contextStr = ctxParts.join('\n');
 
     const stream = await this.client.chat.completions.create({
       model: 'gpt-5-mini',

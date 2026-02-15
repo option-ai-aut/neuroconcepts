@@ -442,6 +442,15 @@ export const CRM_TOOLS = {
       required: ["propertyId", "imageUrl", "toFloorplan"]
     }
   },
+  // === COMPANY INFO TOOL ===
+  get_company_info: {
+    name: "get_company_info",
+    description: "Retrieves detailed information about the user's company (name, description, services, regions, contact info, slogan, team size). Use when the user asks about their own company, needs company details for emails/exposés, or asks 'Wer sind wir?'.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {}
+    }
+  },
   // === TEAM & CONTACTS TOOLS ===
   get_team_members: {
     name: "get_team_members",
@@ -1754,6 +1763,37 @@ export class AiToolExecutor {
           take: 50,
           orderBy: { createdAt: 'desc' }
         });
+      }
+
+      // === COMPANY INFO TOOL ===
+      case 'get_company_info': {
+        const tenant = await getPrisma().tenant.findUnique({
+          where: { id: tenantId },
+          select: {
+            name: true, description: true, phone: true, email: true,
+            website: true, logoUrl: true, services: true, regions: true,
+            slogan: true, address: true, foundedYear: true, teamSize: true,
+            _count: { select: { users: true, leads: true, properties: true } }
+          }
+        });
+        if (!tenant) return 'Firmendaten nicht gefunden.';
+        const info: any = { name: tenant.name };
+        if (tenant.description) info.beschreibung = tenant.description;
+        if (tenant.slogan) info.slogan = tenant.slogan;
+        if (tenant.services.length > 0) info.dienstleistungen = tenant.services;
+        if (tenant.regions.length > 0) info.regionen = tenant.regions;
+        if (tenant.phone) info.telefon = tenant.phone;
+        if (tenant.email) info.email = tenant.email;
+        if (tenant.website) info.website = tenant.website;
+        if (tenant.address) info.adresse = tenant.address;
+        if (tenant.foundedYear) info.gruendungsjahr = tenant.foundedYear;
+        if (tenant.teamSize) info.teamgroesse = tenant.teamSize;
+        info.statistik = {
+          mitarbeiter: tenant._count.users,
+          leads: tenant._count.leads,
+          objekte: tenant._count.properties,
+        };
+        return JSON.stringify(info);
       }
 
       // === TEAM & CONTACTS TOOLS ===

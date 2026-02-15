@@ -3334,6 +3334,12 @@ app.post('/chat/stream',
       // Combine message with file context
       const fullMessage = message + fileContext;
 
+      // Fetch tenant info for AI context (cached per request)
+      const tenant = await prisma.tenant.findUnique({ 
+        where: { id: tenantId },
+        select: { name: true, description: true, phone: true, email: true, website: true, services: true, regions: true, slogan: true, address: true }
+      });
+
       // Stream the response with optimized history, pass uploaded files and userId for tools
       let toolsUsed: string[] = [];
       const userContext = {
@@ -3341,6 +3347,17 @@ app.post('/chat/stream',
         email: currentUser.email,
         role: currentUser.role,
         pageContext: pageContext || undefined,
+        company: tenant ? {
+          name: tenant.name,
+          description: tenant.description || undefined,
+          phone: tenant.phone || undefined,
+          email: tenant.email || undefined,
+          website: tenant.website || undefined,
+          address: tenant.address || undefined,
+          services: tenant.services.length > 0 ? tenant.services : undefined,
+          regions: tenant.regions.length > 0 ? tenant.regions : undefined,
+          slogan: tenant.slogan || undefined,
+        } : undefined,
       };
 
       // Keepalive: Send heartbeat every 5s during tool execution to prevent API GW timeout

@@ -24,48 +24,55 @@ export type AgentCategory =
   | 'memory'       // Chat history, past conversations
   | 'multi';       // Complex request spanning multiple domains
 
-// Tool name prefixes per category
+// Tool names per category — must match actual names in AiTools.ts
 const TOOL_CATEGORIES: Record<AgentCategory, string[]> = {
   smalltalk: [],
   crm: [
-    'get_leads', 'create_lead', 'update_lead', 'delete_leads', 'change_lead_status',
-    'get_properties', 'create_property', 'update_property', 'delete_property',
-    'get_dashboard_stats', 'upload_images_to_property', 'upload_documents_to_lead',
-    'assign_property_to_lead', 'semantic_search',
+    'get_leads', 'get_lead', 'create_lead', 'update_lead', 'delete_lead',
+    'get_properties', 'get_property', 'create_property', 'update_property', 'delete_property',
+    'search_properties', 'search_contacts', 'semantic_search',
+    'get_dashboard_stats', 'get_lead_statistics', 'get_property_statistics',
+    'upload_images_to_property', 'upload_documents_to_lead',
+    'get_property_images', 'delete_property_image',
+    'add_video_to_property', 'set_virtual_tour',
   ],
   email: [
-    'get_emails', 'get_email_detail', 'create_email_draft', 'send_email', 'reply_to_email',
-    'get_leads', // Need lead context for emails
+    'get_emails', 'get_email', 'draft_email', 'send_email', 'reply_to_email',
+    'get_email_templates',
+    'get_leads', 'get_lead', // Lead context for emails
   ],
   calendar: [
     'get_calendar_events', 'create_calendar_event', 'update_calendar_event', 
-    'delete_calendar_event', 'check_availability',
-    'get_leads', 'get_properties', // Context for appointments
+    'delete_calendar_event', 'get_calendar_availability',
+    'get_leads', 'get_lead', 'get_properties', // Context for appointments
   ],
   expose: [
-    'create_full_expose', 'create_expose_block', 'update_expose_block', 
-    'delete_expose_block', 'set_expose_theme', 'generate_expose_text',
-    'get_properties', // Need property data
+    'create_full_expose', 'create_expose_from_template', 'create_expose_template',
+    'create_expose_block', 'update_expose_block', 'delete_expose_block', 'reorder_expose_blocks',
+    'set_expose_theme', 'generate_expose_text', 'get_expose_status', 'set_expose_status',
+    'clear_expose_blocks', 'get_exposes', 'get_expose_templates', 'get_template',
+    'generate_expose_pdf', 'virtual_staging',
+    'get_properties', 'get_property', // Property data for exposés
   ],
   memory: [
-    'search_chat_history', 'get_last_conversation', 'get_topic_context',
-    'get_long_term_memory', 'update_long_term_memory',
+    'search_chat_history', 'get_last_conversation', 'get_conversation_context',
+    'get_memory_summary',
   ],
   multi: [], // Gets ALL tools
 };
 
-const CLASSIFICATION_PROMPT = `Du bist ein Intent-Klassifizierer für ein Immobilien-CRM. Klassifiziere die User-Nachricht in GENAU EINE Kategorie.
+const CLASSIFICATION_PROMPT = `Classify the user message into exactly ONE category. Reply with ONLY the category name.
 
-Kategorien:
-- smalltalk: Begrüßung, Smalltalk, Humor, Fragen über dich ("hey", "wie geht's", "was kannst du")
-- crm: Leads erstellen/suchen/bearbeiten, Immobilien verwalten, Dashboard-Statistiken, Zuweisungen
-- email: E-Mails lesen, schreiben, senden, Entwürfe
-- calendar: Termine, Kalender, Verfügbarkeit, Besichtigungen
-- expose: Exposés erstellen, bearbeiten, Vorlagen, Blöcke, Themes
-- memory: Fragen über vergangene Gespräche ("was haben wir besprochen", "erinnerst du dich")
-- multi: Komplexe Anfrage die MEHRERE der obigen Kategorien klar umfasst
+Categories:
+smalltalk = greetings, casual chat, humor, questions about yourself ("hey", "wer bist du", "was kannst du")
+crm = leads, properties, search, stats, assignments
+email = read, write, send emails
+calendar = events, appointments, availability
+expose = exposé creation, templates, blocks, themes
+memory = past conversations ("was haben wir besprochen", "erinnerst du dich")
+multi = complex request clearly spanning multiple categories
 
-Antworte NUR mit dem Kategorienamen, nichts anderes.`;
+Reply with one word only: smalltalk, crm, email, calendar, expose, memory, or multi.`;
 
 function getOpenAI() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
@@ -99,16 +106,19 @@ export class AgentRouter {
         }).catch(() => {});
       }
 
-      const category = (response.choices[0]?.message?.content || '').trim().toLowerCase() as AgentCategory;
+      const raw = (response.choices[0]?.message?.content || '').trim().toLowerCase().replace(/[^a-z]/g, '');
       
-      // Validate
-      if (TOOL_CATEGORIES[category] !== undefined) {
+      // Match category — also handle partial/fuzzy matches
+      const VALID_CATEGORIES: AgentCategory[] = ['smalltalk', 'crm', 'email', 'calendar', 'expose', 'memory', 'multi'];
+      const category = VALID_CATEGORIES.find(c => raw === c || raw.startsWith(c)) || null;
+      
+      if (category) {
         console.log(`🧭 Router: "${message.substring(0, 50)}..." → ${category} (${Date.now() - startTime}ms)`);
         return category;
       }
 
       // Fallback to multi if classification is unclear
-      console.warn(`⚠️ Router: Unknown category "${category}", falling back to multi`);
+      console.warn(`⚠️ Router: Unknown category "${raw}" (raw: "${response.choices[0]?.message?.content}"), falling back to multi`);
       return 'multi';
     } catch (error) {
       console.error('Router classification error:', error);

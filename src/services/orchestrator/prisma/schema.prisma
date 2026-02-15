@@ -20,6 +20,18 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Company Profile (used by Jarvis for context)
+  description   String?  // Kurzbeschreibung des Unternehmens
+  phone         String?  // Haupttelefonnummer
+  email         String?  // Kontakt-E-Mail
+  website       String?  // Website-URL
+  logoUrl       String?  // Logo-URL
+  services      String[] // Angebotene Dienstleistungen (z.B. "Verkauf", "Vermietung", "Bewertung")
+  regions       String[] // Taetigkeitsgebiete (z.B. "Wien", "Niederösterreich")
+  slogan        String?  // Firmenslogan / USP
+  foundedYear   Int?     // Gruendungsjahr
+  teamSize      Int?     // Teamgroesse
+
   // Relations
   users           User[]
   leads           Lead[]

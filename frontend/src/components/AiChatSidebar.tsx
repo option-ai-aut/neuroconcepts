@@ -706,15 +706,14 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
               }
               
               if (data.done) {
-                // Check if AI performed actions
                 if (data.hadFunctionCalls) {
                   hadFunctionCalls = true;
                 }
-                // Clear executing flag on done
+                // Clear executing flag — all tools finished, response complete
                 setMessages(prev => {
                   const newMessages = [...prev];
                   const assistantIdx = newMessages.findIndex((m, idx) => idx === assistantMsgIndex && m.role === 'ASSISTANT');
-                  if (assistantIdx !== -1 && newMessages[assistantIdx].isExecutingTools) {
+                  if (assistantIdx !== -1) {
                     newMessages[assistantIdx] = {
                       ...newMessages[assistantIdx],
                       isExecutingTools: false
@@ -726,16 +725,15 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
               }
               
               if (data.chunk) {
-                // Update the assistant message with new chunk (preserve toolsUsed, clear executing flag)
+                // Update the assistant message with new chunk (preserve toolsUsed + executing state)
                 setMessages(prev => {
                   const newMessages = [...prev];
-                  // Find the assistant message (not the action message)
                   const assistantIdx = newMessages.findIndex((m, idx) => idx === assistantMsgIndex && m.role === 'ASSISTANT');
                   if (assistantIdx !== -1) {
                     newMessages[assistantIdx] = {
-                      ...newMessages[assistantIdx], // Preserve existing properties like toolsUsed
+                      ...newMessages[assistantIdx],
                       content: (newMessages[assistantIdx]?.content || '') + data.chunk,
-                      isExecutingTools: false
+                      // Keep pulsing until done — tools may still execute in background
                     };
                   }
                   return newMessages;
@@ -866,10 +864,10 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
               </p>
               <div className="mt-4 mx-2 p-3 bg-gray-50 rounded-lg border border-gray-100 text-center">
                 <p className="text-[10px] text-gray-400 leading-relaxed">
-                  Jarvis ist ein KI-Assistent (GPT-5 mini). Deine Nachrichten werden 
-                  zur Verarbeitung an OpenAI übermittelt. Es werden keine Daten für 
-                  KI-Training verwendet. Alle Interaktionen werden protokolliert. 
-                  Antworten können fehlerhaft sein — bitte prüfe wichtige Angaben.
+                  Jarvis ist ein KI-Assistent. Deine Nachrichten werden 
+                  zur Verarbeitung an OpenAI übermittelt. Alle Interaktionen werden 
+                  protokolliert. Antworten können fehlerhaft sein — bitte prüfe 
+                  wichtige Angaben.
                 </p>
               </div>
             </div>
