@@ -113,7 +113,7 @@ export const CRM_TOOLS = {
   // === LEAD TOOLS ===
   create_lead: {
     name: "create_lead",
-    description: "Creates a new lead in the CRM. IMPORTANT: Always include firstName and lastName! For test leads use 'Max Mustermann' or similar.",
+    description: "Creates a new lead in the CRM. Always include firstName, lastName, and email. For test/demo leads: invent realistic DACH names and emails yourself (e.g. 'Lisa Weber', 'lisa.weber@test.at'). NEVER ask the user for test data — just create it.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {

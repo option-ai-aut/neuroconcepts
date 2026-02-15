@@ -106,6 +106,9 @@ export class AgentRouter {
     // Memory patterns
     if (/\b(erinnerst|besprochen|letztes gespräch|chat.*historie|vergangene)\b/i.test(m)) return 'memory';
     
+    // CRM patterns (leads, properties, stats — the most common intent)
+    if (/\b(lead|leads|kontakt|interessent|objekt|immobilie|wohnung|haus|grundstück|property|anlegen|erstell|lösch|aktualisier|statistik|dashboard|zuweisen|test.*objekt|test.*lead)\b/i.test(m)) return 'crm';
+    
     return null; // No clear keyword match — use LLM
   }
 
