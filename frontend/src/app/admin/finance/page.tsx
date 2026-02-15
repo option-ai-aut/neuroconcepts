@@ -254,8 +254,8 @@ export default function FinancePage() {
                       tickFormatter={(v: number) => formatCents(v)}
                     />
                     <Tooltip 
-                      formatter={(value: number, name: string) => [formatCents(value), name === 'openai' ? 'OpenAI' : name === 'gemini' ? 'Gemini' : 'Gesamt']}
-                      labelFormatter={(label: string) => new Date(label).toLocaleDateString('de-DE')}
+                      formatter={(value: any, name: any) => [formatCents(Number(value)), name === 'openai' ? 'OpenAI' : name === 'gemini' ? 'Gemini' : 'Gesamt']}
+                      labelFormatter={(label: any) => new Date(String(label)).toLocaleDateString('de-DE')}
                     />
                     <Area type="monotone" dataKey="openai" stackId="1" stroke="#6366f1" fill="#6366f1" fillOpacity={0.3} name="openai" />
                     <Area type="monotone" dataKey="gemini" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.3} name="gemini" />
@@ -398,7 +398,7 @@ export default function FinancePage() {
       {/* =========== AWS COSTS TAB =========== */}
       {activeTab === 'aws' && (
         <>
-          {awsCosts?.error || !awsCosts ? (
+          {(awsCosts as any)?.error || !awsCosts ? (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 mb-6">
               <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
               <div>
@@ -428,7 +428,7 @@ export default function FinancePage() {
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                         <XAxis type="number" tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={(v: number) => formatCents(v)} />
                         <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} width={80} />
-                        <Tooltip formatter={(value: number) => [formatCents(value), 'Kosten']} />
+                        <Tooltip formatter={(value: any) => [formatCents(Number(value)), 'Kosten']} />
                         <Bar dataKey="cents" fill="#6366f1" radius={[0, 4, 4, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -506,11 +506,11 @@ export default function FinancePage() {
                           tickFormatter={(v: number) => formatCents(v)}
                         />
                         <Tooltip
-                          formatter={(value: number, name: string) => [
-                            name === 'costPerLeadCents' ? formatCents(value) : value,
+                          formatter={(value: any, name: any) => [
+                            name === 'costPerLeadCents' ? formatCents(Number(value)) : value,
                             name === 'costPerLeadCents' ? 'Kosten/Lead' : name === 'leads' ? 'Leads' : name
                           ]}
-                          labelFormatter={(label: string) => new Date(label).toLocaleDateString('de-DE')}
+                          labelFormatter={(label: any) => new Date(String(label)).toLocaleDateString('de-DE')}
                         />
                         <Area type="monotone" dataKey="costPerLeadCents" stroke="#10b981" fill="#10b981" fillOpacity={0.2} name="costPerLeadCents" />
                       </AreaChart>
