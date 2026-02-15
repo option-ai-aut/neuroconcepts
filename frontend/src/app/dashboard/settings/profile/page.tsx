@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { User, Mail, Plus, Trash2, Shield, Eye, EyeOff, Key, Loader2, Download, AlertTriangle } from 'lucide-react';
 import { getMe, getSeats, inviteSeat, deleteSeat, getAuthHeaders } from '@/lib/api';
 import { getRuntimeConfig } from '@/components/EnvProvider';
-import { updatePassword, signOut } from 'aws-amplify/auth';
+import { updatePassword, signOut, fetchAuthSession } from 'aws-amplify/auth';
 import useSWR from 'swr';
 
 export default function ProfileSettingsPage() {
@@ -186,16 +186,18 @@ export default function ProfileSettingsPage() {
     
     setChangingPassword(true);
     try {
+      // Ensure we have a fresh session before changing password
+      await fetchAuthSession({ forceRefresh: true });
+      
       await updatePassword({
         oldPassword: currentPassword,
         newPassword: newPassword
       });
       
-      alert('Passwort erfolgreich geändert!');
-      setIsChangingPassword(false);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
+      // Force sign out so user must re-login with new password
+      // This ensures the new password is definitely active
+      await signOut();
+      window.location.href = '/login';
     } catch (error: any) {
       console.error('Password change error:', error);
       if (error.name === 'NotAuthorizedException') {
@@ -207,7 +209,6 @@ export default function ProfileSettingsPage() {
       } else {
         setPasswordError(error.message || 'Fehler beim Ändern des Passworts.');
       }
-    } finally {
       setChangingPassword(false);
     }
   };
