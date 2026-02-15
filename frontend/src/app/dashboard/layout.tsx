@@ -164,7 +164,8 @@ export default function DashboardLayout({
 
     const checkAuth = async () => {
       try {
-        const session = await fetchAuthSession();
+        // forceRefresh ensures tokens are actually valid (not just cached but revoked)
+        const session = await fetchAuthSession({ forceRefresh: true });
         if (session.tokens) {
           setIsAuthenticated(true);
         } else {

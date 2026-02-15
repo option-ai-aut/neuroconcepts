@@ -57,21 +57,23 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Single auth check: wait for Amplify config, then check session once
+  // Single auth check: wait for Amplify config, then verify session is truly valid
   useEffect(() => {
     if (!authConfigured) return;
 
     const checkExisting = async () => {
       try {
-        const session = await fetchAuthSession();
+        // CRITICAL: forceRefresh=true forces Cognito to validate the refresh token.
+        // Without this, Amplify returns cached tokens that may be revoked (after
+        // password reset or global sign-out), and later API calls fail with 400.
+        const session = await fetchAuthSession({ forceRefresh: true });
         if (session.tokens?.idToken) {
           router.replace(getRedirectTarget());
           return;
         }
       } catch {
-        // Stale/invalid tokens — clear ALL Cognito storage to prevent 400 loops
+        // Refresh failed → tokens are revoked/invalid → clear everything
         clearCognitoStorage();
-        // Also clear Amplify's internal auth state
         try { await signOut(); } catch {}
       }
       setCheckingSession(false);
