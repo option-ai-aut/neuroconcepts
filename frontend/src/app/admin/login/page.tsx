@@ -8,6 +8,23 @@ import { Eye, EyeOff, Loader2, Shield } from 'lucide-react';
 import Image from 'next/image';
 import { useRuntimeConfig } from '@/components/RuntimeConfigProvider';
 
+/** Clean up Cognito error messages */
+function formatAuthError(msg: string): string {
+  if (!msg) return 'Ein Fehler ist aufgetreten';
+  const stripped = msg.replace(/^Password does not conform to policy:\s*/i, '');
+  const t: Record<string, string> = {
+    'Password must have numeric characters': 'Passwort muss mindestens eine Zahl enthalten.',
+    'Password must have uppercase characters': 'Passwort muss mindestens einen Großbuchstaben enthalten.',
+    'Password must have lowercase characters': 'Passwort muss mindestens einen Kleinbuchstaben enthalten.',
+    'Password must have symbol characters': 'Passwort muss mindestens ein Sonderzeichen enthalten.',
+    'Password not long enough': 'Passwort muss mindestens 12 Zeichen lang sein.',
+    'Incorrect username or password.': 'E-Mail oder Passwort ist falsch.',
+    'User does not exist.': 'Kein Admin-Konto mit dieser E-Mail gefunden.',
+    'Attempt limit exceeded, please try after some time.': 'Zu viele Versuche. Bitte warte einen Moment.',
+  };
+  return t[stripped] || t[msg] || stripped;
+}
+
 export default function AdminLoginPage() {
   const router = useRouter();
   const config = useRuntimeConfig();
@@ -93,7 +110,7 @@ export default function AdminLoginPage() {
 
       router.push('/admin');
     } catch (err: any) {
-      setError(err.message || 'Anmeldung fehlgeschlagen');
+      setError(formatAuthError(err.message) || 'Anmeldung fehlgeschlagen');
     } finally {
       setIsLoading(false);
     }
@@ -121,7 +138,7 @@ export default function AdminLoginPage() {
       });
       router.push('/admin');
     } catch (err: any) {
-      setError(err.message || 'Fehler beim Setzen des Passworts');
+      setError(formatAuthError(err.message) || 'Fehler beim Setzen des Passworts');
     } finally {
       setIsLoading(false);
     }

@@ -10,7 +10,7 @@ import Image from 'next/image';
 import { 
   getChannels, getChannelMessages, sendChannelMessage, getMe, getSeats,
   createChannel, deleteChannel, editChannelMessage, deleteChannelMessage,
-  getChannelMembers, getOrCreateDM
+  getChannelMembers, getOrCreateDM, uploadChatFiles, getImageUrl
 } from '@/lib/api';
 import useSWR from 'swr';
 
@@ -85,21 +85,52 @@ function PresenceDot({ status }: { status: PresenceStatus }) {
 // ==========================================
 // Mention parsing helpers
 // ==========================================
-function parseMentions(content: string): React.ReactNode[] {
-  const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
+function parseMentionsAndMedia(content: string): React.ReactNode[] {
+  // Combined regex: mentions @[Name](id), images ![name](url), links [name](url)
+  const combinedRegex = /(@\[([^\]]+)\]\(([^)]+)\))|(!\[([^\]]*)\]\(([^)]+)\))|(\[([^\]]+)\]\(([^)]+)\))/g;
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   let match;
 
-  while ((match = mentionRegex.exec(content)) !== null) {
+  while ((match = combinedRegex.exec(content)) !== null) {
     if (match.index > lastIndex) {
       parts.push(content.slice(lastIndex, match.index));
     }
-    parts.push(
-      <span key={match.index} className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-1 rounded font-medium">
-        @{match[1]}
-      </span>
-    );
+
+    if (match[1]) {
+      // Mention: @[Name](id)
+      parts.push(
+        <span key={match.index} className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-1 rounded font-medium">
+          @{match[2]}
+        </span>
+      );
+    } else if (match[4]) {
+      // Image: ![name](url)
+      parts.push(
+        <img
+          key={match.index}
+          src={match[6]}
+          alt={match[5] || 'Bild'}
+          className="max-w-xs max-h-64 rounded-lg mt-1 cursor-pointer hover:opacity-90 transition-opacity border border-gray-200 dark:border-gray-700"
+          onClick={() => window.open(match![6], '_blank')}
+          loading="lazy"
+        />
+      );
+    } else if (match[7]) {
+      // Link: [name](url)
+      parts.push(
+        <a
+          key={match.index}
+          href={match[9]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+        >
+          📎 {match[8]}
+        </a>
+      );
+    }
+
     lastIndex = match.index + match[0].length;
   }
   if (lastIndex < content.length) {
@@ -246,12 +277,29 @@ export default function TeamChatPage() {
     }
   };
 
-  // Send message
+  // Send message (with optional file uploads)
   const handleSendMessage = async () => {
-    if (!message.trim() || !activeChannelId || sending) return;
+    const hasText = message.trim().length > 0;
+    const hasFiles = uploadedFiles.length > 0;
+    if ((!hasText && !hasFiles) || !activeChannelId || sending) return;
     setSending(true);
     try {
-      await sendChannelMessage(activeChannelId, message.trim());
+      let fullContent = message.trim();
+
+      // Upload files first, then append URLs to message
+      if (hasFiles) {
+        const result = await uploadChatFiles(uploadedFiles.map(f => f.file));
+        const fileParts = result.files.map(f => {
+          if (f.type === 'image') return `![${f.name}](${f.url})`;
+          return `[${f.name}](${f.url})`;
+        });
+        fullContent = [fullContent, ...fileParts].filter(Boolean).join('\n');
+        // Clean up previews
+        uploadedFiles.forEach(f => { if (f.preview) URL.revokeObjectURL(f.preview); });
+        setUploadedFiles([]);
+      }
+
+      await sendChannelMessage(activeChannelId, fullContent);
       setMessage('');
       // Immediately refresh
       const data = await getChannelMessages(activeChannelId, undefined, 30);
@@ -819,7 +867,7 @@ export default function TeamChatPage() {
                           </div>
                         ) : (
                           <p className="text-sm text-gray-800 dark:text-gray-200 mt-0.5 break-words whitespace-pre-wrap">
-                            {parseMentions(msg.content)}
+                            {parseMentionsAndMedia(msg.content)}
                           </p>
                         )}
                       </div>
@@ -966,11 +1014,11 @@ export default function TeamChatPage() {
                   <button
                     onClick={handleSendMessage}
                     className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                      message.trim() && !sending
+                      (message.trim() || uploadedFiles.length > 0) && !sending
                         ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200'
                         : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
                     }`}
-                    disabled={!message.trim() || sending}
+                    disabled={(!message.trim() && uploadedFiles.length === 0) || sending}
                   >
                     {sending ? (
                       <>

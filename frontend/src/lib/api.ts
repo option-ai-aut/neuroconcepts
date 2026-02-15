@@ -539,6 +539,19 @@ export async function sendChannelMessage(channelId: string, content: string) {
   return res.json();
 }
 
+export async function uploadChatFiles(files: File[]): Promise<{ files: { name: string; url: string; type: string }[] }> {
+  const headers = await getAuthHeaders();
+  const formData = new FormData();
+  files.forEach(file => formData.append('files', file));
+  const res = await fetch(`${getApiUrl()}/channels/upload`, {
+    method: 'POST',
+    headers: { 'Authorization': (headers as Record<string, string>)['Authorization'] || '' },
+    body: formData,
+  });
+  if (!res.ok) throw new Error('Failed to upload files');
+  return res.json();
+}
+
 export async function editChannelMessage(channelId: string, messageId: string, content: string) {
   const headers = await getAuthHeaders();
   const res = await fetch(`${getApiUrl()}/channels/${channelId}/messages/${messageId}`, {

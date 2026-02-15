@@ -3808,6 +3808,47 @@ app.get('/channels/:channelId/messages', authMiddleware, async (req, res) => {
   }
 });
 
+// Upload files for team chat (returns URLs)
+app.post('/channels/upload', authMiddleware, upload.array('files', 5), async (req, res) => {
+  try {
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const files = (req as any).files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: 'Keine Dateien hochgeladen' });
+    }
+
+    const folder = `chat/${currentUser.tenantId}`;
+    const urls = await Promise.all(files.map(async (f) => {
+      const ext = path.extname(f.originalname);
+      const baseName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      
+      // Optimize images with sharp
+      if (f.mimetype.startsWith('image/') && f.mimetype !== 'image/gif') {
+        try {
+          const optimized = await sharp(f.buffer)
+            .resize(1920, 1920, { fit: 'inside', withoutEnlargement: true })
+            .webp({ quality: 85 })
+            .toBuffer();
+          const url = await uploadToS3(optimized, `${baseName}.webp`, 'image/webp', folder);
+          return { name: f.originalname, url, type: 'image' };
+        } catch {
+          // Fallback: upload original
+        }
+      }
+      
+      const url = await uploadToS3(f.buffer, `${baseName}${ext}`, f.mimetype, folder);
+      return { name: f.originalname, url, type: f.mimetype.startsWith('image/') ? 'image' : 'file' };
+    }));
+
+    res.json({ files: urls });
+  } catch (error: any) {
+    console.error('Chat upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Send Message (with mentions parsing)
 app.post('/channels/:channelId/messages', authMiddleware, async (req, res) => {
   try {

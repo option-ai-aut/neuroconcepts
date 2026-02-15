@@ -207,7 +207,9 @@ export default function ProfileSettingsPage() {
       } else if (error.name === 'LimitExceededException') {
         setPasswordError('Zu viele Versuche. Bitte warte einen Moment.');
       } else {
-        setPasswordError(error.message || 'Fehler beim Ändern des Passworts.');
+        // Strip "Password does not conform to policy: " prefix
+        const cleanMsg = (error.message || '').replace(/^Password does not conform to policy:\s*/i, '');
+        setPasswordError(cleanMsg || 'Fehler beim Ändern des Passworts.');
       }
       setChangingPassword(false);
     }

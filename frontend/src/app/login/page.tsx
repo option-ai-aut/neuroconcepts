@@ -9,6 +9,28 @@ import Image from 'next/image';
 import { syncUser } from '@/lib/api';
 import { useAuthConfigured } from '@/components/AuthProvider';
 
+/** Clean up Cognito error messages — strip the generic prefix, translate to German */
+function formatAuthError(msg: string): string {
+  if (!msg) return 'Ein Fehler ist aufgetreten';
+  // Strip "Password does not conform to policy: " prefix
+  const stripped = msg.replace(/^Password does not conform to policy:\s*/i, '');
+  // Map common Cognito messages to German
+  const translations: Record<string, string> = {
+    'Password must have numeric characters': 'Passwort muss mindestens eine Zahl enthalten.',
+    'Password must have uppercase characters': 'Passwort muss mindestens einen Großbuchstaben enthalten.',
+    'Password must have lowercase characters': 'Passwort muss mindestens einen Kleinbuchstaben enthalten.',
+    'Password must have symbol characters': 'Passwort muss mindestens ein Sonderzeichen enthalten.',
+    'Password not long enough': 'Passwort muss mindestens 8 Zeichen lang sein.',
+    'Incorrect username or password.': 'E-Mail oder Passwort ist falsch.',
+    'User does not exist.': 'Kein Konto mit dieser E-Mail gefunden.',
+    'User already exists': 'Ein Konto mit dieser E-Mail existiert bereits.',
+    'Invalid verification code provided, please try again.': 'Ungültiger Bestätigungscode. Bitte versuche es erneut.',
+    'Attempt limit exceeded, please try after some time.': 'Zu viele Versuche. Bitte warte einen Moment.',
+    'Username/client id combination not found.': 'Kein Konto mit dieser E-Mail gefunden.',
+  };
+  return translations[stripped] || translations[msg] || stripped;
+}
+
 // Countries with dial codes
 const COUNTRIES = [
   { code: 'AT', name: 'Österreich', dialCode: '+43' },
@@ -137,7 +159,7 @@ export default function LoginPage() {
         setView('confirmSignUp');
         setError('Bitte bestätige zuerst deine E-Mail-Adresse.');
       } else {
-        setError(err.message || 'Anmeldung fehlgeschlagen');
+        setError(formatAuthError(err.message) || 'Anmeldung fehlgeschlagen');
       }
     } finally {
       setIsLoading(false);
@@ -200,7 +222,7 @@ export default function LoginPage() {
       
       router.push(getRedirectTarget());
     } catch (err: any) {
-      setError(err.message || 'Fehler beim Setzen des Passworts');
+      setError(formatAuthError(err.message) || 'Fehler beim Setzen des Passworts');
     } finally {
       setIsLoading(false);
     }
@@ -239,7 +261,7 @@ export default function LoginPage() {
       
       router.push(getRedirectTarget());
     } catch (err: any) {
-      setError(err.message || 'Fehler beim Speichern');
+      setError(formatAuthError(err.message) || 'Fehler beim Speichern');
     } finally {
       setIsLoading(false);
     }
@@ -284,7 +306,7 @@ export default function LoginPage() {
       
       setView('confirmSignUp');
     } catch (err: any) {
-      setError(err.message || 'Registrierung fehlgeschlagen');
+      setError(formatAuthError(err.message) || 'Registrierung fehlgeschlagen');
     } finally {
       setIsLoading(false);
     }
@@ -302,7 +324,7 @@ export default function LoginPage() {
       await syncUser();
       router.push(getRedirectTarget());
     } catch (err: any) {
-      setError(err.message || 'Bestätigung fehlgeschlagen');
+      setError(formatAuthError(err.message) || 'Bestätigung fehlgeschlagen');
     } finally {
       setIsLoading(false);
     }
@@ -317,7 +339,7 @@ export default function LoginPage() {
       await resetPassword({ username: email });
       setView('confirmReset');
     } catch (err: any) {
-      setError(err.message || 'Fehler beim Zurücksetzen');
+      setError(formatAuthError(err.message) || 'Fehler beim Zurücksetzen');
     } finally {
       setIsLoading(false);
     }
@@ -334,7 +356,7 @@ export default function LoginPage() {
       setPassword('');
       setError('');
     } catch (err: any) {
-      setError(err.message || 'Fehler beim Zurücksetzen');
+      setError(formatAuthError(err.message) || 'Fehler beim Zurücksetzen');
     } finally {
       setIsLoading(false);
     }
