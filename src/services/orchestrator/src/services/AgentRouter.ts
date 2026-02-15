@@ -80,10 +80,49 @@ function getOpenAI() {
 
 export class AgentRouter {
   /**
-   * Classify user intent (cheap, fast ~100ms with gpt-5-mini)
+   * Fast keyword-based pre-classification (0ms, no API call)
+   * Catches obvious intents before hitting the LLM.
+   */
+  private static keywordClassify(msg: string): AgentCategory | null {
+    const m = msg.toLowerCase().trim();
+    
+    // Smalltalk patterns
+    const smalltalkPatterns = [
+      /^(hey|hi|hallo|servus|moin|guten (morgen|tag|abend)|na\??|yo|grüß|grüss|gruss)[\s!?.]*$/i,
+      /^(wie geht'?s|was geht|alles klar|danke|tschüss|bis dann|ciao)[\s!?.]*$/i,
+      /^(wer bist du|was kannst du|was bist du|hilfe|help)[\s!?.]*$/i,
+    ];
+    if (smalltalkPatterns.some(p => p.test(m))) return 'smalltalk';
+    
+    // Email patterns
+    if (/\b(e-?mail|mail|postfach|inbox|entwurf|draft|senden|schreib.*mail|nachricht senden)\b/i.test(m)) return 'email';
+    
+    // Calendar patterns
+    if (/\b(termin|kalender|besichtigung|verfügbar|calendar|appointment)\b/i.test(m)) return 'calendar';
+    
+    // Expose patterns
+    if (/\b(exposé|expose|vorlage|template|pdf.*erstell|block)\b/i.test(m)) return 'expose';
+    
+    // Memory patterns
+    if (/\b(erinnerst|besprochen|letztes gespräch|chat.*historie|vergangene)\b/i.test(m)) return 'memory';
+    
+    return null; // No clear keyword match — use LLM
+  }
+
+  /**
+   * Classify user intent: keyword-first, then LLM fallback
    */
   static async classify(message: string, tenantId?: string): Promise<AgentCategory> {
     const startTime = Date.now();
+
+    // Step 1: Fast keyword classification (free, instant)
+    const keywordResult = this.keywordClassify(message);
+    if (keywordResult) {
+      console.log(`🧭 Router: "${message.substring(0, 50)}" → ${keywordResult} (keyword, ${Date.now() - startTime}ms)`);
+      return keywordResult;
+    }
+
+    // Step 2: LLM classification for ambiguous messages
     try {
       const openai = getOpenAI();
       
@@ -93,7 +132,7 @@ export class AgentRouter {
           { role: 'system', content: CLASSIFICATION_PROMPT },
           { role: 'user', content: message },
         ],
-        max_completion_tokens: 10,
+        max_completion_tokens: 20,
       });
 
       // Log cost
@@ -106,20 +145,22 @@ export class AgentRouter {
         }).catch(() => {});
       }
 
-      const raw = (response.choices[0]?.message?.content || '').trim().toLowerCase().replace(/[^a-z]/g, '');
+      const rawContent = response.choices[0]?.message?.content || '';
+      const raw = rawContent.trim().toLowerCase().replace(/[^a-z]/g, '');
       
       // Match category — also handle partial/fuzzy matches
       const VALID_CATEGORIES: AgentCategory[] = ['smalltalk', 'crm', 'email', 'calendar', 'expose', 'memory', 'multi'];
       const category = VALID_CATEGORIES.find(c => raw === c || raw.startsWith(c)) || null;
       
       if (category) {
-        console.log(`🧭 Router: "${message.substring(0, 50)}..." → ${category} (${Date.now() - startTime}ms)`);
+        console.log(`🧭 Router: "${message.substring(0, 50)}" → ${category} (LLM, ${Date.now() - startTime}ms)`);
         return category;
       }
 
-      // Fallback to multi if classification is unclear
-      console.warn(`⚠️ Router: Unknown category "${raw}" (raw: "${response.choices[0]?.message?.content}"), falling back to multi`);
-      return 'multi';
+      // LLM returned garbage — fall back to keyword hints in the message
+      console.warn(`⚠️ Router: LLM returned "${rawContent}", falling back to crm`);
+      // Default to CRM for anything that isn't clearly smalltalk (most user messages are CRM-related)
+      return 'crm';
     } catch (error) {
       console.error('Router classification error:', error);
       return 'multi'; // Safe fallback: all tools
