@@ -3391,14 +3391,20 @@ app.post('/chat/stream',
         (req as any).uploadedFiles = uploadedFileUrls;
       }
 
-      // Assistants API: Thread stores history automatically
-      // Legacy history only used as fallback if Assistants API fails
       const openai = new OpenAIService();
       let fullResponse = '';
       let hadFunctionCalls = false;
 
       // Combine message with file context
       const fullMessage = message + fileContext;
+
+      // Load recent chat history from DB (last 20 messages for context)
+      const recentHistory = await prisma.userChat.findMany({
+        where: { userId, archived: false },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: { role: true, content: true },
+      }).then(msgs => msgs.reverse());
 
       // Fetch tenant info for AI context (cached per request)
       const tenant = await prisma.tenant.findUnique({ 
@@ -3436,7 +3442,7 @@ app.post('/chat/stream',
 
       let chunkCount = 0;
       try {
-        for await (const result of openai.chatStream(fullMessage, tenantId, [], uploadedFileUrls, currentUser.id, userContext)) {
+        for await (const result of openai.chatStream(fullMessage, tenantId, recentHistory, uploadedFileUrls, currentUser.id, userContext)) {
           lastDataTime = Date.now();
           fullResponse += result.chunk;
           if (result.hadFunctionCalls) hadFunctionCalls = true;
@@ -10022,6 +10028,14 @@ async function handleStreamingChat(event: any, responseStream: any): Promise<voi
       } : undefined,
     };
 
+    // Load recent chat history from DB (last 20 messages for context)
+    const recentHistory = await db.userChat.findMany({
+      where: { userId, archived: false },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: { role: true, content: true },
+    }).then((msgs: any[]) => msgs.reverse());
+
     // Stream AI response
     const openai = new OpenAIService();
     let fullResponse = '';
@@ -10038,7 +10052,7 @@ async function handleStreamingChat(event: any, responseStream: any): Promise<voi
     }, 5000);
 
     try {
-      for await (const result of openai.chatStream(message, tenantId, [], [], userId, userContext)) {
+      for await (const result of openai.chatStream(message, tenantId, recentHistory, [], userId, userContext)) {
         lastDataTime = Date.now();
         fullResponse += result.chunk;
         if (result.hadFunctionCalls) hadFunctionCalls = true;

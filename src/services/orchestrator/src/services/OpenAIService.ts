@@ -286,7 +286,7 @@ export class OpenAIService {
 
     // ── Step 2: Smalltalk → gpt-5-mini directly (no thread, no tools) ──
     if (category === 'smalltalk' && uploadedFiles.length === 0) {
-      yield* this.handleSmalltalk(message, tenantId, userId, userContext);
+      yield* this.handleSmalltalk(message, tenantId, userId, userContext, history);
       return;
     }
 
@@ -444,7 +444,8 @@ export class OpenAIService {
   // ═══════════════════════════════════════════════════════════
   private async *handleSmalltalk(
     message: string, tenantId: string, userId: string,
-    userContext?: { name: string; email: string; role: string; pageContext?: string; company?: { name: string; description?: string; phone?: string; email?: string; website?: string; address?: string; services?: string[]; regions?: string[]; slogan?: string } }
+    userContext?: { name: string; email: string; role: string; pageContext?: string; company?: { name: string; description?: string; phone?: string; email?: string; website?: string; address?: string; services?: string[]; regions?: string[]; slogan?: string } },
+    history: any[] = []
   ): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean; toolsUsed?: string[] }> {
     const startTime = Date.now();
     const ctxParts: string[] = [];
@@ -456,10 +457,17 @@ export class OpenAIService {
     }
     const contextStr = ctxParts.join('\n');
 
+    // Include recent chat history for context (last 10 messages for smalltalk)
+    const recentHistory = history.slice(-10).filter(h => h.content && h.content.trim());
+
     const stream = await this.client.chat.completions.create({
       model: 'gpt-5-mini',
       messages: [
         { role: 'system', content: getSystemPrompt() + contextStr },
+        ...recentHistory.map((h: any) => ({
+          role: (h.role === 'assistant' || h.role === 'ASSISTANT' ? 'assistant' : 'user') as 'assistant' | 'user',
+          content: h.content || '',
+        })),
         { role: 'user', content: message },
       ],
       stream: true,
