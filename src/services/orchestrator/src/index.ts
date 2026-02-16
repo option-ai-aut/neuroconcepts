@@ -9384,7 +9384,7 @@ app.get('/events/stream', authMiddleware, async (req: any, res) => {
     const tenantId = currentUser.tenantId;
     const userId = currentUser.id;
     const startTime = Date.now();
-    const MAX_DURATION_MS = 100_000; // 100s, leave 20s buffer for Lambda 120s timeout
+    const MAX_DURATION_MS = 25_000; // 25s — must finish before API Gateway's 29s timeout
     const CHECK_INTERVAL_MS = 2_000; // Check for new events every 2s
 
     // Send initial heartbeat
