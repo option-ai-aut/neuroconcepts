@@ -284,14 +284,15 @@ export class OpenAIService {
     const category = await AgentRouter.classify(message, tenantId);
 
     // ── Step 2: Smalltalk → gpt-5-mini directly (no thread, no tools) ──
-    if (category === 'smalltalk') {
+    if (category === 'smalltalk' && uploadedFiles.length === 0) {
       yield* this.handleSmalltalk(message, tenantId, userId, userContext);
       return;
     }
 
     // ── Step 3: GPT-5 uses Chat Completions with routed tool subsets ──
     // (GPT-5 is a reasoning model — Assistants API doesn't support it)
-    const filteredTools = AgentRouter.filterTools(category);
+    const hasFiles = uploadedFiles.length > 0;
+    const filteredTools = AgentRouter.filterTools(category, hasFiles);
     const categoryHint = AgentRouter.getCategoryPromptHint(category);
 
     yield* this.chatStreamRouted(message, tenantId, history, uploadedFiles, userId, userContext, filteredTools, categoryHint);

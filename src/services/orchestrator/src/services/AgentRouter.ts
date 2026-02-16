@@ -65,12 +65,14 @@ const CLASSIFICATION_PROMPT = `Classify the user message into exactly ONE catego
 
 Categories:
 smalltalk = greetings, casual chat, humor, questions about yourself ("hey", "wer bist du", "was kannst du")
-crm = leads, properties, search, stats, assignments
+crm = leads, properties, search, stats, assignments, uploading images/photos/files to properties or leads, property media management (Bilder hinzufügen, Fotos hochladen, Grundriss, etc.)
 email = read, write, send emails
 calendar = events, appointments, availability
-expose = exposé creation, templates, blocks, themes
+expose = ONLY explicit exposé/PDF creation, templates, blocks, themes. NOT image uploads to properties!
 memory = past conversations ("was haben wir besprochen", "erinnerst du dich")
 multi = complex request clearly spanning multiple categories
+
+IMPORTANT: "Bild hinzufügen zu Objekt" or "Foto hochladen" = crm (NOT expose!)
 
 Reply with one word only: smalltalk, crm, email, calendar, expose, memory, or multi.`;
 
@@ -106,8 +108,11 @@ export class AgentRouter {
     // Memory patterns
     if (/\b(erinnerst|besprochen|letztes gespräch|chat.*historie|vergangene)\b/i.test(m)) return 'memory';
     
+    // Image/file upload patterns → always CRM (not expose!)
+    if (/\b(bild|bilder|foto|fotos|image|images|hochladen|upload|galerie|grundriss|floorplan)\b/i.test(m) && /\b(objekt|immobilie|property|wohnung|haus|büro|loft|hinzufüg|anfüg|add)\b/i.test(m)) return 'crm';
+    
     // CRM patterns (leads, properties, stats — the most common intent)
-    if (/\b(lead|leads|kontakt|interessent|objekt|immobilie|wohnung|haus|grundstück|property|anlegen|erstell|lösch|aktualisier|statistik|dashboard|zuweisen|test.*objekt|test.*lead)\b/i.test(m)) return 'crm';
+    if (/\b(lead|leads|kontakt|interessent|objekt|immobilie|wohnung|haus|grundstück|property|anlegen|erstell|lösch|aktualisier|statistik|dashboard|zuweisen|test.*objekt|test.*lead|bild.*hinzufüg|foto.*hinzufüg|hochladen)\b/i.test(m)) return 'crm';
     
     return null; // No clear keyword match — use LLM
   }
@@ -179,17 +184,24 @@ export class AgentRouter {
   }
 
   /**
-   * Filter CRM_TOOLS to only include relevant ones for the category
+   * Filter CRM_TOOLS to only include relevant ones for the category.
+   * When hasUploadedFiles is true, upload tools are always injected.
    */
-  static filterTools(category: AgentCategory): Record<string, any> | null {
-    if (category === 'smalltalk') return null; // No tools needed
+  static filterTools(category: AgentCategory, hasUploadedFiles = false): Record<string, any> | null {
+    if (category === 'smalltalk' && !hasUploadedFiles) return null;
 
     const toolNames = this.getToolNames(category);
     if (!toolNames) return CRM_TOOLS; // Return all tools for 'multi'
 
+    // Always include upload tools when files are attached
+    const UPLOAD_TOOLS = ['upload_images_to_property', 'upload_documents_to_lead', 'get_properties', 'get_property'];
+    const effectiveNames = hasUploadedFiles
+      ? [...new Set([...toolNames, ...UPLOAD_TOOLS])]
+      : toolNames;
+
     const filtered: Record<string, any> = {};
     for (const [key, tool] of Object.entries(CRM_TOOLS)) {
-      if (toolNames.includes((tool as any).name)) {
+      if (effectiveNames.includes((tool as any).name)) {
         filtered[key] = tool;
       }
     }
