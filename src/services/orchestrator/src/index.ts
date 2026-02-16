@@ -9816,8 +9816,20 @@ app.get('/admin/finance/aws-costs', adminAuthMiddleware, async (req, res) => {
       periods,
     });
   } catch (error: any) {
-    console.error('AWS costs error:', error);
-    res.status(500).json({ error: error.message, hint: 'Stellen Sie sicher, dass die Lambda-Funktion ce:GetCostAndUsage Berechtigung hat.' });
+    console.error('❌ AWS costs error:', error.name, error.message);
+    const errorDetail = error.name === 'AccessDeniedException' 
+      ? 'Fehlende IAM-Berechtigung (ce:GetCostAndUsage)'
+      : error.name === 'OptInRequired'
+      ? 'Cost Explorer muss im AWS-Konto aktiviert werden'
+      : error.message || 'Unbekannter Fehler';
+    // Return 200 with error field so frontend can display gracefully
+    res.json({
+      totalCostCents: 0,
+      totalCostUsd: 0,
+      serviceBreakdown: {},
+      periods: [],
+      error: `Cost Explorer: ${errorDetail}`,
+    });
   }
 });
 

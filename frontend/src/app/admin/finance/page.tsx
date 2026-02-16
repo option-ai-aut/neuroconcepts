@@ -12,7 +12,16 @@ import {
 
 // Recharts (lazy to avoid SSR issues)
 import dynamic from 'next/dynamic';
-const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.ResponsiveContainer), { ssr: false });
+const RechartsContainer = dynamic(
+  () => import('recharts').then(m => {
+    const { ResponsiveContainer } = m;
+    const SafeContainer = (props: any) => (
+      <ResponsiveContainer {...props} minWidth={0} minHeight={0} />
+    );
+    return SafeContainer;
+  }),
+  { ssr: false }
+);
 const AreaChart = dynamic(() => import('recharts').then(m => m.AreaChart), { ssr: false });
 const Area = dynamic(() => import('recharts').then(m => m.Area), { ssr: false });
 const BarChart = dynamic(() => import('recharts').then(m => m.BarChart), { ssr: false });
@@ -255,8 +264,8 @@ export default function FinancePage() {
           {dailyChartData.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
               <h2 className="text-sm font-semibold text-gray-900 mb-3">Tägliche KI-Kosten</h2>
-              <div className="h-[250px]">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-[250px]" style={{ minWidth: 0 }}>
+                <RechartsContainer width="100%" height={250} minWidth={0}>
                   <AreaChart data={dailyChartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis 
@@ -275,7 +284,7 @@ export default function FinancePage() {
                     <Area type="monotone" dataKey="openai" stackId="1" stroke="#6366f1" fill="#6366f1" fillOpacity={0.3} name="openai" />
                     <Area type="monotone" dataKey="gemini" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.3} name="gemini" />
                   </AreaChart>
-                </ResponsiveContainer>
+                </RechartsContainer>
               </div>
             </div>
           )}
@@ -437,8 +446,8 @@ export default function FinancePage() {
               {awsServiceData.length > 0 && (
                 <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
                   <h2 className="text-sm font-semibold text-gray-900 mb-3">Kosten nach Service</h2>
-                  <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
+                  <div className="h-[300px]" style={{ minWidth: 0 }}>
+                    <RechartsContainer width="100%" height={300} minWidth={0}>
                       <BarChart data={awsServiceData} layout="vertical" margin={{ left: 80 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                         <XAxis type="number" tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={(v: number) => formatCents(v)} />
@@ -446,7 +455,7 @@ export default function FinancePage() {
                         <Tooltip formatter={(value: any) => [formatCents(Number(value)), 'Kosten']} />
                         <Bar dataKey="cents" fill="#6366f1" radius={[0, 4, 4, 0]} />
                       </BarChart>
-                    </ResponsiveContainer>
+                    </RechartsContainer>
                   </div>
                 </div>
               )}
@@ -566,8 +575,8 @@ export default function FinancePage() {
                 <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
                   <h2 className="text-sm font-semibold text-gray-900 mb-1">Kosten pro Lead — Tagestrend</h2>
                   <p className="text-[10px] text-gray-400 mb-3">Je mehr Leads, desto guenstiger wird jeder einzelne (Fixkosten verteilen sich)</p>
-                  <div className="h-[250px]">
-                    <ResponsiveContainer width="100%" height="100%">
+                  <div className="h-[250px]" style={{ minWidth: 0 }}>
+                    <RechartsContainer width="100%" height={250} minWidth={0}>
                       <AreaChart data={costPerLead.dailyTrend.filter(d => d.leads > 0)}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                         <XAxis
@@ -588,7 +597,7 @@ export default function FinancePage() {
                         />
                         <Area type="monotone" dataKey="costPerLeadCents" stroke="#10b981" fill="#10b981" fillOpacity={0.2} name="costPerLeadCents" />
                       </AreaChart>
-                    </ResponsiveContainer>
+                    </RechartsContainer>
                   </div>
                 </div>
               )}
