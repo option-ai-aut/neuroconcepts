@@ -147,6 +147,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
   const handleCloseJarvis = useCallback(() => {
     setJarvisClosing(true);
+    fabMoved.current = false;
     setTimeout(() => {
       setMobileJarvisOpen(false);
       setJarvisClosing(false);
@@ -178,26 +179,26 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         <AiChatSidebar />
       </div>
 
-      {/* Mobile: Jarvis Floating Action Button (draggable vertically) */}
-      {!mobileJarvisOpen && !jarvisClosing && (
-        <div
-          ref={fabRef}
-          onClick={() => { if (!fabMoved.current) setMobileJarvisOpen(true); }}
-          className="lg:hidden fixed right-4 z-40 cursor-pointer select-none"
-          style={{
-            top: fabY != null ? `${fabY}px` : undefined,
-            bottom: fabY == null ? `calc(72px + 16px + env(safe-area-inset-bottom, 0px))` : undefined,
-            transition: 'top 0.2s ease-out',
-            touchAction: 'none',
-            WebkitTouchCallout: 'none',
-            WebkitUserSelect: 'none',
-          }}
-          role="button"
-          aria-label="Jarvis KI-Chat öffnen"
-        >
-          <Image src="/logo-icon-only.png" alt="Jarvis" width={52} height={52} className="pointer-events-none" draggable={false} />
-        </div>
-      )}
+      {/* Mobile: Jarvis Floating Action Button (draggable vertically) — always mounted to keep touch listeners alive */}
+      <div
+        ref={fabRef}
+        onClick={() => { if (!fabMoved.current) setMobileJarvisOpen(true); }}
+        className={`lg:hidden fixed right-4 z-40 cursor-pointer select-none transition-opacity duration-200 ${
+          mobileJarvisOpen || jarvisClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}
+        style={{
+          top: fabY != null ? `${fabY}px` : undefined,
+          bottom: fabY == null ? `calc(72px + 16px + env(safe-area-inset-bottom, 0px))` : undefined,
+          transition: fabDragging.current ? 'none' : 'top 0.2s ease-out, opacity 0.2s ease',
+          touchAction: 'none',
+          WebkitTouchCallout: 'none',
+          WebkitUserSelect: 'none',
+        }}
+        role="button"
+        aria-label="Jarvis KI-Chat öffnen"
+      >
+        <Image src="/logo-icon-only.png" alt="Jarvis" width={52} height={52} className="pointer-events-none" draggable={false} />
+      </div>
 
       {/* Mobile: Jarvis Full-Screen Chat Overlay */}
       {(mobileJarvisOpen || jarvisClosing) && (
