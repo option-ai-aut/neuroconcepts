@@ -142,6 +142,28 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
     }
   }, [emailFormData.bodyHtml, emailFormData.body]);
 
+  // Auto-insert signature for new emails (no existing body)
+  useEffect(() => {
+    if (
+      signature &&
+      signatureLoaded &&
+      editorRef.current &&
+      !emailFormData.body &&
+      !emailFormData.bodyHtml
+    ) {
+      const sigHtml = '<br><br>' + signature.replace(/\n/g, '<br>');
+      editorRef.current.innerHTML = sigHtml;
+      // Place cursor at the very beginning (before signature)
+      const range = document.createRange();
+      const sel = window.getSelection();
+      range.setStart(editorRef.current, 0);
+      range.collapse(true);
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      syncContent();
+    }
+  }, [signature, signatureLoaded]);
+
   // Sync editor content to form data
   const syncContent = () => {
     if (!editorRef.current) return;

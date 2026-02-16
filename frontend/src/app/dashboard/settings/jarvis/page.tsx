@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Bot, Clock, MessageSquare, Zap, Calendar, Bell, Save, Loader2 } from 'lucide-react';
+import { Bot, Clock, MessageSquare, Zap, Calendar, Bell, Save, Loader2, Shield } from 'lucide-react';
 import useSWR from 'swr';
 import { useEnv } from '@/components/EnvProvider';
 import { fetchWithAuth } from '@/lib/api';
@@ -19,6 +19,14 @@ interface UserSettings {
   };
 }
 
+interface TenantSettings {
+  autoReplyEnabled: boolean;
+  autoReplyDelay: number;
+  aiDisclosureEnabled: boolean;
+  calendarShareTeam: boolean;
+  inboundLeadEmail: string;
+}
+
 const WEEKDAYS = [
   { value: 1, label: 'Mo' },
   { value: 2, label: 'Di' },
@@ -31,8 +39,9 @@ const WEEKDAYS = [
 
 export default function JarvisSettingsPage() {
   const { apiUrl } = useEnv();
-  const [autoReply, setAutoReply] = useState(true);
+  const [autoReply, setAutoReply] = useState(false);
   const [delay, setDelay] = useState(5);
+  const [aiDisclosure, setAiDisclosure] = useState(true);
   const [autoMatch, setAutoMatch] = useState(true);
   const [notifyOnMatch, setNotifyOnMatch] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -54,7 +63,14 @@ export default function JarvisSettingsPage() {
     { revalidateOnFocus: false }
   );
 
-  // Load settings when data arrives
+  // Fetch tenant settings (auto-reply, AI disclosure, etc.)
+  const { data: tenantData, mutate: mutateTenant } = useSWR<TenantSettings>(
+    `${apiUrl}/settings/tenant`,
+    (url: string) => fetchWithAuth(url),
+    { revalidateOnFocus: false }
+  );
+
+  // Load user settings when data arrives
   useEffect(() => {
     if (settingsData?.settings) {
       const s = settingsData.settings;
@@ -70,6 +86,15 @@ export default function JarvisSettingsPage() {
     }
   }, [settingsData]);
 
+  // Load tenant settings when data arrives
+  useEffect(() => {
+    if (tenantData) {
+      setAutoReply(tenantData.autoReplyEnabled ?? false);
+      setDelay(tenantData.autoReplyDelay ?? 5);
+      setAiDisclosure(tenantData.aiDisclosureEnabled ?? true);
+    }
+  }, [tenantData]);
+
   const toggleWeekday = (day: number) => {
     if (viewingWeekdays.includes(day)) {
       setViewingWeekdays(viewingWeekdays.filter(d => d !== day));
@@ -82,6 +107,7 @@ export default function JarvisSettingsPage() {
     setSaving(true);
     setSaveSuccess(false);
     try {
+      // Save user settings
       await fetchWithAuth(`${apiUrl}/me/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -97,7 +123,20 @@ export default function JarvisSettingsPage() {
           }
         })
       });
+
+      // Save tenant settings (auto-reply, AI disclosure)
+      await fetchWithAuth(`${apiUrl}/settings/tenant`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          autoReplyEnabled: autoReply,
+          autoReplyDelay: delay,
+          aiDisclosureEnabled: aiDisclosure,
+        })
+      });
+
       mutate();
+      mutateTenant();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (error) {
@@ -193,28 +232,55 @@ export default function JarvisSettingsPage() {
           </div>
 
           {/* Delay Setting */}
-          <div className="py-4">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-gray-600" />
+          {autoReply && (
+            <div className="py-4 border-b border-gray-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-gray-600" />
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-gray-900">Verzögerung</span>
+                  <p className="text-xs text-gray-500">Wartezeit vor dem Senden, damit es natürlicher wirkt</p>
+                </div>
+              </div>
+              <div className="ml-13 pl-13">
+                <input
+                  type="range"
+                  min="0"
+                  max="60"
+                  step="1"
+                  value={delay}
+                  onChange={(e) => setDelay(parseInt(e.target.value))}
+                  className="w-full max-w-xs h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+                <div className="mt-2 text-sm text-gray-900 font-medium">{delay} Minuten</div>
+              </div>
+            </div>
+          )}
+
+          {/* AI Disclosure */}
+          <div className="flex items-center justify-between py-4 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                <Shield className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <span className="text-sm font-medium text-gray-900">Verzögerung</span>
-                <p className="text-xs text-gray-500">Wartezeit vor dem Senden, damit es natürlicher wirkt</p>
+                <span className="text-sm font-medium text-gray-900">KI-Hinweis in E-Mails</span>
+                <p className="text-xs text-gray-500">Dezenter Hinweis unter der Signatur, dass die E-Mail KI-unterstützt erstellt wurde</p>
               </div>
             </div>
-            <div className="ml-13 pl-13">
-              <input
-                type="range"
-                min="0"
-                max="60"
-                step="1"
-                value={delay}
-                onChange={(e) => setDelay(parseInt(e.target.value))}
-                className="w-full max-w-xs h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            <button
+              onClick={() => setAiDisclosure(!aiDisclosure)}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                aiDisclosure ? 'bg-gray-900' : 'bg-gray-200'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  aiDisclosure ? 'translate-x-5' : 'translate-x-0'
+                }`}
               />
-              <div className="mt-2 text-sm text-gray-900 font-medium">{delay} Minuten</div>
-            </div>
+            </button>
           </div>
         </div>
       </div>

@@ -30,21 +30,16 @@ export default function DatenschutzPage() {
                 Verantwortlich für die Datenverarbeitung im Sinne der Datenschutz-Grundverordnung (DSGVO) ist:
               </p>
               <address className="mt-3 not-italic text-gray-600 leading-relaxed">
-                <strong>Immivo GmbH</strong><br />
+                <strong>Dynamo Lab Technologies GmbH</strong> <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-medium rounded not-italic">In Gründung</span><br />
                 Sterngasse 3<br />
                 1010 Wien, Österreich<br />
                 E-Mail:{' '}
                 <a href="mailto:office@immivo.ai" className="text-blue-600 hover:text-blue-700 hover:underline">
                   office@immivo.ai
                 </a>
-                <br />
-                Telefon:{' '}
-                <a href="tel:+436703551221" className="text-blue-600 hover:text-blue-700 hover:underline">
-                  +43 670 355 1221
-                </a>
               </address>
               <p className="mt-3 text-gray-600 leading-relaxed">
-                Geschäftsführer: Dennis Kral, Josef Leutgeb
+                Geschäftsführer: Josef Leutgeb
               </p>
             </section>
 

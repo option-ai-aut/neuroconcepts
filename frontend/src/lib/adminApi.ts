@@ -298,3 +298,16 @@ export const getCostPerLead = (from?: string, to?: string) => {
 };
 
 export const getAiPricing = () => adminFetch<{ pricing: Record<string, { input: number; output: number }> }>('/admin/finance/pricing');
+
+export interface TenantCost {
+  tenantId: string;
+  tenantName: string;
+  costCents: number;
+  costUsd: number;
+  calls: number;
+  capCents: number;
+  capUsd: number;
+  percentUsed: number;
+}
+
+export const getTenantCosts = () => adminFetch<{ data: TenantCost[] }>('/admin/finance/tenant-costs');

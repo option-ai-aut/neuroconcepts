@@ -379,6 +379,10 @@ export default function LandingPage() {
                   <Server className="w-4 h-4 text-orange-500" />
                   AWS Hosting EU
                 </div>
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-blue-500" />
+                  Sichere Bezahlung via Stripe
+                </div>
               </div>
             </div>
 
@@ -581,8 +585,7 @@ export default function LandingPage() {
                 {[
                   'Vollständiger Zugriff auf CRM, E-Mails, Kalender & Objekte',
                   'Erstellt professionelle Exposés in Sekunden',
-                  'Bearbeitet Bilder mit KI-Staging (Möbel einbauen)',
-                  'Eskaliert automatisch bei komplexen Fällen'
+                  'Bearbeitet Bilder mit KI-Staging (Möbel einbauen)'
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-3">
                     <div className="w-6 h-6 bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">

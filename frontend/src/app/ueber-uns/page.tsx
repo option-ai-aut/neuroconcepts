@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Mail, MapPin, Phone, ArrowRight, Sparkles, Shield, Users, Target, Zap, Globe, Code, TrendingUp } from 'lucide-react';
+import { Mail, MapPin, ArrowRight, Sparkles, Shield, Users, Target, Zap, Globe, Code, TrendingUp } from 'lucide-react';
 import PublicNavigation from '@/components/PublicNavigation';
 import PublicFooter from '@/components/PublicFooter';
 
@@ -82,7 +82,7 @@ export default function UeberUnsPage() {
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mt-3">
               Die Gründer
             </h2>
-            <p className="text-gray-600 mt-3 max-w-xl mx-auto">Beide Gründer halten jeweils 50% der Anteile an der Immivo GmbH.</p>
+            <p className="text-gray-600 mt-3 max-w-xl mx-auto">Die Köpfe hinter Immivo.</p>
           </div>
           <div className="grid md:grid-cols-2 gap-8">
             {/* Josef Leutgeb — First */}
@@ -96,19 +96,9 @@ export default function UeberUnsPage() {
                   <p className="text-blue-600 font-medium">Co-Founder & CEO</p>
                 </div>
               </div>
-              <div className="space-y-3">
-                {[
-                  'Seriengründer mit Erfahrung im Aufbau mehrerer erfolgreicher Unternehmen',
-                  'Verantwortlich für Strategie, Vertrieb und Partnerschaften',
-                  'Starkes Netzwerk in der Immobilien- und Tech-Branche',
-                  'Hält den Gesamtüberblick über Unternehmensentwicklung und Wachstum',
-                ].map((point, i) => (
-                  <div key={i} className="flex gap-3 text-gray-600">
-                    <div className="w-1.5 h-1.5 rounded-full bg-gray-900 mt-2 flex-shrink-0" />
-                    <span>{point}</span>
-                  </div>
-                ))}
-              </div>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                Strategie, Vertrieb & Unternehmensentwicklung
+              </p>
               <div className="mt-6 pt-6 border-t border-gray-100">
                 <a href="mailto:josef.leutgeb@immivo.ai" className="inline-flex items-center gap-2 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors">
                   <Mail className="w-4 h-4" />
@@ -128,19 +118,9 @@ export default function UeberUnsPage() {
                   <p className="text-blue-600 font-medium">Technical Co-Founder & CTO</p>
                 </div>
               </div>
-              <div className="space-y-3">
-                {[
-                  'Einer der führenden KI-Spezialisten Österreichs',
-                  'Hat die gesamte Immivo-Plattform von Grund auf entwickelt',
-                  'Verantwortlich für Technologie, Projektmanagement und Team',
-                  'Experte für Machine Learning, Cloud-Architektur und Fullstack-Entwicklung',
-                ].map((point, i) => (
-                  <div key={i} className="flex gap-3 text-gray-600">
-                    <div className="w-1.5 h-1.5 rounded-full bg-gray-900 mt-2 flex-shrink-0" />
-                    <span>{point}</span>
-                  </div>
-                ))}
-              </div>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                Technologie, Produktentwicklung & KI
+              </p>
               <div className="mt-6 pt-6 border-t border-gray-100">
                 <a href="mailto:dennis.kral@immivo.ai" className="inline-flex items-center gap-2 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors">
                   <Mail className="w-4 h-4" />
@@ -199,16 +179,13 @@ export default function UeberUnsPage() {
             </Link>
           </div>
           <div className="pt-8 border-t border-white/10">
-            <p className="font-semibold text-lg mb-4">Immivo GmbH</p>
+            <p className="font-semibold text-lg mb-4">Dynamo Lab Technologies GmbH</p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-gray-400">
               <a href="https://maps.google.com/?q=Sterngasse+3,+1010+Wien" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-white transition-colors">
                 <MapPin className="w-4 h-4" /> Sterngasse 3, 1010 Wien
               </a>
               <a href="mailto:office@immivo.ai" className="flex items-center gap-2 hover:text-white transition-colors">
                 <Mail className="w-4 h-4" /> office@immivo.ai
-              </a>
-              <a href="tel:+436703551221" className="flex items-center gap-2 hover:text-white transition-colors">
-                <Phone className="w-4 h-4" /> +43 670 355 1221
               </a>
             </div>
           </div>

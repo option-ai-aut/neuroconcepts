@@ -73,8 +73,9 @@ function convertToolsToAssistant(tools: Record<string, any>): OpenAI.Beta.Assist
   }));
 }
 
-// Model to use
+// Models
 const MODEL = 'gpt-5.2';
+const MINI_MODEL = 'gpt-5-mini';
 
 // System prompt for Jarvis
 function getSystemPrompt(): string {
@@ -367,6 +368,8 @@ export class OpenAIService {
       const toolCallsInProgress: Map<number, { id: string; type: 'function'; function: { name: string; arguments: string } }> = new Map();
       const earlyToolNames: Set<string> = new Set();
 
+      let isStreamingContent = false; // Track if we're getting content (not tools)
+
       for await (const chunk of stream) {
         if ((chunk as any).usage) {
           totalStreamInputTokens += (chunk as any).usage.prompt_tokens || 0;
@@ -374,7 +377,17 @@ export class OpenAIService {
         }
         const delta = chunk.choices[0]?.delta;
         if (!delta) continue;
-        if (delta?.content) roundContent += delta.content;
+
+        // Stream content chunks immediately (word-by-word to frontend)
+        if (delta?.content) {
+          roundContent += delta.content;
+          if (!isStreamingContent) {
+            isStreamingContent = true;
+          }
+          // Yield each content delta immediately for real-time streaming
+          yield { chunk: delta.content, hadFunctionCalls: hadAnyFunctionCalls };
+        }
+
         if (delta?.tool_calls) {
           for (const tc of delta.tool_calls) {
             if (tc.index !== undefined) {
@@ -410,7 +423,7 @@ export class OpenAIService {
         currentMessages.push({ role: 'assistant', content: roundContent || null, tool_calls: roundToolCalls } as any);
         currentMessages.push(...toolResults);
       } else {
-        if (roundContent) yield { chunk: roundContent, hadFunctionCalls: hadAnyFunctionCalls };
+        // Content was already streamed word-by-word above — just break
         break;
       }
     }
@@ -449,10 +462,11 @@ export class OpenAIService {
       ],
       stream: true,
       stream_options: { include_usage: true },
-      max_completion_tokens: 200,
+      max_completion_tokens: 1024,
     });
 
     let totalIn = 0, totalOut = 0;
+    let fullContent = '';
     for await (const chunk of stream) {
       if ((chunk as any).usage) {
         totalIn += (chunk as any).usage.prompt_tokens || 0;
@@ -460,9 +474,12 @@ export class OpenAIService {
       }
       const content = chunk.choices[0]?.delta?.content;
       if (content) {
+        fullContent += content;
         yield { chunk: content };
       }
     }
+
+    console.log(`💬 Smalltalk response (${Date.now() - startTime}ms, ${totalIn}→${totalOut} tokens): "${fullContent.substring(0, 100)}${fullContent.length > 100 ? '...' : ''}"`);
 
     if (totalIn > 0 || totalOut > 0) {
       AiCostService.logUsage({
@@ -540,6 +557,8 @@ export class OpenAIService {
         
         if (delta?.content) {
           roundContent += delta.content;
+          // Yield each content delta immediately for real-time streaming
+          yield { chunk: delta.content, hadFunctionCalls: hadAnyFunctionCalls };
         }
         
         if (delta?.tool_calls) {
@@ -569,19 +588,14 @@ export class OpenAIService {
         const toolNames = roundToolCalls.map(tc => (tc as any).function.name as string);
         allToolNames.push(...toolNames);
         
-        if (roundContent) {
-          yield { chunk: roundContent, hadFunctionCalls: true, toolsUsed: allToolNames };
-        } else {
-          yield { chunk: '', hadFunctionCalls: true, toolsUsed: allToolNames };
-        }
+        // Yield tool names info (content was already streamed above)
+        yield { chunk: '', hadFunctionCalls: true, toolsUsed: allToolNames };
 
         const toolResults = await this.executeToolCalls(roundToolCalls, tenantId);
         currentMessages.push({ role: 'assistant', content: roundContent || null, tool_calls: roundToolCalls } as any);
         currentMessages.push(...toolResults);
       } else {
-        if (roundContent) {
-          yield { chunk: roundContent, hadFunctionCalls: hadAnyFunctionCalls };
-        }
+        // Content was already streamed word-by-word above — just break
         break;
       }
     }
@@ -747,5 +761,96 @@ export class OpenAIService {
     });
 
     return Promise.all(resultPromises);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // Auto-Reply: AI-generierte personalisierte Lead-Antwort
+  // ═══════════════════════════════════════════════════════════
+
+  async generateAutoReply(params: {
+    leadName: string;
+    leadEmail: string;
+    leadMessage?: string;
+    leadSource?: string;
+    propertyTitle?: string;
+    propertyAddress?: string;
+    propertyPrice?: number;
+    propertyRooms?: number;
+    propertyArea?: number;
+    agentName: string;
+    companyName?: string;
+    tenantId?: string;
+  }): Promise<{ subject: string; body: string }> {
+    const startTime = Date.now();
+
+    const propertyInfo = params.propertyTitle
+      ? `Objekt: "${params.propertyTitle}"${params.propertyAddress ? ` in ${params.propertyAddress}` : ''}${params.propertyPrice ? `, ${params.propertyPrice.toLocaleString('de-DE')}€` : ''}${params.propertyRooms ? `, ${params.propertyRooms} Zimmer` : ''}${params.propertyArea ? `, ${params.propertyArea}m²` : ''}`
+      : 'Kein spezifisches Objekt zugeordnet';
+
+    const systemPrompt = `Du bist ein Assistent, der für den Immobilienmakler "${params.agentName}"${params.companyName ? ` (${params.companyName})` : ''} eine professionelle Antwort-E-Mail auf Deutsch verfasst.
+
+REGELN:
+- Schreibe eine kurze, freundliche, professionelle E-Mail (3-5 Sätze)
+- Sprich den Lead mit Namen an (${params.leadName})
+- Bedanke dich für das Interesse
+- Erwähne das Objekt kurz, falls vorhanden
+- Biete an, für Fragen oder eine Besichtigung zur Verfügung zu stehen
+- Unterzeichne NICHT — die Signatur wird automatisch angehängt
+- Kein Betreff — nur den E-Mail-Body
+- Schreibe natürlich und menschlich, nicht wie ein Bot
+- Verwende "Sie" als Anrede`;
+
+    const userPrompt = `Schreibe eine Antwort-E-Mail an ${params.leadName} (${params.leadEmail}).
+${params.leadMessage ? `Die Anfrage des Leads: "${params.leadMessage}"` : `Der Lead hat über ${params.leadSource || 'eine Plattform'} Interesse gezeigt.`}
+${propertyInfo}
+Makler: ${params.agentName}`;
+
+    try {
+      const response = await this.client.chat.completions.create({
+        model: MINI_MODEL,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        max_completion_tokens: 512,
+        temperature: 0.7,
+      });
+
+      const body = response.choices[0]?.message?.content?.trim() || '';
+
+      // Generate subject
+      const subjectResponse = await this.client.chat.completions.create({
+        model: MINI_MODEL,
+        messages: [
+          { role: 'system', content: 'Generiere einen kurzen, professionellen E-Mail-Betreff auf Deutsch für die folgende Makler-Antwort. Nur den Betreff, nichts anderes. Maximal 8 Wörter.' },
+          { role: 'user', content: body },
+        ],
+        max_completion_tokens: 64,
+        temperature: 0.5,
+      });
+
+      const subject = subjectResponse.choices[0]?.message?.content?.trim()?.replace(/^["']|["']$/g, '') || (params.propertyTitle ? `Ihre Anfrage zu ${params.propertyTitle}` : 'Ihre Immobilienanfrage');
+
+      // Log usage
+      const totalInput = (response.usage?.prompt_tokens || 0) + (subjectResponse.usage?.prompt_tokens || 0);
+      const totalOutput = (response.usage?.completion_tokens || 0) + (subjectResponse.usage?.completion_tokens || 0);
+      AiCostService.logUsage({
+        provider: 'openai',
+        model: MINI_MODEL,
+        endpoint: 'auto-reply',
+        inputTokens: totalInput,
+        outputTokens: totalOutput,
+        durationMs: Date.now() - startTime,
+        tenantId: params.tenantId,
+      }).catch(() => {});
+
+      return { subject, body };
+    } catch (error: any) {
+      console.error('generateAutoReply error:', error.message);
+      // Fallback: simple template
+      const fallbackBody = `Sehr geehrte/r ${params.leadName},\n\nvielen Dank für Ihr Interesse${params.propertyTitle ? ` an "${params.propertyTitle}"` : ''}. Ich melde mich in Kürze bei Ihnen.\n\nMit freundlichen Grüßen`;
+      const fallbackSubject = params.propertyTitle ? `Ihre Anfrage zu ${params.propertyTitle}` : 'Ihre Immobilienanfrage';
+      return { subject: fallbackSubject, body: fallbackBody };
+    }
   }
 }

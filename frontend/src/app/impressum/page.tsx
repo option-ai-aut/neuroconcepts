@@ -17,14 +17,15 @@ export default function ImpressumPage() {
             <section>
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Angaben gemäß § 5 ECG</h2>
               <div className="text-gray-600 space-y-1 text-sm leading-relaxed">
-                <p><strong>Immivo GmbH</strong></p>
+                <p><strong>Dynamo Lab Technologies GmbH</strong></p>
+                <p className="inline-flex items-center gap-2"><span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-medium rounded">In Gründung</span></p>
                 <p>Sterngasse 3</p>
                 <p>1010 Wien</p>
                 <p>Österreich</p>
-                <p className="pt-2">FN XXXXXX z (Firmenbuchnummer)</p>
+                <p className="pt-2">Firmenbuchnummer: in Vergebung</p>
                 <p>Firmenbuchgericht: Handelsgericht Wien</p>
-                <p>UID-Nummer: ATU XXXXXXXX</p>
-                <p className="pt-2">Geschäftsführer: Dennis Kral, Josef Leutgeb</p>
+                <p>UID-Nummer: in Vergebung</p>
+                <p className="pt-2">Geschäftsführer: Josef Leutgeb</p>
                 <p>Aufsichtsbehörde: Magistratisches Bezirksamt des I. Bezirks</p>
               </div>
             </section>
@@ -34,7 +35,6 @@ export default function ImpressumPage() {
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Kontakt</h2>
               <div className="text-gray-600 space-y-1 text-sm leading-relaxed">
                 <p>E-Mail: <a href="mailto:office@immivo.ai" className="text-gray-900 hover:underline">office@immivo.ai</a></p>
-                <p>Telefon: <a href="tel:+436703551221" className="text-gray-900 hover:underline">+43 6703551221</a></p>
               </div>
             </section>
 
@@ -94,7 +94,7 @@ export default function ImpressumPage() {
             <section>
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Medieninhaber gemäß § 25 MedienG</h2>
               <div className="text-gray-600 space-y-2 text-sm leading-relaxed">
-                <p><strong>Immivo GmbH</strong></p>
+                <p><strong>Dynamo Lab Technologies GmbH</strong> <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-medium rounded">In Gründung</span></p>
                 <p>Sterngasse 3, 1010 Wien, Österreich</p>
                 <p className="pt-2">Unternehmensgegenstand: Entwicklung und Vertrieb von KI-gestützter Software für die Immobilienbranche</p>
               </div>
@@ -104,7 +104,7 @@ export default function ImpressumPage() {
             <section>
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Verantwortlich für den Inhalt</h2>
               <p className="text-gray-600 text-sm leading-relaxed">
-                Dennis Kral, Josef Leutgeb
+                Josef Leutgeb
               </p>
             </section>
           </div>

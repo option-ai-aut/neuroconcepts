@@ -306,6 +306,96 @@ export class AiCostService {
   }
 
   /**
+   * Check if a tenant has exceeded their monthly AI cost cap.
+   * Returns { exceeded: boolean, currentCostCents, capCents, remainingCents }
+   */
+  static async checkCostCap(tenantId: string): Promise<{
+    exceeded: boolean;
+    currentCostCents: number;
+    capCents: number;
+    remainingCents: number;
+  }> {
+    if (!_prisma) return { exceeded: false, currentCostCents: 0, capCents: 2000, remainingCents: 2000 };
+
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    const [usageResult, settings] = await Promise.all([
+      _prisma.$queryRaw<any[]>`
+        SELECT COALESCE(SUM("costCentsUsd"), 0)::float as "totalCostCents"
+        FROM "AiUsageLog"
+        WHERE "tenantId" = ${tenantId}
+          AND "createdAt" >= ${monthStart}
+          AND "createdAt" <= ${monthEnd}
+      `,
+      _prisma.tenantSettings.findUnique({
+        where: { tenantId },
+        select: { aiCostCapCentsUsd: true },
+      }),
+    ]);
+
+    const currentCostCents = usageResult[0]?.totalCostCents || 0;
+    const capCents = settings?.aiCostCapCentsUsd ?? 2000; // Default $20
+    const remainingCents = Math.max(0, capCents - currentCostCents);
+
+    return {
+      exceeded: currentCostCents >= capCents,
+      currentCostCents,
+      capCents,
+      remainingCents,
+    };
+  }
+
+  /**
+   * Get monthly cost for a specific tenant
+   */
+  static async getTenantMonthlyCost(tenantId: string): Promise<{
+    costCents: number;
+    costUsd: number;
+    calls: number;
+    capCents: number;
+    capUsd: number;
+    percentUsed: number;
+  }> {
+    if (!_prisma) return { costCents: 0, costUsd: 0, calls: 0, capCents: 2000, capUsd: 20, percentUsed: 0 };
+
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    const [usageResult, settings] = await Promise.all([
+      _prisma.$queryRaw<any[]>`
+        SELECT 
+          COALESCE(SUM("costCentsUsd"), 0)::float as "totalCostCents",
+          COUNT(*)::int as "totalCalls"
+        FROM "AiUsageLog"
+        WHERE "tenantId" = ${tenantId}
+          AND "createdAt" >= ${monthStart}
+          AND "createdAt" <= ${monthEnd}
+      `,
+      _prisma.tenantSettings.findUnique({
+        where: { tenantId },
+        select: { aiCostCapCentsUsd: true },
+      }),
+    ]);
+
+    const costCents = usageResult[0]?.totalCostCents || 0;
+    const calls = usageResult[0]?.totalCalls || 0;
+    const capCents = settings?.aiCostCapCentsUsd ?? 2000;
+    const percentUsed = capCents > 0 ? (costCents / capCents) * 100 : 0;
+
+    return {
+      costCents,
+      costUsd: costCents / 100,
+      calls,
+      capCents,
+      capUsd: capCents / 100,
+      percentUsed: Math.min(100, percentUsed),
+    };
+  }
+
+  /**
    * Get the current pricing table (for display in admin UI)
    */
   static getPricingTable(): Record<string, { input: number; output: number }> {

@@ -6,8 +6,8 @@ import {
   AlertTriangle, Zap, Brain, Server, ArrowDownRight, ArrowUpRight, BarChart3
 } from 'lucide-react';
 import {
-  getFinanceSummary, getAiCosts, getAwsCosts, getCostPerLead, getAiPricing,
-  FinanceSummary, AiCostByModel, AiCostByDay, AiCostByEndpoint, AwsCostData, CostPerLead
+  getFinanceSummary, getAiCosts, getAwsCosts, getCostPerLead, getAiPricing, getTenantCosts,
+  FinanceSummary, AiCostByModel, AiCostByDay, AiCostByEndpoint, AwsCostData, CostPerLead, TenantCost
 } from '@/lib/adminApi';
 
 // Recharts (lazy to avoid SSR issues)
@@ -71,7 +71,7 @@ const ENDPOINT_LABELS: Record<string, string> = {
   'team-chat': 'Team Chat',
 };
 
-type Tab = 'overview' | 'ai' | 'aws' | 'leads';
+type Tab = 'overview' | 'ai' | 'aws' | 'leads' | 'tenants';
 
 export default function FinancePage() {
   const [loading, setLoading] = useState(true);
@@ -83,6 +83,7 @@ export default function FinancePage() {
   const [awsCosts, setAwsCosts] = useState<AwsCostData | null>(null);
   const [costPerLead, setCostPerLead] = useState<CostPerLead | null>(null);
   const [pricing, setPricing] = useState<Record<string, { input: number; output: number }>>({});
+  const [tenantCosts, setTenantCosts] = useState<TenantCost[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // Date range: current month
@@ -95,7 +96,7 @@ export default function FinancePage() {
     setLoading(true);
     setError(null);
     try {
-      const [summaryRes, modelRes, dayRes, endpointRes, awsRes, leadRes, pricingRes] = await Promise.allSettled([
+      const [summaryRes, modelRes, dayRes, endpointRes, awsRes, leadRes, pricingRes, tenantRes] = await Promise.allSettled([
         getFinanceSummary(fromStr, toStr),
         getAiCosts('model', fromStr, toStr),
         getAiCosts('day', fromStr, toStr),
@@ -103,15 +104,28 @@ export default function FinancePage() {
         getAwsCosts('DAILY', fromStr, toStr),
         getCostPerLead(fromStr, toStr),
         getAiPricing(),
+        getTenantCosts(),
       ]);
 
-      if (summaryRes.status === 'fulfilled') setSummary(summaryRes.value);
-      if (modelRes.status === 'fulfilled') setAiByModel(modelRes.value.data as AiCostByModel[]);
-      if (dayRes.status === 'fulfilled') setAiByDay(dayRes.value.data as AiCostByDay[]);
-      if (endpointRes.status === 'fulfilled') setAiByEndpoint(endpointRes.value.data as AiCostByEndpoint[]);
-      if (awsRes.status === 'fulfilled') setAwsCosts(awsRes.value);
-      if (leadRes.status === 'fulfilled') setCostPerLead(leadRes.value);
-      if (pricingRes.status === 'fulfilled') setPricing(pricingRes.value.pricing);
+      // Collect errors from rejected promises
+      const errors: string[] = [];
+      const check = (r: PromiseSettledResult<any>, label: string) => {
+        if (r.status === 'rejected') errors.push(`${label}: ${r.reason?.message || r.reason}`);
+        return r.status === 'fulfilled';
+      };
+
+      if (check(summaryRes, 'Summary') && summaryRes.status === 'fulfilled') setSummary(summaryRes.value);
+      if (check(modelRes, 'AI Model') && modelRes.status === 'fulfilled') setAiByModel(modelRes.value.data as AiCostByModel[]);
+      if (check(dayRes, 'AI Daily') && dayRes.status === 'fulfilled') setAiByDay(dayRes.value.data as AiCostByDay[]);
+      if (check(endpointRes, 'AI Endpoint') && endpointRes.status === 'fulfilled') setAiByEndpoint(endpointRes.value.data as AiCostByEndpoint[]);
+      if (check(awsRes, 'AWS') && awsRes.status === 'fulfilled') setAwsCosts(awsRes.value);
+      if (check(leadRes, 'Cost/Lead') && leadRes.status === 'fulfilled') setCostPerLead(leadRes.value);
+      if (check(pricingRes, 'Pricing') && pricingRes.status === 'fulfilled') setPricing(pricingRes.value.pricing);
+      if (check(tenantRes, 'Tenant Costs') && tenantRes.status === 'fulfilled') setTenantCosts(tenantRes.value.data);
+
+      if (errors.length > 0) {
+        setError(errors.join(' | '));
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -155,6 +169,7 @@ export default function FinancePage() {
     { id: 'ai', label: 'KI-Kosten', icon: Brain },
     { id: 'aws', label: 'AWS-Kosten', icon: Cloud },
     { id: 'leads', label: 'Kosten/Lead', icon: TrendingDown },
+    { id: 'tenants', label: 'Pro Tenant', icon: Users },
   ];
 
   return (
@@ -455,6 +470,65 @@ export default function FinancePage() {
               </div>
             </>
           )}
+        </>
+      )}
+
+      {/* =========== TENANT COSTS TAB =========== */}
+      {activeTab === 'tenants' && (
+        <>
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-900">KI-Kosten pro Tenant — aktueller Monat</h2>
+              <p className="text-[10px] text-gray-400 mt-0.5">Monatliches Limit: $20 pro Tenant (konfigurierbar)</p>
+            </div>
+            {tenantCosts.length === 0 ? (
+              <div className="p-8 text-center text-gray-400 text-sm">Keine Daten</div>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase">Tenant</th>
+                    <th className="text-right px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase">Kosten</th>
+                    <th className="text-right px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase">Limit</th>
+                    <th className="text-right px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase">Aufrufe</th>
+                    <th className="px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase">Auslastung</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tenantCosts.map((t) => (
+                    <tr key={t.tenantId} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
+                      <td className="px-4 py-3">
+                        <p className="text-sm font-medium text-gray-900">{t.tenantName}</p>
+                        <p className="text-[10px] text-gray-400 font-mono">{t.tenantId.slice(0, 8)}...</p>
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">{formatUsd(t.costUsd)}</td>
+                      <td className="px-4 py-3 text-right text-xs text-gray-600">{formatUsd(t.capUsd)}</td>
+                      <td className="px-4 py-3 text-right text-xs text-gray-600">{t.calls.toLocaleString('de-DE')}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                t.percentUsed >= 90 ? 'bg-red-500' :
+                                t.percentUsed >= 70 ? 'bg-amber-500' : 'bg-green-500'
+                              }`}
+                              style={{ width: `${Math.min(100, t.percentUsed)}%` }}
+                            />
+                          </div>
+                          <span className={`text-xs font-medium min-w-[40px] text-right ${
+                            t.percentUsed >= 90 ? 'text-red-600' :
+                            t.percentUsed >= 70 ? 'text-amber-600' : 'text-gray-600'
+                          }`}>
+                            {t.percentUsed.toFixed(0)}%
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </>
       )}
 

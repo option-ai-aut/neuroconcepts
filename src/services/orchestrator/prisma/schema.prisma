@@ -79,6 +79,12 @@ model TenantSettings {
   autoReplyEnabled Boolean @default(false) // If true, Jarvis sends emails automatically
   autoReplyDelay   Int     @default(5)     // Minutes to wait before auto-sending
   
+  // KI-Hinweis bei Auto-Reply
+  aiDisclosureEnabled Boolean @default(true) // If true, add AI disclosure to auto-reply emails
+  
+  // AI Cost Cap — monthly limit per tenant (in US cents, default 2000 = $20)
+  aiCostCapCentsUsd Float @default(2000)
+  
   // Lead Ingestion - Email address for receiving portal leads
   // e.g. "f7k2m9" -> f7k2m9@leads.immivo.ai
   inboundLeadEmail String? @unique

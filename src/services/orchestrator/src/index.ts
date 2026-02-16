@@ -383,6 +383,9 @@ async function applyPendingMigrations(db: PrismaClient) {
     'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "slogan" TEXT',
     'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "foundedYear" INTEGER',
     'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "teamSize" INTEGER',
+    // 2026-02-16: AI Disclosure + Cost Cap
+    'ALTER TABLE "TenantSettings" ADD COLUMN IF NOT EXISTS "aiDisclosureEnabled" BOOLEAN NOT NULL DEFAULT true',
+    'ALTER TABLE "TenantSettings" ADD COLUMN IF NOT EXISTS "aiCostCapCentsUsd" DOUBLE PRECISION NOT NULL DEFAULT 2000',
   ];
   
   for (const sql of migrations) {
@@ -970,10 +973,48 @@ app.get('/settings/tenant', authMiddleware, async (req, res) => {
       inboundLeadEmail: settings.inboundLeadEmail,
       autoReplyEnabled: settings.autoReplyEnabled,
       autoReplyDelay: settings.autoReplyDelay,
+      aiDisclosureEnabled: (settings as any).aiDisclosureEnabled ?? true,
       calendarShareTeam: settings.calendarShareTeam,
     });
   } catch (error) {
     console.error('Error fetching tenant settings:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Update Tenant Settings
+app.put('/settings/tenant', authMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const currentUser = await db.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { autoReplyEnabled, autoReplyDelay, aiDisclosureEnabled } = req.body;
+
+    const updateData: any = {};
+    if (typeof autoReplyEnabled === 'boolean') updateData.autoReplyEnabled = autoReplyEnabled;
+    if (typeof autoReplyDelay === 'number') updateData.autoReplyDelay = Math.max(0, Math.min(60, autoReplyDelay));
+    if (typeof aiDisclosureEnabled === 'boolean') updateData.aiDisclosureEnabled = aiDisclosureEnabled;
+
+    const settings = await db.tenantSettings.upsert({
+      where: { tenantId: currentUser.tenantId },
+      update: updateData,
+      create: {
+        tenantId: currentUser.tenantId,
+        inboundLeadEmail: Math.random().toString(36).substring(2, 10),
+        ...updateData,
+      },
+    });
+
+    res.json({
+      inboundLeadEmail: settings.inboundLeadEmail,
+      autoReplyEnabled: settings.autoReplyEnabled,
+      autoReplyDelay: settings.autoReplyDelay,
+      aiDisclosureEnabled: (settings as any).aiDisclosureEnabled ?? true,
+      calendarShareTeam: settings.calendarShareTeam,
+    });
+  } catch (error) {
+    console.error('Error updating tenant settings:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -3299,6 +3340,20 @@ app.post('/chat/stream',
       const userId = currentUser.id;
       const tenantId = currentUser.tenantId;
       
+      // Check AI cost cap for this tenant
+      const costCheck = await AiCostService.checkCostCap(tenantId);
+      if (costCheck.exceeded) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        const capUsd = (costCheck.capCents / 100).toFixed(2);
+        const usedUsd = (costCheck.currentCostCents / 100).toFixed(2);
+        res.write(`data: ${JSON.stringify({ chunk: `⚠️ Das monatliche KI-Budget deines Teams ist erreicht ($${usedUsd} / $${capUsd}). Bitte kontaktiere deinen Administrator oder warte bis zum nächsten Monat.` })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+        return;
+      }
+      
       // Set headers for SSE (Server-Sent Events)
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
@@ -3379,12 +3434,14 @@ app.post('/chat/stream',
         }
       }, 5000);
 
+      let chunkCount = 0;
       try {
         for await (const result of openai.chatStream(fullMessage, tenantId, [], uploadedFileUrls, currentUser.id, userContext)) {
           lastDataTime = Date.now();
           fullResponse += result.chunk;
           if (result.hadFunctionCalls) hadFunctionCalls = true;
           if (result.toolsUsed) toolsUsed = result.toolsUsed;
+          chunkCount++;
           // Send chunk as SSE (include tools info when available)
           if (result.toolsUsed) {
             res.write(`data: ${JSON.stringify({ chunk: result.chunk, toolsUsed: result.toolsUsed })}\n\n`);
@@ -3395,6 +3452,7 @@ app.post('/chat/stream',
       } finally {
         clearInterval(heartbeatInterval);
       }
+      console.log(`📡 SSE: ${chunkCount} chunks sent, total ${fullResponse.length} chars`);
 
       // Send done signal with function call info
       res.write(`data: ${JSON.stringify({ done: true, hadFunctionCalls, toolsUsed })}\n\n`);
@@ -8023,12 +8081,60 @@ app.post('/internal/scheduler/auto-reply', async (req, res) => {
       return res.json({ success: false, error: 'Tenant settings not found' });
     }
     
-    // 3. Get the draft message
+    // 3. Get assigned agent info
+    const assignedAgent = lead.assignedToId
+      ? await db.user.findUnique({
+          where: { id: lead.assignedToId },
+          select: { id: true, firstName: true, lastName: true, email: true, settings: { select: { emailSignature: true } } }
+        })
+      : null;
+
+    const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { name: true } });
+    const agentName = assignedAgent ? [assignedAgent.firstName, assignedAgent.lastName].filter(Boolean).join(' ') : (tenant?.name || 'Ihr Makler');
+
+    // 3b. Get lead's original message (for AI context)
+    const leadMessages = await db.message.findMany({
+      where: { leadId, role: 'USER' },
+      orderBy: { createdAt: 'asc' },
+      take: 1,
+    });
+    const leadMessageText = leadMessages[0]?.content || '';
+
+    // 3c. Generate AI reply OR use existing draft
     const draftMessage = lead.messages[0];
-    if (!draftMessage) {
-      console.log(`⚠️ No draft message found for lead ${leadId}`);
-      return res.json({ success: false, error: 'No draft message' });
+    let emailBody: string;
+    let emailSubject: string;
+
+    const openaiService = new OpenAIService();
+    const aiReply = await openaiService.generateAutoReply({
+      leadName: [lead.firstName, lead.lastName].filter(Boolean).join(' ') || lead.email,
+      leadEmail: lead.email,
+      leadMessage: leadMessageText || undefined,
+      leadSource: lead.source || undefined,
+      propertyTitle: lead.property?.title || undefined,
+      propertyAddress: lead.property?.address || undefined,
+      propertyPrice: lead.property?.price ? Number(lead.property.price) : undefined,
+      propertyRooms: lead.property?.rooms || undefined,
+      propertyArea: lead.property?.livingArea ? Number(lead.property.livingArea) : undefined,
+      agentName,
+      companyName: tenant?.name || undefined,
+      tenantId,
+    });
+
+    emailBody = aiReply.body;
+    emailSubject = aiReply.subject;
+
+    // Append agent signature
+    if (assignedAgent?.settings?.emailSignature) {
+      emailBody += `\n\n${assignedAgent.settings.emailSignature}`;
     }
+
+    // Append AI disclosure if enabled
+    if ((tenantSettings as any).aiDisclosureEnabled !== false) {
+      emailBody += '\n\n---\nDiese Nachricht wurde KI-unterstützt erstellt.';
+    }
+
+    console.log(`🤖 AI auto-reply generated for lead ${leadId}: "${emailSubject}"`);
     
     // 4. Prepare email config
     const emailConfig: any = {};
@@ -8077,37 +8183,39 @@ app.post('/internal/scheduler/auto-reply', async (req, res) => {
       return res.json({ success: false, error: 'No email provider configured' });
     }
     
-    // 6. Generate email subject
-    const emailSubject = lead.property 
-      ? `Ihr Exposé für ${lead.property.title}`
-      : 'Ihre Anfrage';
-    
-    // 7. Send the email
+    // 6. Send the email (subject + body already generated by AI above)
     const result = await EmailService.sendEmail(emailConfig, {
       to: lead.email,
       subject: emailSubject,
-      body: draftMessage.content,
-      html: draftMessage.content.includes('<') ? draftMessage.content : undefined
+      body: emailBody,
+      html: emailBody.includes('<') ? emailBody : undefined
     });
     
     if (result.success) {
-      // 8. Update lead status and message
+      // 8. Update lead status + mark draft as sent
       await db.lead.update({
         where: { id: leadId },
         data: { status: 'CONTACTED' }
       });
       
-      await db.message.update({
-        where: { id: draftMessage.id },
-        data: { status: 'SENT' }
-      });
+      if (draftMessage) {
+        await db.message.update({
+          where: { id: draftMessage.id },
+          data: { status: 'SENT', content: emailBody }
+        });
+      } else {
+        // Create sent message for audit trail
+        await db.message.create({
+          data: { leadId, role: 'ASSISTANT', content: emailBody, status: 'SENT' }
+        });
+      }
       
       // 9. Create activity log
       await db.leadActivity.create({
         data: {
           leadId,
           type: 'EMAIL_SENT',
-          description: `Exposé automatisch gesendet via ${result.provider}`
+          description: `KI-Auto-Reply gesendet via ${result.provider}`
         }
       });
       
@@ -8120,8 +8228,8 @@ app.post('/internal/scheduler/auto-reply', async (req, res) => {
           cc: [],
           bcc: [],
           subject: emailSubject,
-          bodyHtml: draftMessage.content.includes('<') ? draftMessage.content : undefined,
-          bodyText: draftMessage.content,
+          bodyHtml: emailBody.includes('<') ? emailBody : undefined,
+          bodyText: emailBody,
           folder: 'SENT',
           isRead: true,
           hasAttachments: false,
@@ -8131,7 +8239,7 @@ app.post('/internal/scheduler/auto-reply', async (req, res) => {
         }
       });
       
-      console.log(`✅ Auto-reply sent successfully for lead ${leadId} via ${result.provider}`);
+      console.log(`✅ AI auto-reply sent successfully for lead ${leadId} via ${result.provider}`);
       res.json({ success: true, provider: result.provider });
     } else {
       console.log(`❌ Auto-reply failed for lead ${leadId}: ${result.error}`);
@@ -9703,6 +9811,34 @@ app.get('/admin/finance/cost-per-lead', adminAuthMiddleware, async (req, res) =>
 // GET /admin/finance/pricing — Current AI pricing table
 app.get('/admin/finance/pricing', adminAuthMiddleware, async (_req, res) => {
   res.json({ pricing: AiCostService.getPricingTable() });
+});
+
+// GET /admin/finance/tenant-costs — Monthly costs per tenant with cap info
+app.get('/admin/finance/tenant-costs', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const db = await initializePrisma();
+    const tenants = await db.tenant.findMany({
+      select: { id: true, name: true, settings: { select: { aiCostCapCentsUsd: true } } },
+    });
+
+    const tenantCosts = await Promise.all(
+      tenants.map(async (t) => {
+        const cost = await AiCostService.getTenantMonthlyCost(t.id);
+        return {
+          tenantId: t.id,
+          tenantName: t.name,
+          ...cost,
+        };
+      })
+    );
+
+    // Sort by costCents descending
+    tenantCosts.sort((a, b) => b.costCents - a.costCents);
+    res.json({ data: tenantCosts });
+  } catch (error: any) {
+    console.error('Tenant costs error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // ============================================

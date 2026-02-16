@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { Mail, Phone, MapPin } from 'lucide-react';
+import { Mail, MapPin, Lock } from 'lucide-react';
 
 export default function PublicFooter() {
   return (
@@ -23,13 +23,9 @@ export default function PublicFooter() {
                 <Mail className="w-4 h-4 flex-shrink-0" />
                 office@immivo.ai
               </a>
-              <a href="tel:+436703551221" className="flex items-center gap-2 hover:text-white transition-colors">
-                <Phone className="w-4 h-4 flex-shrink-0" />
-                +43 670 355 1221
-              </a>
               <div className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>Immivo GmbH<br />Sterngasse 3, 1010 Wien</span>
+                <span>Dynamo Lab Technologies GmbH<br />Sterngasse 3, 1010 Wien</span>
               </div>
             </div>
           </div>
@@ -68,10 +64,16 @@ export default function PublicFooter() {
         </div>
 
         <div className="pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-gray-500 text-center md:text-left">© 2026 Immivo GmbH. Alle Rechte vorbehalten.</p>
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span className="flex w-2 h-2 bg-green-500 rounded-full"></span>
-            Alle Systeme operational
+          <p className="text-sm text-gray-500 text-center md:text-left">© 2026 Dynamo Lab Technologies GmbH. Alle Rechte vorbehalten.</p>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5 text-sm text-gray-500">
+              <Lock className="w-3.5 h-3.5" />
+              Sichere Bezahlung via Stripe
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <span className="flex w-2 h-2 bg-green-500 rounded-full"></span>
+              Alle Systeme operational
+            </div>
           </div>
         </div>
       </div>

@@ -106,14 +106,15 @@ export default function PageHeader() {
         {/* Notifications */}
         <NotificationBell />
 
-        {/* User Avatar (desktop only) */}
+        {/* User Avatar (desktop only) — click to go to profile */}
         {user && (
-          <div 
-            className="hidden lg:flex w-7 h-7 bg-gray-100 rounded-full items-center justify-center text-gray-600 text-xs font-semibold cursor-default"
+          <button 
+            onClick={() => router.push('/dashboard/settings/profile')}
+            className="hidden lg:flex w-7 h-7 bg-gray-100 hover:bg-gray-200 rounded-full items-center justify-center text-gray-600 text-xs font-semibold cursor-pointer transition-colors"
             title={`${user.firstName} ${user.lastName}`}
           >
             {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
-          </div>
+          </button>
         )}
       </div>
     </div>

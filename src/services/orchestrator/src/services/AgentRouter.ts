@@ -86,10 +86,10 @@ export class AgentRouter {
   private static keywordClassify(msg: string): AgentCategory | null {
     const m = msg.toLowerCase().trim();
     
-    // Smalltalk patterns
+    // Smalltalk patterns (allow optional name/word after greeting, e.g. "hallo jarvis")
     const smalltalkPatterns = [
-      /^(hey|hi|hallo|servus|moin|guten (morgen|tag|abend)|na\??|yo|grüß|grüss|gruss)[\s!?.]*$/i,
-      /^(wie geht'?s|was geht|alles klar|danke|tschüss|bis dann|ciao)[\s!?.]*$/i,
+      /^(hey|hi|hallo|servus|moin|guten (morgen|tag|abend)|na\??|yo|grüß|grüss|gruss)(\s+\w+)?[\s!?.]*$/i,
+      /^(wie geht'?s|was geht|alles klar|danke|tschüss|bis dann|ciao)(\s+\w+)?[\s!?.]*$/i,
       /^(wer bist du|was kannst du|was bist du|hilfe|help)[\s!?.]*$/i,
     ];
     if (smalltalkPatterns.some(p => p.test(m))) return 'smalltalk';
@@ -135,7 +135,7 @@ export class AgentRouter {
           { role: 'system', content: CLASSIFICATION_PROMPT },
           { role: 'user', content: message },
         ],
-        max_completion_tokens: 20,
+        max_completion_tokens: 256,
       });
 
       // Log cost
@@ -160,9 +160,9 @@ export class AgentRouter {
         return category;
       }
 
-      // LLM returned garbage — fall back to keyword hints in the message
-      console.warn(`⚠️ Router: LLM returned "${rawContent}", falling back to crm`);
-      // Default to CRM for anything that isn't clearly smalltalk (most user messages are CRM-related)
+      // LLM returned garbage — fall back to smalltalk for general questions, crm for everything else
+      const usageInfo = response.usage ? `${response.usage.prompt_tokens}→${response.usage.completion_tokens}tok` : 'no-usage';
+      console.warn(`⚠️ Router: LLM returned "${rawContent}" (${usageInfo}), falling back to crm`);
       return 'crm';
     } catch (error) {
       console.error('Router classification error:', error);

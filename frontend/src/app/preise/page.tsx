@@ -12,7 +12,6 @@ import {
   Users,
   Sparkles,
   Mail,
-  Phone,
   ChevronDown,
   HelpCircle,
 } from 'lucide-react';
@@ -58,8 +57,8 @@ export default function PreisePage() {
       subtext: '1 Woche gratis',
       features: [
         { text: 'Alle Grundfunktionen', color: 'green' as const },
-        { text: 'Jarvis auf 20 Eingaben beschränkt', color: 'yellow' as const },
-        { text: 'Bildstudio auf 3 Generierungen beschränkt', color: 'yellow' as const },
+        { text: 'Jarvis beschränkt', color: 'yellow' as const },
+        { text: 'Bildstudio beschränkt', color: 'yellow' as const },
         { text: 'KEIN Portal-Push', color: 'red' as const },
         { text: 'E-Mail-Support', color: 'green' as const },
       ],
@@ -72,8 +71,8 @@ export default function PreisePage() {
       id: 'solo',
       name: 'Solo',
       tagline: 'Für Einzelmakler',
-      price: 99,
-      priceYearly: 89.1,
+      price: 149,
+      priceYearly: 134.1,
       period: '/Monat',
       subtext: null,
       seats: '1 Seat',
@@ -96,11 +95,11 @@ export default function PreisePage() {
       id: 'team',
       name: 'Team',
       tagline: 'Für kleine Teams',
-      price: 249,
-      priceYearly: 224.1,
+      price: 699,
+      priceYearly: 629.1,
       period: '/Monat',
       subtext: null,
-      seats: '3 Seats inklusive',
+      seats: '5 Seats inklusive',
       features: [
         { text: 'Everything in Solo PLUS', color: 'green' as const },
         { text: 'Team-Verwaltung', color: 'green' as const },
@@ -117,11 +116,11 @@ export default function PreisePage() {
       id: 'enterprise',
       name: 'Enterprise',
       tagline: 'Für große Teams',
-      price: 699,
-      priceYearly: 629.1,
-      period: '/Monat',
-      subtext: 'jeder weitere +50€/Monat',
-      seats: 'Bis zu 10 Seats',
+      price: -1,
+      priceYearly: -1,
+      period: '',
+      subtext: 'Ab 6 Seats',
+      seats: 'Individuell',
       features: [
         { text: 'Everything in Team PLUS', color: 'green' as const },
         { text: 'Eigene Domain', color: 'green' as const },
@@ -139,28 +138,44 @@ export default function PreisePage() {
 
   const faqs = [
     {
-      q: 'Kündigung',
-      a: 'Du kannst dein Abo jederzeit zum Ende des Abrechnungszeitraums kündigen. Keine Mindestlaufzeit, keine versteckten Kosten.',
+      q: 'Kann ich Immivo kostenlos testen?',
+      a: 'Ja! Du bekommst eine vollständige Testwoche — komplett kostenlos und ohne Kreditkarte. In dieser Zeit hast du Zugriff auf alle Grundfunktionen, inkl. CRM, E-Mails, Kalender und Objekte. Jarvis (KI-Assistent) und das Bildstudio sind in der Testphase beschränkt nutzbar. Nach Ablauf der 7 Tage wird dein Konto automatisch pausiert — es entstehen keine Kosten, solange du keinen Plan wählst.',
     },
     {
-      q: 'Testphase',
-      a: '1 Woche kostenlos testen — ohne Kreditkarte. Alle Grundfunktionen stehen dir zur Verfügung. Nach der Testphase kannst du auf einen kostenpflichtigen Plan wechseln oder pausieren.',
+      q: 'Was passiert nach der Testphase?',
+      a: 'Nach Ablauf der kostenlosen Woche kannst du dich für einen der drei Pläne (Solo, Team oder Enterprise) entscheiden. Es gibt keine automatische Umstellung auf einen kostenpflichtigen Plan. Wenn du keinen Plan wählst, wird dein Zugang pausiert — deine Daten bleiben aber 30 Tage gespeichert, falls du dich später entscheidest.',
     },
     {
-      q: 'Jahresabrechnung',
-      a: 'Bei jährlicher Zahlung sparst du 10% gegenüber der monatlichen Abrechnung. Du kannst jederzeit zwischen monatlich und jährlich wechseln.',
+      q: 'Kann ich jederzeit kündigen?',
+      a: 'Ja, du kannst jederzeit kündigen — ohne Mindestlaufzeit und ohne versteckte Kosten. Bei monatlicher Abrechnung wird die Kündigung zum Ende des laufenden Monats wirksam. Bei jährlicher Abrechnung zum Ende der gebuchten Laufzeit. Du behältst bis dahin vollen Zugriff auf alle Funktionen.',
     },
     {
-      q: 'Seats',
-      a: 'Solo beinhaltet 1 Seat, Team 3 Seats. Beim Enterprise-Plan sind bis zu 10 Seats inklusive — jeder weitere Seat kostet 50€/Monat zusätzlich.',
+      q: 'Gibt es einen Rabatt bei jährlicher Zahlung?',
+      a: 'Ja, bei jährlicher Zahlung sparst du 10% gegenüber der monatlichen Abrechnung. Du kannst jederzeit zwischen monatlicher und jährlicher Abrechnung wechseln. Der Wechsel wird zum nächsten Abrechnungszeitraum wirksam.',
     },
     {
-      q: 'Zahlungsmethoden',
-      a: 'Wir akzeptieren Kreditkarte, SEPA-Lastschrift und Rechnung. Die Abrechnung erfolgt automatisch am Monats- oder Jahresende.',
+      q: 'Was ist ein „Seat" und wie funktioniert das?',
+      a: 'Ein Seat ist ein Benutzerkonto für einen Mitarbeiter deines Teams. Solo beinhaltet 1 Seat (ideal für Einzelmakler), Team beinhaltet 5 Seats (perfekt für kleine bis mittelgroße Büros). Brauchst du mehr als 5 Seats? Dann ist der Enterprise-Plan das Richtige — kontaktiere uns für ein individuelles Angebot.',
     },
     {
-      q: 'DSGVO',
-      a: 'Wir hosten deine Daten DSGVO-konform auf AWS EU (Frankfurt). Alle Daten sind verschlüsselt. Keine Weitergabe an Dritte.',
+      q: 'Welche Zahlungsmethoden werden akzeptiert?',
+      a: 'Die Zahlungsabwicklung erfolgt sicher über Stripe, einen der weltweit führenden Zahlungsdienstleister. Wir akzeptieren Kreditkarte (Visa, Mastercard, Amex), SEPA-Lastschrift und Rechnung. Alle Zahlungsdaten werden verschlüsselt direkt bei Stripe verarbeitet — wir haben keinen Zugriff auf deine Kartendaten.',
+    },
+    {
+      q: 'Kann ich zwischen Plänen wechseln?',
+      a: 'Ja, du kannst jederzeit upgraden oder downgraden. Beim Upgrade wird der neue Preis anteilig berechnet. Beim Downgrade wird die Änderung zum nächsten Abrechnungszeitraum aktiv.',
+    },
+    {
+      q: 'Gibt es eine Einrichtungsgebühr?',
+      a: 'Nein. Es gibt keine Setup-Gebühren, keine Einrichtungskosten und keine versteckten Kosten. Du zahlst nur den monatlichen oder jährlichen Preis deines gewählten Plans.',
+    },
+    {
+      q: 'Ist Immivo DSGVO-konform?',
+      a: 'Ja, vollständig. Wir hosten alle Daten auf AWS EU (Frankfurt). Sämtliche Daten sind im Ruhezustand (AES-256) und bei der Übertragung (TLS/HTTPS) verschlüsselt. Jeder Kunde hat seinen eigenen isolierten Datenbereich (Mandantentrennung). Es findet kein Tracking durch Drittanbieter statt. Detaillierte Informationen findest du in unserer Datenschutzerklärung.',
+    },
+    {
+      q: 'Was ist in der Free-Version enthalten?',
+      a: 'In der kostenlosen Testphase hast du Zugriff auf alle Grundfunktionen: CRM, Lead-Management, Objekte, E-Mail-Anbindung und Kalender. Der KI-Assistent Jarvis und das KI-Bildstudio sind beschränkt nutzbar. Portal-Push (Veröffentlichung auf Immobilienportalen) ist in der Free-Version nicht verfügbar.',
     },
   ];
 
@@ -305,6 +320,25 @@ export default function PreisePage() {
                         {plan.subtext}
                       </span>
                     </div>
+                  ) : plan.price === -1 ? (
+                    <div>
+                      <span
+                        className={`text-3xl sm:text-4xl font-extrabold ${
+                          plan.popular ? 'text-white' : 'text-gray-900'
+                        }`}
+                      >
+                        Auf Anfrage
+                      </span>
+                      {plan.subtext && (
+                        <p
+                          className={`text-xs mt-1 ${
+                            plan.popular ? 'text-gray-400' : 'text-gray-400'
+                          }`}
+                        >
+                          {plan.subtext}
+                        </p>
+                      )}
+                    </div>
                   ) : (
                     <div>
                       <span
@@ -434,13 +468,6 @@ export default function PreisePage() {
             >
               <Mail className="w-5 h-5" />
               office@immivo.ai
-            </a>
-            <a
-              href="tel:+436703551221"
-              className="inline-flex items-center gap-2 text-gray-900 font-medium hover:text-gray-700 transition-colors"
-            >
-              <Phone className="w-5 h-5" />
-              +43 6703551221
             </a>
           </div>
         </div>
