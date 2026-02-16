@@ -9859,7 +9859,7 @@ app.get('/admin/finance/tenant-costs', adminAuthMiddleware, async (_req, res) =>
   try {
     const db = await initializePrisma();
     const tenants = await db.tenant.findMany({
-      select: { id: true, name: true, settings: { select: { aiCostCapCentsUsd: true } } },
+      select: { id: true, name: true },
     });
 
     const tenantCosts = await Promise.all(
