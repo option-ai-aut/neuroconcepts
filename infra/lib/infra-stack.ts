@@ -12,6 +12,7 @@ import * as apprunner from 'aws-cdk-lib/aws-apprunner';
 import * as assets from 'aws-cdk-lib/aws-ecr-assets';
 import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
+import * as kms from 'aws-cdk-lib/aws-kms';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as route53 from 'aws-cdk-lib/aws-route53';
@@ -115,6 +116,43 @@ export class ImmivoStack extends cdk.Stack {
     }
 
     // --- 3. Authentication (Cognito) ---
+
+    // KMS Key for Cognito Custom Email Sender (encrypts verification codes)
+    const cognitoEmailKmsKey = new kms.Key(this, 'CognitoEmailKmsKey', {
+      description: `Immivo Cognito Email Sender KMS Key (${props.stageName})`,
+      enableKeyRotation: true,
+      alias: `immivo-cognito-email-${props.stageName}`,
+    });
+
+    // Allow Cognito to encrypt codes with this key
+    cognitoEmailKmsKey.addToResourcePolicy(new cdk.aws_iam.PolicyStatement({
+      effect: cdk.aws_iam.Effect.ALLOW,
+      principals: [new cdk.aws_iam.ServicePrincipal('cognito-idp.amazonaws.com')],
+      actions: ['kms:CreateGrant', 'kms:Encrypt'],
+      resources: ['*'],
+    }));
+
+    // Custom Email Sender Lambda — decrypts code + sends branded email via Resend
+    const customEmailSenderLambda = new lambdaNode.NodejsFunction(this, 'CustomEmailSenderLambda', {
+      functionName: `Immivo-CustomEmailSender-${props.stageName}`,
+      runtime: lambda.Runtime.NODEJS_22_X,
+      entry: path.join(__dirname, '../src/lambdas/cognito-custom-email-sender/index.ts'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: {
+        KEY_ARN: cognitoEmailKmsKey.keyArn,
+      },
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['@aws-sdk/*', '@smithy/*'],
+      },
+    });
+
+    // Grant Lambda permission to decrypt codes
+    cognitoEmailKmsKey.grantDecrypt(customEmailSenderLambda);
+
     this.userPool = new cognito.UserPool(this, 'ImmivoUserPool', {
       userPoolName: `Immivo-Users-${props.stageName}`,
       selfSignUpEnabled: true, // Allow users to register themselves
@@ -138,6 +176,10 @@ export class ImmivoStack extends cdk.Stack {
         postal_code: new cognito.StringAttribute({ mutable: true }),
         city: new cognito.StringAttribute({ mutable: true }),
         country: new cognito.StringAttribute({ mutable: true }),
+      },
+      customSenderKmsKey: cognitoEmailKmsKey,
+      lambdaTriggers: {
+        customEmailSender: customEmailSenderLambda,
       },
       removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
     });
@@ -168,6 +210,10 @@ export class ImmivoStack extends cdk.Stack {
       standardAttributes: {
         givenName: { required: true, mutable: true },
         familyName: { required: true, mutable: true },
+      },
+      customSenderKmsKey: cognitoEmailKmsKey,
+      lambdaTriggers: {
+        customEmailSender: customEmailSenderLambda,
       },
       removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
     });
@@ -283,6 +329,10 @@ export class ImmivoStack extends cdk.Stack {
 
     this.dbSecret.grantRead(orchestratorLambda);
     appSecret.grantRead(orchestratorLambda);
+
+    // Grant Custom Email Sender Lambda access to app secret (contains RESEND_API_KEY)
+    customEmailSenderLambda.addEnvironment('APP_SECRET_ARN', appSecret.secretArn);
+    appSecret.grantRead(customEmailSenderLambda);
 
     // Grant Cognito admin access (invite/delete/manage users)
     orchestratorLambda.addToRolePolicy(new cdk.aws_iam.PolicyStatement({

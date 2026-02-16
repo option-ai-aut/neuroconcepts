@@ -22,7 +22,9 @@
   },
   "dependencies": {
     "@aws-cdk/aws-amplify-alpha": "^2.236.0-alpha.0",
+    "@aws-crypto/client-node": "^4.2.1",
     "aws-cdk-lib": "^2.235.1",
-    "constructs": "^10.4.5"
+    "constructs": "^10.4.5",
+    "resend": "^6.9.2"
   }
 }
