@@ -317,34 +317,39 @@ export class AiCostService {
   }> {
     if (!_prisma) return { exceeded: false, currentCostCents: 0, capCents: 2000, remainingCents: 2000 };
 
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    try {
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-    const [usageResult, settings] = await Promise.all([
-      _prisma.$queryRaw<any[]>`
-        SELECT COALESCE(SUM("costCentsUsd"), 0)::float as "totalCostCents"
-        FROM "AiUsageLog"
-        WHERE "tenantId" = ${tenantId}
-          AND "createdAt" >= ${monthStart}
-          AND "createdAt" <= ${monthEnd}
-      `,
-      _prisma.tenantSettings.findUnique({
-        where: { tenantId },
-        select: { aiCostCapCentsUsd: true },
-      }),
-    ]);
+      const [usageResult, settings] = await Promise.all([
+        _prisma.$queryRaw<any[]>`
+          SELECT COALESCE(SUM("costCentsUsd"), 0)::float as "totalCostCents"
+          FROM "AiUsageLog"
+          WHERE "tenantId" = ${tenantId}
+            AND "createdAt" >= ${monthStart}
+            AND "createdAt" <= ${monthEnd}
+        `,
+        _prisma.tenantSettings.findUnique({
+          where: { tenantId },
+          select: { aiCostCapCentsUsd: true },
+        }).catch(() => null),
+      ]);
 
-    const currentCostCents = usageResult[0]?.totalCostCents || 0;
-    const capCents = settings?.aiCostCapCentsUsd ?? 2000; // Default $20
-    const remainingCents = Math.max(0, capCents - currentCostCents);
+      const currentCostCents = usageResult[0]?.totalCostCents || 0;
+      const capCents = settings?.aiCostCapCentsUsd ?? 2000;
+      const remainingCents = Math.max(0, capCents - currentCostCents);
 
-    return {
-      exceeded: currentCostCents >= capCents,
-      currentCostCents,
-      capCents,
-      remainingCents,
-    };
+      return {
+        exceeded: currentCostCents >= capCents,
+        currentCostCents,
+        capCents,
+        remainingCents,
+      };
+    } catch (err) {
+      console.warn('checkCostCap failed (column may not exist yet):', (err as Error).message);
+      return { exceeded: false, currentCostCents: 0, capCents: 2000, remainingCents: 2000 };
+    }
   }
 
   /**
@@ -360,39 +365,44 @@ export class AiCostService {
   }> {
     if (!_prisma) return { costCents: 0, costUsd: 0, calls: 0, capCents: 2000, capUsd: 20, percentUsed: 0 };
 
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    try {
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-    const [usageResult, settings] = await Promise.all([
-      _prisma.$queryRaw<any[]>`
-        SELECT 
-          COALESCE(SUM("costCentsUsd"), 0)::float as "totalCostCents",
-          COUNT(*)::int as "totalCalls"
-        FROM "AiUsageLog"
-        WHERE "tenantId" = ${tenantId}
-          AND "createdAt" >= ${monthStart}
-          AND "createdAt" <= ${monthEnd}
-      `,
-      _prisma.tenantSettings.findUnique({
-        where: { tenantId },
-        select: { aiCostCapCentsUsd: true },
-      }),
-    ]);
+      const [usageResult, settings] = await Promise.all([
+        _prisma.$queryRaw<any[]>`
+          SELECT 
+            COALESCE(SUM("costCentsUsd"), 0)::float as "totalCostCents",
+            COUNT(*)::int as "totalCalls"
+          FROM "AiUsageLog"
+          WHERE "tenantId" = ${tenantId}
+            AND "createdAt" >= ${monthStart}
+            AND "createdAt" <= ${monthEnd}
+        `,
+        _prisma.tenantSettings.findUnique({
+          where: { tenantId },
+          select: { aiCostCapCentsUsd: true },
+        }).catch(() => null),
+      ]);
 
-    const costCents = usageResult[0]?.totalCostCents || 0;
-    const calls = usageResult[0]?.totalCalls || 0;
-    const capCents = settings?.aiCostCapCentsUsd ?? 2000;
-    const percentUsed = capCents > 0 ? (costCents / capCents) * 100 : 0;
+      const costCents = usageResult[0]?.totalCostCents || 0;
+      const calls = usageResult[0]?.totalCalls || 0;
+      const capCents = settings?.aiCostCapCentsUsd ?? 2000;
+      const percentUsed = capCents > 0 ? (costCents / capCents) * 100 : 0;
 
-    return {
-      costCents,
-      costUsd: costCents / 100,
-      calls,
-      capCents,
-      capUsd: capCents / 100,
-      percentUsed: Math.min(100, percentUsed),
-    };
+      return {
+        costCents,
+        costUsd: costCents / 100,
+        calls,
+        capCents,
+        capUsd: capCents / 100,
+        percentUsed: Math.min(100, percentUsed),
+      };
+    } catch (err) {
+      console.warn('getTenantMonthlyCost failed:', (err as Error).message);
+      return { costCents: 0, costUsd: 0, calls: 0, capCents: 2000, capUsd: 20, percentUsed: 0 };
+    }
   }
 
   /**
