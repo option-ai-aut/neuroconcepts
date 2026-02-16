@@ -233,6 +233,9 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
   
   // Abort controller for stopping stream
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Store last sent message for restoring on stop
+  const lastSentMessageRef = useRef<string>('');
 
   // Get shown tips from localStorage
   const getShownTips = useCallback((): string[] => {
@@ -540,6 +543,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     
     // Store files for upload before clearing
     const filesToUpload = [...uploadedFiles];
+    lastSentMessageRef.current = aiChatDraft;
     setAiChatDraft('');
     setUploadedFiles([]);
     setIsLoading(true);
@@ -589,6 +593,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           triggerExposeRefresh();
         }
         setIsLoading(false);
+        lastSentMessageRef.current = '';
       } else {
         // Regular chat endpoint with STREAMING
         // Use Lambda Function URL (no 29s timeout) if available, else API Gateway
@@ -654,6 +659,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         const assistantMsgIndex = messages.length + 1;
         setMessages(prev => [...prev, { role: 'ASSISTANT', content: '' }]);
         setIsLoading(false);
+        lastSentMessageRef.current = ''; // Response started — no need to restore
 
         // Read the stream
         const reader = res.body.getReader();
@@ -772,6 +778,11 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     setIsLoading(false);
     // Remove any action indicator messages
     setMessages(prev => prev.filter(m => !m.isAction));
+    // Restore the sent message to the input field
+    if (lastSentMessageRef.current) {
+      setAiChatDraft(lastSentMessageRef.current);
+      lastSentMessageRef.current = '';
+    }
   };
 
   return (

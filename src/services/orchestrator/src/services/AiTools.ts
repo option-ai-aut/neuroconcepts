@@ -246,6 +246,8 @@ export const CRM_TOOLS = {
         timeFrame: { type: SchemaType.STRING, description: "Time frame: IMMEDIATE, THREE_MONTHS, SIX_MONTHS, TWELVE_MONTHS, LONGTERM" } as FunctionDeclarationSchema,
         financingStatus: { type: SchemaType.STRING, description: "Financing status: NOT_CLARIFIED, PRE_QUALIFIED, APPROVED, CASH_BUYER" } as FunctionDeclarationSchema,
         notes: { type: SchemaType.STRING, description: "Internal notes" } as FunctionDeclarationSchema,
+        propertyId: { type: SchemaType.STRING, description: "ID of the property to assign this lead to (use get_properties to find IDs)" } as FunctionDeclarationSchema,
+        assignedToId: { type: SchemaType.STRING, description: "ID of the team member to assign this lead to (use get_team_members to find IDs)" } as FunctionDeclarationSchema,
       },
       required: ["leadId"]
     }
@@ -1274,7 +1276,7 @@ export class AiToolExecutor {
           minRooms, minArea, timeFrame, financingStatus, source
         } = args;
         
-        return await getPrisma().lead.create({
+        const newLead = await getPrisma().lead.create({
           data: {
             salutation: salutation || 'NONE',
             formalAddress: formalAddress !== undefined ? formalAddress : true,
@@ -1304,6 +1306,7 @@ export class AiToolExecutor {
             }
           }
         });
+        return `Lead "${firstName} ${lastName}" (${email || 'keine E-Mail'}) wurde angelegt. ID: ${newLead.id}`;
       }
 
       case 'get_leads': {
@@ -1412,7 +1415,8 @@ export class AiToolExecutor {
         
         const updatedLead = await getPrisma().lead.update({
           where: { id: leadId },
-          data: updateData
+          data: updateData,
+          select: { id: true, firstName: true, lastName: true, email: true, status: true }
         });
         
         // Create activities for important changes
@@ -1438,7 +1442,7 @@ export class AiToolExecutor {
           });
         }
         
-        return updatedLead;
+        return `Lead "${updatedLead.firstName} ${updatedLead.lastName}" wurde aktualisiert.`;
       }
 
       case 'delete_lead': {
@@ -1490,26 +1494,43 @@ export class AiToolExecutor {
         return await getPrisma().property.findMany({
           where: { tenantId },
           take: limit,
-          orderBy: { createdAt: 'desc' }
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true, title: true, address: true, city: true, zipCode: true,
+            propertyType: true, marketingType: true, status: true,
+            salePrice: true, rentCold: true, rooms: true, area: true,
+            createdAt: true,
+          }
         });
       }
 
       case 'get_property': {
         const { propertyId } = args;
         return await getPrisma().property.findFirst({
-          where: { id: propertyId, tenantId }
+          where: { id: propertyId, tenantId },
+          select: {
+            id: true, title: true, address: true, city: true, zipCode: true,
+            propertyType: true, marketingType: true, status: true,
+            salePrice: true, rentCold: true, rentWarm: true,
+            rooms: true, bedrooms: true, bathrooms: true, area: true, plotArea: true,
+            floor: true, totalFloors: true, yearBuilt: true,
+            description: true, features: true, energyEfficiencyClass: true,
+            images: true, videos: true, virtualTour: true,
+            createdAt: true, updatedAt: true,
+          }
         });
       }
 
       case 'update_property': {
         const { propertyId, ...updateData } = args;
-        // Verify tenant ownership
         const propToUpdate = await getPrisma().property.findFirst({ where: { id: propertyId, tenantId } });
         if (!propToUpdate) return 'Das Objekt wurde nicht gefunden.';
-        return await getPrisma().property.update({
+        const updated = await getPrisma().property.update({
           where: { id: propertyId },
-          data: updateData
+          data: updateData,
+          select: { id: true, title: true, address: true }
         });
+        return `Objekt "${updated.title}" (${updated.address || ''}) wurde aktualisiert.`;
       }
 
       case 'delete_property': {
@@ -2376,16 +2397,13 @@ export class AiToolExecutor {
             const accessToken = encryptionService.decrypt(encryptedConfig.accessToken);
             const refreshToken = encryptionService.decrypt(encryptedConfig.refreshToken);
             
-            await CalendarService.updateGoogleEvent({
-              accessToken,
-              refreshToken,
-              eventId,
-              title: title || '',
-              start: start ? new Date(start) : new Date(),
-              end: end ? new Date(end) : new Date(),
-              location,
-              description
-            });
+            const updatePayload: any = { accessToken, refreshToken, eventId };
+            if (title !== undefined) updatePayload.title = title;
+            if (start !== undefined) updatePayload.start = new Date(start);
+            if (end !== undefined) updatePayload.end = new Date(end);
+            if (location !== undefined) updatePayload.location = location;
+            if (description !== undefined) updatePayload.description = description;
+            await CalendarService.updateGoogleEvent(updatePayload);
             
             return { success: true, message: `Termin wurde erfolgreich aktualisiert.` };
           } catch (error: any) {

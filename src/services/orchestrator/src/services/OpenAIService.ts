@@ -52,27 +52,6 @@ function convertToolsToOpenAI(tools: Record<string, any>): OpenAI.Chat.ChatCompl
   }));
 }
 
-// Convert tools to Assistants API format
-function convertToolsToAssistant(tools: Record<string, any>): OpenAI.Beta.AssistantTool[] {
-  return Object.values(tools).map((tool: any) => ({
-    type: 'function' as const,
-    function: {
-      name: tool.name,
-      description: tool.description,
-      parameters: {
-        type: 'object' as const,
-        properties: Object.fromEntries(
-          Object.entries(tool.parameters?.properties || {}).map(([key, value]: [string, any]) => [
-            key,
-            convertPropertyToOpenAI(value)
-          ])
-        ),
-        required: tool.parameters?.required || [],
-      },
-    },
-  }));
-}
-
 // Models
 const MODEL = 'gpt-5.2';
 const MINI_MODEL = 'gpt-5-mini';
@@ -84,8 +63,9 @@ function getSystemPrompt(): string {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' 
   });
   const isoDate = today.toISOString().split('T')[0];
+  const currentTime = today.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
   
-  return `Du bist Jarvis, der KI-Assistent von Immivo — einer Plattform fuer Immobilienmakler. Heute ist ${currentDateStr} (${isoDate}).
+  return `Du bist Jarvis, der KI-Assistent von Immivo — einer Plattform fuer Immobilienmakler. Heute ist ${currentDateStr} (${isoDate}), aktuelle Uhrzeit: ${currentTime}.
 
 PERSOENLICHKEIT:
 Professionell, praegnant, mit trockenem Humor. Du bist kompetent und auf den Punkt — kein Roboter, kein uebertrieben freundlicher Chatbot. Du redest wie ein smarter Kollege, der weiss was er tut.
@@ -107,6 +87,19 @@ KOMMUNIKATION:
 - NIEMALS ungefragt Optionslisten anbieten.
 - NIEMALS sagen "Sag mir kurz..." oder "Gib mir noch..." wenn du die Daten selbst erfinden kannst.
 
+GESPRAECHES-KONTEXT:
+- Du hast die letzten ~20 Nachrichten aus dem aktuellen Chat bereits im Kontext. Wenn der User nach etwas fragt das in diesen Nachrichten steht ("was hab ich gefragt?", "was war meine letzte Nachricht?", "wovon haben wir geredet?"), antworte DIREKT aus dem Kontext. Nutze KEIN Memory-Tool dafuer.
+- Nutze Memory-Tools (search_chat_history, get_last_conversation) NUR wenn der User explizit nach AELTEREN/ARCHIVIERTEN Gespraechen fragt ("letzte Woche", "vor einem Monat", "in einem frueheren Gespraech").
+
+ANTI-HALLUZINATION:
+- Wenn du Daten abrufst und nichts findest, sag das klar. Erfinde NIE Daten die wie echte Ergebnisse aussehen.
+- Wenn ein Tool fehlschlaegt, erklaere kurz was nicht geklappt hat. Keine generischen Fehlermeldungen.
+- Verwechsle nie erfundene Test-Daten mit echten Daten aus der Datenbank.
+
+MULTI-STEP:
+- Bei komplexen Aufgaben die mehrere Tools brauchen: erst suchen/lesen, dann aendern. Nie blind aendern.
+- Wenn du z.B. ein Bild zu einem Objekt hinzufuegen sollst, erst das Objekt suchen, dann hochladen.
+
 STIL:
 - Keine Floskeln ("Gerne!", "Super!", "Natuerlich!"), keine Emojis, keine Ausrufezeichen.
 - Keine Semikolons — kurze Saetze, Kommas, Punkte, Gedankenstriche.
@@ -123,7 +116,7 @@ FAEHIGKEITEN (nutze Tools still im Hintergrund):
 - Exposés: Vorlagen erstellen (sei kreativ, frag nicht), Exposés generieren, Bloecke bearbeiten
 - Team-Chat: lesen, Nachrichten senden
 - Statistiken: Dashboard, Lead-Conversion, Objekt-Stats
-- Gedaechtnis: du erinnerst dich an vergangene Gespraeche (Thread-basiert)
+- Gedaechtnis: vergangene Gespraeche durchsuchen (nur fuer aeltere, archivierte Chats noetig)
 
 SICHERHEIT: Nur eigene Tenant-Daten. Bei Loeschungen: kurze Bestaetigung. Leads immer mit vollstaendigem Namen.
 
@@ -167,84 +160,6 @@ VARIABLEN: {{property.title}}, {{property.address}}, {{property.city}}, {{proper
 
 STIL: Deutsch, du-Form, max 1-3 kurze Sätze. Keine Floskeln, Emojis, Ausrufezeichen, Semikolons. Nie IDs oder technische Details. Kurz sagen was du gemacht hast.`;
 
-// ═══════════════════════════════════════════════════════════════
-// Assistants API: Global Jarvis Assistant (created once, reused)
-// ═══════════════════════════════════════════════════════════════
-
-let _cachedAssistantId: string | null = null;
-
-async function getOrCreateAssistant(client: OpenAI): Promise<string> {
-  // Return cached
-  if (_cachedAssistantId) return _cachedAssistantId;
-
-  // Check env var (set after first creation)
-  if (process.env.OPENAI_ASSISTANT_ID) {
-    _cachedAssistantId = process.env.OPENAI_ASSISTANT_ID;
-    return _cachedAssistantId;
-  }
-
-  // Try to find existing assistant by name
-  try {
-    const assistants = await client.beta.assistants.list({ limit: 20 });
-    const existing = assistants.data.find(a => a.name === 'Jarvis Immivo');
-    if (existing) {
-      _cachedAssistantId = existing.id;
-      console.log(`✅ Assistants API: Found existing Jarvis (${existing.id})`);
-      
-      // Update tools + instructions (in case they changed)
-      await client.beta.assistants.update(existing.id, {
-        instructions: getSystemPrompt(),
-        tools: convertToolsToAssistant(CRM_TOOLS),
-        model: MODEL,
-      });
-      
-      return _cachedAssistantId;
-    }
-  } catch (err) {
-    console.warn('Could not list assistants:', err);
-  }
-
-  // Create new assistant
-  console.log('🔧 Creating Jarvis assistant via Assistants API...');
-  const assistant = await client.beta.assistants.create({
-    name: 'Jarvis Immivo',
-    instructions: getSystemPrompt(),
-    model: MODEL,
-    tools: convertToolsToAssistant(CRM_TOOLS),
-  });
-  
-  _cachedAssistantId = assistant.id;
-  console.log(`✅ Assistants API: Created Jarvis (${assistant.id})`);
-  return _cachedAssistantId;
-}
-
-async function getOrCreateThread(client: OpenAI, userId: string): Promise<string> {
-  if (!prisma) throw new Error('Prisma not injected into OpenAIService');
-
-  // Check if user has a thread
-  const user = await prisma.user.findUnique({ 
-    where: { id: userId },
-    select: { assistantThreadId: true }
-  });
-
-  if (user?.assistantThreadId) {
-    return user.assistantThreadId;
-  }
-
-  // Create new thread
-  const thread = await client.beta.threads.create();
-  
-  // Save thread ID
-  await prisma.user.update({
-    where: { id: userId },
-    data: { assistantThreadId: thread.id }
-  });
-
-  console.log(`🧵 New thread created for user ${userId}: ${thread.id}`);
-  return thread.id;
-}
-
-
 export class OpenAIService {
   private client: OpenAI;
   private uploadedFiles: string[] = [];
@@ -282,7 +197,7 @@ export class OpenAIService {
     }
 
     // ── Step 1: Route with gpt-5-mini (fast, cheap ~100ms) ──
-    const category = await AgentRouter.classify(message, tenantId);
+    const category = await AgentRouter.classify(message, tenantId, history);
 
     // ── Step 2: Smalltalk → gpt-5-mini directly (no thread, no tools) ──
     if (category === 'smalltalk' && uploadedFiles.length === 0) {
@@ -364,6 +279,7 @@ export class OpenAIService {
         tool_choice: 'auto',
         stream: true,
         stream_options: { include_usage: true },
+        max_completion_tokens: 4096,
       });
 
       let roundContent = '';
@@ -428,6 +344,11 @@ export class OpenAIService {
         // Content was already streamed word-by-word above — just break
         break;
       }
+
+      // If this was the last round and we still had tool calls, inform user
+      if (round === MAX_TOOL_ROUNDS - 1 && hadAnyFunctionCalls) {
+        yield { chunk: '\n\n(Maximale Verarbeitungstiefe erreicht — einige Schritte wurden moeglicherweise nicht abgeschlossen.)', toolsUsed: allToolNames };
+      }
     }
 
     if (totalStreamInputTokens > 0 || totalStreamOutputTokens > 0) {
@@ -450,9 +371,11 @@ export class OpenAIService {
     const startTime = Date.now();
     const ctxParts: string[] = [];
     if (userContext) {
-      ctxParts.push(`\n\n[Kontext: ${userContext.name}]`);
+      ctxParts.push(`\n\n[Interner Kontext — NICHT proaktiv erwaehnen, nur nutzen wenn relevant]`);
+      ctxParts.push(`User: ${userContext.name} (${userContext.email}, ${userContext.role})`);
+      if (userContext.pageContext) ctxParts.push(`Aktuelle Seite: ${userContext.pageContext}`);
       if (userContext.company) {
-        ctxParts.push(`[Firma: ${userContext.company.name}${userContext.company.slogan ? ` — ${userContext.company.slogan}` : ''}]`);
+        ctxParts.push(`Firma: ${userContext.company.name}${userContext.company.slogan ? ` — ${userContext.company.slogan}` : ''}`);
       }
     }
     const contextStr = ctxParts.join('\n');
@@ -472,7 +395,7 @@ export class OpenAIService {
       ],
       stream: true,
       stream_options: { include_usage: true },
-      max_completion_tokens: 1024,
+      max_completion_tokens: 512,
     });
 
     let totalIn = 0, totalOut = 0;
@@ -766,7 +689,10 @@ export class OpenAIService {
         return { role: 'tool', tool_call_id: call.id, content: typeof output === 'string' ? output : JSON.stringify(output) };
       } catch (error: any) {
         console.error(`Tool ${call.function.name} error:`, error);
-        return { role: 'tool', tool_call_id: call.id, content: JSON.stringify({ error: error.message }) };
+        const safeMsg = error.message?.includes('prisma') || error.message?.includes('SQL') || error.message?.includes('ECONNREFUSED')
+          ? 'Datenbankfehler — bitte versuche es nochmal.'
+          : (error.message || 'Unbekannter Fehler');
+        return { role: 'tool', tool_call_id: call.id, content: `Tool fehlgeschlagen: ${safeMsg}` };
       }
     });
 

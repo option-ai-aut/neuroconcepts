@@ -2,6 +2,8 @@ import OpenAI from 'openai';
 import { CRM_TOOLS, EXPOSE_TOOLS } from './AiTools';
 import { AiCostService } from './AiCostService';
 
+const ALL_TOOLS = { ...CRM_TOOLS, ...EXPOSE_TOOLS };
+
 /**
  * Multi-Agent Router: Uses gpt-5-mini to classify user intent,
  * then routes to the appropriate tool subset.
@@ -29,30 +31,37 @@ const TOOL_CATEGORIES: Record<AgentCategory, string[]> = {
   smalltalk: [],
   crm: [
     'get_leads', 'get_lead', 'create_lead', 'update_lead', 'delete_lead',
+    'delete_all_leads',
     'get_properties', 'get_property', 'create_property', 'update_property', 'delete_property',
+    'delete_all_properties',
     'search_properties', 'search_contacts', 'semantic_search',
     'get_dashboard_stats', 'get_lead_statistics', 'get_property_statistics',
     'upload_images_to_property', 'upload_documents_to_lead',
-    'get_property_images', 'delete_property_image',
+    'get_property_images', 'delete_property_image', 'delete_all_property_images',
+    'move_image_to_floorplan',
     'add_video_to_property', 'set_virtual_tour',
+    'get_company_info', 'get_team_members',
+    'send_team_message', 'get_team_channels', 'get_channel_messages',
   ],
   email: [
     'get_emails', 'get_email', 'draft_email', 'send_email', 'reply_to_email',
     'get_email_templates',
-    'get_leads', 'get_lead', // Lead context for emails
+    'get_leads', 'get_lead',
   ],
   calendar: [
     'get_calendar_events', 'create_calendar_event', 'update_calendar_event', 
     'delete_calendar_event', 'get_calendar_availability',
-    'get_leads', 'get_lead', 'get_properties', // Context for appointments
+    'get_leads', 'get_lead', 'get_properties',
   ],
   expose: [
     'create_full_expose', 'create_expose_from_template', 'create_expose_template',
     'create_expose_block', 'update_expose_block', 'delete_expose_block', 'reorder_expose_blocks',
     'set_expose_theme', 'generate_expose_text', 'get_expose_status', 'set_expose_status',
     'clear_expose_blocks', 'get_exposes', 'get_expose_templates', 'get_template',
+    'update_expose_template', 'update_template',
+    'delete_expose', 'delete_all_exposes', 'delete_expose_template',
     'generate_expose_pdf', 'virtual_staging',
-    'get_properties', 'get_property', // Property data for exposés
+    'get_properties', 'get_property',
   ],
   memory: [
     'search_chat_history', 'get_last_conversation', 'get_conversation_context',
@@ -64,18 +73,21 @@ const TOOL_CATEGORIES: Record<AgentCategory, string[]> = {
 const CLASSIFICATION_PROMPT = `Classify the user message into exactly ONE category. Reply with ONLY the category name.
 
 Categories:
-smalltalk = greetings, casual chat, humor, questions about yourself, short/ambiguous messages, numbers, jokes, counting, anything that is NOT a clear work instruction
+smalltalk = greetings, casual chat, humor, questions about yourself, short/ambiguous messages, numbers, jokes, counting, anything that is NOT a clear work instruction. Also: questions about the current conversation ("was hab ich gefragt?", "worüber haben wir geredet?") — the assistant already has the recent chat history.
 crm = leads, properties, search, stats, assignments, uploading images/photos/files to properties or leads, property media management (Bilder hinzufügen, Fotos hochladen, Grundriss, etc.)
 email = read, write, send emails
 calendar = events, appointments, availability
 expose = ONLY explicit exposé/PDF creation, templates, blocks, themes. NOT image uploads to properties!
-memory = past conversations ("was haben wir besprochen", "erinnerst du dich")
+memory = ONLY when user explicitly asks about OLDER/ARCHIVED conversations ("letzte Woche", "vor einem Monat", "früheres Gespräch"). NOT for recent messages.
 multi = complex request clearly spanning multiple categories
 
 IMPORTANT RULES:
 - "Bild hinzufügen zu Objekt" or "Foto hochladen" = crm (NOT expose!)
 - Short/ambiguous messages like "1", "ok", "ja", "cool", "haha" = smalltalk (NOT crm!)
-- When in doubt between smalltalk and another category, prefer smalltalk.
+- "was hab ich gefragt?" / "worüber haben wir geredet?" = smalltalk (recent history is already available)
+- "was haben wir letzte Woche besprochen?" = memory (needs archived data)
+- Short confirmations after a work-related message ("ja", "mach das", "genau") = use the PREVIOUS message context to decide. If previous was crm, this is crm.
+- When in doubt and message < 5 words: smalltalk. When in doubt and message >= 5 words: multi.
 
 Reply with one word only: smalltalk, crm, email, calendar, expose, memory, or multi.`;
 
@@ -112,11 +124,13 @@ export class AgentRouter {
     // Calendar patterns
     if (/\b(termin|kalender|besichtigung|verfügbar|calendar|appointment)\b/i.test(m)) return 'calendar';
     
-    // Expose patterns
-    if (/\b(exposé|expose|vorlage|template|pdf.*erstell|block)\b/i.test(m)) return 'expose';
+    // Expose patterns (block only with expose context)
+    if (/\b(exposé|expose|vorlage|template|pdf.*erstell)\b/i.test(m)) return 'expose';
+    if (/\b(block)\b/i.test(m) && /\b(exposé|expose)\b/i.test(m)) return 'expose';
     
-    // Memory patterns
-    if (/\b(erinnerst|besprochen|letztes gespräch|chat.*historie|vergangene)\b/i.test(m)) return 'memory';
+    // Memory patterns — only for explicitly OLD/archived conversations
+    if (/\b(letzte woche|letzten monat|vor \d+ (tagen|wochen|monaten)|früheres? gespräch|archiviert)\b/i.test(m)) return 'memory';
+    if (/\b(erinnerst|besprochen|chat.*historie|vergangene)\b/i.test(m) && /\b(letzte|früher|damals|woche|monat)\b/i.test(m)) return 'memory';
     
     // Image/file upload patterns → always CRM (not expose!)
     if (/\b(bild|bilder|foto|fotos|image|images|hochladen|upload|galerie|grundriss|floorplan)\b/i.test(m) && /\b(objekt|immobilie|property|wohnung|haus|büro|loft|hinzufüg|anfüg|add)\b/i.test(m)) return 'crm';
@@ -128,9 +142,10 @@ export class AgentRouter {
   }
 
   /**
-   * Classify user intent: keyword-first, then LLM fallback
+   * Classify user intent: keyword-first, then LLM fallback.
+   * Optional previousMessages for context-aware classification.
    */
-  static async classify(message: string, tenantId?: string): Promise<AgentCategory> {
+  static async classify(message: string, tenantId?: string, previousMessages?: { role: string; content: string }[]): Promise<AgentCategory> {
     const startTime = Date.now();
 
     // Step 1: Fast keyword classification (free, instant)
@@ -144,13 +159,29 @@ export class AgentRouter {
     try {
       const openai = getOpenAI();
       
+      // Build messages with optional conversation context
+      const llmMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+        { role: 'system', content: CLASSIFICATION_PROMPT },
+      ];
+      
+      // Add last 2 messages for context (helps with "ja mach das", "genau", etc.)
+      if (previousMessages && previousMessages.length > 0) {
+        const recent = previousMessages.slice(-2);
+        for (const msg of recent) {
+          const truncated = msg.content.length > 200 ? msg.content.substring(0, 200) + '...' : msg.content;
+          llmMessages.push({
+            role: msg.role === 'ASSISTANT' || msg.role === 'assistant' ? 'assistant' : 'user',
+            content: truncated,
+          });
+        }
+      }
+      
+      llmMessages.push({ role: 'user', content: message });
+      
       const response = await openai.chat.completions.create({
         model: ROUTER_MODEL,
-        messages: [
-          { role: 'system', content: CLASSIFICATION_PROMPT },
-          { role: 'user', content: message },
-        ],
-        max_completion_tokens: 256,
+        messages: llmMessages,
+        max_completion_tokens: 16,
       });
 
       // Log cost
@@ -201,7 +232,7 @@ export class AgentRouter {
     if (category === 'smalltalk' && !hasUploadedFiles) return null;
 
     const toolNames = this.getToolNames(category);
-    if (!toolNames) return CRM_TOOLS; // Return all tools for 'multi'
+    if (!toolNames) return ALL_TOOLS; // Return ALL tools for 'multi'
 
     // Always include upload tools when files are attached
     const UPLOAD_TOOLS = ['upload_images_to_property', 'upload_documents_to_lead', 'get_properties', 'get_property'];
@@ -210,13 +241,13 @@ export class AgentRouter {
       : toolNames;
 
     const filtered: Record<string, any> = {};
-    for (const [key, tool] of Object.entries(CRM_TOOLS)) {
+    for (const [key, tool] of Object.entries(ALL_TOOLS)) {
       if (effectiveNames.includes((tool as any).name)) {
         filtered[key] = tool;
       }
     }
 
-    return Object.keys(filtered).length > 0 ? filtered : CRM_TOOLS;
+    return Object.keys(filtered).length > 0 ? filtered : ALL_TOOLS;
   }
 
   /**

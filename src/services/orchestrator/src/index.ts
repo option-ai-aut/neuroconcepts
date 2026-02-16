@@ -3280,7 +3280,7 @@ app.post('/chat',
   AiSafetyMiddleware.auditLog,
   async (req, res) => {
     try {
-      const { message, history } = req.body;
+      const { message } = req.body;
       
       // Get user from auth - CRITICAL: tenantId comes from authenticated user!
       const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
@@ -3289,12 +3289,26 @@ app.post('/chat',
       const userId = currentUser.id;
       const tenantId = currentUser.tenantId;
 
+      // Cost cap check
+      const costCheck = await AiCostService.checkCostCap(tenantId);
+      if (costCheck.exceeded) {
+        return res.status(429).json({ error: `AI-Kostenlimit erreicht ($${(costCheck.capCents / 100).toFixed(2)}/Monat). Bitte kontaktiere den Administrator.` });
+      }
+
+      // Load history from DB (never trust client-side history)
+      const recentHistory = await prisma.userChat.findMany({
+        where: { userId, archived: false },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: { role: true, content: true },
+      }).then(msgs => msgs.reverse());
+
       await prisma.userChat.create({
         data: { userId, role: 'USER', content: message }
       });
 
       const openai = new OpenAIService();
-      const responseText = await openai.chat(message, tenantId, history, {
+      const responseText = await openai.chat(message, tenantId, recentHistory, {
         name: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email,
         email: currentUser.email,
         role: currentUser.role,
@@ -3432,6 +3446,11 @@ app.post('/chat/stream',
         } : undefined,
       };
 
+      // Save user message to DB BEFORE streaming (so follow-ups see it immediately)
+      await prisma.userChat.create({
+        data: { userId, role: 'USER', content: message + (uploadedFileUrls.length > 0 ? ` [${uploadedFileUrls.length} Datei(en)]` : '') }
+      });
+
       // Keepalive: Send heartbeat every 5s during tool execution to prevent API GW timeout
       let lastDataTime = Date.now();
       const heartbeatInterval = setInterval(() => {
@@ -3448,7 +3467,6 @@ app.post('/chat/stream',
           if (result.hadFunctionCalls) hadFunctionCalls = true;
           if (result.toolsUsed) toolsUsed = result.toolsUsed;
           chunkCount++;
-          // Send chunk as SSE (include tools info when available)
           if (result.toolsUsed) {
             res.write(`data: ${JSON.stringify({ chunk: result.chunk, toolsUsed: result.toolsUsed })}\n\n`);
           } else {
@@ -3460,18 +3478,15 @@ app.post('/chat/stream',
       }
       console.log(`📡 SSE: ${chunkCount} chunks sent, total ${fullResponse.length} chars`);
 
-      // Send done signal with function call info
-      res.write(`data: ${JSON.stringify({ done: true, hadFunctionCalls, toolsUsed })}\n\n`);
-      res.end();
-
-      // Save messages to DB after streaming is complete
-      await prisma.userChat.create({
-        data: { userId, role: 'USER', content: message + (uploadedFileUrls.length > 0 ? ` [${uploadedFileUrls.length} Datei(en)]` : '') }
-      });
+      // Save assistant message BEFORE ending the response
       await prisma.userChat.create({
         data: { userId, role: 'ASSISTANT', content: wrapAiResponse(fullResponse) }
       });
       console.log(`💾 Chat gespeichert für User ${userId}`);
+
+      // Send done signal with function call info
+      res.write(`data: ${JSON.stringify({ done: true, hadFunctionCalls, toolsUsed })}\n\n`);
+      res.end();
       
       // ConversationMemory summary no longer needed (Assistants API threads store full history)
       // Kept for legacy search: ConversationMemory.autoSummarizeIfNeeded(userId).catch(console.error);
@@ -9650,7 +9665,10 @@ app.get('/admin/finance/summary', adminAuthMiddleware, async (req, res) => {
       const ceClient = new CostExplorerClient({ region: process.env.AWS_REGION || 'eu-central-1' });
       
       const awsFrom = from.toISOString().split('T')[0];
-      const awsTo = to.toISOString().split('T')[0];
+      // AWS Cost Explorer end date is EXCLUSIVE — add 1 day
+      const endDate = new Date(to);
+      endDate.setDate(endDate.getDate() + 1);
+      const awsTo = endDate.toISOString().split('T')[0];
       
       const awsResult = await ceClient.send(new GetCostAndUsageCommand({
         TimePeriod: { Start: awsFrom, End: awsTo },
@@ -9674,8 +9692,13 @@ app.get('/admin/finance/summary', adminAuthMiddleware, async (req, res) => {
       
       awsCosts = { totalCents: totalAwsCents, byService: services };
     } catch (awsErr: any) {
-      console.warn('⚠️ AWS Cost Explorer not available:', awsErr.message);
-      awsCosts = { totalCents: 0, byService: {}, error: 'Cost Explorer nicht verfügbar (IAM-Berechtigung fehlt oder noch keine Daten)' };
+      console.error('❌ AWS Cost Explorer error:', awsErr.name, awsErr.message);
+      const errorDetail = awsErr.name === 'AccessDeniedException' 
+        ? 'Fehlende IAM-Berechtigung (ce:GetCostAndUsage)'
+        : awsErr.name === 'OptInRequired'
+        ? 'Cost Explorer muss im AWS-Konto aktiviert werden'
+        : awsErr.message || 'Unbekannter Fehler';
+      awsCosts = { totalCents: 0, byService: {}, error: `Cost Explorer: ${errorDetail}` };
     }
     
     // Lead count for cost-per-lead
@@ -10036,6 +10059,9 @@ async function handleStreamingChat(event: any, responseStream: any): Promise<voi
       select: { role: true, content: true },
     }).then((msgs: any[]) => msgs.reverse());
 
+    // Save user message BEFORE streaming (so follow-ups see it immediately)
+    await db.userChat.create({ data: { userId, role: 'USER', content: message } });
+
     // Stream AI response
     const openai = new OpenAIService();
     let fullResponse = '';
@@ -10064,12 +10090,11 @@ async function handleStreamingChat(event: any, responseStream: any): Promise<voi
       clearInterval(heartbeatInterval);
     }
 
+    // Save assistant message BEFORE ending stream
+    await db.userChat.create({ data: { userId, role: 'ASSISTANT', content: wrapAiResponse(fullResponse) } });
+
     writeSse({ done: true, hadFunctionCalls, toolsUsed });
     console.log(`📡 Stream: ${chunkCount} chunks, ${fullResponse.length} chars`);
-
-    // Save chat history
-    await db.userChat.create({ data: { userId, role: 'USER', content: message } });
-    await db.userChat.create({ data: { userId, role: 'ASSISTANT', content: wrapAiResponse(fullResponse) } });
   } catch (err: any) {
     console.error('Streaming chat error:', err);
     try {
