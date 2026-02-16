@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { 
   Hash, Plus, Search, User, Send, Menu, X, ChevronRight, 
   Shield, Loader2, MoreHorizontal, Pencil, Trash2,
@@ -85,7 +86,7 @@ function PresenceDot({ status }: { status: PresenceStatus }) {
 // ==========================================
 // Mention parsing helpers
 // ==========================================
-function parseMentionsAndMedia(content: string): React.ReactNode[] {
+function parseMentionsAndMedia(content: string, imageAlt = 'Bild'): React.ReactNode[] {
   // Combined regex: mentions @[Name](id), images ![name](url), links [name](url)
   const combinedRegex = /(@\[([^\]]+)\]\(([^)]+)\))|(!\[([^\]]*)\]\(([^)]+)\))|(\[([^\]]+)\]\(([^)]+)\))/g;
   const parts: React.ReactNode[] = [];
@@ -110,7 +111,7 @@ function parseMentionsAndMedia(content: string): React.ReactNode[] {
         <img
           key={match.index}
           src={match[6]}
-          alt={match[5] || 'Bild'}
+          alt={match[5] || imageAlt}
           className="max-w-xs max-h-64 rounded-lg mt-1 cursor-pointer hover:opacity-90 transition-opacity border border-gray-200 dark:border-gray-700"
           onClick={() => window.open(match![6], '_blank')}
           loading="lazy"
@@ -139,7 +140,7 @@ function parseMentionsAndMedia(content: string): React.ReactNode[] {
   return parts.length > 0 ? parts : [content];
 }
 
-function formatTime(dateString: string) {
+function formatTime(dateString: string, yesterdayFn?: (time: string) => string) {
   const d = new Date(dateString);
   const now = new Date();
   const isToday = d.toDateString() === now.toDateString();
@@ -149,7 +150,7 @@ function formatTime(dateString: string) {
 
   const time = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
   if (isToday) return time;
-  if (isYesterday) return `Gestern ${time}`;
+  if (isYesterday) return yesterdayFn ? yesterdayFn(time) : `Gestern ${time}`;
   return `${d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} ${time}`;
 }
 
@@ -157,6 +158,7 @@ function formatTime(dateString: string) {
 // Main Component
 // ==========================================
 export default function TeamChatPage() {
+  const t = useTranslations('chat');
   const { data: user } = useSWR('/me', getMe);
   const { data: channels = [], mutate: mutateChannels } = useSWR('/channels', getChannels);
   const { data: seats = [] } = useSWR('/seats', getSeats);
@@ -195,6 +197,7 @@ export default function TeamChatPage() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mentionsMapRef = useRef<Map<string, string>>(new Map());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
@@ -278,13 +281,22 @@ export default function TeamChatPage() {
   };
 
   // Send message (with optional file uploads)
+  const convertMentionsForSend = (text: string): string => {
+    let result = text;
+    for (const [name, id] of mentionsMapRef.current) {
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      result = result.replace(new RegExp(`@${escaped}(?=\\s|$)`, 'g'), `@[${name}](${id})`);
+    }
+    return result;
+  };
+
   const handleSendMessage = async () => {
     const hasText = message.trim().length > 0;
     const hasFiles = uploadedFiles.length > 0;
     if ((!hasText && !hasFiles) || !activeChannelId || sending) return;
     setSending(true);
     try {
-      let fullContent = message.trim();
+      let fullContent = convertMentionsForSend(message.trim());
 
       // Upload files first, then append URLs to message
       if (hasFiles) {
@@ -301,6 +313,7 @@ export default function TeamChatPage() {
 
       await sendChannelMessage(activeChannelId, fullContent);
       setMessage('');
+      mentionsMapRef.current.clear();
       // Immediately refresh
       const data = await getChannelMessages(activeChannelId, undefined, 30);
       setMessages(data.messages);
@@ -354,7 +367,7 @@ export default function TeamChatPage() {
       setNewChannelDesc('');
       setShowCreateChannel(false);
     } catch (error: any) {
-      alert(error.message || 'Fehler beim Erstellen');
+      alert(error.message || t('createChannel.error'));
     } finally {
       setCreatingChannel(false);
     }
@@ -376,7 +389,7 @@ export default function TeamChatPage() {
   };
 
   // Jarvis virtual seat for mentions
-  const jarvisSeat: Seat = { id: 'jarvis', firstName: 'Jarvis', lastName: '', email: 'ki-assistent', role: 'BOT', lastSeenAt: new Date().toISOString() };
+  const jarvisSeat: Seat = { id: 'jarvis', firstName: 'Jarvis', lastName: '', email: t('jarvisMentionLabel'), role: 'BOT', lastSeenAt: new Date().toISOString() };
 
   const filteredMentionSeats = [
     // Always show Jarvis if it matches the query
@@ -394,7 +407,9 @@ export default function TeamChatPage() {
     const atIndex = textBeforeCursor.lastIndexOf('@');
     const before = message.slice(0, atIndex);
     const after = message.slice(cursorPos);
-    const mention = `@[${seat.firstName}${seat.lastName ? ' ' + seat.lastName : ''}](${seat.id}) `;
+    const displayName = `${seat.firstName}${seat.lastName ? ' ' + seat.lastName : ''}`;
+    mentionsMapRef.current.set(displayName, seat.id);
+    const mention = `@${displayName} `;
     setMessage(before + mention + after);
     setShowMentions(false);
     textareaRef.current?.focus();
@@ -526,7 +541,7 @@ export default function TeamChatPage() {
             <Hash className="w-4 h-4 text-gray-400" />
           )}
           <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate max-w-[200px]">
-            {activeChannel ? (activeChannel.type === 'DM' ? getDmDisplayName(activeChannel) : activeChannel.name) : 'Channel wählen'}
+            {activeChannel ? (activeChannel.type === 'DM' ? getDmDisplayName(activeChannel) : activeChannel.name) : t('selectChannel')}
           </span>
         </div>
         <div className="w-9" /> {/* Spacer for centering */}
@@ -538,7 +553,7 @@ export default function TeamChatPage() {
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileDrawerOpen(false)} />
           <div className="relative w-72 bg-white dark:bg-[#111] h-full shadow-xl animate-slide-right flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-              <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Channels</h2>
+              <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">{t('sections.channels')}</h2>
               <button onClick={() => setMobileDrawerOpen(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
                 <X className="w-5 h-5 text-gray-500" />
               </button>
@@ -546,7 +561,7 @@ export default function TeamChatPage() {
             <div className="p-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input type="text" placeholder="Suchen..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                <input type="text" placeholder={t('searchPlaceholder')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm" />
               </div>
             </div>
@@ -554,7 +569,7 @@ export default function TeamChatPage() {
               {/* Channels */}
               <div>
                 <div className="flex items-center justify-between px-2 mb-2">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Channels</h3>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('sections.channels')}</h3>
                   {isAdmin && (
                     <button onClick={() => { setShowCreateChannel(true); setMobileDrawerOpen(false); }} className="text-gray-400 hover:text-gray-600">
                       <Plus className="w-4 h-4" />
@@ -573,7 +588,7 @@ export default function TeamChatPage() {
                       <div className="flex items-center min-w-0">
                         <Hash className={`w-4 h-4 mr-2 shrink-0 ${activeChannelId === channel.id ? 'text-blue-600' : 'text-gray-400'}`} />
                         <span className="truncate">{channel.name}</span>
-                        {channel.isDefault && <span className="ml-1.5 text-[9px] bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1 rounded">Standard</span>}
+                        {channel.isDefault && <span className="ml-1.5 text-[9px] bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1 rounded">{t('defaultBadge')}</span>}
                       </div>
                       <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
                     </button>
@@ -585,7 +600,7 @@ export default function TeamChatPage() {
               {dmChannels.length > 0 && (
                 <div>
                   <div className="px-2 mb-2">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Direktnachrichten</h3>
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('sections.directMessages')}</h3>
                   </div>
                   <div className="space-y-0.5">
                     {dmChannels.map((channel: Channel) => (
@@ -609,7 +624,7 @@ export default function TeamChatPage() {
               {/* Team Members */}
               <div>
                 <div className="px-2 mb-2">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Team</h3>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('sections.team')}</h3>
                 </div>
                 <div className="space-y-0.5">
                   {seats.filter((s: Seat) => s.id !== user?.id).map((seat: Seat) => (
@@ -640,7 +655,7 @@ export default function TeamChatPage() {
           <div className="p-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input type="text" placeholder="Suchen..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              <input type="text" placeholder={t('searchPlaceholder')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm" />
             </div>
           </div>
@@ -649,7 +664,7 @@ export default function TeamChatPage() {
             {/* Channels */}
             <div>
               <div className="flex items-center justify-between px-2 mb-2">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Channels</h3>
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('sections.channels')}</h3>
                 {isAdmin && (
                   <button onClick={() => setShowCreateChannel(true)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Channel erstellen">
                     <Plus className="w-4 h-4" />
@@ -669,7 +684,7 @@ export default function TeamChatPage() {
                   >
                     <Hash className="w-4 h-4 mr-2 text-gray-400 group-hover:text-gray-500 shrink-0" />
                     <span className="truncate">{channel.name}</span>
-                    {channel.isDefault && <span className="ml-auto text-[9px] bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1 rounded shrink-0">Standard</span>}
+                    {channel.isDefault && <span className="ml-auto text-[9px] bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1 rounded shrink-0">{t('defaultBadge')}</span>}
                   </button>
                 ))}
               </div>
@@ -679,7 +694,7 @@ export default function TeamChatPage() {
             {dmChannels.length > 0 && (
               <div>
                 <div className="px-2 mb-2">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Direktnachrichten</h3>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('sections.directMessages')}</h3>
                 </div>
                 <div className="space-y-0.5">
                   {dmChannels.map((channel: Channel) => (
@@ -705,7 +720,7 @@ export default function TeamChatPage() {
             {/* Team Members */}
             <div>
               <div className="flex items-center justify-between px-2 mb-2">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Team</h3>
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('sections.team')}</h3>
               </div>
               <div className="space-y-0.5">
                 {seats.filter((s: Seat) => s.id !== user?.id).map((seat: Seat) => (
@@ -732,8 +747,8 @@ export default function TeamChatPage() {
             <div className="flex items-center gap-2 px-2 py-2 bg-green-50 dark:bg-green-900/10 rounded-lg">
               <Shield className="w-4 h-4 text-green-600 dark:text-green-400 shrink-0" />
               <div>
-                <p className="text-[11px] font-semibold text-green-700 dark:text-green-400">Ende-zu-Ende verschlüsselt</p>
-                <p className="text-[10px] text-green-600/70 dark:text-green-500/70">AES-256 • Nur dein Team</p>
+                <p className="text-[11px] font-semibold text-green-700 dark:text-green-400">{t('security.encrypted')}</p>
+                <p className="text-[10px] text-green-600/70 dark:text-green-500/70">{t('security.description')}</p>
               </div>
             </div>
           </div>
@@ -779,7 +794,7 @@ export default function TeamChatPage() {
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
                     >
                       {loadingMore ? <Loader2 className="w-3 h-3 animate-spin" /> : <ChevronUp className="w-3 h-3" />}
-                      {loadingMore ? 'Laden...' : 'Ältere Nachrichten laden'}
+                      {loadingMore ? t('loading') : t('loadMore')}
                     </button>
                   </div>
                 )}
@@ -801,14 +816,14 @@ export default function TeamChatPage() {
                     </div>
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
                       {activeChannel.type === 'DM'
-                        ? `Konversation mit ${getDmDisplayName(activeChannel)}`
-                        : `Willkommen in #${activeChannel.name}`
+                        ? t('emptyState.dmTitle', { name: getDmDisplayName(activeChannel) })
+                        : t('emptyState.channelTitle', { name: activeChannel.name })
                       }
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       {activeChannel.type === 'DM'
-                        ? 'Schreibe die erste Nachricht.'
-                        : 'Schreibe die erste Nachricht in diesem Channel.'
+                        ? t('emptyState.dmDescription')
+                        : t('emptyState.channelDescription')
                       }
                     </p>
                   </div>
@@ -821,30 +836,30 @@ export default function TeamChatPage() {
                   return (
                     <div
                       key={msg.id}
-                      className={`flex items-start space-x-2.5 lg:space-x-3 group relative ${msg.isJarvis ? 'bg-blue-50/50 dark:bg-blue-900/10 -mx-4 lg:-mx-6 px-4 lg:px-6 py-2 rounded-lg border-l-2 border-blue-500' : ''}`}
+                      className="flex items-start space-x-2.5 lg:space-x-3 group relative"
                     >
                       {/* Avatar */}
-                      {msg.isJarvis ? (
-                        <Image src="/logo-icon-only.png" alt="Jarvis" width={32} height={32} className="w-8 h-8 lg:w-9 lg:h-9 shrink-0 mt-0.5" />
-                      ) : (
-                        <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300 shrink-0 mt-0.5">
-                          {msg.user.firstName?.charAt(0)}{msg.user.lastName?.charAt(0)}
-                        </div>
-                      )}
+                      <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300 shrink-0 mt-0.5">
+                        {msg.isJarvis ? (
+                          <Image src="/logo-icon-only.png" alt="Jarvis" width={20} height={20} className="w-5 h-5" />
+                        ) : (
+                          <>{msg.user.firstName?.charAt(0)}{msg.user.lastName?.charAt(0)}</>
+                        )}
+                      </div>
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-baseline gap-2">
-                          <span className={`font-semibold text-sm ${msg.isJarvis ? 'text-blue-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'} truncate`}>
+                          <span className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">
                             {msg.isJarvis ? 'Jarvis' : `${msg.user.firstName} ${msg.user.lastName}`}
                           </span>
                           {msg.isJarvis && (
-                            <span className="text-[9px] font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-1.5 py-0.5 rounded leading-none">KI</span>
+                            <span className="text-[9px] font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded leading-none">{t('jarvisBadge')}</span>
                           )}
                           {msg.user.role === 'ADMIN' && !msg.isJarvis && (
-                            <span className="text-[9px] font-medium text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded leading-none">Admin</span>
+                            <span className="text-[9px] font-medium text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded leading-none">{t('adminBadge')}</span>
                           )}
-                          <span className="text-[10px] lg:text-xs text-gray-400 shrink-0">{formatTime(msg.createdAt)}</span>
-                          {msg.editedAt && <span className="text-[10px] text-gray-400 italic">(bearbeitet)</span>}
+                          <span className="text-[10px] lg:text-xs text-gray-400 shrink-0">{formatTime(msg.createdAt, (time) => t('yesterday', { time }))}</span>
+                          {msg.editedAt && <span className="text-[10px] text-gray-400 italic">{t('edited')}</span>}
                         </div>
 
                         {isEditing ? (
@@ -861,13 +876,13 @@ export default function TeamChatPage() {
                               autoFocus
                             />
                             <div className="flex gap-2 mt-1">
-                              <button onClick={handleEditMessage} className="text-xs text-blue-600 hover:underline">Speichern</button>
-                              <button onClick={() => setEditingMessageId(null)} className="text-xs text-gray-400 hover:underline">Abbrechen</button>
+                              <button onClick={handleEditMessage} className="text-xs text-blue-600 hover:underline">{t('save')}</button>
+                              <button onClick={() => setEditingMessageId(null)} className="text-xs text-gray-400 hover:underline">{t('cancel')}</button>
                             </div>
                           </div>
                         ) : (
                           <p className="text-sm text-gray-800 dark:text-gray-200 mt-0.5 break-words whitespace-pre-wrap">
-                            {parseMentionsAndMedia(msg.content)}
+                            {parseMentionsAndMedia(msg.content, t('imageAlt'))}
                           </p>
                         )}
                       </div>
@@ -889,14 +904,14 @@ export default function TeamChatPage() {
                                     onClick={() => { setEditingMessageId(msg.id); setEditContent(msg.content); setMenuMessageId(null); }}
                                     className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                                   >
-                                    <Pencil className="w-3.5 h-3.5" /> Bearbeiten
+                                    <Pencil className="w-3.5 h-3.5" /> {t('contextMenu.edit')}
                                   </button>
                                 )}
                                 <button
                                   onClick={() => handleDeleteMessage(msg.id)}
                                   className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" /> Löschen
+                                  <Trash2 className="w-3.5 h-3.5" /> {t('contextMenu.delete')}
                                 </button>
                               </div>
                             )}
@@ -927,11 +942,11 @@ export default function TeamChatPage() {
                             {seat.firstName?.charAt(0)}{seat.lastName?.charAt(0)}
                           </div>
                         )}
-                        <span className={`font-medium ${seat.id === 'jarvis' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">
                           {seat.firstName}{seat.lastName ? ` ${seat.lastName}` : ''}
                         </span>
                         <span className="text-gray-400 text-xs ml-auto">
-                          {seat.id === 'jarvis' ? 'KI-Assistent' : seat.email}
+                          {seat.id === 'jarvis' ? t('jarvisMentionLabel') : seat.email}
                         </span>
                       </button>
                     ))}
@@ -980,7 +995,7 @@ export default function TeamChatPage() {
                   rows={1}
                   className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl text-[16px] lg:text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white dark:focus:bg-gray-800 transition-all placeholder-gray-400 resize-none overflow-y-auto"
                   style={{ maxHeight: '8rem', minHeight: '2.75rem' }}
-                  placeholder={activeChannel.type === 'DM' ? `Nachricht an ${getDmDisplayName(activeChannel)}...` : `Nachricht an #${activeChannel.name}... (@ für Erwähnungen)`}
+                  placeholder={activeChannel.type === 'DM' ? t('inputPlaceholder.dm', { name: getDmDisplayName(activeChannel) }) : t('inputPlaceholder.channel', { name: activeChannel.name })}
                   value={message}
                   onChange={e => handleMessageChange(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -1022,12 +1037,12 @@ export default function TeamChatPage() {
                   >
                     {sending ? (
                       <>
-                        Senden
+                        {t('send')}
                         <Loader2 className="w-4 h-4 animate-spin" />
                       </>
                     ) : (
                       <>
-                        Senden
+                        {t('send')}
                         <Send className="w-4 h-4" />
                       </>
                     )}
@@ -1039,7 +1054,7 @@ export default function TeamChatPage() {
             <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400 text-sm">
               <div className="text-center">
                 <Hash className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                <p>Wähle einen Channel aus</p>
+                <p>{t('selectChannelPrompt')}</p>
               </div>
             </div>
           )}
@@ -1051,41 +1066,41 @@ export default function TeamChatPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowCreateChannel(false)} />
           <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md p-6">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Neuen Channel erstellen</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">{t('createChannel.title')}</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('createChannel.nameLabel')}</label>
                 <input
                   type="text"
                   value={newChannelName}
                   onChange={e => setNewChannelName(e.target.value)}
-                  placeholder="z.B. Vertrieb, Marketing..."
+                  placeholder={t('createChannel.namePlaceholder')}
                   className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   autoFocus
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Beschreibung (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('createChannel.descriptionLabel')}</label>
                 <input
                   type="text"
                   value={newChannelDesc}
                   onChange={e => setNewChannelDesc(e.target.value)}
-                  placeholder="Worum geht es in diesem Channel?"
+                  placeholder={t('createChannel.descriptionPlaceholder')}
                   className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 />
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Alle Team-Mitglieder werden automatisch hinzugefügt.</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t('createChannel.info')}</p>
             </div>
             <div className="flex justify-end gap-2 mt-6">
               <button onClick={() => setShowCreateChannel(false)} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
-                Abbrechen
+                {t('cancel')}
               </button>
               <button
                 onClick={handleCreateChannel}
                 disabled={!newChannelName.trim() || creatingChannel}
                 className="px-4 py-2 text-sm font-medium bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50"
               >
-                {creatingChannel ? 'Wird erstellt...' : 'Erstellen'}
+                {creatingChannel ? t('createChannel.creating') : t('createChannel.create')}
               </button>
             </div>
           </div>

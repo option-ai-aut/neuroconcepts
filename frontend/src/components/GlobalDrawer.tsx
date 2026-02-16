@@ -7,6 +7,7 @@ import { createLead, createProperty, sendManualEmail, API_ENDPOINTS, fetchWithAu
 import { useRouter } from 'next/navigation';
 import { mutate } from 'swr';
 import { useEnv } from '@/components/EnvProvider';
+import { useTranslations } from 'next-intl';
 
 const SALUTATION_OPTIONS = [
   { value: 'NONE', label: 'Keine Anrede' },
@@ -105,6 +106,7 @@ interface EmailComposerProps {
 
 function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, onDiscard, loading }: EmailComposerProps) {
   const { apiUrl } = useEnv();
+  const t = useTranslations('drawer');
   const [showCc, setShowCc] = useState(!!emailFormData.cc);
   const [showBcc, setShowBcc] = useState(!!emailFormData.bcc);
   const [signature, setSignature] = useState<string | null>(null);
@@ -470,7 +472,7 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
             onClick={onDiscard}
             className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            Verwerfen
+            {t('discard')}
           </button>
           <button
             type="button"
@@ -479,7 +481,7 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors flex items-center gap-2"
           >
             <FileText className="w-4 h-4" />
-            Entwurf
+            {t('draft')}
           </button>
           <button
             type="button"
@@ -488,7 +490,7 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
             className="px-5 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
           >
             <Send className="w-4 h-4" />
-            {loading ? 'Senden...' : 'Senden'}
+            {loading ? t('sending') : t('send')}
           </button>
         </div>
       </div>
@@ -513,6 +515,7 @@ export default function GlobalDrawer() {
     emailFormData,
     updateEmailForm
   } = useGlobalState();
+  const t = useTranslations('drawer');
 
   // Animation state
   const [isVisible, setIsVisible] = useState(false);
@@ -759,10 +762,10 @@ export default function GlobalDrawer() {
 
   const getDrawerTitle = () => {
     switch (drawerType) {
-      case 'LEAD': return 'Neuen Lead erfassen';
-      case 'PROPERTY': return 'Neues Objekt anlegen';
-      case 'EMAIL': return 'E-Mail verfassen';
-      case 'BUG_REPORT': return 'Bug melden';
+      case 'LEAD': return t('newLead');
+      case 'PROPERTY': return t('newProperty');
+      case 'EMAIL': return t('composeEmail');
+      case 'BUG_REPORT': return t('reportBug');
       default: return '';
     }
   };
@@ -788,49 +791,10 @@ export default function GlobalDrawer() {
     </button>
   );
 
-  return (
-    <div
-      className={`fixed bottom-0 right-80 bg-white shadow-[0_-5px_30px_rgba(0,0,0,0.15)] border-t border-x border-gray-200 rounded-t-xl z-40 ${
-        drawerMinimized ? 'h-12' : 'h-[720px]'
-      }`}
-      style={{ 
-        transform: isVisible ? 'translateY(0)' : 'translateY(100%)',
-        left: sidebarExpanded ? '256px' : '80px',
-        transition: 'all 0.3s ease-in-out'
-      }}
-    >
-      {/* Header */}
-      <div 
-        className="flex items-center justify-between px-6 h-12 bg-white border-b border-gray-100 rounded-t-xl cursor-pointer hover:bg-gray-50 transition-colors"
-        onClick={drawerMinimized ? maximizeDrawer : minimizeDrawer}
-      >
-        <div className="flex items-center space-x-2">
-          <div className={`w-2 h-2 rounded-full ${getHeaderColor()}`} />
-          <h3 className="text-gray-900 font-semibold text-sm">
-            {getDrawerTitle()}
-          </h3>
-        </div>
-        <div className="flex items-center space-x-2">
-          {drawerMinimized ? (
-            <button onClick={(e) => { e.stopPropagation(); maximizeDrawer(); }} className="p-1 text-gray-400 hover:text-blue-600 rounded-md hover:bg-gray-50">
-              <Maximize2 className="w-4 h-4" />
-            </button>
-          ) : (
-            <button onClick={minimizeDrawer} className="p-1 text-gray-400 hover:text-blue-600 rounded-md hover:bg-gray-50">
-              <Minus className="w-4 h-4" />
-            </button>
-          )}
-          <button onClick={handleAnimatedClose} className="p-1 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* Body */}
-      {!drawerMinimized && (
-        <div className="p-6 overflow-y-auto h-[calc(720px-48px)]">
-          {drawerType === 'EMAIL' && (
-            <EmailComposer
+  const renderDrawerContent = () => (
+    <>
+      {drawerType === 'EMAIL' && (
+        <EmailComposer
               emailFormData={emailFormData}
               updateEmailForm={updateEmailForm}
               onSend={() => handleSendEmail(false)}
@@ -843,8 +807,8 @@ export default function GlobalDrawer() {
           {drawerType === 'LEAD' && (
             <div className="max-w-4xl mx-auto space-y-5">
               {/* Anrede & Name */}
-              <div className="grid grid-cols-12 gap-4">
-                <div className="col-span-2">
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-12">
+                <div className="col-span-1 lg:col-span-2">
                   <label className={labelClass}>Anrede</label>
                   <select
                     value={leadFormData.salutation || 'NONE'}
@@ -856,7 +820,7 @@ export default function GlobalDrawer() {
                     ))}
                   </select>
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 lg:col-span-2">
                   <label className={labelClass}>Ansprache</label>
                   <div className="flex h-[42px]">
                     <button
@@ -883,7 +847,7 @@ export default function GlobalDrawer() {
                     </button>
                   </div>
                 </div>
-                <div className="col-span-4">
+                <div className="col-span-1 lg:col-span-4">
                   <label className={labelClass}>Vorname</label>
                   <input
                     type="text"
@@ -893,7 +857,7 @@ export default function GlobalDrawer() {
                     placeholder="Max"
                   />
                 </div>
-                <div className="col-span-4">
+                <div className="col-span-1 lg:col-span-4">
                   <label className={labelClass}>Nachname</label>
                   <input
                     type="text"
@@ -906,7 +870,7 @@ export default function GlobalDrawer() {
               </div>
 
               {/* Kontakt */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={labelClass}>E-Mail *</label>
                   <input
@@ -968,7 +932,7 @@ export default function GlobalDrawer() {
                   disabled={loading || !leadFormData.email}
                   className="px-6 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
                 >
-                  {loading ? 'Speichern...' : 'Lead anlegen'}
+                  {loading ? t('saving') : t('createLead')}
                 </button>
               </div>
             </div>
@@ -977,8 +941,8 @@ export default function GlobalDrawer() {
           {drawerType === 'PROPERTY' && (
             <div className="max-w-5xl mx-auto space-y-4">
               {/* Grunddaten */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="sm:col-span-2">
                   <label className={labelClass}>Titel (Intern) *</label>
                   <input
                     type="text"
@@ -1003,7 +967,7 @@ export default function GlobalDrawer() {
               </div>
 
               {/* Typ & Vermarktung */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={labelClass}>Objekttyp</label>
                   <select
@@ -1050,8 +1014,8 @@ export default function GlobalDrawer() {
                 <SectionHeader title="📍 Adresse" section="address" expanded={expandedSections.address} />
                 {expandedSections.address && (
                   <div className="space-y-4 mt-2">
-                    <div className="grid grid-cols-6 gap-4">
-                      <div className="col-span-3">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-6 sm:gap-4">
+                      <div className="col-span-2 sm:col-span-3">
                         <label className={labelClass}>Straße *</label>
                         <input
                           type="text"
@@ -1092,7 +1056,7 @@ export default function GlobalDrawer() {
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-6 gap-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-6 sm:gap-4">
                       <div>
                         <label className={labelClass}>Etage</label>
                         <input
@@ -1123,7 +1087,7 @@ export default function GlobalDrawer() {
                           placeholder="1060"
                         />
                       </div>
-                      <div className="col-span-2">
+                      <div className="col-span-2 sm:col-span-2">
                         <label className={labelClass}>Stadt *</label>
                         <input
                           type="text"
@@ -1144,7 +1108,7 @@ export default function GlobalDrawer() {
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                       <div>
                         <label className={labelClass}>Bundesland/Provinz</label>
                         <input
@@ -1178,7 +1142,7 @@ export default function GlobalDrawer() {
                 {expandedSections.price && (
                   <div className="space-y-4 mt-2">
                     {(propertyFormData.marketingType || 'SALE') === 'SALE' ? (
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
                         <div>
                           <label className={labelClass}>Kaufpreis (€) *</label>
                           <input
@@ -1201,7 +1165,7 @@ export default function GlobalDrawer() {
                         </div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
                         <div>
                           <label className={labelClass}>Kaltmiete (€) *</label>
                           <input
@@ -1253,7 +1217,7 @@ export default function GlobalDrawer() {
                 <SectionHeader title="📐 Details" section="details" expanded={expandedSections.details} />
                 {expandedSections.details && (
                   <div className="space-y-4 mt-2">
-                    <div className="grid grid-cols-5 gap-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 sm:gap-4">
                       <div>
                         <label className={labelClass}>Wohnfläche (m²)</label>
                         <input
@@ -1306,7 +1270,7 @@ export default function GlobalDrawer() {
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
                       <div>
                         <label className={labelClass}>Baujahr</label>
                         <input
@@ -1339,7 +1303,7 @@ export default function GlobalDrawer() {
                 <SectionHeader title="⚡ Energieausweis" section="energy" expanded={expandedSections.energy} />
                 {expandedSections.energy && (
                   <div className="space-y-4 mt-2">
-                    <div className="grid grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
                       <div>
                         <label className={labelClass}>Art</label>
                         <select
@@ -1431,7 +1395,7 @@ export default function GlobalDrawer() {
                   disabled={loading || !propertyFormData.title || !propertyFormData.street || !propertyFormData.city}
                   className="px-6 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
                 >
-                  {loading ? 'Speichern...' : 'Objekt anlegen'}
+                  {loading ? t('saving') : t('createProperty')}
                 </button>
               </div>
             </div>
@@ -1444,13 +1408,13 @@ export default function GlobalDrawer() {
                   <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mb-4">
                     <svg className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Vielen Dank!</h3>
-                  <p className="text-sm text-gray-500">Dein Bug-Report wurde erfolgreich gesendet.</p>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">{t('bugSuccess')}</h3>
+                  <p className="text-sm text-gray-500">{t('bugSuccessDesc')}</p>
                 </div>
               ) : (
                 <>
                   <p className="text-sm text-gray-500 mb-4">
-                    Beschreibe den Fehler so genau wie möglich. Die aktuelle Seite wird automatisch mitgesendet.
+                    {t('bugPageInfo')}
                   </p>
                   <div>
                     <label className={labelClass}>Titel *</label>
@@ -1573,15 +1537,87 @@ export default function GlobalDrawer() {
                       disabled={bugSubmitting || !bugTitle.trim() || !bugDescription.trim()}
                       className="px-6 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
                     >
-                      {bugSubmitting ? 'Senden...' : 'Bug melden'}
+                      {bugSubmitting ? t('submittingBug') : t('submitBug')}
                     </button>
                   </div>
                 </>
               )}
             </div>
           )}
+    </>
+  );
+
+  return (
+    <>
+    {/* Mobile: Fullscreen overlay */}
+    <div
+      className={`lg:hidden fixed inset-0 bg-white z-50`}
+      style={{
+        transform: isVisible ? 'translateY(0)' : 'translateY(100%)',
+        transition: 'transform 0.3s ease-in-out'
+      }}
+    >
+      {/* Mobile Header */}
+      <div className="flex items-center justify-between px-4 h-14 bg-white border-b border-gray-100" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <div className="flex items-center space-x-2">
+          <div className={`w-2 h-2 rounded-full ${getHeaderColor()}`} />
+          <h3 className="text-gray-900 font-semibold text-sm">{getDrawerTitle()}</h3>
+        </div>
+        <button onClick={handleAnimatedClose} className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+      {/* Mobile Body */}
+      <div className="p-4 overflow-y-auto" style={{ height: 'calc(100dvh - 56px - env(safe-area-inset-top, 0px))' }}>
+        {renderDrawerContent()}
+      </div>
+    </div>
+
+    {/* Desktop: Bottom drawer */}
+    <div
+      className={`hidden lg:block fixed bottom-0 right-80 bg-white shadow-[0_-5px_30px_rgba(0,0,0,0.15)] border-t border-x border-gray-200 rounded-t-xl z-40 ${
+        drawerMinimized ? 'h-12' : 'h-[720px]'
+      }`}
+      style={{ 
+        transform: isVisible ? 'translateY(0)' : 'translateY(100%)',
+        left: sidebarExpanded ? '256px' : '80px',
+        transition: 'all 0.3s ease-in-out'
+      }}
+    >
+      {/* Header */}
+      <div 
+        className="flex items-center justify-between px-6 h-12 bg-white border-b border-gray-100 rounded-t-xl cursor-pointer hover:bg-gray-50 transition-colors"
+        onClick={drawerMinimized ? maximizeDrawer : minimizeDrawer}
+      >
+        <div className="flex items-center space-x-2">
+          <div className={`w-2 h-2 rounded-full ${getHeaderColor()}`} />
+          <h3 className="text-gray-900 font-semibold text-sm">
+            {getDrawerTitle()}
+          </h3>
+        </div>
+        <div className="flex items-center space-x-2">
+          {drawerMinimized ? (
+            <button onClick={(e) => { e.stopPropagation(); maximizeDrawer(); }} className="p-1 text-gray-400 hover:text-blue-600 rounded-md hover:bg-gray-50">
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          ) : (
+            <button onClick={minimizeDrawer} className="p-1 text-gray-400 hover:text-blue-600 rounded-md hover:bg-gray-50">
+              <Minus className="w-4 h-4" />
+            </button>
+          )}
+          <button onClick={handleAnimatedClose} className="p-1 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Body */}
+      {!drawerMinimized && (
+        <div className="p-6 overflow-y-auto h-[calc(720px-48px)]">
+          {renderDrawerContent()}
         </div>
       )}
     </div>
+    </>
   );
 }

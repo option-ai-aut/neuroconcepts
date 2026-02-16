@@ -8,36 +8,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { syncUser } from '@/lib/api';
 import { useAuthConfigured } from '@/components/AuthProvider';
-
-/** Clean up Cognito error messages — strip the generic prefix, translate to German */
-function formatAuthError(msg: string): string {
-  if (!msg) return 'Ein Fehler ist aufgetreten';
-  // Strip "Password does not conform to policy: " prefix
-  const stripped = msg.replace(/^Password does not conform to policy:\s*/i, '');
-  // Map common Cognito messages to German
-  const translations: Record<string, string> = {
-    'Password must have numeric characters': 'Passwort muss mindestens eine Zahl enthalten.',
-    'Password must have uppercase characters': 'Passwort muss mindestens einen Großbuchstaben enthalten.',
-    'Password must have lowercase characters': 'Passwort muss mindestens einen Kleinbuchstaben enthalten.',
-    'Password must have symbol characters': 'Passwort muss mindestens ein Sonderzeichen enthalten.',
-    'Password not long enough': 'Passwort muss mindestens 8 Zeichen lang sein.',
-    'Incorrect username or password.': 'E-Mail oder Passwort ist falsch.',
-    'User does not exist.': 'Kein Konto mit dieser E-Mail gefunden.',
-    'User already exists': 'Ein Konto mit dieser E-Mail existiert bereits.',
-    'Invalid verification code provided, please try again.': 'Ungültiger Bestätigungscode. Bitte versuche es erneut.',
-    'Attempt limit exceeded, please try after some time.': 'Zu viele Versuche. Bitte warte einen Moment.',
-    'Username/client id combination not found.': 'Kein Konto mit dieser E-Mail gefunden.',
-  };
-  return translations[stripped] || translations[msg] || stripped;
-}
-
-// Countries with dial codes
-const COUNTRIES = [
-  { code: 'AT', name: 'Österreich', dialCode: '+43' },
-  { code: 'DE', name: 'Deutschland', dialCode: '+49' },
-  { code: 'CH', name: 'Schweiz', dialCode: '+41' },
-  { code: 'LI', name: 'Liechtenstein', dialCode: '+423' },
-];
+import { useTranslations } from 'next-intl';
 
 type AuthView = 'signIn' | 'signUp' | 'confirmSignUp' | 'forgotPassword' | 'confirmReset' | 'onboarding' | 'newPasswordRequired';
 
@@ -61,8 +32,36 @@ function clearCognitoStorage() {
 }
 
 export default function LoginPage() {
+  const t = useTranslations('auth');
   const router = useRouter();
   const authConfigured = useAuthConfigured();
+
+  /** Clean up Cognito error messages — strip the generic prefix, translate */
+  const formatAuthError = (msg: string): string => {
+    if (!msg) return t('errors.default');
+    const stripped = msg.replace(/^Password does not conform to policy:\s*/i, '');
+    const translations: Record<string, string> = {
+      'Password must have numeric characters': t('errors.passwordNumber'),
+      'Password must have uppercase characters': t('errors.passwordUppercase'),
+      'Password must have lowercase characters': t('errors.passwordLowercase'),
+      'Password must have symbol characters': t('errors.passwordSpecial'),
+      'Password not long enough': t('errors.passwordLength'),
+      'Incorrect username or password.': t('errors.wrongCredentials'),
+      'User does not exist.': t('errors.userNotFound'),
+      'User already exists': t('errors.userExists'),
+      'Invalid verification code provided, please try again.': t('errors.invalidCode'),
+      'Attempt limit exceeded, please try after some time.': t('errors.tooManyAttempts'),
+      'Username/client id combination not found.': t('errors.userNotFound'),
+    };
+    return translations[stripped] || translations[msg] || stripped;
+  };
+
+  const countries = [
+    { code: 'AT', name: t('countries.austria'), dialCode: '+43' },
+    { code: 'DE', name: t('countries.germany'), dialCode: '+49' },
+    { code: 'CH', name: t('countries.switzerland'), dialCode: '+41' },
+    { code: 'LI', name: t('countries.liechtenstein'), dialCode: '+423' },
+  ];
 
   const [checkingSession, setCheckingSession] = useState(true);
   const searchParams = useSearchParams();
@@ -117,7 +116,7 @@ export default function LoginPage() {
   const [address, setAddress] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [city, setCity] = useState('');
-  const [country, setCountry] = useState('Österreich');
+  const [country, setCountry] = useState(t('countries.austria'));
   const [confirmationCode, setConfirmationCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   
@@ -157,9 +156,9 @@ export default function LoginPage() {
     } catch (err: any) {
       if (err.name === 'UserNotConfirmedException') {
         setView('confirmSignUp');
-        setError('Bitte bestätige zuerst deine E-Mail-Adresse.');
+        setError(t('errors.confirmEmail'));
       } else {
-        setError(formatAuthError(err.message) || 'Anmeldung fehlgeschlagen');
+        setError(formatAuthError(err.message) || t('errors.signInFailed'));
       }
     } finally {
       setIsLoading(false);
@@ -171,17 +170,17 @@ export default function LoginPage() {
     setError('');
     
     if (!onboardingFirstName.trim() || !onboardingLastName.trim()) {
-      setError('Bitte gib deinen Vor- und Nachnamen ein');
+      setError(t('errors.enterName'));
       return;
     }
     
     if (newPassword !== confirmPassword) {
-      setError('Passwörter stimmen nicht überein');
+      setError(t('errors.passwordMismatch'));
       return;
     }
     
     if (newPassword.length < 8) {
-      setError('Passwort muss mindestens 8 Zeichen lang sein');
+      setError(t('errors.passwordTooShort'));
       return;
     }
     
@@ -222,7 +221,7 @@ export default function LoginPage() {
       
       router.push(getRedirectTarget());
     } catch (err: any) {
-      setError(formatAuthError(err.message) || 'Fehler beim Setzen des Passworts');
+      setError(formatAuthError(err.message) || t('errors.setPasswordFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -233,7 +232,7 @@ export default function LoginPage() {
     setError('');
     
     if (!onboardingFirstName.trim() || !onboardingLastName.trim()) {
-      setError('Bitte gib deinen Vor- und Nachnamen ein.');
+      setError(t('errors.enterName'));
       return;
     }
     
@@ -256,12 +255,12 @@ export default function LoginPage() {
       });
       
       if (!res.ok) {
-        throw new Error('Profil konnte nicht aktualisiert werden');
+        throw new Error(t('errors.profileUpdateFailed'));
       }
       
       router.push(getRedirectTarget());
     } catch (err: any) {
-      setError(formatAuthError(err.message) || 'Fehler beim Speichern');
+      setError(formatAuthError(err.message) || t('errors.saveFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -272,12 +271,12 @@ export default function LoginPage() {
     setError('');
     
     if (password !== confirmPassword) {
-      setError('Passwörter stimmen nicht überein');
+      setError(t('errors.passwordMismatch'));
       return;
     }
     
     if (password.length < 8) {
-      setError('Passwort muss mindestens 8 Zeichen lang sein');
+      setError(t('errors.passwordTooShort'));
       return;
     }
     
@@ -306,7 +305,7 @@ export default function LoginPage() {
       
       setView('confirmSignUp');
     } catch (err: any) {
-      setError(formatAuthError(err.message) || 'Registrierung fehlgeschlagen');
+      setError(formatAuthError(err.message) || t('errors.registrationFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -324,7 +323,7 @@ export default function LoginPage() {
       await syncUser();
       router.push(getRedirectTarget());
     } catch (err: any) {
-      setError(formatAuthError(err.message) || 'Bestätigung fehlgeschlagen');
+      setError(formatAuthError(err.message) || t('errors.confirmationFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -339,7 +338,7 @@ export default function LoginPage() {
       await resetPassword({ username: email });
       setView('confirmReset');
     } catch (err: any) {
-      setError(formatAuthError(err.message) || 'Fehler beim Zurücksetzen');
+      setError(formatAuthError(err.message) || t('errors.resetFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -356,7 +355,7 @@ export default function LoginPage() {
       setPassword('');
       setError('');
     } catch (err: any) {
-      setError(formatAuthError(err.message) || 'Fehler beim Zurücksetzen');
+      setError(formatAuthError(err.message) || t('errors.resetFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -414,7 +413,7 @@ export default function LoginPage() {
               <Image src="/logo-icon-only.png" alt="Immivo" width={240} height={240} className="relative z-10 drop-shadow-[0_0_60px_rgba(255,255,255,0.15)]" />
             </div>
             <h2 className="text-4xl font-bold text-center">
-              {view === 'signUp' || view === 'confirmSignUp' ? 'Willkommen.' : 'Willkommen zurück.'}
+              {view === 'signUp' || view === 'confirmSignUp' ? t('welcomeNew') : t('welcomeBack')}
             </h2>
           </div>
           
@@ -432,7 +431,7 @@ export default function LoginPage() {
             className="group inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-full transition-all"
           >
             <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 group-hover:-translate-x-1 transition-transform" />
-            Zurück zur Startseite
+            {t('backToHome')}
           </a>
         </div>
 
@@ -447,8 +446,8 @@ export default function LoginPage() {
             {view === 'signIn' && (
               <form onSubmit={handleSignIn} className="space-y-5">
                 <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold text-gray-900">Anmelden</h3>
-                  <p className="text-sm text-gray-500 mt-2">Zugang zu deinem Dashboard</p>
+                  <h3 className="text-2xl font-bold text-gray-900">{t('signIn.title')}</h3>
+                  <p className="text-sm text-gray-500 mt-2">{t('signIn.subtitle')}</p>
                 </div>
 
                 {error && (
@@ -458,7 +457,7 @@ export default function LoginPage() {
                 )}
 
                 <div>
-                  <label className={labelClass}>E-Mail</label>
+                  <label className={labelClass}>{t('signIn.email')}</label>
                   <input
                     type="email"
                     value={email}
@@ -469,7 +468,7 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <label className={labelClass}>Passwort</label>
+                  <label className={labelClass}>{t('signIn.password')}</label>
                   <div className="relative">
                     <input
                       type={showPassword ? 'text' : 'password'}
@@ -494,22 +493,22 @@ export default function LoginPage() {
                     onClick={() => setView('forgotPassword')}
                     className="text-sm text-blue-600 hover:text-blue-700"
                   >
-                    Passwort vergessen?
+                    {t('signIn.forgotPassword')}
                   </button>
                 </div>
 
                 <button type="submit" disabled={isLoading} className={buttonClass}>
-                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Anmelden'}
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : t('signIn.submit')}
                 </button>
 
                 <p className="text-center text-sm text-gray-500">
-                  Noch kein Konto?{' '}
+                  {t('signIn.noAccount')}{' '}
                   <button
                     type="button"
                     onClick={() => { setView('signUp'); setError(''); }}
                     className="text-blue-600 hover:text-blue-700 font-medium"
                   >
-                    Jetzt registrieren
+                    {t('signIn.register')}
                   </button>
                 </p>
               </form>
@@ -519,8 +518,8 @@ export default function LoginPage() {
             {view === 'signUp' && (
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="text-center mb-6">
-                  <h3 className="text-2xl font-bold text-gray-900">Konto erstellen</h3>
-                  <p className="text-sm text-gray-500 mt-2">Starte deine 14-tägige Testphase</p>
+                  <h3 className="text-2xl font-bold text-gray-900">{t('signUp.title')}</h3>
+                  <p className="text-sm text-gray-500 mt-2">{t('signUp.subtitle')}</p>
                 </div>
 
                 {error && (
@@ -530,7 +529,7 @@ export default function LoginPage() {
                 )}
 
                 <div>
-                  <label className={labelClass}>E-Mail *</label>
+                  <label className={labelClass}>{t('signUp.email')}</label>
                   <input
                     type="email"
                     value={email}
@@ -542,7 +541,7 @@ export default function LoginPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className={labelClass}>Passwort *</label>
+                    <label className={labelClass}>{t('signUp.password')}</label>
                     <input
                       type="password"
                       value={password}
@@ -552,7 +551,7 @@ export default function LoginPage() {
                     />
                   </div>
                   <div>
-                    <label className={labelClass}>Bestätigen *</label>
+                    <label className={labelClass}>{t('signUp.confirmPassword')}</label>
                     <input
                       type="password"
                       value={confirmPassword}
@@ -565,7 +564,7 @@ export default function LoginPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className={labelClass}>Vorname *</label>
+                    <label className={labelClass}>{t('signUp.firstName')}</label>
                     <input
                       type="text"
                       value={firstName}
@@ -575,7 +574,7 @@ export default function LoginPage() {
                     />
                   </div>
                   <div>
-                    <label className={labelClass}>Nachname *</label>
+                    <label className={labelClass}>{t('signUp.lastName')}</label>
                     <input
                       type="text"
                       value={lastName}
@@ -587,7 +586,7 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <label className={labelClass}>Firmenname</label>
+                  <label className={labelClass}>{t('signUp.companyName')}</label>
                   <input
                     type="text"
                     value={companyName}
@@ -597,14 +596,14 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <label className={labelClass}>Telefon</label>
+                  <label className={labelClass}>{t('signUp.phone')}</label>
                   <div className="flex">
                     <select
                       value={dialCode}
                       onChange={(e) => setDialCode(e.target.value)}
                       className="w-[76px] pl-3 pr-0 py-3 border border-gray-300 border-r-0 rounded-l-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2210%22%20height%3D%226%22%20viewBox%3D%220%200%2010%206%22%3E%3Cpath%20d%3D%22M0%200l5%206%205-6z%22%20fill%3D%22%239ca3af%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_6px_center] bg-[length:10px_6px]"
                     >
-                      {COUNTRIES.map((c) => (
+                      {countries.map((c) => (
                         <option key={c.code} value={c.dialCode}>
                           {c.dialCode}
                         </option>
@@ -621,7 +620,7 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <label className={labelClass}>Straße & Hausnummer</label>
+                  <label className={labelClass}>{t('signUp.street')}</label>
                   <input
                     type="text"
                     value={address}
@@ -632,7 +631,7 @@ export default function LoginPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className={labelClass}>PLZ</label>
+                    <label className={labelClass}>{t('signUp.zip')}</label>
                     <input
                       type="text"
                       value={postalCode}
@@ -641,7 +640,7 @@ export default function LoginPage() {
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className={labelClass}>Ort</label>
+                    <label className={labelClass}>{t('signUp.city')}</label>
                     <input
                       type="text"
                       value={city}
@@ -652,13 +651,13 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <label className={labelClass}>Land</label>
+                  <label className={labelClass}>{t('signUp.country')}</label>
                   <select
                     value={country}
                     onChange={(e) => setCountry(e.target.value)}
                     className={inputClass}
                   >
-                    {COUNTRIES.map((c) => (
+                    {countries.map((c) => (
                       <option key={c.code} value={c.name}>
                         {c.name}
                       </option>
@@ -667,23 +666,23 @@ export default function LoginPage() {
                 </div>
 
                 <button type="submit" disabled={isLoading} className={buttonClass}>
-                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Konto erstellen'}
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : t('signUp.submit')}
                 </button>
 
                 <p className="text-center text-xs text-gray-400">
-                  Mit der Registrierung akzeptierst du unsere{' '}
-                <Link href="/agb" className="text-blue-600 hover:underline">AGB</Link> und{' '}
-                <Link href="/datenschutz" className="text-blue-600 hover:underline">Datenschutzerklärung</Link>.
+                  {t('signUp.termsPrefix')}{' '}
+                <Link href="/agb" className="text-blue-600 hover:underline">{t('signUp.terms')}</Link> und{' '}
+                <Link href="/datenschutz" className="text-blue-600 hover:underline">{t('signUp.privacyPolicy')}</Link>.
                 </p>
 
                 <p className="text-center text-sm text-gray-500">
-                  Bereits ein Konto?{' '}
+                  {t('signUp.hasAccount')}{' '}
                   <button
                     type="button"
                     onClick={() => { setView('signIn'); setError(''); }}
                     className="text-blue-600 hover:text-blue-700 font-medium"
                   >
-                    Anmelden
+                    {t('signUp.signIn')}
                   </button>
                 </p>
               </form>
@@ -693,9 +692,9 @@ export default function LoginPage() {
             {view === 'confirmSignUp' && (
               <form onSubmit={handleConfirmSignUp} className="space-y-5">
                 <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold text-gray-900">E-Mail bestätigen</h3>
+                  <h3 className="text-2xl font-bold text-gray-900">{t('confirm.title')}</h3>
                   <p className="text-sm text-gray-500 mt-2">
-                    Wir haben einen Code an <strong>{email}</strong> gesendet
+                    {t('confirm.codeSentTo')} <strong>{email}</strong> {t('confirm.codeSentSuffix')}
                   </p>
                 </div>
 
@@ -706,7 +705,7 @@ export default function LoginPage() {
                 )}
 
                 <div>
-                  <label className={labelClass}>Bestätigungscode</label>
+                  <label className={labelClass}>{t('confirm.codeLabel')}</label>
                   <input
                     type="text"
                     value={confirmationCode}
@@ -718,7 +717,7 @@ export default function LoginPage() {
                 </div>
 
                 <button type="submit" disabled={isLoading} className={buttonClass}>
-                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Bestätigen'}
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : t('confirm.submit')}
                 </button>
 
                 <p className="text-center text-sm text-gray-500">
@@ -727,7 +726,7 @@ export default function LoginPage() {
                     onClick={() => setView('signIn')}
                     className="text-blue-600 hover:text-blue-700 font-medium"
                   >
-                    Zurück zur Anmeldung
+                    {t('confirm.backToSignIn')}
                   </button>
                 </p>
               </form>
@@ -737,8 +736,8 @@ export default function LoginPage() {
             {view === 'forgotPassword' && (
               <form onSubmit={handleForgotPassword} className="space-y-5">
                 <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold text-gray-900">Passwort zurücksetzen</h3>
-                  <p className="text-sm text-gray-500 mt-2">Gib deine E-Mail-Adresse ein</p>
+                  <h3 className="text-2xl font-bold text-gray-900">{t('resetPassword.title')}</h3>
+                  <p className="text-sm text-gray-500 mt-2">{t('resetPassword.subtitle')}</p>
                 </div>
 
                 {error && (
@@ -748,7 +747,7 @@ export default function LoginPage() {
                 )}
 
                 <div>
-                  <label className={labelClass}>E-Mail</label>
+                  <label className={labelClass}>{t('resetPassword.email')}</label>
                   <input
                     type="email"
                     value={email}
@@ -759,7 +758,7 @@ export default function LoginPage() {
                 </div>
 
                 <button type="submit" disabled={isLoading} className={buttonClass}>
-                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Code senden'}
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : t('resetPassword.sendCode')}
                 </button>
 
                 <p className="text-center text-sm text-gray-500">
@@ -768,7 +767,7 @@ export default function LoginPage() {
                     onClick={() => setView('signIn')}
                     className="text-blue-600 hover:text-blue-700 font-medium"
                   >
-                    Zurück zur Anmeldung
+                    {t('resetPassword.backToSignIn')}
                   </button>
                 </p>
               </form>
@@ -778,9 +777,9 @@ export default function LoginPage() {
             {view === 'confirmReset' && (
               <form onSubmit={handleConfirmReset} className="space-y-5">
                 <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold text-gray-900">Neues Passwort</h3>
+                  <h3 className="text-2xl font-bold text-gray-900">{t('newPassword.title')}</h3>
                   <p className="text-sm text-gray-500 mt-2">
-                    Gib den Code und dein neues Passwort ein
+                    {t('newPassword.subtitle')}
                   </p>
                 </div>
 
@@ -791,7 +790,7 @@ export default function LoginPage() {
                 )}
 
                 <div>
-                  <label className={labelClass}>Bestätigungscode</label>
+                  <label className={labelClass}>{t('newPassword.code')}</label>
                   <input
                     type="text"
                     value={confirmationCode}
@@ -802,7 +801,7 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <label className={labelClass}>Neues Passwort</label>
+                  <label className={labelClass}>{t('newPassword.password')}</label>
                   <input
                     type="password"
                     value={newPassword}
@@ -813,7 +812,7 @@ export default function LoginPage() {
                 </div>
 
                 <button type="submit" disabled={isLoading} className={buttonClass}>
-                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Passwort ändern'}
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : t('newPassword.submit')}
                 </button>
 
                 <p className="text-center text-sm text-gray-500">
@@ -822,7 +821,7 @@ export default function LoginPage() {
                     onClick={() => setView('signIn')}
                     className="text-blue-600 hover:text-blue-700 font-medium"
                   >
-                    Zurück zur Anmeldung
+                    {t('newPassword.backToSignIn')}
                   </button>
                 </p>
               </form>
@@ -835,9 +834,9 @@ export default function LoginPage() {
                   <div className="w-16 h-16 bg-gray-900 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                     <span className="text-3xl">👋</span>
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900">Willkommen bei Immivo!</h3>
+                  <h3 className="text-2xl font-bold text-gray-900">{t('completeProfile.title')}</h3>
                   <p className="text-sm text-gray-500 mt-2">
-                    Vervollständige dein Profil und setze ein neues Passwort.
+                    {t('completeProfile.subtitleNewPassword')}
                   </p>
                 </div>
 
@@ -849,7 +848,7 @@ export default function LoginPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className={labelClass}>Vorname *</label>
+                    <label className={labelClass}>{t('completeProfile.firstName')}</label>
                     <input
                       type="text"
                       value={onboardingFirstName}
@@ -861,7 +860,7 @@ export default function LoginPage() {
                     />
                   </div>
                   <div>
-                    <label className={labelClass}>Nachname *</label>
+                    <label className={labelClass}>{t('completeProfile.lastName')}</label>
                     <input
                       type="text"
                       value={onboardingLastName}
@@ -874,12 +873,12 @@ export default function LoginPage() {
                 </div>
 
                 <div className="relative">
-                  <label className={labelClass}>Neues Passwort *</label>
+                  <label className={labelClass}>{t('completeProfile.newPassword')}</label>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Mindestens 8 Zeichen"
+                    placeholder={t('completeProfile.minChars')}
                     className={inputClass}
                     required
                   />
@@ -893,12 +892,12 @@ export default function LoginPage() {
                 </div>
 
                 <div className="relative">
-                  <label className={labelClass}>Passwort bestätigen *</label>
+                  <label className={labelClass}>{t('completeProfile.confirmPassword')}</label>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Passwort wiederholen"
+                    placeholder={t('completeProfile.repeatPassword')}
                     className={inputClass}
                     required
                   />
@@ -908,7 +907,7 @@ export default function LoginPage() {
                   {isLoading ? (
                     <Loader2 className="w-5 h-5 animate-spin mx-auto" />
                   ) : (
-                    'Konto aktivieren'
+                    t('completeProfile.submitActivate')
                   )}
                 </button>
               </form>
@@ -921,9 +920,9 @@ export default function LoginPage() {
                   <div className="w-16 h-16 bg-gray-900 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                     <span className="text-3xl">👋</span>
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900">Willkommen bei Immivo!</h3>
+                  <h3 className="text-2xl font-bold text-gray-900">{t('completeProfile.title')}</h3>
                   <p className="text-sm text-gray-500 mt-2">
-                    Bitte vervollständige dein Profil, um loszulegen.
+                    {t('completeProfile.subtitleProfile')}
                   </p>
                 </div>
 
@@ -934,7 +933,7 @@ export default function LoginPage() {
                 )}
 
                 <div>
-                  <label className={labelClass}>Vorname *</label>
+                  <label className={labelClass}>{t('completeProfile.firstName')}</label>
                   <input
                     type="text"
                     value={onboardingFirstName}
@@ -947,7 +946,7 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <label className={labelClass}>Nachname *</label>
+                  <label className={labelClass}>{t('completeProfile.lastName')}</label>
                   <input
                     type="text"
                     value={onboardingLastName}
@@ -962,7 +961,7 @@ export default function LoginPage() {
                   {isLoading ? (
                     <Loader2 className="w-5 h-5 animate-spin mx-auto" />
                   ) : (
-                    'Profil speichern & loslegen'
+                    t('completeProfile.submitSave')
                   )}
                 </button>
               </form>

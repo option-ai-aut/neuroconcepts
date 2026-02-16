@@ -11,12 +11,14 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useGlobalState } from '@/context/GlobalStateContext';
+import { useTranslations } from 'next-intl';
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { setSidebarExpanded } = useGlobalState();
   const [isHovered, setIsHovered] = useState(false);
+  const t = useTranslations('nav');
 
   const handleSignOut = async () => {
     await signOut();
@@ -24,14 +26,14 @@ export default function Sidebar() {
   };
 
   const mainNavigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Aktivitäten', href: '/dashboard/activities', icon: Activity },
-    { name: 'Posteingang', href: '/dashboard/inbox', icon: Inbox },
-    { name: 'CRM', href: '/dashboard/crm/leads', icon: Users },
-    { name: 'Kalender', href: '/dashboard/calendar', icon: Calendar },
-    { name: 'Exposés', href: '/dashboard/exposes', icon: FileText },
-    { name: 'Bildstudio', href: '/dashboard/image-studio', icon: Wand2 },
-    { name: 'Team Chat', href: '/dashboard/assistant', icon: MessageSquare },
+    { name: t('dashboard'), href: '/dashboard', icon: LayoutDashboard },
+    { name: t('activities'), href: '/dashboard/activities', icon: Activity },
+    { name: t('inbox'), href: '/dashboard/inbox', icon: Inbox },
+    { name: t('crm'), href: '/dashboard/crm/leads', icon: Users },
+    { name: t('calendar'), href: '/dashboard/calendar', icon: Calendar },
+    { name: t('exposes'), href: '/dashboard/exposes', icon: FileText },
+    { name: t('imageStudio'), href: '/dashboard/image-studio', icon: Wand2 },
+    { name: t('teamChat'), href: '/dashboard/assistant', icon: MessageSquare },
   ];
 
   const isActive = (itemHref: string) => {
@@ -89,7 +91,7 @@ export default function Sidebar() {
         >
           <Settings className="w-5 h-5 shrink-0 text-gray-500" />
           <span className={`ml-3 whitespace-nowrap transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
-            Einstellungen
+            {t('settings')}
           </span>
         </Link>
         <button
@@ -98,7 +100,7 @@ export default function Sidebar() {
         >
           <LogOut className="w-5 h-5 shrink-0" />
           <span className={`ml-3 whitespace-nowrap transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
-            Abmelden
+            {t('signOut')}
           </span>
         </button>
       </div>

@@ -152,6 +152,9 @@ model UserSettings {
   emailSignature      String? @db.Text // Full HTML signature
   emailSignatureName  String? // Display name for signature selection
   
+  // Language preference (per-seat, not per-tenant)
+  locale              String  @default("de") // "de", "en", etc.
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

@@ -6,6 +6,8 @@ import { GlobalStateProvider } from "@/context/GlobalStateContext";
 import { RuntimeConfigProvider } from "@/components/RuntimeConfigProvider";
 import CookieConsent from "@/components/CookieConsent";
 import ConsoleCaptureInit from "@/components/ConsoleCaptureInit";
+import { NextIntlClientProvider } from 'next-intl';
+import { getLocale, getMessages } from 'next-intl/server';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -226,13 +228,16 @@ const jsonLd = {
   ],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
-    <html lang="de" className="bg-white">
+    <html lang={locale} className="bg-white">
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -244,15 +249,17 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${playfairDisplay.variable} ${cormorantGaramond.variable} antialiased bg-white`}
       >
-        <RuntimeConfigProvider>
-          <AuthProvider>
-            <GlobalStateProvider>
-              <ConsoleCaptureInit />
-              {children}
-              <CookieConsent />
-            </GlobalStateProvider>
-          </AuthProvider>
-        </RuntimeConfigProvider>
+        <NextIntlClientProvider messages={messages} locale={locale}>
+          <RuntimeConfigProvider>
+            <AuthProvider>
+              <GlobalStateProvider>
+                <ConsoleCaptureInit />
+                {children}
+                <CookieConsent />
+              </GlobalStateProvider>
+            </AuthProvider>
+          </RuntimeConfigProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

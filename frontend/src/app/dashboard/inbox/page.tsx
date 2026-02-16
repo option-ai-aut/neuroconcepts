@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { fetchWithAuth } from '@/lib/api';
 import { useEnv } from '@/components/EnvProvider';
 import { 
@@ -52,14 +53,15 @@ interface EmailsResponse {
 }
 
 const FOLDERS = [
-  { id: 'INBOX', label: 'Posteingang', icon: Inbox },
-  { id: 'SENT', label: 'Gesendet', icon: Send },
-  { id: 'DRAFTS', label: 'Entwürfe', icon: FileText },
-  { id: 'TRASH', label: 'Papierkorb', icon: Trash2 },
+  { id: 'INBOX', key: 'inbox', icon: Inbox },
+  { id: 'SENT', key: 'sent', icon: Send },
+  { id: 'DRAFTS', key: 'drafts', icon: FileText },
+  { id: 'TRASH', key: 'trash', icon: Trash2 },
 ];
 
 // Isolated Email Body Viewer
 function EmailBodyViewer({ email, onContentClick }: { email: Email; onContentClick?: () => void }) {
+  const t = useTranslations('inbox');
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [iframeHeight, setIframeHeight] = useState(400);
 
@@ -146,7 +148,7 @@ function EmailBodyViewer({ email, onContentClick }: { email: Email; onContentCli
   if (!hasBody) {
     return (
       <div className="p-6 text-center text-gray-400 text-sm italic">
-        Kein Inhalt vorhanden
+        {t('noContent')}
       </div>
     );
   }
@@ -163,6 +165,7 @@ function EmailBodyViewer({ email, onContentClick }: { email: Email; onContentCli
 }
 
 export default function InboxPage() {
+  const t = useTranslations('inbox');
   const { apiUrl } = useEnv();
   const { openDrawer, updateEmailForm } = useGlobalState();
   
@@ -305,7 +308,7 @@ export default function InboxPage() {
   };
 
   const handleForward = (email: Email) => {
-    const forwardBody = `\n\n---------- Weitergeleitete Nachricht ----------\nVon: ${email.fromName || email.from} <${email.from}>\nDatum: ${new Date(email.receivedAt || email.sentAt || '').toLocaleString('de-DE')}\nBetreff: ${email.subject}\nAn: ${email.to?.join(', ')}\n\n${email.bodyText || ''}`;
+    const forwardBody = `\n\n${t('forwardHeader')}\n${t('forwardFrom')} ${email.fromName || email.from} <${email.from}>\n${t('forwardDate')} ${new Date(email.receivedAt || email.sentAt || '').toLocaleString('de-DE')}\n${t('forwardSubject')} ${email.subject}\n${t('forwardTo')} ${email.to?.join(', ')}\n\n${email.bodyText || ''}`;
     updateEmailForm({ subject: `Fwd: ${email.subject}`, body: forwardBody });
     openDrawer('EMAIL'); setContextMenu(null);
   };
@@ -424,7 +427,7 @@ export default function InboxPage() {
           
           {/* Subject */}
           <div className={`text-sm truncate ${!email.isRead ? 'font-medium text-gray-800' : 'text-gray-600'}`}>
-            {email.subject || '(Kein Betreff)'}
+            {email.subject || t('noSubject')}
           </div>
           
           {/* Preview */}
@@ -436,10 +439,10 @@ export default function InboxPage() {
           {(email.hasAttachments || email.leadId || email.providerData?.aiGenerated) && (
             <div className="flex items-center gap-2 mt-1.5">
               {email.providerData?.aiGenerated && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-600 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5">KI</span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-600 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5">{t('aiGeneratedShort')}</span>
               )}
               {email.hasAttachments && <Paperclip className="w-3 h-3 text-gray-400" />}
-              {email.leadId && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">Lead</span>}
+              {email.leadId && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">{t('leadBadge')}</span>}
             </div>
           )}
         </div>
@@ -460,7 +463,7 @@ export default function InboxPage() {
               className="flex items-center gap-1 text-blue-600 text-sm font-medium -ml-1 p-1"
             >
               <ArrowLeft className="w-5 h-5" />
-              Zurück
+              {t('back')}
             </button>
             <div className="flex items-center gap-0.5">
               <button onClick={() => toggleStar(selectedEmail.id, selectedEmail.isStarred)}
@@ -480,7 +483,7 @@ export default function InboxPage() {
           {/* Subject + Sender */}
           <div className="px-4 py-3 border-b border-gray-100">
             <h2 className="text-base font-semibold text-gray-900 leading-snug mb-2">
-              {selectedEmail.subject || '(Kein Betreff)'}
+              {selectedEmail.subject || t('noSubject')}
             </h2>
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-gray-800 flex items-center justify-center text-white font-semibold text-sm shrink-0">
@@ -491,7 +494,7 @@ export default function InboxPage() {
                   <span className="font-semibold text-gray-900 text-sm">
                     {selectedEmail.fromName || selectedEmail.from.split('@')[0]}
                   </span>
-                  {selectedEmail.leadId && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">Lead</span>}
+                  {selectedEmail.leadId && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">{t('leadBadge')}</span>}
                 </div>
                 <div className="text-xs text-gray-400 truncate">
                   {selectedEmail.from} · {new Date(selectedEmail.receivedAt || selectedEmail.sentAt || '').toLocaleString('de-DE', {
@@ -514,14 +517,14 @@ export default function InboxPage() {
               className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg"
             >
               <Reply className="w-4 h-4" />
-              Antworten
+              {t('reply')}
             </button>
             <button
               onClick={() => handleForward(selectedEmail)}
               className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg"
             >
               <Forward className="w-4 h-4" />
-              Weiterleiten
+              {t('forward')}
             </button>
           </div>
         </div>
@@ -543,7 +546,7 @@ export default function InboxPage() {
           <div className="p-4">
             <button onClick={handleNewEmail}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors shadow-sm">
-              <Plus className="w-4 h-4" /> Neue E-Mail
+              <Plus className="w-4 h-4" /> {t('newEmail')}
             </button>
           </div>
           <nav className="flex-1 px-2">
@@ -559,7 +562,7 @@ export default function InboxPage() {
                   }`}>
                   <div className="flex items-center gap-2.5">
                     <Icon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
-                    {folder.label}
+                    {t(`folders.${folder.key}`)}
                   </div>
                   {unread > 0 && <span className="text-xs font-semibold text-blue-600 bg-gray-100 px-1.5 py-0.5 rounded">{unread}</span>}
                 </button>
@@ -570,7 +573,7 @@ export default function InboxPage() {
             <button onClick={handleSync} disabled={syncing}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg transition-colors">
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Synchronisiere...' : 'E-Mails abrufen'}
+              {syncing ? t('syncing') : t('syncButton')}
             </button>
           </div>
       </div>
@@ -580,7 +583,7 @@ export default function InboxPage() {
           <div className="p-3 border-b border-gray-200">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input type="text" placeholder="E-Mails durchsuchen..." value={searchQuery}
+              <input type="text" placeholder={t('searchPlaceholder')} value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent rounded-lg text-sm focus:bg-white focus:border-gray-300 focus:ring-1 focus:ring-blue-500 transition-all" />
             </div>
@@ -590,7 +593,7 @@ export default function InboxPage() {
               <div className="flex items-center justify-center h-32"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
             ) : emails.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-32 text-gray-400">
-                <Mail className="w-8 h-8 mb-2 opacity-50" /><p className="text-sm">Keine E-Mails</p>
+                <Mail className="w-8 h-8 mb-2 opacity-50" /><p className="text-sm">{t('noEmails')}</p>
               </div>
             ) : emails.map((email) => <EmailListItem key={email.id} email={email} />)}
           </div>
@@ -604,7 +607,7 @@ export default function InboxPage() {
               <div className="px-6 pt-5 pb-4 border-b border-gray-100 bg-white">
                 <div className="flex items-start justify-between mb-4">
                   <h2 className="text-xl font-semibold text-gray-900 leading-snug pr-4">
-                    {selectedEmail.subject || '(Kein Betreff)'}
+                    {selectedEmail.subject || t('noSubject')}
                   </h2>
                   <div className="flex items-center gap-1 shrink-0">
                     <button onClick={() => toggleStar(selectedEmail.id, selectedEmail.isStarred)}
@@ -630,15 +633,15 @@ export default function InboxPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-gray-900 text-sm">{selectedEmail.fromName || selectedEmail.from.split('@')[0]}</span>
                       <span className="text-sm text-gray-400">&lt;{selectedEmail.from}&gt;</span>
-                      {selectedEmail.leadId && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Lead</span>}
+                      {selectedEmail.leadId && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">{t('leadBadge')}</span>}
                       {selectedEmail.providerData?.aiGenerated && (
-                        <span className="text-xs bg-gray-50 text-blue-600 border border-gray-200 px-2 py-0.5 rounded-full font-medium">KI-generiert</span>
+                        <span className="text-xs bg-gray-50 text-blue-600 border border-gray-200 px-2 py-0.5 rounded-full font-medium">{t('aiGenerated')}</span>
                       )}
                     </div>
                     <div className="text-xs text-gray-500 mt-0.5">
-                      An: {selectedEmail.to.join(', ')}
+                      {t('detailTo')} {selectedEmail.to.join(', ')}
                       {selectedEmail.cc && selectedEmail.cc.length > 0 && (
-                        <span className="ml-3">CC: {selectedEmail.cc.join(', ')}</span>
+                        <span className="ml-3">{t('detailCc')} {selectedEmail.cc.join(', ')}</span>
                       )}
                     </div>
                   </div>
@@ -657,11 +660,11 @@ export default function InboxPage() {
               <div className="px-5 py-3 border-t border-gray-100 flex gap-2 bg-white">
                 <button onClick={() => handleReply(selectedEmail)}
                   className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors">
-                  <Reply className="w-4 h-4" /> Antworten
+                  <Reply className="w-4 h-4" /> {t('reply')}
                 </button>
                 <button onClick={() => handleForward(selectedEmail)}
                   className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
-                  <Forward className="w-4 h-4" /> Weiterleiten
+                  <Forward className="w-4 h-4" /> {t('forward')}
                 </button>
               </div>
             </>
@@ -670,8 +673,8 @@ export default function InboxPage() {
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                 <Mail className="w-8 h-8 text-gray-300" />
               </div>
-              <p className="text-lg font-medium text-gray-500">Wähle eine E-Mail aus</p>
-              <p className="text-sm">Details werden hier angezeigt</p>
+              <p className="text-lg font-medium text-gray-500">{t('selectEmail')}</p>
+              <p className="text-sm">{t('selectEmailDesc')}</p>
             </div>
           )}
         </div>
@@ -692,7 +695,7 @@ export default function InboxPage() {
             className="flex items-center gap-2 text-gray-900"
           >
             <Menu className="w-5 h-5 text-gray-500" />
-            <span className="font-semibold text-base">{currentFolder.label}</span>
+            <span className="font-semibold text-base">{t(`folders.${currentFolder.key}`)}</span>
             {inboxUnread > 0 && selectedFolder === 'INBOX' && (
               <span className="text-xs font-semibold text-blue-600 bg-gray-100 px-1.5 py-0.5 rounded-full">{inboxUnread}</span>
             )}
@@ -714,7 +717,7 @@ export default function InboxPage() {
           <div className="px-4 py-2 border-b border-gray-100">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input type="text" placeholder="Suchen..." value={searchQuery} autoFocus
+              <input type="text" placeholder={t('searchPlaceholderShort')} value={searchQuery} autoFocus
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-8 py-2 bg-gray-100 rounded-lg text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all" />
               {searchQuery && (
@@ -733,14 +736,14 @@ export default function InboxPage() {
             <div className="flex items-center justify-center h-40">
               <div className="text-center">
                 <Loader2 className="w-6 h-6 animate-spin text-gray-500 mx-auto mb-2" />
-                <p className="text-xs text-gray-400">{syncing ? 'Synchronisiere...' : 'Laden...'}</p>
+                <p className="text-xs text-gray-400">{syncing ? t('syncing') : t('loading')}</p>
               </div>
             </div>
           ) : emails.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-gray-400">
               <Mail className="w-10 h-10 mb-2 opacity-40" />
-              <p className="text-sm font-medium text-gray-500">Keine E-Mails</p>
-              <p className="text-xs mt-0.5">Ziehe nach unten zum Aktualisieren</p>
+              <p className="text-sm font-medium text-gray-500">{t('noEmails')}</p>
+              <p className="text-xs mt-0.5">{t('pullToRefresh')}</p>
             </div>
           ) : emails.map((email) => <EmailListItem key={email.id} email={email} compact />)}
         </div>
@@ -755,7 +758,7 @@ export default function InboxPage() {
           {/* Drawer */}
           <div className="relative w-72 bg-white h-full shadow-xl animate-slide-right flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <span className="font-semibold text-gray-900">Ordner</span>
+              <span className="font-semibold text-gray-900">{t('foldersTitle')}</span>
               <button onClick={() => setShowMobileFolders(false)} className="p-1 text-gray-400">
                 <X className="w-5 h-5" />
               </button>
@@ -778,7 +781,7 @@ export default function InboxPage() {
                     }`}>
                     <div className="flex items-center gap-3">
                       <Icon className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
-                      {folder.label}
+                      {t(`folders.${folder.key}`)}
                     </div>
                     {unread > 0 && (
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
@@ -794,7 +797,7 @@ export default function InboxPage() {
               <button onClick={() => { handleSync(); setShowMobileFolders(false); }} disabled={syncing}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm text-gray-600 bg-gray-50 rounded-xl">
                 <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-                {syncing ? 'Synchronisiere...' : 'E-Mails abrufen'}
+                {syncing ? t('syncing') : t('syncButton')}
               </button>
             </div>
           </div>
@@ -815,41 +818,41 @@ export default function InboxPage() {
             <>
               <button onClick={() => handleReply(contextMenu.email)}
                 className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3">
-                <Reply className="w-4 h-4 text-gray-400" /> Antworten
+                <Reply className="w-4 h-4 text-gray-400" /> {t('reply')}
               </button>
             </>
           )}
           {selectedFolder !== 'DRAFTS' && (
             <button onClick={() => handleForward(contextMenu.email)}
               className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3">
-              <Forward className="w-4 h-4 text-gray-400" /> Weiterleiten
+              <Forward className="w-4 h-4 text-gray-400" /> {t('forward')}
             </button>
           )}
           {selectedFolder === 'DRAFTS' && (
             <button onClick={() => handleEditDraft(contextMenu.email)}
               className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3">
-              <Pencil className="w-4 h-4 text-gray-400" /> Bearbeiten
+              <Pencil className="w-4 h-4 text-gray-400" /> {t('contextMenu.edit')}
             </button>
           )}
           <div className="border-t border-gray-100 my-1" />
           <button onClick={() => { toggleRead(contextMenu.email.id, contextMenu.email.isRead); setContextMenu(null); }}
             className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3">
-            {contextMenu.email.isRead ? <><EyeOff className="w-4 h-4 text-gray-400" /> Als ungelesen</> : <><Eye className="w-4 h-4 text-gray-400" /> Als gelesen</>}
+            {contextMenu.email.isRead ? <><EyeOff className="w-4 h-4 text-gray-400" /> {t('contextMenu.markUnread')}</> : <><Eye className="w-4 h-4 text-gray-400" /> {t('contextMenu.markRead')}</>}
           </button>
           <button onClick={() => toggleStar(contextMenu.email.id, contextMenu.email.isStarred)}
             className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3">
-            {contextMenu.email.isStarred ? <><StarOff className="w-4 h-4 text-gray-400" /> Stern entfernen</> : <><Star className="w-4 h-4 text-yellow-500" /> Stern</>}
+            {contextMenu.email.isStarred ? <><StarOff className="w-4 h-4 text-gray-400" /> {t('contextMenu.removeStar')}</> : <><Star className="w-4 h-4 text-yellow-500" /> {t('contextMenu.addStar')}</>}
           </button>
           <div className="border-t border-gray-100 my-1" />
           {selectedFolder !== 'INBOX' && selectedFolder !== 'DRAFTS' && (
             <button onClick={() => moveToFolder(contextMenu.email.id, 'INBOX')}
               className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3">
-              <Inbox className="w-4 h-4 text-gray-400" /> In Posteingang
+              <Inbox className="w-4 h-4 text-gray-400" /> {t('contextMenu.moveToInbox')}
             </button>
           )}
           <button onClick={() => deleteEmail(contextMenu.email.id, selectedFolder === 'TRASH')}
             className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3">
-            <Trash2 className="w-4 h-4" /> {selectedFolder === 'TRASH' ? 'Endgültig löschen' : 'Löschen'}
+            <Trash2 className="w-4 h-4" /> {selectedFolder === 'TRASH' ? t('contextMenu.deletePermanently') : t('contextMenu.delete')}
           </button>
         </div>
       )}

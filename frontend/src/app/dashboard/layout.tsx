@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { useRouter, usePathname } from 'next/navigation';
 import { fetchAuthSession, signOut } from 'aws-amplify/auth';
 import Sidebar from '@/components/Sidebar';
@@ -33,6 +34,7 @@ function isMobileAllowedRoute(pathname: string): boolean {
 
 // Mobile route guard component
 function MobileRouteGuard({ children, pathname }: { children: React.ReactNode; pathname: string }) {
+  const t = useTranslations('mobileGuard');
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -48,9 +50,9 @@ function MobileRouteGuard({ children, pathname }: { children: React.ReactNode; p
         <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-2xl flex items-center justify-center mb-5">
           <Monitor className="w-8 h-8 text-gray-400 dark:text-gray-500" />
         </div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Desktop-Funktion</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">{t('title')}</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed max-w-xs">
-          Diese Seite ist nur in der Desktop-Version verfügbar. Öffne Immivo auf deinem Computer für vollen Zugriff.
+          {t('description')}
         </p>
       </div>
     );
@@ -65,6 +67,76 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [jarvisClosing, setJarvisClosing] = useState(false);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Draggable Jarvis FAB state
+  const [fabY, setFabY] = useState<number | null>(null);
+  const fabRef = useRef<HTMLDivElement>(null);
+  const fabDragging = useRef(false);
+  const fabStartY = useRef(0);
+  const fabStartTop = useRef(0);
+  const fabMoved = useRef(false);
+  const fabYRef = useRef<number | null>(null);
+
+  // Keep ref in sync with state so native handlers can read current value
+  useEffect(() => { fabYRef.current = fabY; }, [fabY]);
+
+  // Attach native touch listeners with { passive: false } so preventDefault works
+  useEffect(() => {
+    const el = fabRef.current;
+    if (!el) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      fabStartY.current = touch.clientY;
+      fabStartTop.current = fabYRef.current ?? (window.innerHeight - 72 - 52 - 16);
+      fabMoved.current = false;
+      fabDragging.current = false;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      const dy = touch.clientY - fabStartY.current;
+      if (Math.abs(dy) > 8) {
+        fabDragging.current = true;
+        fabMoved.current = true;
+      }
+      if (fabDragging.current) {
+        e.preventDefault();
+        e.stopPropagation();
+        const safeTop = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sat') || '0', 10) || 44;
+        const minY = safeTop + 56;
+        const maxY = window.innerHeight - 72 - 52 - 16;
+        const newY = Math.min(maxY, Math.max(minY, fabStartTop.current + dy));
+        // Direct DOM manipulation for smooth 60fps dragging
+        el.style.transition = 'none';
+        el.style.top = `${newY}px`;
+        el.style.bottom = 'auto';
+        fabYRef.current = newY;
+      }
+    };
+
+    const onTouchEnd = () => {
+      if (fabDragging.current) {
+        // Commit final position to React state
+        setFabY(fabYRef.current);
+        el.style.transition = '';
+      }
+      fabDragging.current = false;
+      if (!fabMoved.current) {
+        setMobileJarvisOpen(true);
+      }
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [setMobileJarvisOpen]);
 
   // Presence heartbeat — send every 60 seconds
   useEffect(() => {
@@ -106,16 +178,25 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         <AiChatSidebar />
       </div>
 
-      {/* Mobile: Jarvis Floating Action Button */}
+      {/* Mobile: Jarvis Floating Action Button (draggable vertically) */}
       {!mobileJarvisOpen && !jarvisClosing && (
-        <button
-          onClick={() => setMobileJarvisOpen(true)}
-          className="lg:hidden fixed bottom-[72px] right-4 z-40 active:scale-95 transition-transform safe-bottom"
-          style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        <div
+          ref={fabRef}
+          onClick={() => { if (!fabMoved.current) setMobileJarvisOpen(true); }}
+          className="lg:hidden fixed right-4 z-40 cursor-pointer select-none"
+          style={{
+            top: fabY != null ? `${fabY}px` : undefined,
+            bottom: fabY == null ? `calc(72px + 16px + env(safe-area-inset-bottom, 0px))` : undefined,
+            transition: 'top 0.2s ease-out',
+            touchAction: 'none',
+            WebkitTouchCallout: 'none',
+            WebkitUserSelect: 'none',
+          }}
+          role="button"
           aria-label="Jarvis KI-Chat öffnen"
         >
-          <Image src="/logo-icon-only.png" alt="Jarvis" width={52} height={52} />
-        </button>
+          <Image src="/logo-icon-only.png" alt="Jarvis" width={52} height={52} className="pointer-events-none" draggable={false} />
+        </div>
       )}
 
       {/* Mobile: Jarvis Full-Screen Chat Overlay */}
@@ -157,6 +238,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const authConfigured = useAuthConfigured();
+  const tCommon = useTranslations('common');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -199,7 +281,7 @@ export default function DashboardLayout({
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto" />
-          <p className="mt-4 text-gray-600">Wird geladen...</p>
+          <p className="mt-4 text-gray-600">{tCommon('loading')}</p>
         </div>
       </div>
     );

@@ -6,6 +6,7 @@ import { useGlobalState } from '@/context/GlobalStateContext';
 import { Trash2, RefreshCw, Globe, Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
+import { useTranslations } from 'next-intl';
 
 export default function PropertiesPage() {
   const { data: properties = [], mutate, isValidating } = useSWR<Property[]>(API_ENDPOINTS.PROPERTIES, fetcher, { 
@@ -15,6 +16,10 @@ export default function PropertiesPage() {
   const { openDrawer, aiActionPerformed } = useGlobalState();
   const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set());
   const router = useRouter();
+  const t = useTranslations('crm.properties');
+  const tType = useTranslations('crm.propertyTypes');
+  const tStatus = useTranslations('crm.propertyStatus');
+  const tc = useTranslations('common');
 
   // Refresh when AI performs an action
   useEffect(() => {
@@ -42,37 +47,49 @@ export default function PropertiesPage() {
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Möchtest du ${selectedProperties.size} Objekte wirklich löschen?`)) return;
+    if (!confirm(t('confirmDelete', { count: selectedProperties.size }))) return;
     
     try {
       await Promise.all(Array.from(selectedProperties).map(id => deleteProperty(id)));
       setSelectedProperties(new Set());
       mutate();
     } catch (error) {
-      alert('Fehler beim Löschen: ' + error);
+      alert(t('deleteError') + error);
     }
+  };
+
+  const propertyTypeLabels: Record<string, string> = {
+    APARTMENT: tType('apartment'),
+    HOUSE: tType('house'),
+    COMMERCIAL: tType('commercial'),
+  };
+
+  const propertyStatusLabels: Record<string, string> = {
+    ACTIVE: tStatus('active'),
+    RESERVED: tStatus('reserved'),
+    SOLD: tStatus('sold'),
   };
 
   return (
     <div className="h-full flex flex-col">
       <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50/30">
         <div className="flex items-center space-x-4">
-          <span className="text-sm text-gray-500">{properties.length} Objekte</span>
+          <span className="text-sm text-gray-500">{t('title', { count: properties.length })}</span>
           <button 
             onClick={() => mutate()}
             disabled={isValidating}
             className={`p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all ${isValidating ? 'animate-spin' : ''}`}
-            title="Aktualisieren"
+            title={tc('refresh')}
           >
             <RefreshCw className="w-4 h-4" />
           </button>
           {selectedProperties.size > 0 && (
             <div className="flex items-center space-x-2 bg-gray-50 px-3 py-1 rounded-md">
-              <span className="text-sm font-medium text-gray-700">{selectedProperties.size} ausgewählt</span>
+              <span className="text-sm font-medium text-gray-700">{t('selected', { count: selectedProperties.size })}</span>
               <button 
                 onClick={handleDelete}
                 className="text-blue-600 hover:text-red-600 p-1 rounded transition-colors"
-                title="Ausgewählte löschen"
+                title={t('deleteSelected')}
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -83,7 +100,7 @@ export default function PropertiesPage() {
           onClick={() => openDrawer('PROPERTY')}
           className="bg-gray-900 text-white px-3 py-1.5 text-sm font-medium rounded-md hover:bg-gray-800 shadow-sm transition-colors"
         >
-          Neues Objekt
+          {t('newProperty')}
         </button>
       </div>
 
@@ -99,27 +116,27 @@ export default function PropertiesPage() {
                   onChange={toggleSelectAll}
                 />
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Titel</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ort</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Typ</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preis</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fläche</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Online</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('columns.title')}</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('columns.location')}</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('columns.type')}</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('columns.price')}</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('columns.area')}</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('columns.status')}</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('columns.online')}</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {properties.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-6 py-10 text-center text-gray-500">
-                  Noch keine Objekte angelegt.
+                  {t('noProperties')}
                 </td>
               </tr>
             ) : (
               properties.map((prop) => {
                 const isOnline = prop.publishedPortals && prop.publishedPortals.length > 0;
                 const displayPrice = prop.marketingType === 'RENT' 
-                  ? (prop.rentCold ? `${prop.rentCold}€ kalt` : '-')
+                  ? (prop.rentCold ? t('coldRent', { price: prop.rentCold }) : '-')
                   : (prop.salePrice ? `${prop.salePrice}€` : (prop.price ? `${prop.price}€` : '-'));
                 
                 return (
@@ -144,10 +161,7 @@ export default function PropertiesPage() {
                     </td>
                     <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
                       <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-                        {prop.propertyType === 'APARTMENT' ? 'Wohnung' : 
-                         prop.propertyType === 'HOUSE' ? 'Haus' : 
-                         prop.propertyType === 'COMMERCIAL' ? 'Gewerbe' : 
-                         prop.propertyType || 'Sonstige'}
+                        {(prop.propertyType && propertyTypeLabels[prop.propertyType]) || prop.propertyType || tType('other')}
                       </span>
                     </td>
                     <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
@@ -162,10 +176,7 @@ export default function PropertiesPage() {
                         prop.status === 'RESERVED' ? 'bg-yellow-100 text-yellow-700' :
                         'bg-gray-100 text-gray-600'
                       }`}>
-                        {prop.status === 'ACTIVE' ? 'Aktiv' :
-                         prop.status === 'RESERVED' ? 'Reserviert' :
-                         prop.status === 'SOLD' ? 'Verkauft' :
-                         prop.status || 'Aktiv'}
+                        {(prop.status && propertyStatusLabels[prop.status]) || prop.status || tStatus('active')}
                       </span>
                     </td>
                     <td className="px-6 py-3 whitespace-nowrap text-sm">
@@ -177,7 +188,7 @@ export default function PropertiesPage() {
                           </div>
                         </div>
                       ) : (
-                        <span className="text-gray-400 text-xs">Offline</span>
+                        <span className="text-gray-400 text-xs">{t('offline')}</span>
                       )}
                     </td>
                   </tr>

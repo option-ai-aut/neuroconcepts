@@ -21,6 +21,7 @@ import {
 import { getAuthHeaders } from '@/lib/api';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 import { useGlobalState } from '@/context/GlobalStateContext';
+import { useTranslations } from 'next-intl';
 
 interface DashboardStats {
   user: {
@@ -74,14 +75,6 @@ interface DashboardStats {
   }>;
 }
 
-const statusLabels: Record<string, string> = {
-  NEW: 'Neu',
-  CONTACTED: 'Kontaktiert',
-  CONVERSATION: 'In Gespräch',
-  BOOKED: 'Gebucht',
-  LOST: 'Verloren'
-};
-
 const statusColors: Record<string, string> = {
   NEW: 'bg-gray-100 text-gray-700',
   CONTACTED: 'bg-yellow-100 text-yellow-700',
@@ -100,27 +93,37 @@ const activityIcons: Record<string, any> = {
   CREATED: Plus
 };
 
-function formatTimeAgo(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return 'Gerade eben';
-  if (diffMins < 60) return `vor ${diffMins} Min.`;
-  if (diffHours < 24) return `vor ${diffHours} Std.`;
-  if (diffDays === 1) return 'Gestern';
-  if (diffDays < 7) return `vor ${diffDays} Tagen`;
-  return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-}
-
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { openDrawer } = useGlobalState();
+  const t = useTranslations('dashboard');
+  const tc = useTranslations('common');
+
+  const statusLabels: Record<string, string> = {
+    NEW: t('status.new'),
+    CONTACTED: t('status.contacted'),
+    CONVERSATION: t('status.inConversation'),
+    BOOKED: t('status.booked'),
+    LOST: t('status.lost')
+  };
+
+  function formatTimeAgo(dateString: string): string {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return tc('justNow');
+    if (diffMins < 60) return tc('minutesAgo', { count: diffMins });
+    if (diffHours < 24) return tc('hoursAgo', { count: diffHours });
+    if (diffDays === 1) return tc('yesterday');
+    if (diffDays < 7) return tc('daysAgo', { count: diffDays });
+    return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+  }
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -135,7 +138,7 @@ export default function DashboardPage() {
         setStats(data);
       } catch (err) {
         console.error('Dashboard error:', err);
-        setError('Fehler beim Laden der Dashboard-Daten');
+        setError('load_error');
       } finally {
         setLoading(false);
       }
@@ -157,7 +160,7 @@ export default function DashboardPage() {
       <div className="h-full flex items-center justify-center bg-white">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <p className="text-gray-600">{error || 'Keine Daten verfügbar'}</p>
+          <p className="text-gray-600">{tc('noData')}</p>
         </div>
       </div>
     );
@@ -175,13 +178,13 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
             <h2 className="text-xl md:text-2xl font-bold text-gray-900">
-              Guten {new Date().getHours() < 12 ? 'Morgen' : new Date().getHours() < 18 ? 'Tag' : 'Abend'}, {stats.user.firstName}
+              {new Date().getHours() < 12 ? t('greeting.morning') : new Date().getHours() < 18 ? t('greeting.afternoon') : t('greeting.evening')}, {stats.user.firstName}
             </h2>
             <p className="text-gray-500 text-xs md:text-sm mt-0.5">
               {stats.leads.newToday > 0 
-                ? `${stats.leads.newToday} neue${stats.leads.newToday === 1 ? 'r' : ''} Lead${stats.leads.newToday === 1 ? '' : 's'} heute`
-                : 'Keine neuen Leads heute'}
-              {stats.leads.byStatus.NEW > 0 && ` · ${stats.leads.byStatus.NEW} warten auf Kontakt`}
+                ? t('subtitle.newLeads', { count: stats.leads.newToday, suffix: stats.leads.newToday === 1 ? 'r' : '', plural: stats.leads.newToday === 1 ? '' : 's' })
+                : t('subtitle.noNewLeads')}
+              {stats.leads.byStatus.NEW > 0 && ` · ${t('subtitle.waitingForContact', { count: stats.leads.byStatus.NEW })}`}
             </p>
           </div>
           <div className="flex gap-2 md:gap-3">
@@ -190,14 +193,14 @@ export default function DashboardPage() {
               className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-xs md:text-sm font-medium"
             >
               <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Neuer</span> Lead
+              {t('newLead')}
             </button>
             <button
               onClick={() => openDrawer('PROPERTY')}
               className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-xs md:text-sm font-medium"
             >
               <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Neues</span> Objekt
+              {t('newProperty')}
             </button>
           </div>
         </div>
@@ -219,11 +222,11 @@ export default function DashboardPage() {
               <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" />
             </div>
             <div className="text-2xl md:text-3xl font-bold text-gray-900">{activeLeads}</div>
-            <div className="text-xs md:text-sm text-gray-500 mt-1">Aktive Leads</div>
+            <div className="text-xs md:text-sm text-gray-500 mt-1">{t('stats.activeLeads')}</div>
             {stats.leads.newThisWeek > 0 && (
               <div className="text-xs text-green-600 mt-2 flex items-center gap-1">
                 <TrendingUp className="w-3 h-3" />
-                +{stats.leads.newThisWeek} diese Woche
+                +{stats.leads.newThisWeek} {tc('thisWeek')}
               </div>
             )}
           </Link>
@@ -240,10 +243,10 @@ export default function DashboardPage() {
               <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
             </div>
             <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats.properties.active}</div>
-            <div className="text-xs md:text-sm text-gray-500 mt-1">Aktive Objekte</div>
+            <div className="text-xs md:text-sm text-gray-500 mt-1">{t('stats.activeProperties')}</div>
             {stats.properties.reserved > 0 && (
               <div className="text-xs text-orange-600 mt-2">
-                {stats.properties.reserved} reserviert
+                {stats.properties.reserved} {t('stats.reserved')}
               </div>
             )}
           </Link>
@@ -256,9 +259,9 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="text-2xl md:text-3xl font-bold text-gray-900">{conversionRate}%</div>
-            <div className="text-xs md:text-sm text-gray-500 mt-1">Abschlussrate</div>
+            <div className="text-xs md:text-sm text-gray-500 mt-1">{t('stats.conversionRate')}</div>
             <div className="text-xs text-gray-400 mt-2">
-              {stats.leads.byStatus.BOOKED} von {stats.leads.total} Leads
+              {stats.leads.byStatus.BOOKED} {t('stats.ofLeads', { total: stats.leads.total })}
             </div>
           </div>
 
@@ -270,10 +273,10 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats.leads.byStatus.NEW}</div>
-            <div className="text-xs md:text-sm text-gray-500 mt-1">Warten auf Kontakt</div>
+            <div className="text-xs md:text-sm text-gray-500 mt-1">{t('stats.waitingForContact')}</div>
             {stats.leads.needingAttention.length > 0 && stats.leads.needingAttention[0].daysSinceCreated > 0 && (
               <div className="text-xs text-amber-600 mt-2">
-                Ältester: {stats.leads.needingAttention[0].daysSinceCreated} Tag{stats.leads.needingAttention[0].daysSinceCreated !== 1 ? 'e' : ''}
+                {t('stats.oldest', { days: stats.leads.needingAttention[0].daysSinceCreated, suffix: stats.leads.needingAttention[0].daysSinceCreated !== 1 ? 'e' : '' })}
               </div>
             )}
           </div>
@@ -284,19 +287,19 @@ export default function DashboardPage() {
           {/* Leads needing attention */}
           <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 p-4 md:p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-gray-900">Leads - Handlungsbedarf</h2>
+              <h2 className="text-lg font-semibold text-gray-900">{t('actionRequired')}</h2>
               <Link 
                 href="/dashboard/crm/leads?status=NEW" 
                 className="text-sm text-blue-600 hover:text-blue-700 font-medium"
               >
-                Alle anzeigen
+                {tc('showAll')}
               </Link>
             </div>
 
             {stats.leads.needingAttention.length === 0 ? (
               <div className="text-center py-12">
                 <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-3" />
-                <p className="text-gray-500">Alle Leads wurden kontaktiert</p>
+                <p className="text-gray-500">{t('allContacted')}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -320,11 +323,11 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-3">
                       {lead.daysSinceCreated > 2 && (
                         <span className="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded-full">
-                          {lead.daysSinceCreated} Tage
+                          {lead.daysSinceCreated} {tc('days')}
                         </span>
                       )}
 <span className="text-xs px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full">
-                                        Neu
+                                        {t('status.new')}
                                       </span>
                       <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" />
                     </div>
@@ -336,12 +339,12 @@ export default function DashboardPage() {
 
           {/* Recent Activity */}
           <div className="bg-white rounded-xl border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-5">Letzte Aktivitäten</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-5">{t('recentActivities')}</h2>
             
             {stats.activities.length === 0 ? (
               <div className="text-center py-8">
                 <Clock className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 text-sm">Noch keine Aktivitäten</p>
+                <p className="text-gray-500 text-sm">{t('noActivities')}</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -369,12 +372,12 @@ export default function DashboardPage() {
         {/* Pipeline Overview */}
         <div className="mt-4 md:mt-6 bg-white rounded-xl border border-gray-100 p-4 md:p-6">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg font-semibold text-gray-900">Lead-Pipeline</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{t('leadPipeline')}</h2>
             <Link 
               href="/dashboard/crm/leads" 
               className="text-sm text-blue-600 hover:text-blue-700 font-medium"
             >
-              CRM öffnen
+              {t('openCrm')}
             </Link>
           </div>
           
@@ -425,22 +428,22 @@ export default function DashboardPage() {
         <div className="mt-4 md:mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           <div className="bg-gray-50 rounded-lg p-4 text-center">
             <div className="text-2xl font-bold text-gray-900">{stats.leads.newThisMonth}</div>
-            <div className="text-xs text-gray-500 mt-1">Leads diesen Monat</div>
+            <div className="text-xs text-gray-500 mt-1">{t('leadsThisMonth')}</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-4 text-center">
             <div className="text-2xl font-bold text-gray-900">{stats.leads.byStatus.CONTACTED}</div>
-            <div className="text-xs text-gray-500 mt-1">Kontaktiert</div>
+            <div className="text-xs text-gray-500 mt-1">{t('status.contacted')}</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-4 text-center">
             <div className="text-2xl font-bold text-gray-900">{stats.leads.byStatus.CONVERSATION}</div>
-            <div className="text-xs text-gray-500 mt-1">In Gespräch</div>
+            <div className="text-xs text-gray-500 mt-1">{t('status.inConversation')}</div>
           </div>
           <div className="bg-gray-50 rounded-lg p-4 text-center">
             <div className="text-2xl font-bold text-green-600 flex items-center justify-center gap-1">
               <CheckCircle2 className="w-5 h-5" />
               {stats.leads.byStatus.BOOKED}
             </div>
-            <div className="text-xs text-gray-500 mt-1">Gebucht</div>
+            <div className="text-xs text-gray-500 mt-1">{t('status.booked')}</div>
           </div>
         </div>
       </div>

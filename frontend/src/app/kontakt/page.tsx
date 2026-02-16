@@ -15,36 +15,33 @@ import {
 import PublicNavigation from '@/components/PublicNavigation';
 import PublicFooter from '@/components/PublicFooter';
 import { getApiUrl } from '@/lib/api';
+import { useTranslations } from 'next-intl';
 
-type BetreffOption =
-  | 'Allgemeine Anfrage'
-  | 'Support'
-  | 'Partnerschaft'
-  | 'Demo buchen'
-  | 'Sonstiges';
+type BetreffKey = 'general' | 'support' | 'partnership' | 'demo' | 'other';
 
 interface FormData {
   vorname: string;
   nachname: string;
   email: string;
-  betreff: BetreffOption;
+  betreff: BetreffKey;
   nachricht: string;
 }
 
-const BETREFF_OPTIONS: BetreffOption[] = [
-  'Allgemeine Anfrage',
-  'Support',
-  'Partnerschaft',
-  'Demo buchen',
-  'Sonstiges',
+const BETREFF_KEYS: BetreffKey[] = [
+  'general',
+  'support',
+  'partnership',
+  'demo',
+  'other',
 ];
 
 export default function KontaktPage() {
+  const t = useTranslations('contact');
   const [formData, setFormData] = useState<FormData>({
     vorname: '',
     nachname: '',
     email: '',
-    betreff: 'Allgemeine Anfrage',
+    betreff: 'general',
     nachricht: '',
   });
   const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle');
@@ -85,11 +82,10 @@ export default function KontaktPage() {
       <section className="pt-24 sm:pt-32 pb-12 sm:pb-16 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-4 sm:mb-6">
-            Kontakt
+            {t('title')}
           </h1>
           <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto px-4">
-            Hast du Fragen? Wir sind für dich da. Schreib uns eine Nachricht oder
-            ruf uns an.
+            {t('subtitle')}
           </p>
         </div>
       </section>
@@ -101,7 +97,7 @@ export default function KontaktPage() {
             {/* Contact Info */}
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 sm:mb-8">
-                So erreichst du uns
+                {t('reachUs')}
               </h2>
 
               <div className="space-y-4 sm:space-y-6">
@@ -111,7 +107,7 @@ export default function KontaktPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-2 text-sm sm:text-base">
-                      E-Mail
+                      {t('email')}
                     </h3>
                     <div className="space-y-1">
                       <a
@@ -121,7 +117,7 @@ export default function KontaktPage() {
                         office@immivo.ai
                       </a>
                       <span className="text-gray-500 text-xs sm:text-sm">
-                        (allgemein)
+                        {t('general')}
                       </span>
                       <a
                         href="mailto:support@immivo.ai"
@@ -130,7 +126,7 @@ export default function KontaktPage() {
                         support@immivo.ai
                       </a>
                       <span className="text-gray-500 text-xs sm:text-sm">
-                        (Support)
+                        {t('support')}
                       </span>
                     </div>
                   </div>
@@ -142,7 +138,7 @@ export default function KontaktPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1 text-sm sm:text-base">
-                      Telefon
+                      {t('phone')}
                     </h3>
                     <a
                       href="tel:+436703551221"
@@ -151,7 +147,7 @@ export default function KontaktPage() {
                       +43 670 355 1221
                     </a>
                     <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                      Mo–Fr, 9:00–18:00
+                      {t('hours')}
                     </p>
                   </div>
                 </div>
@@ -162,7 +158,7 @@ export default function KontaktPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1 text-sm sm:text-base">
-                      Adresse
+                      {t('address')}
                     </h3>
                     <p className="text-gray-600 text-sm sm:text-base">
                       Immivo GmbH
@@ -178,16 +174,16 @@ export default function KontaktPage() {
               {/* Demo Section */}
               <div className="mt-8 sm:mt-12 p-4 sm:p-6 bg-blue-50 rounded-xl border border-blue-100">
                 <h3 className="font-semibold text-gray-900 mb-2 text-sm sm:text-base">
-                  Möchtest du eine persönliche Demo?
+                  {t('personalDemo')}
                 </h3>
                 <p className="text-gray-600 text-xs sm:text-sm mb-4">
-                  Buche eine persönliche Demo und sieh Immivo in Aktion.
+                  {t('personalDemoDesc')}
                 </p>
                 <Link
                   href="/#demo"
                   className="inline-flex items-center text-blue-600 font-medium hover:underline text-sm sm:text-base group"
                 >
-                  Demo-Termin vereinbaren
+                  {t('bookDemo')}
                   <ArrowRight className="ml-1 w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                 </Link>
               </div>
@@ -195,7 +191,7 @@ export default function KontaktPage() {
               {/* Founders Direct Contact */}
               <div className="mt-8 sm:mt-12 p-4 sm:p-6 bg-gray-50 rounded-xl">
                 <h3 className="font-semibold text-gray-900 mb-4 text-sm sm:text-base">
-                  Direktkontakt Gründer
+                  {t('directContact')}
                 </h3>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
@@ -235,7 +231,7 @@ export default function KontaktPage() {
             {/* Contact Form */}
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 sm:mb-8">
-                Nachricht senden
+                {t('sendMessage')}
               </h2>
 
               {status === 'success' ? (
@@ -244,11 +240,10 @@ export default function KontaktPage() {
                     <CheckCircle2 className="w-7 sm:w-8 h-7 sm:h-8 text-green-600" />
                   </div>
                   <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">
-                    Nachricht gesendet!
+                    {t('messageSent')}
                   </h3>
                   <p className="text-gray-600 text-sm sm:text-base">
-                    Vielen Dank für deine Nachricht. Wir melden uns innerhalb von
-                    24 Stunden bei dir.
+                    {t('messageSentDesc')}
                   </p>
                 </div>
               ) : (
@@ -259,7 +254,7 @@ export default function KontaktPage() {
                         htmlFor="vorname"
                         className="block text-sm font-medium text-gray-700 mb-2"
                       >
-                        Vorname
+                        {t('firstName')}
                       </label>
                       <input
                         id="vorname"
@@ -276,7 +271,7 @@ export default function KontaktPage() {
                         htmlFor="nachname"
                         className="block text-sm font-medium text-gray-700 mb-2"
                       >
-                        Nachname
+                        {t('lastName')}
                       </label>
                       <input
                         id="nachname"
@@ -295,7 +290,7 @@ export default function KontaktPage() {
                       htmlFor="email"
                       className="block text-sm font-medium text-gray-700 mb-2"
                     >
-                      E-Mail
+                      {t('emailLabel')}
                     </label>
                     <input
                       id="email"
@@ -313,7 +308,7 @@ export default function KontaktPage() {
                       htmlFor="betreff"
                       className="block text-sm font-medium text-gray-700 mb-2"
                     >
-                      Betreff
+                      {t('subject')}
                     </label>
                     <select
                       id="betreff"
@@ -322,9 +317,9 @@ export default function KontaktPage() {
                       onChange={handleChange}
                       className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
                     >
-                      {BETREFF_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
+                      {BETREFF_KEYS.map((key) => (
+                        <option key={key} value={key}>
+                          {t(`subjectOptions.${key}`)}
                         </option>
                       ))}
                     </select>
@@ -335,7 +330,7 @@ export default function KontaktPage() {
                       htmlFor="nachricht"
                       className="block text-sm font-medium text-gray-700 mb-2"
                     >
-                      Nachricht
+                      {t('message')}
                     </label>
                     <textarea
                       id="nachricht"
@@ -356,11 +351,11 @@ export default function KontaktPage() {
                     {status === 'loading' ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        Wird gesendet...
+                        {t('sending')}
                       </>
                     ) : (
                       <>
-                        Nachricht senden
+                        {t('send')}
                         <Send className="w-5 h-5" />
                       </>
                     )}

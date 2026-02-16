@@ -248,7 +248,7 @@ export default function ActivitiesPage() {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="h-full flex items-center justify-center bg-white dark:bg-[#111111]">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     );
@@ -274,36 +274,36 @@ export default function ActivitiesPage() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col bg-white dark:bg-[#111111] transition-colors">
       {/* Filter Bar */}
-      <div className="px-8 py-4 border-b border-gray-100 flex items-center gap-4">
-        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+      <div className="px-4 sm:px-8 py-3 sm:py-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-4 overflow-x-auto">
+        <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 shrink-0">
           <button
             onClick={() => setFilter('all')}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+            className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors ${
               filter === 'all' 
-                ? 'bg-white text-gray-900 shadow-sm' 
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' 
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             Alle
           </button>
           <button
             onClick={() => setFilter('mine')}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+            className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors ${
               filter === 'mine' 
-                ? 'bg-white text-gray-900 shadow-sm' 
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' 
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             Meine
           </button>
           <button
             onClick={() => setFilter('pending')}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+            className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors ${
               filter === 'pending' 
-                ? 'bg-white text-gray-900 shadow-sm' 
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' 
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             Offen ({pendingActions.length})
@@ -312,23 +312,23 @@ export default function ActivitiesPage() {
       </div>
 
       {/* Activities List */}
-      <div className="flex-1 overflow-auto px-8 py-6">
+      <div className="flex-1 overflow-auto px-4 sm:px-8 py-4 sm:py-6 pb-20 lg:pb-6">
         {Object.keys(filteredGroups).length === 0 ? (
           <div className="text-center py-12">
-            <Activity className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">Keine Aktivitäten gefunden</p>
+            <Activity className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+            <p className="text-gray-500 dark:text-gray-400">Keine Aktivitäten gefunden</p>
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-6 sm:space-y-8">
             {Object.entries(filteredGroups)
               .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
               .map(([date, dateActivities]) => (
                 <div key={date}>
-                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                  <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 sm:mb-4">
                     {formatDate(dateActivities[0].createdAt)}
                   </h2>
                   
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     {dateActivities
                       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                       .map((activity) => {
@@ -343,81 +343,79 @@ export default function ActivitiesPage() {
                           <Link 
                             key={activity.id}
                             href={`/dashboard/crm/leads/${activity.leadId}`}
-                            className={`block p-4 rounded-xl border transition-all cursor-pointer ${
+                            className={`block p-3 sm:p-4 rounded-xl border transition-all cursor-pointer ${
                               isMine 
-                                ? 'bg-gray-50/50 border-gray-200 hover:border-gray-300' 
-                                : 'bg-white border-gray-100 hover:border-gray-200 hover:shadow-sm'
-                            } ${isPending ? 'ring-2 ring-amber-200' : ''}`}
+                                ? 'bg-gray-50/50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600' 
+                                : 'bg-white dark:bg-[#1a1a1a] border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700 hover:shadow-sm'
+                            } ${isPending ? 'ring-2 ring-amber-200 dark:ring-amber-500/30' : ''}`}
                           >
-                            <div className="flex items-start gap-4">
+                            <div className="flex items-start gap-3 sm:gap-4">
                               {/* Icon */}
-                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                                 isPending 
-                                  ? 'bg-amber-100' 
-                                  : isMine 
-                                    ? 'bg-gray-100' 
-                                    : 'bg-gray-100'
+                                  ? 'bg-amber-100 dark:bg-amber-900/30' 
+                                  : 'bg-gray-100 dark:bg-gray-800'
                               }`}>
-                                <Icon className={`w-5 h-5 ${
+                                <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${
                                   isPending 
-                                    ? 'text-amber-600' 
+                                    ? 'text-amber-600 dark:text-amber-400' 
                                     : isMine 
-                                      ? 'text-blue-600' 
-                                      : 'text-gray-600'
+                                      ? 'text-blue-600 dark:text-blue-400' 
+                                      : 'text-gray-600 dark:text-gray-400'
                                 }`} />
                               </div>
 
                               {/* Content */}
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-sm font-medium text-gray-900">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <span className="text-sm font-medium text-gray-900 dark:text-white">
                                     {activityTypeLabels[activity.type] || activity.type}
                                   </span>
                                   {isMine && (
-                                    <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-full">
+                                    <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full">
                                       Meine
                                     </span>
                                   )}
                                   {activity.jarvisActionId && (
-                                    <span className="px-2 py-0.5 text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200 rounded-full">
+                                    <span className="px-2 py-0.5 text-xs font-medium bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full">
                                       Automatisiert
                                     </span>
                                   )}
                                   {isPending && (
-                                    <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">
+                                    <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full">
                                       Offen
                                     </span>
                                   )}
                                 </div>
                                 
-                                <p className="text-sm text-gray-600 mb-2">
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
                                   {activity.description}
                                 </p>
 
                                 {/* Lead & Property Links */}
-                                <div className="flex items-center flex-wrap gap-3 text-xs text-gray-500">
+                                <div className="flex items-center flex-wrap gap-2 sm:gap-3 text-xs text-gray-500 dark:text-gray-500">
                                   <span className="flex items-center gap-1">
                                     <Clock className="w-3 h-3" />
                                     {formatTime(activity.createdAt)}
                                   </span>
                                   
                                   {activity.createdByName && (
-                                    <span className="flex items-center gap-1 px-2 py-0.5 bg-gray-50 text-blue-600 rounded-full">
+                                    <span className="flex items-center gap-1 px-2 py-0.5 bg-gray-50 dark:bg-gray-800 text-blue-600 dark:text-blue-400 rounded-full">
                                       <Users className="w-3 h-3" />
                                       {activity.createdByName}
                                     </span>
                                   )}
                                   
                                   {activity.lead && (
-                                    <span className="flex items-center gap-1 text-blue-600">
+                                    <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
                                       <User className="w-3 h-3" />
                                       {leadName}
                                     </span>
                                   )}
                                   
                                   {activity.property && (
-                                    <span className="flex items-center gap-1 text-blue-600">
-                                      <Building2 className="w-3 h-3" />
+                                    <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 truncate max-w-[150px]">
+                                      <Building2 className="w-3 h-3 shrink-0" />
                                       {activity.property.title}
                                     </span>
                                   )}
@@ -425,8 +423,8 @@ export default function ActivitiesPage() {
 
                                 {/* Jarvis Action Buttons */}
                                 {activity.jarvisAction && isPending && (
-                                  <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
-                                    <p className="text-sm font-medium text-gray-900 mb-3">
+                                  <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-white dark:bg-[#1a1a1a] rounded-lg border border-gray-200 dark:border-gray-700">
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mb-3">
                                       {activity.jarvisAction.question}
                                     </p>
                                     
@@ -434,9 +432,9 @@ export default function ActivitiesPage() {
                                       {activity.jarvisAction.options?.map((option) => (
                                         <button
                                           key={option.id}
-                                          onClick={() => handleRespondToAction(activity.jarvisAction!.id, option.id)}
+                                          onClick={(e) => { e.preventDefault(); handleRespondToAction(activity.jarvisAction!.id, option.id); }}
                                           disabled={respondingTo === activity.jarvisAction!.id}
-                                          className="px-4 py-2 text-sm font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                                          className="px-3 sm:px-4 py-2 text-sm font-medium bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
                                         >
                                           {respondingTo === activity.jarvisAction!.id && (
                                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -450,8 +448,8 @@ export default function ActivitiesPage() {
                               </div>
 
                               {/* Arrow */}
-                              <div className="p-2">
-                                <ChevronRight className="w-5 h-5 text-gray-400" />
+                              <div className="p-1 sm:p-2">
+                                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 dark:text-gray-600" />
                               </div>
                             </div>
                           </Link>

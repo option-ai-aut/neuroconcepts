@@ -13,6 +13,7 @@ import NextImage from 'next/image';
 import PublicNavigation from '@/components/PublicNavigation';
 import PublicFooter from '@/components/PublicFooter';
 import DemoBooking from '@/components/DemoBooking';
+import { useTranslations } from 'next-intl';
 
 // Intersection Observer Hook for scroll animations
 function useInView(options = {}) {
@@ -76,6 +77,7 @@ function BeforeAfterSlider() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [sliderPos, setSliderPos] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
+  const t = useTranslations('landing');
 
   const updatePosition = (clientX: number) => {
     if (!containerRef.current) return;
@@ -115,14 +117,14 @@ function BeforeAfterSlider() {
     >
       <div className="aspect-[4/3] relative">
         {/* After (full background) */}
-        <NextImage src="/Neu.jpg" alt="Nachher — Möbliert mit KI" fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" priority />
+        <NextImage src="/Neu.jpg" alt={t('beforeAfter.afterAlt')} fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" priority />
         {/* Before (clipped) */}
         <div className="absolute inset-0 overflow-hidden" style={{ width: `${sliderPos}%` }}>
-          <NextImage src="/Alt.jpg" alt="Vorher — Leerer Raum" fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" style={{ minWidth: containerRef.current ? `${containerRef.current.offsetWidth}px` : '100%' }} priority />
+          <NextImage src="/Alt.jpg" alt={t('beforeAfter.beforeAlt')} fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" style={{ minWidth: containerRef.current ? `${containerRef.current.offsetWidth}px` : '100%' }} priority />
         </div>
         {/* Labels */}
-        <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1.5 rounded-full z-20 pointer-events-none">Vorher</div>
-        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-gray-900 text-xs font-semibold px-3 py-1.5 rounded-full z-20 pointer-events-none">Nachher</div>
+        <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1.5 rounded-full z-20 pointer-events-none">{t('beforeAfter.before')}</div>
+        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-gray-900 text-xs font-semibold px-3 py-1.5 rounded-full z-20 pointer-events-none">{t('beforeAfter.after')}</div>
         {/* Slider Handle */}
         <div className="absolute inset-y-0 z-30 pointer-events-none" style={{ left: `${sliderPos}%` }}>
           <div className="absolute inset-y-0 w-0.5 bg-white shadow-lg -translate-x-1/2" />
@@ -136,6 +138,7 @@ function BeforeAfterSlider() {
 }
 
 export default function LandingPage() {
+  const t = useTranslations('landing');
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const heroRef = useRef<HTMLDivElement>(null);
 
@@ -283,13 +286,13 @@ export default function LandingPage() {
             />
             
             <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-gray-900 mb-4 leading-[1.08]">
-              Dein Büro arbeitet.
+              {t('hero.title1')}
               <br />
-              <span className="text-gray-400">Du verdienst.</span>
+              <span className="text-gray-400">{t('hero.title2')}</span>
             </h1>
             
             <p className="text-base sm:text-lg text-gray-500 mb-8 leading-relaxed max-w-md">
-              Das erste <strong className="text-gray-700">KI-gesteuerte Betriebssystem</strong> für Immobilienmakler.
+              {t.rich('hero.subtitle', { bold: (chunks) => <strong className="text-gray-700">{chunks}</strong> })}
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto mb-6">
@@ -297,7 +300,7 @@ export default function LandingPage() {
                 href="/login?mode=register" 
                 className="group inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold text-white bg-gray-900 rounded-full shadow-lg"
               >
-                Kostenlos testen
+                {t('hero.ctaPrimary')}
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Link>
               <a 
@@ -305,22 +308,22 @@ export default function LandingPage() {
                 onClick={(e) => handleAnchorClick(e, 'demo')}
                 className="inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold text-gray-700 bg-white border border-gray-200 rounded-full shadow-sm"
               >
-                Demo buchen
+                {t('hero.ctaSecondary')}
               </a>
             </div>
 
             <div className="flex items-center justify-center gap-4 text-xs text-gray-400">
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                Keine Kreditkarte
+                {t('hero.trustNoCard')}
               </span>
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                7 Tage gratis
+                {t('hero.trust7Days')}
               </span>
               <span className="flex items-center gap-1.5">
                 <Shield className="w-3.5 h-3.5 text-gray-400" />
-                DSGVO
+                {t('hero.trustGdpr')}
               </span>
             </div>
           </div>
@@ -331,20 +334,19 @@ export default function LandingPage() {
             <div className="text-left">
               <div className="inline-flex items-center px-4 py-2 rounded-full bg-gray-100 text-blue-600 text-sm font-medium mb-8 border border-gray-200 backdrop-blur-sm">
                 <span className="flex w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
-                Jarvis 1.0
+                {t('hero.badge')}
               </div>
               
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 mb-6 leading-[1.05]">
-                Dein Büro arbeitet.
+                {t('hero.title1')}
                 <br />
                 <span className="font-extrabold text-gray-900">
-                  Du verdienst.
+                  {t('hero.title2')}
                 </span>
               </h1>
               
               <p className="text-xl text-gray-600 mb-10 leading-relaxed max-w-xl">
-                Immivo ist das erste <strong>vollständig KI-gesteuerte</strong> Betriebssystem für Immobilienmakler. 
-                Jarvis übernimmt dein Tagesgeschäft — du konzentrierst dich auf Abschlüsse.
+                {t.rich('hero.introText', { bold: (chunks) => <strong>{chunks}</strong> })}
               </p>
               
               <div className="flex flex-row gap-4 mb-12">
@@ -352,7 +354,7 @@ export default function LandingPage() {
                   href="/login?mode=register" 
                   className="group inline-flex items-center justify-center px-8 py-4 text-base font-semibold text-white bg-gray-900 rounded-full hover:shadow-xl hover:shadow-gray-500/20 transition-all hover:-translate-y-1"
                 >
-                  Kostenlos testen
+                  {t('hero.ctaPrimary')}
                   <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Link>
                 <a 
@@ -361,7 +363,7 @@ export default function LandingPage() {
                   className="group inline-flex items-center justify-center px-8 py-4 text-base font-semibold text-gray-700 bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-all hover:-translate-y-1 shadow-sm"
                 >
                   <Calendar className="mr-2 w-5 h-5 text-blue-600" />
-                  Demo buchen
+                  {t('hero.ctaSecondary')}
                 </a>
               </div>
 
@@ -369,19 +371,19 @@ export default function LandingPage() {
               <div className="flex flex-wrap items-center gap-6 text-sm text-gray-500">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-green-500" />
-                  Keine Kreditkarte
+                  {t('hero.trustNoCard')}
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-green-500" />
-                  DSGVO-konform
+                  {t('hero.gdprCompliant')}
                 </div>
                 <div className="flex items-center gap-2">
                   <Server className="w-4 h-4 text-orange-500" />
-                  AWS Hosting EU
+                  {t('hero.awsHosting')}
                 </div>
                 <div className="flex items-center gap-2">
                   <Shield className="w-4 h-4 text-blue-500" />
-                  Sichere Bezahlung via Stripe
+                  {t('hero.securePayment')}
                 </div>
               </div>
             </div>
@@ -409,19 +411,19 @@ export default function LandingPage() {
                     {/* Stats Row */}
                     <div className="grid grid-cols-3 gap-3">
                       <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/30">
-                        <p className="text-xs text-gray-500 mb-1">Neue Leads heute</p>
+                        <p className="text-xs text-gray-500 mb-1">{t('preview.newLeadsToday')}</p>
                         <p className="text-2xl font-bold text-white">12</p>
                         <p className="text-xs text-green-400 mt-1">+23% ↑</p>
                       </div>
                       <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/30">
-                        <p className="text-xs text-gray-500 mb-1">Termine gebucht</p>
+                        <p className="text-xs text-gray-500 mb-1">{t('preview.appointmentsBooked')}</p>
                         <p className="text-2xl font-bold text-white">8</p>
-                        <p className="text-xs text-green-400 mt-1">von Jarvis</p>
+                        <p className="text-xs text-green-400 mt-1">{t('preview.byJarvis')}</p>
                       </div>
                       <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/30">
-                        <p className="text-xs text-gray-500 mb-1">Exposés gesendet</p>
+                        <p className="text-xs text-gray-500 mb-1">{t('preview.exposesSent')}</p>
                         <p className="text-2xl font-bold text-white">15</p>
-                        <p className="text-xs text-blue-400 mt-1">automatisch</p>
+                        <p className="text-xs text-blue-400 mt-1">{t('preview.automatic')}</p>
                       </div>
                     </div>
 
@@ -430,9 +432,9 @@ export default function LandingPage() {
                       <div className="flex items-start gap-3">
                         <NextImage src="/logo-icon.png" alt="Jarvis" width={40} height={40} className="flex-shrink-0 animate-pulse-glow rounded-xl" />
                         <div>
-                          <p className="text-xs text-gray-400 mb-1">Jarvis • Gerade eben</p>
+                          <p className="text-xs text-gray-400 mb-1">{t('preview.jarvisJustNow')}</p>
                           <p className="text-sm text-white">
-                            Ich habe 3 neue Anfragen bearbeitet, Exposés versendet und einen Besichtigungstermin für morgen 14 Uhr eingetragen. Alles erledigt! 🎯
+                            {t('preview.jarvisMessage')}
                           </p>
                         </div>
                       </div>
@@ -441,9 +443,9 @@ export default function LandingPage() {
                     {/* Activity Feed */}
                     <div className="space-y-2">
                       {[
-                        { icon: Mail, text: 'Lead qualifiziert: Familie Müller', time: 'vor 2 Min', color: 'text-blue-400' },
-                        { icon: Calendar, text: 'Besichtigung gebucht: Penthouse Wien', time: 'vor 5 Min', color: 'text-green-400' },
-                        { icon: FileText, text: 'Exposé erstellt: 3-Zi-Wohnung Berlin', time: 'vor 8 Min', color: 'text-gray-400' },
+                        { icon: Mail, text: t('preview.activity1'), time: 'vor 2 Min', color: 'text-blue-400' },
+                        { icon: Calendar, text: t('preview.activity2'), time: 'vor 5 Min', color: 'text-green-400' },
+                        { icon: FileText, text: t('preview.activity3'), time: 'vor 8 Min', color: 'text-gray-400' },
                       ].map((item, i) => (
                         <div key={i} className="flex items-center gap-3 bg-gray-800/30 rounded-lg px-3 py-2">
                           <item.icon className={`w-4 h-4 ${item.color}`} />
@@ -464,8 +466,8 @@ export default function LandingPage() {
                       <TrendingUp className="w-4 h-4 text-green-600" />
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500">Zeitersparnis</p>
-                      <p className="text-sm font-bold text-gray-900">15h/Woche</p>
+                      <p className="text-xs text-gray-500">{t('preview.timeSavings')}</p>
+                      <p className="text-sm font-bold text-gray-900">{t('preview.timeSavingsValue')}</p>
                     </div>
                   </div>
                 </div>
@@ -478,8 +480,8 @@ export default function LandingPage() {
                       <Zap className="w-4 h-4 text-gray-600" />
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500">Antwortzeit</p>
-                      <p className="text-sm font-bold text-gray-900">&lt; 30 Sek</p>
+                      <p className="text-xs text-gray-500">{t('preview.responseTime')}</p>
+                      <p className="text-sm font-bold text-gray-900">{t('preview.responseTimeValue')}</p>
                     </div>
                   </div>
                 </div>
@@ -497,13 +499,12 @@ export default function LandingPage() {
           className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${section1.isInView ? 'animate-slide-up' : 'opacity-0'}`}
         >
           <div className="text-center mb-8 sm:mb-16">
-            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">Das Problem</span>
+            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">{t('problem.sectionLabel')}</span>
             <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mt-3 sm:mt-4 mb-4 sm:mb-6">
-              Du bist Makler, kein Sachbearbeiter.
+              {t('problem.title')}
             </h2>
             <p className="text-base sm:text-xl text-gray-600 max-w-3xl mx-auto">
-              80% deiner Zeit geht für E-Mails, Terminabsprachen und Papierkram drauf. 
-              Nur 20% für das, was wirklich zählt: Kunden treffen und Deals abschließen.
+              {t('problem.subtitle')}
             </p>
           </div>
 
@@ -511,23 +512,23 @@ export default function LandingPage() {
             {[
               {
                 icon: Mail,
-                title: 'E-Mail-Flut',
-                problem: '50+ E-Mails täglich',
-                solution: 'Jarvis antwortet in Sekunden',
+                title: t('problem.emailFlood'),
+                problem: t('problem.emailProblem'),
+                solution: t('problem.emailSolution'),
                 color: 'from-red-500 to-orange-500'
               },
               {
                 icon: Calendar,
-                title: 'Termin-Chaos',
-                problem: '3-5 Mails pro Termin',
-                solution: 'Automatische Buchung',
+                title: t('problem.appointmentChaos'),
+                problem: t('problem.appointmentProblem'),
+                solution: t('problem.appointmentSolution'),
                 color: 'from-orange-500 to-amber-500'
               },
               {
                 icon: FileText,
-                title: 'Exposé-Marathon',
-                problem: '2h pro Exposé',
-                solution: '2 Minuten mit KI',
+                title: t('problem.exposeMarathon'),
+                problem: t('problem.exposeProblem'),
+                solution: t('problem.exposeSolution'),
                 color: 'from-amber-500 to-yellow-500'
               }
             ].map((item, i) => (
@@ -567,25 +568,22 @@ export default function LandingPage() {
             <div>
               <div className="inline-flex items-center px-3 sm:px-4 py-2 rounded-full bg-white/10 text-gray-300 text-xs sm:text-sm font-medium mb-4 sm:mb-6 border border-white/10">
                 <Brain className="w-4 h-4 mr-2" />
-                Powered by OpenAI GPT-5
+                {t('jarvis.badge')}
               </div>
               
               <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6 leading-tight">
-                Triff <span className="text-gray-200">Jarvis</span>,
-                <br />deinen KI-Assistenten.
+                {t.rich('jarvis.title', { bold: (chunks) => <span className="text-gray-200">{chunks}</span> })}
               </h2>
               
               <p className="text-base sm:text-xl text-gray-300 mb-6 sm:mb-8 leading-relaxed">
-                Jarvis ist kein Chatbot. Er ist ein vollwertiger Mitarbeiter, der dein Business versteht. 
-                Er liest E-Mails, qualifiziert Leads, erstellt Exposés und bucht Termine — 
-                <strong className="text-white"> 24/7, ohne Pause, ohne Fehler.</strong>
+                {t.rich('jarvis.subtitle', { bold: (chunks) => <strong className="text-white">{chunks}</strong> })}
               </p>
 
               <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-10">
                 {[
-                  'Vollständiger Zugriff auf CRM, E-Mails, Kalender & Objekte',
-                  'Erstellt professionelle Exposés in Sekunden',
-                  'Bearbeitet Bilder mit KI-Staging (Möbel einbauen)'
+                  t('jarvis.feature1'),
+                  t('jarvis.feature2'),
+                  t('jarvis.feature3')
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-3">
                     <div className="w-6 h-6 bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
@@ -600,7 +598,7 @@ export default function LandingPage() {
                 href="/login" 
                 className="inline-flex items-center px-6 py-3 bg-white text-gray-900 rounded-full font-semibold hover:bg-gray-100 transition-all hover:-translate-y-1 shadow-lg"
               >
-                Jarvis kennenlernen
+                {t('jarvis.cta')}
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Link>
             </div>
@@ -610,12 +608,12 @@ export default function LandingPage() {
               {/* Mobile: Simple Grid */}
               <div className="grid grid-cols-3 gap-3 lg:hidden">
                 {[
-                  { icon: Mail, label: 'E-Mails' },
-                  { icon: Calendar, label: 'Termine' },
-                  { icon: FileText, label: 'Exposés' },
-                  { icon: Users, label: 'Leads' },
-                  { icon: Building2, label: 'Objekte' },
-                  { icon: MessageSquare, label: 'Chat' },
+                  { icon: Mail, label: t('jarvis.emails') },
+                  { icon: Calendar, label: t('jarvis.appointments') },
+                  { icon: FileText, label: t('jarvis.exposesLabel') },
+                  { icon: Users, label: t('jarvis.leads') },
+                  { icon: Building2, label: t('jarvis.properties') },
+                  { icon: MessageSquare, label: t('jarvis.chat') },
                 ].map((item, i) => (
                   <div key={i} className="bg-white/10 backdrop-blur-sm rounded-xl p-3 flex flex-col items-center justify-center border border-white/20">
                     <item.icon className="w-6 h-6 text-white mb-1.5" />
@@ -673,22 +671,22 @@ export default function LandingPage() {
           className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${section3.isInView ? 'animate-slide-up' : 'opacity-0'}`}
         >
           <div className="text-center mb-8 sm:mb-16">
-            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">Das Ergebnis</span>
+            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">{t('results.sectionLabel')}</span>
             <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mt-3 sm:mt-4 mb-4 sm:mb-6">
-              Mehr Umsatz. Weniger Stress.
+              {t('results.title')}
             </h2>
             <p className="text-base sm:text-xl text-gray-600 max-w-3xl mx-auto">
-              Immivo automatisiert dein Tagesgeschäft — so kannst du dich auf das konzentrieren, was wirklich zählt.
+              {t('results.subtitle')}
             </p>
           </div>
 
           {/* Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 mb-8 sm:mb-16">
             {[
-              { value: 15, suffix: 'h', label: 'Zeitersparnis pro Woche', icon: Clock },
-              { value: 40, suffix: '%', label: 'Mehr qualifizierte Leads', icon: Target },
-              { value: 3, suffix: 'x', label: 'Schnellere Reaktionszeit', icon: Zap },
-              { value: 25, suffix: '%', label: 'Höhere Abschlussquote', icon: TrendingUp },
+              { value: 15, suffix: 'h', label: t('results.timeSaving'), icon: Clock },
+              { value: 40, suffix: '%', label: t('results.moreLeads'), icon: Target },
+              { value: 3, suffix: 'x', label: t('results.fasterResponse'), icon: Zap },
+              { value: 25, suffix: '%', label: t('results.higherConversion'), icon: TrendingUp },
             ].map((stat, i) => (
               <div 
                 key={i} 
@@ -711,14 +709,13 @@ export default function LandingPage() {
               </div>
               <div>
                 <h3 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-3">
-                  24 Immobilienportale — ein Klick.
+                  {t('results.portalsTitle')}
                 </h3>
                 <p className="text-sm sm:text-lg text-gray-300 mb-3 sm:mb-4 leading-relaxed">
-                  Verbinde deine Portale und pushe Objekte mit einem Klick auf ImmoScout24, Willhaben, 
-                  Immowelt, Homegate, Kleinanzeigen und 19 weitere Portale. Keine manuelle Arbeit, keine Fehler.
+                  {t('results.portalsSubtitle')}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {['ImmoScout24', 'Willhaben', 'Immowelt', 'Homegate', 'Kleinanzeigen', '+19 weitere'].map((portal, i) => (
+                  {['ImmoScout24', 'Willhaben', 'Immowelt', 'Homegate', 'Kleinanzeigen', t('results.morePortals')].map((portal, i) => (
                     <span key={i} className={`px-3 py-1 rounded-full text-xs font-medium ${i === 5 ? 'bg-white/20 text-white' : 'bg-white/10 text-gray-300 border border-white/10'}`}>
                       {portal}
                     </span>
@@ -737,12 +734,12 @@ export default function LandingPage() {
           className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${section4.isInView ? 'animate-slide-up' : 'opacity-0'}`}
         >
           <div className="text-center mb-8 sm:mb-16">
-            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">Alles inklusive</span>
+            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">{t('features.sectionLabel')}</span>
             <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mt-3 sm:mt-4 mb-4 sm:mb-6">
-              Ein System. Unendliche Möglichkeiten.
+              {t('features.title')}
             </h2>
             <p className="text-base sm:text-xl text-gray-600 max-w-3xl mx-auto">
-              Immivo ersetzt dein CRM, deine E-Mail-Tools und deine Exposé-Software — in einer einzigen, KI-gesteuerten Plattform.
+              {t('features.subtitle')}
             </p>
           </div>
 
@@ -750,62 +747,62 @@ export default function LandingPage() {
             {[
               {
                 icon: Bot,
-                title: 'Jarvis KI-Assistent',
-                description: '24/7 verfügbar, beantwortet Anfragen in Sekunden, qualifiziert Leads automatisch.',
+                title: t('features.jarvisTitle'),
+                description: t('features.jarvisDesc'),
                 gradient: 'from-gray-700 to-gray-800'
               },
               {
                 icon: Wand2,
-                title: 'KI-Bildbearbeitung',
-                description: 'Virtual Staging: Möbel einbauen, Räume umgestalten — ultra-realistisch mit KI.',
+                title: t('features.imageTitle'),
+                description: t('features.imageDesc'),
                 gradient: 'from-gray-600 to-gray-700'
               },
               {
                 icon: Users,
-                title: 'Intelligentes CRM',
-                description: 'Leads mit Anrede, Du/Sie-Präferenz, Suchprofilen und automatischer Qualifizierung.',
+                title: t('features.crmTitle'),
+                description: t('features.crmDesc'),
                 gradient: 'from-blue-500 to-cyan-500'
               },
               {
                 icon: Building2,
-                title: 'Objektverwaltung',
-                description: 'Alle Immobilien an einem Ort mit Energieausweis, Bildern und Portal-Sync.',
+                title: t('features.propertiesTitle'),
+                description: t('features.propertiesDesc'),
                 gradient: 'from-emerald-500 to-teal-500'
               },
               {
                 icon: FileText,
-                title: 'KI-Exposé-Editor',
-                description: 'Professionelle Exposés in Minuten. Mit Templates, Variablen und Live-Vorschau.',
+                title: t('features.exposeTitle'),
+                description: t('features.exposeDesc'),
                 gradient: 'from-orange-500 to-amber-500'
               },
               {
                 icon: Calendar,
-                title: 'Kalender-Integration',
-                description: 'Automatische Terminbuchung direkt in Google Calendar oder Outlook.',
+                title: t('features.calendarTitle'),
+                description: t('features.calendarDesc'),
                 gradient: 'from-gray-500 to-gray-600'
               },
               {
                 icon: Mail,
-                title: 'E-Mail-Automatisierung',
-                description: 'White-Label-Versand über deine Domain. Jarvis antwortet in deinem Namen.',
+                title: t('features.emailTitle'),
+                description: t('features.emailDesc'),
                 gradient: 'from-gray-600 to-gray-700'
               },
               {
                 icon: Globe,
-                title: 'Portal-Anbindung',
-                description: 'Alle gängigen Portale — ImmoScout, Willhaben, Immowelt und mehr.',
+                title: t('features.portalsTitle'),
+                description: t('features.portalsDesc'),
                 gradient: 'from-cyan-500 to-blue-500'
               },
               {
                 icon: BarChart3,
-                title: 'Analytics & Reports',
-                description: 'Echtzeit-Dashboards mit Conversion-Rates, Lead-Quellen und Performance.',
+                title: t('features.analyticsTitle'),
+                description: t('features.analyticsDesc'),
                 gradient: 'from-amber-500 to-orange-500'
               },
               {
                 icon: Shield,
-                title: 'AWS Hosting EU',
-                description: 'DSGVO-konform auf AWS Frankfurt. Verschlüsselte Daten, höchste Sicherheit.',
+                title: t('features.hostingTitle'),
+                description: t('features.hostingDesc'),
                 gradient: 'from-slate-500 to-gray-500'
               },
             ].map((feature, i) => (
@@ -839,8 +836,8 @@ export default function LandingPage() {
                     <TrendingUp className="w-5 h-5 text-green-600" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">Mehr Aufmerksamkeit</p>
-                    <p className="text-lg font-bold text-gray-900">+73%</p>
+                    <p className="text-xs text-gray-500">{t('staging.moreAttention')}</p>
+                    <p className="text-lg font-bold text-gray-900">{t('staging.moreAttentionValue')}</p>
                   </div>
                 </div>
               </div>
@@ -850,29 +847,23 @@ export default function LandingPage() {
             <div>
               <div className="inline-flex items-center px-4 py-2 rounded-full bg-gray-100 text-gray-700 text-sm font-medium mb-6 border border-gray-200">
                 <Wand2 className="w-4 h-4 mr-2" />
-                KI-Bildbearbeitung
+                {t('staging.badge')}
               </div>
               
               <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4 sm:mb-6 leading-tight">
-                Virtual Staging mit
-                <br />
-                <span className="text-gray-900">
-                  KI-Präzision
-                </span>
+                {t.rich('staging.title', { bold: (chunks) => <strong>{chunks}</strong> })}
               </h2>
               
               <p className="text-base sm:text-xl text-gray-600 mb-6 sm:mb-8 leading-relaxed">
-                Verwandle leere Räume in einladende Wohnträume. Unsere KI fügt 
-                <strong className="text-gray-900"> ultra-realistische Möbel</strong> ein — 
-                in Sekunden, nicht Stunden.
+                {t.rich('staging.subtitle', { bold: (chunks) => <strong className="text-gray-900">{chunks}</strong> })}
               </p>
 
               <div className="space-y-4 mb-8">
                 {[
-                  'Möbel automatisch einbauen — passend zum Raum',
-                  'Verschiedene Einrichtungsstile wählbar',
-                  'Erhöht die Vorstellungskraft der Interessenten',
-                  'Mehr Klicks, mehr Anfragen, schnellere Verkäufe'
+                  t('staging.feature1'),
+                  t('staging.feature2'),
+                  t('staging.feature3'),
+                  t('staging.feature4')
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-3">
                     <div className="w-6 h-6 bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
@@ -887,7 +878,7 @@ export default function LandingPage() {
                 href="/login" 
                 className="inline-flex items-center px-6 py-3 bg-gray-900 text-white rounded-full font-semibold hover:shadow-lg hover:shadow-gray-500/20 transition-all hover:-translate-y-1"
               >
-                Jetzt ausprobieren
+                {t('staging.cta')}
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Link>
             </div>
@@ -902,9 +893,9 @@ export default function LandingPage() {
           className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${section5.isInView ? 'animate-slide-up' : 'opacity-0'}`}
         >
           <div className="text-center mb-8 sm:mb-16">
-            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">So funktioniert&apos;s</span>
+            <span className="text-blue-600 font-semibold text-sm uppercase tracking-wider">{t('howItWorks.sectionLabel')}</span>
             <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mt-3 sm:mt-4 mb-4 sm:mb-6">
-              In 3 Schritten zur KI-Automatisierung
+              {t('howItWorks.title')}
             </h2>
           </div>
 
@@ -912,20 +903,20 @@ export default function LandingPage() {
             {[
               {
                 step: '01',
-                title: 'Verbinden',
-                description: 'Verknüpfe deine E-Mail, deinen Kalender und deine Portale. Dauert 5 Minuten.',
+                title: t('howItWorks.step1Title'),
+                description: t('howItWorks.step1Desc'),
                 icon: Rocket
               },
               {
                 step: '02',
-                title: 'Einrichten',
-                description: 'Lade deine Objekte hoch und erstelle Exposé-Vorlagen — selbst im Editor oder lass Jarvis sie für dich generieren.',
+                title: t('howItWorks.step2Title'),
+                description: t('howItWorks.step2Desc'),
                 icon: Brain
               },
               {
                 step: '03',
-                title: 'Entspannen',
-                description: 'Jarvis übernimmt. Du bekommst nur noch Benachrichtigungen bei wichtigen Events.',
+                title: t('howItWorks.step3Title'),
+                description: t('howItWorks.step3Desc'),
                 icon: Award
               }
             ].map((item, i) => (
@@ -958,28 +949,23 @@ export default function LandingPage() {
             <div>
               <div className="inline-flex items-center px-4 py-2 rounded-full bg-gray-100 text-blue-600 text-sm font-medium mb-6 border border-gray-200">
                 <Calendar className="w-4 h-4 mr-2" />
-                Persönliche Demo
+                {t('demo.badge')}
               </div>
               
               <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4 sm:mb-6 leading-tight">
-                Erlebe Immivo
-                <br />
-                <span className="text-gray-900">
-                  live in Aktion
-                </span>
+                {t.rich('demo.title', { bold: (chunks) => <strong>{chunks}</strong> })}
               </h2>
               
               <p className="text-base sm:text-xl text-gray-600 mb-6 sm:mb-8 leading-relaxed">
-                In einer 30-minütigen Demo zeigen wir dir, wie Jarvis dein Tagesgeschäft 
-                revolutioniert. Keine Verpflichtungen, keine Verkaufsgespräche — nur Mehrwert.
+                {t('demo.subtitle')}
               </p>
 
               <div className="space-y-4 mb-8">
                 {[
-                  'Individuelle Beratung für dein Business',
-                  'Live-Demonstration aller Features',
-                  'Antworten auf alle deine Fragen',
-                  'Unverbindlich und kostenlos'
+                  t('demo.feature1'),
+                  t('demo.feature2'),
+                  t('demo.feature3'),
+                  t('demo.feature4')
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-3">
                     <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -1013,15 +999,14 @@ export default function LandingPage() {
 
           <div className="inline-flex items-center px-4 py-2 rounded-full bg-white/20 text-white text-sm font-medium mb-8 border border-white/20">
             <Star className="w-4 h-4 mr-2 text-yellow-300" />
-            7 Tage kostenlos testen • Keine Kreditkarte
+            {t('cta.badge')}
           </div>
 
           <h2 className="text-2xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6">
-            Bereit, dein Business zu transformieren?
+            {t('cta.title')}
           </h2>
           <p className="text-base sm:text-xl text-white/80 mb-6 sm:mb-10 max-w-2xl mx-auto">
-            Starte jetzt mit Immivo — in 5 Minuten bist du live. 
-            Mehr Abschlüsse, weniger Büroarbeit, ab dem ersten Tag.
+            {t('cta.subtitle')}
           </p>
           
           <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
@@ -1029,22 +1014,22 @@ export default function LandingPage() {
               href="/login?mode=register" 
               className="group inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-bold text-gray-900 bg-white rounded-full hover:bg-gray-100 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1"
             >
-              Jetzt kostenlos starten
+              {t('cta.primary')}
               <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <a 
               href="mailto:office@immivo.ai" 
               className="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-semibold text-white border-2 border-white/30 rounded-full hover:bg-white/10 transition-all"
             >
-              Persönliche Demo buchen
+              {t('cta.secondary')}
             </a>
           </div>
 
           {/* Trust Logos */}
           <div className="mt-8 sm:mt-16 pt-6 sm:pt-8 border-t border-white/20">
-            <p className="text-sm text-white/60 mb-6">Verbunden mit 24+ Portalen und den Tools, die du nutzt</p>
+            <p className="text-sm text-white/60 mb-6">{t('cta.connectedWith')}</p>
             <div className="flex justify-center items-center gap-4 sm:gap-8 flex-wrap opacity-70">
-              {['24 Immobilienportale', 'Google Workspace', 'Microsoft 365'].map((name, i) => (
+              {[t('cta.portals'), t('cta.google'), t('cta.microsoft')].map((name, i) => (
                 <div key={i} className="px-4 py-2 bg-white/10 rounded-lg text-sm font-medium">
                   {name}
                 </div>

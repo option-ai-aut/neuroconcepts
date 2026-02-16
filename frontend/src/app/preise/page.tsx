@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import PublicNavigation from '@/components/PublicNavigation';
 import PublicFooter from '@/components/PublicFooter';
+import { useTranslations } from 'next-intl';
 
 // Intersection Observer Hook for scroll animations
 function useInView(options = {}) {
@@ -41,6 +42,8 @@ function useInView(options = {}) {
 }
 
 export default function PreisePage() {
+  const t = useTranslations('pricing');
+  const tCommon = useTranslations('common');
   const [ yearly, setYearly ] = useState(false );
   const heroRef = useInView();
   const cardsRef = useInView();
@@ -50,19 +53,19 @@ export default function PreisePage() {
     {
       id: 'free',
       name: 'Free Trial',
-      tagline: 'Kostenlos testen',
+      tagline: t('free.tagline'),
       price: 0,
       priceYearly: 0,
-      period: '/Monat',
-      subtext: '1 Woche gratis',
+      period: tCommon('perMonth'),
+      subtext: t('free.subtext'),
       features: [
-        { text: 'Alle Grundfunktionen', color: 'green' as const },
-        { text: 'Jarvis beschränkt', color: 'yellow' as const },
-        { text: 'Bildstudio beschränkt', color: 'yellow' as const },
-        { text: 'KEIN Portal-Push', color: 'red' as const },
-        { text: 'E-Mail-Support', color: 'green' as const },
+        { text: t('free.features.0'), color: 'green' as const },
+        { text: t('free.features.1'), color: 'yellow' as const },
+        { text: t('free.features.2'), color: 'yellow' as const },
+        { text: t('free.features.3'), color: 'red' as const },
+        { text: t('free.features.4'), color: 'green' as const },
       ],
-      cta: 'Jetzt testen',
+      cta: t('free.cta'),
       href: '/login',
       popular: false,
       icon: Zap,
@@ -70,23 +73,23 @@ export default function PreisePage() {
     {
       id: 'solo',
       name: 'Solo',
-      tagline: 'Für Einzelmakler',
+      tagline: t('solo.tagline'),
       price: 149,
       priceYearly: 134.1,
-      period: '/Monat',
+      period: tCommon('perMonth'),
       subtext: null,
-      seats: '1 Seat',
+      seats: t('solo.seats'),
       features: [
-        { text: 'Zugriff auf ALLES', color: 'green' as const },
-        { text: 'Unbegrenzter Jarvis', color: 'green' as const },
-        { text: 'Unbegrenztes Bildstudio', color: 'green' as const },
-        { text: '24 Portal-Integrationen', color: 'green' as const },
-        { text: 'KI-Exposé-Editor', color: 'green' as const },
-        { text: 'CRM + Lead-Management', color: 'green' as const },
-        { text: 'E-Mail & Kalender', color: 'green' as const },
-        { text: 'Priority Support', color: 'green' as const },
+        { text: t('solo.features.0'), color: 'green' as const },
+        { text: t('solo.features.1'), color: 'green' as const },
+        { text: t('solo.features.2'), color: 'green' as const },
+        { text: t('solo.features.3'), color: 'green' as const },
+        { text: t('solo.features.4'), color: 'green' as const },
+        { text: t('solo.features.5'), color: 'green' as const },
+        { text: t('solo.features.6'), color: 'green' as const },
+        { text: t('solo.features.7'), color: 'green' as const },
       ],
-      cta: 'Jetzt starten',
+      cta: t('solo.cta'),
       href: '/login',
       popular: false,
       icon: Building2,
@@ -94,90 +97,52 @@ export default function PreisePage() {
     {
       id: 'team',
       name: 'Team',
-      tagline: 'Für kleine Teams',
+      tagline: t('team.tagline'),
       price: 699,
       priceYearly: 629.1,
-      period: '/Monat',
+      period: tCommon('perMonth'),
       subtext: null,
-      seats: '5 Seats inklusive',
+      seats: t('team.seats'),
       features: [
-        { text: 'Everything in Solo PLUS', color: 'green' as const },
-        { text: 'Team-Verwaltung', color: 'green' as const },
-        { text: 'Gemeinsame Objekte & Leads', color: 'green' as const },
-        { text: 'Rollen & Berechtigungen', color: 'green' as const },
+        { text: t('team.features.0'), color: 'green' as const },
+        { text: t('team.features.1'), color: 'green' as const },
+        { text: t('team.features.2'), color: 'green' as const },
+        { text: t('team.features.3'), color: 'green' as const },
       ],
-      cta: 'Jetzt starten',
+      cta: t('solo.cta'),
       href: '/login',
       popular: true,
-      badge: 'Beliebteste Wahl',
+      badge: t('team.badge'),
       icon: Users,
     },
     {
       id: 'enterprise',
       name: 'Enterprise',
-      tagline: 'Für große Teams',
+      tagline: t('enterprise.tagline'),
       price: -1,
       priceYearly: -1,
       period: '',
-      subtext: 'Ab 6 Seats',
-      seats: 'Individuell',
+      subtext: t('enterprise.subtext'),
+      seats: t('enterprise.seats'),
       features: [
-        { text: 'Everything in Team PLUS', color: 'green' as const },
-        { text: 'Eigene Domain', color: 'green' as const },
-        { text: 'Dedizierter Account Manager', color: 'green' as const },
-        { text: 'API-Zugang', color: 'green' as const },
-        { text: 'Custom Integrationen', color: 'green' as const },
-        { text: 'SLA-Garantie', color: 'green' as const },
+        { text: t('enterprise.features.0'), color: 'green' as const },
+        { text: t('enterprise.features.1'), color: 'green' as const },
+        { text: t('enterprise.features.2'), color: 'green' as const },
+        { text: t('enterprise.features.3'), color: 'green' as const },
+        { text: t('enterprise.features.4'), color: 'green' as const },
+        { text: t('enterprise.features.5'), color: 'green' as const },
       ],
-      cta: 'Kontakt aufnehmen',
+      cta: t('enterprise.cta'),
       href: '/kontakt',
       popular: false,
       icon: Sparkles,
     },
   ];
 
-  const faqs = [
-    {
-      q: 'Kann ich Immivo kostenlos testen?',
-      a: 'Ja! Du bekommst eine vollständige Testwoche — komplett kostenlos und ohne Kreditkarte. In dieser Zeit hast du Zugriff auf alle Grundfunktionen, inkl. CRM, E-Mails, Kalender und Objekte. Jarvis (KI-Assistent) und das Bildstudio sind in der Testphase beschränkt nutzbar. Nach Ablauf der 7 Tage wird dein Konto automatisch pausiert — es entstehen keine Kosten, solange du keinen Plan wählst.',
-    },
-    {
-      q: 'Was passiert nach der Testphase?',
-      a: 'Nach Ablauf der kostenlosen Woche kannst du dich für einen der drei Pläne (Solo, Team oder Enterprise) entscheiden. Es gibt keine automatische Umstellung auf einen kostenpflichtigen Plan. Wenn du keinen Plan wählst, wird dein Zugang pausiert — deine Daten bleiben aber 30 Tage gespeichert, falls du dich später entscheidest.',
-    },
-    {
-      q: 'Kann ich jederzeit kündigen?',
-      a: 'Ja, du kannst jederzeit kündigen — ohne Mindestlaufzeit und ohne versteckte Kosten. Bei monatlicher Abrechnung wird die Kündigung zum Ende des laufenden Monats wirksam. Bei jährlicher Abrechnung zum Ende der gebuchten Laufzeit. Du behältst bis dahin vollen Zugriff auf alle Funktionen.',
-    },
-    {
-      q: 'Gibt es einen Rabatt bei jährlicher Zahlung?',
-      a: 'Ja, bei jährlicher Zahlung sparst du 10% gegenüber der monatlichen Abrechnung. Du kannst jederzeit zwischen monatlicher und jährlicher Abrechnung wechseln. Der Wechsel wird zum nächsten Abrechnungszeitraum wirksam.',
-    },
-    {
-      q: 'Was ist ein „Seat" und wie funktioniert das?',
-      a: 'Ein Seat ist ein Benutzerkonto für einen Mitarbeiter deines Teams. Solo beinhaltet 1 Seat (ideal für Einzelmakler), Team beinhaltet 5 Seats (perfekt für kleine bis mittelgroße Büros). Brauchst du mehr als 5 Seats? Dann ist der Enterprise-Plan das Richtige — kontaktiere uns für ein individuelles Angebot.',
-    },
-    {
-      q: 'Welche Zahlungsmethoden werden akzeptiert?',
-      a: 'Die Zahlungsabwicklung erfolgt sicher über Stripe, einen der weltweit führenden Zahlungsdienstleister. Wir akzeptieren Kreditkarte (Visa, Mastercard, Amex), SEPA-Lastschrift und Rechnung. Alle Zahlungsdaten werden verschlüsselt direkt bei Stripe verarbeitet — wir haben keinen Zugriff auf deine Kartendaten.',
-    },
-    {
-      q: 'Kann ich zwischen Plänen wechseln?',
-      a: 'Ja, du kannst jederzeit upgraden oder downgraden. Beim Upgrade wird der neue Preis anteilig berechnet. Beim Downgrade wird die Änderung zum nächsten Abrechnungszeitraum aktiv.',
-    },
-    {
-      q: 'Gibt es eine Einrichtungsgebühr?',
-      a: 'Nein. Es gibt keine Setup-Gebühren, keine Einrichtungskosten und keine versteckten Kosten. Du zahlst nur den monatlichen oder jährlichen Preis deines gewählten Plans.',
-    },
-    {
-      q: 'Ist Immivo DSGVO-konform?',
-      a: 'Ja, vollständig. Wir hosten alle Daten auf AWS EU (Frankfurt). Sämtliche Daten sind im Ruhezustand (AES-256) und bei der Übertragung (TLS/HTTPS) verschlüsselt. Jeder Kunde hat seinen eigenen isolierten Datenbereich (Mandantentrennung). Es findet kein Tracking durch Drittanbieter statt. Detaillierte Informationen findest du in unserer Datenschutzerklärung.',
-    },
-    {
-      q: 'Was ist in der Free-Version enthalten?',
-      a: 'In der kostenlosen Testphase hast du Zugriff auf alle Grundfunktionen: CRM, Lead-Management, Objekte, E-Mail-Anbindung und Kalender. Der KI-Assistent Jarvis und das KI-Bildstudio sind beschränkt nutzbar. Portal-Push (Veröffentlichung auf Immobilienportalen) ist in der Free-Version nicht verfügbar.',
-    },
-  ];
+  const faqs = Array.from({ length: 10 }, (_, i) => ({
+    q: t(`faq.q${i + 1}`),
+    a: t(`faq.a${i + 1}`),
+  }));
 
   return (
     <div className="min-h-screen bg-white">
@@ -198,16 +163,16 @@ export default function PreisePage() {
           className={`max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center ${heroRef.isInView ? 'animate-slide-up' : 'opacity-0'}`}
         >
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-4 sm:mb-6">
-            Einfache, transparente Preise
+            {t('title')}
           </h1>
           <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto mb-6">
-            Keine versteckten Kosten. Keine Überraschungen.
+            {t('subtitle')}
           </p>
 
           {/* Jederzeit kündbar badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-50 text-green-700 text-sm font-medium border border-green-200 mb-8">
             <CheckCircle2 className="w-4 h-4" />
-            Jederzeit kündbar
+            {t('cancelAnytime')}
           </div>
 
           {/* Monthly/Yearly Toggle */}
@@ -215,7 +180,7 @@ export default function PreisePage() {
             <span
               className={`text-sm font-medium ${!yearly ? 'text-gray-900' : 'text-gray-500'}`}
             >
-              Monatlich
+              {t('monthly')}
             </span>
             <button
               type="button"
@@ -235,10 +200,10 @@ export default function PreisePage() {
             <span
               className={`text-sm font-medium ${yearly ? 'text-gray-900' : 'text-gray-500'}`}
             >
-              Jährlich
+              {t('yearly')}
             </span>
             <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">
-              10% Rabatt
+              {t('discount')}
             </span>
           </div>
         </div>
@@ -311,7 +276,7 @@ export default function PreisePage() {
                           plan.popular ? 'text-white' : 'text-gray-900'
                         }`}
                       >
-                        0€
+                        {t('free.price')}
                       </span>
                       <span
                         className={plan.popular ? 'text-gray-300' : 'text-gray-500'}
@@ -327,7 +292,7 @@ export default function PreisePage() {
                           plan.popular ? 'text-white' : 'text-gray-900'
                         }`}
                       >
-                        Auf Anfrage
+                        {t('enterprise.price')}
                       </span>
                       {plan.subtext && (
                         <p
@@ -365,7 +330,7 @@ export default function PreisePage() {
                             plan.popular ? 'text-gray-400' : 'text-gray-400'
                           }`}
                         >
-                          jährlich berechnet
+                          {t('billedYearly')}
                         </p>
                       )}
                       {plan.subtext && plan.price > 0 && (
@@ -434,7 +399,7 @@ export default function PreisePage() {
         >
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-8 sm:mb-12 flex items-center justify-center gap-2">
             <HelpCircle className="w-8 h-8 text-gray-500" />
-            Häufige Fragen
+            {t('faqTitle')}
           </h2>
           <div className="space-y-4 sm:space-y-6">
             {faqs.map((faq, i) => (
@@ -459,7 +424,7 @@ export default function PreisePage() {
       <section className="py-12 sm:py-16 bg-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-gray-600 mb-4">
-            Noch Fragen? Wir helfen dir gerne weiter.
+            {t('stillQuestions')}
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8">
             <a

@@ -18,6 +18,7 @@ import {
   Save,
 } from 'lucide-react';
 import useSWR from 'swr';
+import { useTranslations } from 'next-intl';
 import { getProperties, getImageUrl } from '@/lib/api';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 
@@ -47,6 +48,16 @@ const ROOMS = [
   { id: 'kids room', name: 'Kinderzimmer' },
 ];
 
+const ROOM_TRANSLATION_KEYS: Record<string, string> = {
+  'living room': 'livingRoom',
+  'bedroom': 'bedroom',
+  'kitchen': 'kitchen',
+  'dining room': 'diningRoom',
+  'home office': 'homeOffice',
+  'bathroom': 'bathroom',
+  'kids room': 'kidsRoom',
+};
+
 // Compress image to max dimension and JPEG quality
 function compressImage(dataUrl: string, maxDim = 2048, quality = 0.85): Promise<{ compressed: string; width: number; height: number }> {
   return new Promise((resolve) => {
@@ -71,7 +82,7 @@ function compressImage(dataUrl: string, maxDim = 2048, quality = 0.85): Promise<
 }
 
 // Before/After Slider component
-function BeforeAfterSlider({ before, after }: { before: string; after: string }) {
+function BeforeAfterSlider({ before, after, beforeLabel, afterLabel }: { before: string; after: string; beforeLabel: string; afterLabel: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [sliderPos, setSliderPos] = useState(50);
   const isDragging = useRef(false);
@@ -115,11 +126,11 @@ function BeforeAfterSlider({ before, after }: { before: string; after: string })
       onClick={(e) => updatePosition(e.clientX)}
     >
       {/* After image: full width, sets the container height */}
-      <img src={after} alt="Nachher" className="w-full h-auto block" draggable={false} />
+      <img src={after} alt={afterLabel} className="w-full h-auto block" draggable={false} />
       {/* Before image: absolutely positioned, same size, clipped by width */}
       <div className="absolute inset-0 overflow-hidden" style={{ clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }}>
         <img 
-          src={before} alt="Vorher" className="absolute inset-0 w-full h-full object-cover"
+          src={before} alt={beforeLabel} className="absolute inset-0 w-full h-full object-cover"
           draggable={false}
         />
       </div>
@@ -129,13 +140,14 @@ function BeforeAfterSlider({ before, after }: { before: string; after: string })
           <GripVertical className="w-4 h-4 text-gray-600" />
         </div>
       </div>
-      <div className="absolute top-3 left-3 bg-black/60 text-white text-[10px] font-semibold px-2 py-1 rounded-md uppercase tracking-wider">Vorher</div>
-      <div className="absolute top-3 right-3 bg-black/60 text-white text-[10px] font-semibold px-2 py-1 rounded-md uppercase tracking-wider">Nachher</div>
+      <div className="absolute top-3 left-3 bg-black/60 text-white text-[10px] font-semibold px-2 py-1 rounded-md uppercase tracking-wider">{beforeLabel}</div>
+      <div className="absolute top-3 right-3 bg-black/60 text-white text-[10px] font-semibold px-2 py-1 rounded-md uppercase tracking-wider">{afterLabel}</div>
     </div>
   );
 }
 
 export default function ImageStudioPage() {
+  const t = useTranslations('imageStudio');
   const { data: properties = [] } = useSWR<Property[]>('/properties', getProperties);
   
   const [originalImage, setOriginalImage] = useState<string | null>(null);
@@ -288,14 +300,14 @@ export default function ImageStudioPage() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Bildbearbeitung fehlgeschlagen');
+        throw new Error(data.error || t('errorGeneric'));
       }
 
       const data = await response.json();
       setResultImage(data.image);
     } catch (err: any) {
       console.error('Image studio error:', err);
-      setError(err.message || 'Die Bildbearbeitung ist fehlgeschlagen.');
+      setError(err.message || t('errorFailed'));
     } finally {
       setIsProcessing(false);
     }
@@ -381,7 +393,7 @@ export default function ImageStudioPage() {
         <div className="p-4 2xl:p-5 space-y-5 flex-1">
           {/* Image Source */}
           <div>
-            <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Bild</h3>
+            <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">{t('sections.image')}</h3>
             
             {/* Current image info */}
             {originalImage && (
@@ -389,7 +401,7 @@ export default function ImageStudioPage() {
                 <img src={originalImage} alt="" className="w-10 h-10 rounded object-cover" />
                 <div className="flex-1 min-w-0">
                   <p className="text-[11px] font-medium text-gray-700 truncate">
-                    {selectedProperty?.title || 'Hochgeladen'}
+                    {selectedProperty?.title || t('uploaded')}
                   </p>
                   {imageDimensions && (
                     <p className="text-[10px] text-gray-400">{imageDimensions.width} x {imageDimensions.height}px</p>
@@ -410,7 +422,7 @@ export default function ImageStudioPage() {
                 >
                   <div className="flex items-center gap-2">
                     <Building2 className="w-3.5 h-3.5 text-gray-400" />
-                    <span className="text-gray-600">Aus Objekt wählen</span>
+                    <span className="text-gray-600">{t('selectFromProperty')}</span>
                   </div>
                   <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showPropertyDropdown ? 'rotate-180' : ''}`} />
                 </button>
@@ -420,7 +432,7 @@ export default function ImageStudioPage() {
                     {properties.filter(p => p.images && p.images.length > 0).length === 0 ? (
                       <div className="p-4 text-center text-gray-400 text-xs">
                         <ImageIcon className="w-6 h-6 mx-auto mb-1.5 text-gray-300" />
-                        Keine Objekte mit Bildern
+                        {t('noPropertiesWithImages')}
                       </div>
                     ) : (
                       properties.filter(p => p.images && p.images.length > 0).map((property) => (
@@ -468,7 +480,7 @@ export default function ImageStudioPage() {
               className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 border border-dashed border-gray-200 rounded-lg text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 hover:bg-gray-50/50 transition-all"
             >
               <Upload className="w-3.5 h-3.5" />
-              {originalImage ? 'Anderes Bild' : 'Foto hochladen'}
+              {originalImage ? t('changeImage') : t('uploadPhoto')}
             </button>
             <input
               ref={fileInputRef}
@@ -485,10 +497,10 @@ export default function ImageStudioPage() {
           {/* Style Selection */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Stil</h3>
+              <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{t('sections.style')}</h3>
               {selectedStyle && (
                 <button onClick={() => setSelectedStyle(null)} className="text-[10px] text-gray-400 hover:text-gray-600">
-                  Zurücksetzen
+                  {t('reset')}
                 </button>
               )}
             </div>
@@ -503,8 +515,8 @@ export default function ImageStudioPage() {
                       : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'
                   }`}
                 >
-                  <span className="text-xs font-medium block">{style.name}</span>
-                  <span className={`text-[10px] block ${selectedStyle?.id === style.id ? 'text-gray-300' : 'text-gray-400'}`}>{style.desc}</span>
+                  <span className="text-xs font-medium block">{t(`styles.${style.id}.name`)}</span>
+                  <span className={`text-[10px] block ${selectedStyle?.id === style.id ? 'text-gray-300' : 'text-gray-400'}`}>{t(`styles.${style.id}.desc`)}</span>
                 </button>
               ))}
             </div>
@@ -513,10 +525,10 @@ export default function ImageStudioPage() {
           {/* Room Type */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Raumtyp</h3>
+              <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{t('sections.roomType')}</h3>
               {selectedRoom && (
                 <button onClick={() => setSelectedRoom(null)} className="text-[10px] text-gray-400 hover:text-gray-600">
-                  Zurücksetzen
+                  {t('reset')}
                 </button>
               )}
             </div>
@@ -531,7 +543,7 @@ export default function ImageStudioPage() {
                       : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-100'
                   }`}
                 >
-                  {room.name}
+                  {t(`rooms.${ROOM_TRANSLATION_KEYS[room.id]}`)}
                 </button>
               ))}
             </div>
@@ -540,12 +552,12 @@ export default function ImageStudioPage() {
           {/* Custom Prompt */}
           <div>
             <h3 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
-              Anweisung <span className="font-normal normal-case text-gray-400">(optional)</span>
+              {t('sections.prompt')} <span className="font-normal normal-case text-gray-400">{t('optional')}</span>
             </h3>
             <textarea
               value={customPrompt}
               onChange={(e) => setCustomPrompt(e.target.value)}
-              placeholder="z.B. Graues Sofa, Holztisch, warme Beleuchtung..."
+              placeholder={t('promptPlaceholder')}
               rows={3}
               className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-xs text-gray-900 placeholder-gray-400 resize-none"
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && hasSelection && !isProcessing && originalImage) { e.preventDefault(); handleGenerate(); } }}
@@ -559,7 +571,7 @@ export default function ImageStudioPage() {
           {!hasSelection && originalImage && (
             <p className="text-[10px] text-amber-600 flex items-center gap-1">
               <AlertTriangle className="w-3 h-3 shrink-0" />
-              Wähle einen Stil, Raumtyp oder gib eine Anweisung ein.
+              {t('validationHint')}
             </p>
           )}
 
@@ -582,12 +594,12 @@ export default function ImageStudioPage() {
             {isProcessing ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Generiere... {elapsed}s
+                {t('generateProcessing', { elapsed })}
               </>
             ) : (
               <>
                 <Wand2 className="w-4 h-4" />
-                Generieren
+                {t('generate')}
               </>
             )}
           </button>
@@ -595,7 +607,7 @@ export default function ImageStudioPage() {
           
 
           <p className="text-[9px] text-gray-300 text-center">
-            Bilder auf max. 2048px komprimiert
+            {t('compressionInfo')}
           </p>
         </div>
       </div>
@@ -613,8 +625,8 @@ export default function ImageStudioPage() {
             className="w-full max-w-2xl aspect-[4/3] border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 hover:bg-white/60 transition-all group"
           >
             <Upload className="w-12 h-12 text-gray-200 group-hover:text-gray-400 mb-4 transition-colors" />
-            <p className="text-sm font-medium text-gray-400 group-hover:text-gray-600 transition-colors">Foto hierher ziehen oder klicken</p>
-            <p className="text-xs text-gray-300 mt-1">JPG, PNG, WebP</p>
+            <p className="text-sm font-medium text-gray-400 group-hover:text-gray-600 transition-colors">{t('uploadPrompt')}</p>
+            <p className="text-xs text-gray-300 mt-1">{t('fileTypes')}</p>
           </div>
         )}
 
@@ -639,8 +651,8 @@ export default function ImageStudioPage() {
                     style={{ width: `${Math.min((elapsed / 25) * 100, 95)}%` }}
                   />
                 </div>
-                <p className="text-base font-semibold text-gray-900">KI platziert Möbel...</p>
-                <p className="text-sm text-gray-500 mt-1">{elapsed}s · ca. 10–20 Sekunden</p>
+                <p className="text-base font-semibold text-gray-900">{t('processing')}</p>
+                <p className="text-sm text-gray-500 mt-1">{t('processingTime', { elapsed })}</p>
               </div>
             </div>
           </div>
@@ -649,7 +661,7 @@ export default function ImageStudioPage() {
         {/* Result: Before/After + Action Buttons */}
         {resultImage && originalImage && !isProcessing && (
           <div className="w-full max-w-2xl">
-            <BeforeAfterSlider before={originalImage} after={resultImage} />
+            <BeforeAfterSlider before={originalImage} after={resultImage} beforeLabel={t('before')} afterLabel={t('after')} />
             
             {/* Action buttons below the image */}
             <div className="flex items-center gap-2 mt-4">
@@ -658,14 +670,14 @@ export default function ImageStudioPage() {
                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                Nochmal
+                {t('regenerate')}
               </button>
               <button
                 onClick={handleDownload}
                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 <Download className="w-3.5 h-3.5" />
-                Download
+                {t('download')}
               </button>
 
               {/* Save to property */}
@@ -680,9 +692,9 @@ export default function ImageStudioPage() {
                     }`}
                   >
                     {savedToProperty === selectedProperty.id ? (
-                      <><Check className="w-3.5 h-3.5" /> Gespeichert</>
+                      <><Check className="w-3.5 h-3.5" /> {t('saved')}</>
                     ) : (
-                      <><Save className="w-3.5 h-3.5" /> Zu &quot;{selectedProperty.title.length > 20 ? selectedProperty.title.slice(0, 20) + '...' : selectedProperty.title}&quot; hinzufügen</>
+                      <><Save className="w-3.5 h-3.5" /> {t('addToProperty', { title: selectedProperty.title.length > 20 ? selectedProperty.title.slice(0, 20) + '...' : selectedProperty.title })}</>
                     )}
                   </button>
                 ) : (
@@ -696,17 +708,17 @@ export default function ImageStudioPage() {
                       }`}
                     >
                       {savedToProperty ? (
-                        <><Check className="w-3.5 h-3.5" /> Gespeichert</>
+                        <><Check className="w-3.5 h-3.5" /> {t('saved')}</>
                       ) : (
-                        <><Building2 className="w-3.5 h-3.5" /> Objekt hinzufügen</>
+                        <><Building2 className="w-3.5 h-3.5" /> {t('addToPropertyShort')}</>
                       )}
                     </button>
                     {showSaveDropdown && (
                       <div className="absolute bottom-full right-0 mb-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 max-h-[300px] overflow-y-auto z-30">
                         <div className="p-2">
-                          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider px-2 py-1">Bild speichern zu...</p>
+                          <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider px-2 py-1">{t('saveToHeading')}</p>
                           {properties.length === 0 ? (
-                            <p className="text-xs text-gray-400 p-3 text-center">Keine Objekte vorhanden</p>
+                            <p className="text-xs text-gray-400 p-3 text-center">{t('noProperties')}</p>
                           ) : (
                             properties.map((property) => (
                               <button
@@ -739,7 +751,7 @@ export default function ImageStudioPage() {
               <img src={originalImage} alt="Original" className="w-full h-auto" />
             </div>
             <p className="text-[10px] text-gray-400 text-center mt-3">
-              Wähle links Stil und Raumtyp, dann klicke auf Generieren.
+              {t('hint')}
             </p>
           </div>
         )}

@@ -235,7 +235,7 @@ async function initializePrisma() {
 // Auto-migration: Apply missing columns/tables that exist in Prisma schema but not in DB
 // Each statement uses IF NOT EXISTS / IF EXISTS so it's safe to run multiple times
 // Version-gated: Only runs full migration set when version changes
-const MIGRATION_VERSION = 11; // Increment when adding new migrations
+const MIGRATION_VERSION = 12; // Increment when adding new migrations
 let _migrationsApplied = false;
 
 async function applyPendingMigrations(db: PrismaClient) {
@@ -386,6 +386,8 @@ async function applyPendingMigrations(db: PrismaClient) {
     // 2026-02-16: AI Disclosure + Cost Cap
     'ALTER TABLE "TenantSettings" ADD COLUMN IF NOT EXISTS "aiDisclosureEnabled" BOOLEAN NOT NULL DEFAULT true',
     'ALTER TABLE "TenantSettings" ADD COLUMN IF NOT EXISTS "aiCostCapCentsUsd" DOUBLE PRECISION NOT NULL DEFAULT 2000',
+    // 2026-02-16: Per-seat language preference
+    'ALTER TABLE "UserSettings" ADD COLUMN IF NOT EXISTS "locale" TEXT NOT NULL DEFAULT \'de\'',
   ];
   
   for (const sql of migrations) {
@@ -1201,6 +1203,7 @@ app.get('/me/settings', authMiddleware, async (req: any, res) => {
       emailNotifications: settings.emailNotifications,
       emailSignature: (settings as any).emailSignature,
       emailSignatureName: (settings as any).emailSignatureName,
+      locale: (settings as any).locale || 'de',
       viewingPreferences: {
         enabled: settings.viewingHoursEnabled,
         weekdays: settings.viewingDays || [1, 2, 3, 4, 5],
@@ -1227,10 +1230,13 @@ app.put('/me/settings', authMiddleware, async (req: any, res) => {
     const user = await db.user.findUnique({ where: { email: req.user!.email } });
     if (!user) return res.status(404).json({ error: 'User not found' });
     
-    const { emailNotifications, viewingPreferences, emailSignature, emailSignatureName } = req.body;
+    const { emailNotifications, viewingPreferences, emailSignature, emailSignatureName, locale } = req.body;
 
     // Transform from frontend format to DB format
     const updateData: any = {};
+    if (locale !== undefined) {
+      updateData.locale = locale;
+    }
     if (emailNotifications !== undefined) {
       updateData.emailNotifications = emailNotifications;
     }
@@ -3978,8 +3984,8 @@ app.post('/channels/:channelId/messages', authMiddleware, async (req, res) => {
     // Respond immediately — then handle @jarvis in the background
     res.json(message);
 
-    // Check if @jarvis was mentioned (either as @[Jarvis](jarvis) or plain @jarvis)
-    const jarvisMentioned = /(@jarvis|@\[jarvis\])/i.test(content);
+    // Check if @jarvis was mentioned (as @[Jarvis](jarvis), plain @jarvis, or @Jarvis)
+    const jarvisMentioned = /(@\[Jarvis\]\([^)]*\)|@jarvis\b)/i.test(content);
     if (jarvisMentioned) {
       // Fire-and-forget: generate Jarvis response asynchronously
       (async () => {
@@ -3999,8 +4005,8 @@ app.post('/channels/:channelId/messages', authMiddleware, async (req, res) => {
             content: `${m.isJarvis ? 'Jarvis' : `${m.user.firstName || ''} ${m.user.lastName || ''}`.trim()}: ${m.content}`,
           }));
 
-          // Strip the @jarvis mention from the actual question
-          const cleanContent = content.replace(/@\[Jarvis\]\([^)]*\)/gi, '').replace(/@jarvis/gi, '').trim();
+          // Strip all forms of @jarvis mention from the actual question
+          const cleanContent = content.replace(/@\[Jarvis\]\([^)]*\)/gi, '').replace(/@jarvis\b/gi, '').trim();
 
           const openai = new OpenAIService();
           const jarvisResponse = await openai.chat(
@@ -9659,16 +9665,19 @@ app.get('/admin/finance/summary', adminAuthMiddleware, async (req, res) => {
     const aiSummary = await AiCostService.getSummary(from, to);
     
     // AWS costs from Cost Explorer (24h delay)
+    // Cost Explorer is a global billing service — always use us-east-1
     let awsCosts: any = null;
     try {
       const { CostExplorerClient, GetCostAndUsageCommand } = await import('@aws-sdk/client-cost-explorer');
-      const ceClient = new CostExplorerClient({ region: process.env.AWS_REGION || 'eu-central-1' });
+      const ceClient = new CostExplorerClient({ region: 'us-east-1' });
       
       const awsFrom = from.toISOString().split('T')[0];
       // AWS Cost Explorer end date is EXCLUSIVE — add 1 day
       const endDate = new Date(to);
       endDate.setDate(endDate.getDate() + 1);
       const awsTo = endDate.toISOString().split('T')[0];
+
+      console.log(`📊 Cost Explorer query: ${awsFrom} → ${awsTo} (MONTHLY)`);
       
       const awsResult = await ceClient.send(new GetCostAndUsageCommand({
         TimePeriod: { Start: awsFrom, End: awsTo },
@@ -9676,6 +9685,8 @@ app.get('/admin/finance/summary', adminAuthMiddleware, async (req, res) => {
         Metrics: ['UnblendedCost'],
         GroupBy: [{ Type: 'DIMENSION', Key: 'SERVICE' }],
       }));
+
+      console.log(`📊 Cost Explorer response: ${awsResult.ResultsByTime?.length || 0} periods, ${awsResult.ResultsByTime?.reduce((sum, p) => sum + (p.Groups?.length || 0), 0) || 0} groups`);
       
       const services: Record<string, number> = {};
       let totalAwsCents = 0;
@@ -9689,8 +9700,17 @@ app.get('/admin/finance/summary', adminAuthMiddleware, async (req, res) => {
           totalAwsCents += cents;
         }
       }
-      
-      awsCosts = { totalCents: totalAwsCents, byService: services };
+
+      console.log(`📊 Cost Explorer total: $${(totalAwsCents / 100).toFixed(2)} across ${Object.keys(services).length} services`);
+
+      // Detect if Cost Explorer was recently enabled (all periods show "Estimated" with $0)
+      const allEstimated = awsResult.ResultsByTime?.every(p => p.Estimated === true);
+      if (totalAwsCents < 1 && allEstimated && Object.keys(services).length > 0) {
+        console.log('⚠️ Cost Explorer appears recently enabled — data not yet processed');
+        awsCosts = { totalCents: 0, byService: {}, error: 'Cost Explorer wurde kürzlich aktiviert. Kostendaten werden innerhalb von 24h verfügbar (Billing > Cost Explorer > "Launch Cost Explorer" in der AWS Console).' };
+      } else {
+        awsCosts = { totalCents: totalAwsCents, byService: services };
+      }
     } catch (awsErr: any) {
       console.error('❌ AWS Cost Explorer error:', awsErr.name, awsErr.message);
       const errorDetail = awsErr.name === 'AccessDeniedException' 
@@ -9765,13 +9785,14 @@ app.get('/admin/finance/ai-costs', adminAuthMiddleware, async (req, res) => {
 });
 
 // GET /admin/finance/aws-costs — AWS costs by service (24h delay)
+// Cost Explorer is a global billing service — always use us-east-1
 app.get('/admin/finance/aws-costs', adminAuthMiddleware, async (req, res) => {
   try {
     const { from, to } = parseFinanceDateRange(req.query);
     const granularity = (req.query.granularity as string) === 'DAILY' ? 'DAILY' : 'MONTHLY';
     
     const { CostExplorerClient, GetCostAndUsageCommand } = await import('@aws-sdk/client-cost-explorer');
-    const ceClient = new CostExplorerClient({ region: process.env.AWS_REGION || 'eu-central-1' });
+    const ceClient = new CostExplorerClient({ region: 'us-east-1' });
     
     const awsFrom = from.toISOString().split('T')[0];
     // AWS Cost Explorer end date is exclusive, add 1 day
@@ -9779,12 +9800,16 @@ app.get('/admin/finance/aws-costs', adminAuthMiddleware, async (req, res) => {
     endDate.setDate(endDate.getDate() + 1);
     const awsTo = endDate.toISOString().split('T')[0];
     
+    console.log(`📊 AWS costs query: ${awsFrom} → ${awsTo} (${granularity})`);
+    
     const result = await ceClient.send(new GetCostAndUsageCommand({
       TimePeriod: { Start: awsFrom, End: awsTo },
       Granularity: granularity as any,
       Metrics: ['UnblendedCost', 'UsageQuantity'],
       GroupBy: [{ Type: 'DIMENSION', Key: 'SERVICE' }],
     }));
+
+    console.log(`📊 AWS costs response: ${result.ResultsByTime?.length || 0} periods, ${result.ResultsByTime?.reduce((sum, p) => sum + (p.Groups?.length || 0), 0) || 0} groups`);
     
     const periods: { start: string; end: string; services: Record<string, { cost: number; usage: number }> }[] = [];
     let totalCostCents = 0;
@@ -9807,6 +9832,20 @@ app.get('/admin/finance/aws-costs', adminAuthMiddleware, async (req, res) => {
       });
     }
     
+    // Detect if Cost Explorer was recently enabled (all periods show "Estimated" with $0)
+    const allEstimated = result.ResultsByTime?.every(p => p.Estimated === true);
+    const hasGroups = result.ResultsByTime?.some(p => (p.Groups?.length || 0) > 0);
+    if (totalCostCents < 1 && allEstimated && hasGroups) {
+      res.json({
+        totalCostCents: 0,
+        totalCostUsd: 0,
+        serviceBreakdown: {},
+        periods: [],
+        error: 'Cost Explorer wurde kürzlich aktiviert. Kostendaten werden innerhalb von 24h verfügbar (Billing > Cost Explorer > "Launch Cost Explorer" in der AWS Console).',
+      });
+      return;
+    }
+
     res.json({
       period: { from: awsFrom, to: awsTo },
       granularity,

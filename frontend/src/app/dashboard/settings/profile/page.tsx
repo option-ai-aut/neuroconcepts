@@ -1,13 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { User, Mail, Plus, Trash2, Shield, Eye, EyeOff, Key, Loader2, Download, AlertTriangle } from 'lucide-react';
 import { getMe, getSeats, inviteSeat, deleteSeat, getAuthHeaders } from '@/lib/api';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 import { updatePassword, signOut, fetchAuthSession } from 'aws-amplify/auth';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 import useSWR from 'swr';
 
 export default function ProfileSettingsPage() {
+  const t = useTranslations('settings');
+  const tAuth = useTranslations('auth');
+  const tCommon = useTranslations('common');
+
   const { data: user, mutate: mutateUser } = useSWR('/me', getMe);
   const { data: seats = [], mutate: mutateSeats } = useSWR('/seats', getSeats);
 
@@ -55,20 +61,20 @@ export default function ProfileSettingsPage() {
       setNewSeatEmail('');
       setIsInviteOpen(false);
       mutateSeats();
-      alert('Einladung gesendet!');
+      alert(t('messages.inviteSent'));
     } catch (error) {
-      alert('Fehler beim Einladen: ' + error);
+      alert(t('messages.inviteError') + error);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Möchten Sie diesen Nutzer wirklich entfernen?')) {
+    if (confirm(t('messages.confirmRemoveUser'))) {
       try {
         await deleteSeat(id);
         mutateSeats();
-        alert('Nutzer erfolgreich entfernt!');
+        alert(t('messages.userRemoved'));
       } catch (error: any) {
-        alert('Fehler beim Entfernen: ' + (error.message || 'Unbekannter Fehler'));
+        alert(t('messages.removeError') + (error.message || ''));
       }
     }
   };
@@ -95,16 +101,16 @@ export default function ProfileSettingsPage() {
       });
 
       if (response.ok) {
-        mutateUser(); // Refresh user data
+        mutateUser();
         setIsEditingProfile(false);
-        alert('Profil erfolgreich gespeichert!');
+        alert(t('messages.profileSaved'));
       } else {
         const error = await response.json();
-        alert('Fehler beim Speichern: ' + (error.error || 'Unbekannter Fehler'));
+        alert(t('messages.saveError') + (error.error || ''));
       }
     } catch (error) {
       console.error('Error saving profile:', error);
-      alert('Fehler beim Speichern des Profils');
+      alert(t('messages.saveProfileError'));
     }
   };
 
@@ -125,7 +131,7 @@ export default function ProfileSettingsPage() {
       const response = await fetch(`${config.apiUrl}/account/export`, {
         headers: authHeaders as Record<string, string>,
       });
-      if (!response.ok) throw new Error('Export fehlgeschlagen');
+      if (!response.ok) throw new Error(t('messages.exportFailed'));
       
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -138,14 +144,14 @@ export default function ProfileSettingsPage() {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Export error:', error);
-      alert('Fehler beim Datenexport. Bitte versuchen Sie es erneut.');
+      alert(t('messages.exportError'));
     } finally {
       setIsExporting(false);
     }
   };
 
   const handleDeleteAccount = async () => {
-    if (deleteConfirmText !== 'LÖSCHEN') return;
+    if (deleteConfirmText !== t('privacy.deleteConfirmWord')) return;
     setIsDeleting(true);
     try {
       const config = getRuntimeConfig();
@@ -157,7 +163,7 @@ export default function ProfileSettingsPage() {
       
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Löschung fehlgeschlagen');
+        throw new Error(data.error || t('messages.exportFailed'));
       }
       
       // Sign out and redirect
@@ -165,7 +171,7 @@ export default function ProfileSettingsPage() {
       window.location.href = '/';
     } catch (error: any) {
       console.error('Delete error:', error);
-      alert(error.message || 'Fehler beim Löschen des Kontos.');
+      alert(error.message || t('messages.saveProfileError'));
     } finally {
       setIsDeleting(false);
     }
@@ -176,11 +182,11 @@ export default function ProfileSettingsPage() {
     setPasswordError('');
     
     if (newPassword !== confirmPassword) {
-      setPasswordError('Passwörter stimmen nicht überein!');
+      setPasswordError(t('messages.passwordMismatch'));
       return;
     }
     if (newPassword.length < 8) {
-      setPasswordError('Passwort muss mindestens 8 Zeichen lang sein!');
+      setPasswordError(t('messages.passwordTooShort'));
       return;
     }
     
@@ -195,35 +201,33 @@ export default function ProfileSettingsPage() {
       });
       
       // Force sign out so user must re-login with new password
-      // This ensures the new password is definitely active
       await signOut();
       window.location.href = '/login';
     } catch (error: any) {
       console.error('Password change error:', error);
       if (error.name === 'NotAuthorizedException') {
-        setPasswordError('Das aktuelle Passwort ist falsch.');
+        setPasswordError(t('messages.wrongPassword'));
       } else if (error.name === 'InvalidPasswordException') {
-        setPasswordError('Das neue Passwort erfüllt nicht die Anforderungen (mind. 8 Zeichen, Groß-/Kleinbuchstaben, Zahlen).');
+        setPasswordError(t('messages.passwordRequirements'));
       } else if (error.name === 'LimitExceededException') {
-        setPasswordError('Zu viele Versuche. Bitte warte einen Moment.');
+        setPasswordError(t('messages.tooManyAttempts'));
       } else {
-        // Strip "Password does not conform to policy: " prefix
         const cleanMsg = (error.message || '').replace(/^Password does not conform to policy:\s*/i, '');
-        setPasswordError(cleanMsg || 'Fehler beim Ändern des Passworts.');
+        setPasswordError(cleanMsg || t('messages.changePasswordError'));
       }
       setChangingPassword(false);
     }
   };
 
-  if (!user) return <div className="p-8 text-center text-gray-500">Laden...</div>;
+  if (!user) return <div className="p-8 text-center text-gray-500">{tCommon('loading')}</div>;
 
   return (
     <div className="space-y-10">
       {/* Personal Profile */}
       <div>
-        <h2 className="text-base font-semibold text-gray-900 mb-1">Mein Profil</h2>
+        <h2 className="text-base font-semibold text-gray-900 mb-1">{t('profile.title')}</h2>
         <p className="text-sm text-gray-500 mb-6">
-          Ihre persönlichen Einstellungen und Login-Daten.
+          {t('profile.subtitle')}
         </p>
         
         <div className="bg-white border border-gray-200 rounded-xl p-6">
@@ -247,7 +251,7 @@ export default function ProfileSettingsPage() {
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Vorname</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('profile.firstName')}</label>
                 <input 
                   type="text" 
                   value={firstName || user.firstName || ''} 
@@ -256,7 +260,7 @@ export default function ProfileSettingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nachname</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('profile.lastName')}</label>
                 <input 
                   type="text" 
                   value={lastName || user.lastName || ''} 
@@ -268,7 +272,7 @@ export default function ProfileSettingsPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">E-Mail Adresse</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('profile.email')}</label>
                 <input 
                   type="email" 
                   value={email || user.email || ''} 
@@ -277,7 +281,7 @@ export default function ProfileSettingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Telefonnummer</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('profile.phone')}</label>
                 <input 
                   type="tel" 
                   value={phone || user.phone || ''} 
@@ -288,10 +292,10 @@ export default function ProfileSettingsPage() {
             </div>
 
             <div className="border-t border-gray-200 pt-6">
-              <h4 className="text-sm font-medium text-gray-900 mb-4">Adresse</h4>
+              <h4 className="text-sm font-medium text-gray-900 mb-4">{t('profile.address')}</h4>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Straße & Hausnummer</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('profile.street')}</label>
                   <input 
                     type="text" 
                     value={street || user.street || ''} 
@@ -301,7 +305,7 @@ export default function ProfileSettingsPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">PLZ</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('profile.zip')}</label>
                     <input 
                       type="text" 
                       value={postalCode || user.postalCode || ''} 
@@ -310,7 +314,7 @@ export default function ProfileSettingsPage() {
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Stadt</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('profile.city')}</label>
                     <input 
                       type="text" 
                       value={city || user.city || ''} 
@@ -320,16 +324,16 @@ export default function ProfileSettingsPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Land</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('profile.country')}</label>
                   <select 
                     value={country || user.country || ''} 
                     onChange={(e) => { setCountry(e.target.value); setIsEditingProfile(true); }}
                     className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">Bitte wählen</option>
-                    <option value="DE">Deutschland</option>
-                    <option value="AT">Österreich</option>
-                    <option value="CH">Schweiz</option>
+                    <option value="">{t('profile.selectCountry')}</option>
+                    <option value="DE">{tAuth('countries.germany')}</option>
+                    <option value="AT">{tAuth('countries.austria')}</option>
+                    <option value="CH">{tAuth('countries.switzerland')}</option>
                   </select>
                 </div>
               </div>
@@ -342,14 +346,14 @@ export default function ProfileSettingsPage() {
               className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"
             >
               <Key className="w-4 h-4" />
-              Passwort ändern
+              {t('profile.changePassword')}
             </button>
             {isEditingProfile && (
               <button 
                 onClick={handleSaveProfile}
                 className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800"
               >
-                Speichern
+                {tCommon('save')}
               </button>
             )}
           </div>
@@ -360,7 +364,7 @@ export default function ProfileSettingsPage() {
       {isChangingPassword && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Passwort ändern</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('profile.changePassword')}</h3>
             <form onSubmit={handleChangePassword} className="space-y-4">
               {passwordError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -368,7 +372,7 @@ export default function ProfileSettingsPage() {
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Aktuelles Passwort</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('profile.currentPassword')}</label>
                 <div className="relative">
                   <input 
                     type={showCurrentPassword ? 'text' : 'password'}
@@ -388,7 +392,7 @@ export default function ProfileSettingsPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Neues Passwort</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('profile.newPassword')}</label>
                 <div className="relative">
                   <input 
                     type={showNewPassword ? 'text' : 'password'}
@@ -407,10 +411,10 @@ export default function ProfileSettingsPage() {
                     {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Mind. 8 Zeichen, Groß-/Kleinbuchstaben und Zahlen</p>
+                <p className="text-xs text-gray-500 mt-1">{t('profile.passwordRequirements')}</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Passwort bestätigen</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('profile.confirmPassword')}</label>
                 <input 
                   type="password"
                   value={confirmPassword}
@@ -433,7 +437,7 @@ export default function ProfileSettingsPage() {
                   disabled={changingPassword}
                   className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                 >
-                  Abbrechen
+                  {tCommon('cancel')}
                 </button>
                 <button 
                   type="submit"
@@ -441,7 +445,7 @@ export default function ProfileSettingsPage() {
                   className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50 flex items-center gap-2"
                 >
                   {changingPassword && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {changingPassword ? 'Wird geändert...' : 'Passwort ändern'}
+                  {changingPassword ? t('profile.changingPassword') : t('profile.changePassword')}
                 </button>
               </div>
             </form>
@@ -449,14 +453,21 @@ export default function ProfileSettingsPage() {
         </div>
       )}
 
+      {/* Language */}
+      <div className="mt-8">
+        <label className="block text-sm font-medium text-gray-700 mb-1">{t('profile.language')}</label>
+        <p className="text-sm text-gray-500 mb-2">{t('profile.languageDesc')}</p>
+        <LanguageSwitcher variant="dropdown" persistToDb />
+      </div>
+
       {/* Team Management (Seats) - Only for Admins */}
       {(user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') && (
       <div className="border-t border-gray-200 pt-8">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-base font-semibold text-gray-900 mb-1">Team & Seats</h2>
+            <h2 className="text-base font-semibold text-gray-900 mb-1">{t('team.title')}</h2>
             <p className="text-sm text-gray-500">
-              Verwalten Sie Zugänge für Ihre Mitarbeiter. Jeder Seat hat seinen eigenen Login.
+              {t('team.subtitle')}
             </p>
           </div>
           <button 
@@ -464,14 +475,14 @@ export default function ProfileSettingsPage() {
             className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 flex items-center shadow-sm"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Mitarbeiter einladen
+            {t('team.inviteEmployee')}
           </button>
         </div>
 
         {isInviteOpen && (
           <form onSubmit={handleInvite} className="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200 flex items-end gap-4 animate-in fade-in slide-in-from-top-2">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">E-Mail Adresse des Mitarbeiters</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('team.employeeEmail')}</label>
               <input 
                 type="email" 
                 required
@@ -482,19 +493,19 @@ export default function ProfileSettingsPage() {
               />
             </div>
             <div className="w-40">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Rolle</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('team.role')}</label>
               <select 
                 value={newSeatRole}
                 onChange={(e) => setNewSeatRole(e.target.value)}
                 className="block w-full border border-gray-300 rounded-lg shadow-sm p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="AGENT">Agent</option>
-                <option value="ADMIN">Admin</option>
+                <option value="AGENT">{t('team.agent')}</option>
+                <option value="ADMIN">{t('team.admin')}</option>
               </select>
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={() => setIsInviteOpen(false)} className="px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100">Abbrechen</button>
-              <button type="submit" className="bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800">Einladen</button>
+              <button type="button" onClick={() => setIsInviteOpen(false)} className="px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100">{tCommon('cancel')}</button>
+              <button type="submit" className="bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800">{t('team.invite')}</button>
             </div>
           </form>
         )}
@@ -503,10 +514,10 @@ export default function ProfileSettingsPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rolle</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Aktion</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('team.name')}</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('team.role')}</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('team.status')}</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{t('team.action')}</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -524,7 +535,7 @@ export default function ProfileSettingsPage() {
                       <div>
                         <div className="text-sm font-medium text-gray-900">
                           {isPending ? (
-                            <span className="text-yellow-700 italic">Einladung ausstehend</span>
+                            <span className="text-yellow-700 italic">{t('team.invitationPending')}</span>
                           ) : (
                             `${seat.firstName} ${seat.lastName}`
                           )}
@@ -543,7 +554,7 @@ export default function ProfileSettingsPage() {
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       isPending ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
                     }`}>
-                      {isPending ? 'Eingeladen' : 'Aktiv'}
+                      {isPending ? t('team.invited') : t('team.active')}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -551,7 +562,7 @@ export default function ProfileSettingsPage() {
                       <button 
                         onClick={() => handleDelete(seat.id)}
                         className="text-red-600 hover:text-red-900 p-1 hover:bg-red-50 rounded-lg"
-                        title={isPending ? 'Einladung zurückziehen' : 'Nutzer entfernen'}
+                        title={isPending ? t('team.revokeInvitation') : t('team.removeUser')}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -567,18 +578,18 @@ export default function ProfileSettingsPage() {
 
       {/* DSGVO: Data Export & Account Deletion */}
       <div className="border-t border-gray-200 pt-8">
-        <h2 className="text-base font-semibold text-gray-900 mb-1">Datenschutz & Konto</h2>
+        <h2 className="text-base font-semibold text-gray-900 mb-1">{t('privacy.title')}</h2>
         <p className="text-sm text-gray-500 mb-6">
-          Gemäß DSGVO haben Sie das Recht auf Datenexport und Löschung Ihres Kontos.
+          {t('privacy.subtitle')}
         </p>
         
         <div className="space-y-4">
           {/* Data Export */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-medium text-gray-900">Meine Daten exportieren</h3>
+              <h3 className="text-sm font-medium text-gray-900">{t('privacy.exportData')}</h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Alle Ihre gespeicherten Daten als JSON-Datei herunterladen (Art. 20 DSGVO).
+                {t('privacy.exportDataDesc')}
               </p>
             </div>
             <button
@@ -587,7 +598,7 @@ export default function ProfileSettingsPage() {
               className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
             >
               {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              {isExporting ? 'Exportiere...' : 'Daten exportieren'}
+              {isExporting ? t('privacy.exporting') : t('privacy.exportButton')}
             </button>
           </div>
 
@@ -595,10 +606,9 @@ export default function ProfileSettingsPage() {
           <div className="bg-red-50 border border-red-200 rounded-xl p-5">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-medium text-red-900">Konto & Daten löschen</h3>
+                <h3 className="text-sm font-medium text-red-900">{t('privacy.deleteAccount')}</h3>
                 <p className="text-xs text-red-700/70 mt-0.5">
-                  Alle persönlichen Daten werden unwiderruflich gelöscht (Art. 17 DSGVO). 
-                  Firmendaten (Leads, Objekte) bleiben im Tenant erhalten.
+                  {t('privacy.deleteAccountDesc')}
                 </p>
               </div>
               <button
@@ -606,7 +616,7 @@ export default function ProfileSettingsPage() {
                 className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors shrink-0"
               >
                 <Trash2 className="w-4 h-4" />
-                Konto löschen
+                {t('privacy.deleteAccount')}
               </button>
             </div>
           </div>
@@ -621,25 +631,25 @@ export default function ProfileSettingsPage() {
               <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5 text-red-600" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900">Konto endgültig löschen?</h3>
+              <h3 className="text-lg font-semibold text-gray-900">{t('privacy.confirmDeleteTitle')}</h3>
             </div>
             <p className="text-sm text-gray-600 mb-4">
-              Diese Aktion ist <strong>unwiderruflich</strong>. Folgende Daten werden gelöscht:
+              {t('privacy.confirmDeleteWarning')}
             </p>
             <ul className="text-xs text-gray-500 space-y-1 mb-4 pl-4 list-disc">
-              <li>Ihr Benutzerkonto und Profildaten</li>
-              <li>Chat-Verlauf mit Jarvis</li>
-              <li>Benachrichtigungen und Einstellungen</li>
-              <li>KI-Audit-Logs</li>
+              <li>{t('privacy.deleteItem1')}</li>
+              <li>{t('privacy.deleteItem2')}</li>
+              <li>{t('privacy.deleteItem3')}</li>
+              <li>{t('privacy.deleteItem4')}</li>
             </ul>
             <p className="text-sm text-gray-600 mb-3">
-              Tippen Sie <strong>LÖSCHEN</strong> zur Bestätigung:
+              {t('privacy.typeDeleteConfirm')}
             </p>
             <input
               type="text"
               value={deleteConfirmText}
               onChange={(e) => setDeleteConfirmText(e.target.value)}
-              placeholder="LÖSCHEN"
+              placeholder={t('privacy.deleteConfirmWord')}
               className="block w-full border border-gray-300 rounded-lg p-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500 mb-4"
             />
             <div className="flex justify-end gap-3">
@@ -647,15 +657,15 @@ export default function ProfileSettingsPage() {
                 onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }}
                 className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
               >
-                Abbrechen
+                {tCommon('cancel')}
               </button>
               <button
                 onClick={handleDeleteAccount}
-                disabled={deleteConfirmText !== 'LÖSCHEN' || isDeleting}
+                disabled={deleteConfirmText !== t('privacy.deleteConfirmWord') || isDeleting}
                 className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
               >
                 {isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isDeleting ? 'Wird gelöscht...' : 'Endgültig löschen'}
+                {isDeleting ? t('privacy.deleting') : t('privacy.permanentlyDelete')}
               </button>
             </div>
           </div>

@@ -2,21 +2,24 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Inbox, Users, Calendar, MessageSquare } from 'lucide-react';
-
-const NAV_ITEMS = [
-  { name: 'Home', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Postfach', href: '/dashboard/inbox', icon: Inbox },
-  { name: 'CRM', href: '/dashboard/crm/leads', icon: Users },
-  { name: 'Kalender', href: '/dashboard/calendar', icon: Calendar },
-  { name: 'Team', href: '/dashboard/assistant', icon: MessageSquare },
-];
+import { LayoutDashboard, Inbox, Users, Calendar, MessageSquare, Activity } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
+  const t = useTranslations('nav');
+
+  const NAV_ITEMS = [
+    { name: t('home'), href: '/dashboard', icon: LayoutDashboard },
+    { name: t('activities'), href: '/dashboard/activities', icon: Activity },
+    { name: t('mailbox'), href: '/dashboard/inbox', icon: Inbox },
+    { name: t('crm'), href: '/dashboard/crm/leads', icon: Users },
+    { name: t('calendar'), href: '/dashboard/calendar', icon: Calendar },
+    { name: t('team'), href: '/dashboard/assistant', icon: MessageSquare },
+  ];
 
   const isActive = (href: string) => {
-    if (href === '/dashboard') return pathname === '/dashboard' || pathname === '/dashboard/activities';
+    if (href === '/dashboard') return pathname === '/dashboard';
     if (href === '/dashboard/crm/leads') return pathname.startsWith('/dashboard/crm');
     return pathname.startsWith(href);
   };

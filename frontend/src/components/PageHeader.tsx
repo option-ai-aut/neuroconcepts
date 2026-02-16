@@ -6,39 +6,52 @@ import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, Users, Inbox, Calendar, FileText, 
   MessageSquare, Wand2, Activity, Settings, RefreshCw,
-  Sun, Moon, Bug
+  Sun, Moon, Bug, LogOut
 } from 'lucide-react';
+import { signOut } from 'aws-amplify/auth';
 import NotificationBell from '@/components/NotificationBell';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { useDarkMode } from '@/context/DarkModeContext';
 import { useSWRConfig } from 'swr';
 import useSWR from 'swr';
 import { getMe } from '@/lib/api';
+import { useTranslations } from 'next-intl';
 
-const PAGE_TITLES: Record<string, { title: string; icon: any }> = {
-  '/dashboard': { title: 'Dashboard', icon: LayoutDashboard },
-  '/dashboard/activities': { title: 'Aktivitäten', icon: Activity },
-  '/dashboard/inbox': { title: 'Posteingang', icon: Inbox },
-  '/dashboard/crm/leads': { title: 'CRM', icon: Users },
-  '/dashboard/crm/properties': { title: 'CRM', icon: Users },
-  '/dashboard/calendar': { title: 'Kalender', icon: Calendar },
-  '/dashboard/exposes': { title: 'Exposés & Vorlagen', icon: FileText },
-  '/dashboard/image-studio': { title: 'KI-Bildstudio', icon: Wand2 },
-  '/dashboard/assistant': { title: 'Team Chat', icon: MessageSquare },
-  '/dashboard/settings': { title: 'Einstellungen', icon: Settings },
+const PAGE_ICONS: Record<string, any> = {
+  '/dashboard': LayoutDashboard,
+  '/dashboard/activities': Activity,
+  '/dashboard/inbox': Inbox,
+  '/dashboard/crm/leads': Users,
+  '/dashboard/crm/properties': Users,
+  '/dashboard/calendar': Calendar,
+  '/dashboard/exposes': FileText,
+  '/dashboard/image-studio': Wand2,
+  '/dashboard/assistant': MessageSquare,
+  '/dashboard/settings': Settings,
 };
 
-function getPageInfo(pathname: string) {
-  // Exact match first
-  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
+const PAGE_TITLE_KEYS: Record<string, string> = {
+  '/dashboard': 'dashboard',
+  '/dashboard/activities': 'activities',
+  '/dashboard/inbox': 'inbox',
+  '/dashboard/crm/leads': 'crm',
+  '/dashboard/crm/properties': 'crm',
+  '/dashboard/calendar': 'calendar',
+  '/dashboard/exposes': 'exposesAndTemplates',
+  '/dashboard/image-studio': 'aiImageStudio',
+  '/dashboard/assistant': 'teamChat',
+  '/dashboard/settings': 'settings',
+};
+
+function getPageInfo(pathname: string): { titleKey: string; icon: any } {
+  if (PAGE_TITLE_KEYS[pathname]) return { titleKey: PAGE_TITLE_KEYS[pathname], icon: PAGE_ICONS[pathname] };
   
-  // Prefix match (for sub-pages like /dashboard/settings/profile)
-  const sorted = Object.keys(PAGE_TITLES).sort((a, b) => b.length - a.length);
+  const sorted = Object.keys(PAGE_TITLE_KEYS).sort((a, b) => b.length - a.length);
   for (const key of sorted) {
-    if (pathname.startsWith(key)) return PAGE_TITLES[key];
+    if (pathname.startsWith(key)) return { titleKey: PAGE_TITLE_KEYS[key], icon: PAGE_ICONS[key] };
   }
   
-  return { title: 'Dashboard', icon: LayoutDashboard };
+  return { titleKey: 'dashboard', icon: LayoutDashboard };
 }
 
 export default function PageHeader() {
@@ -48,7 +61,8 @@ export default function PageHeader() {
   const { data: user } = useSWR('/me', getMe);
   const { headerActions, openDrawer } = useGlobalState();
   const { isDark, toggleDarkMode } = useDarkMode();
-  const { title, icon: Icon } = getPageInfo(pathname);
+  const t = useTranslations('nav');
+  const { titleKey, icon: Icon } = getPageInfo(pathname);
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -65,7 +79,7 @@ export default function PageHeader() {
         {/* Mobile brand logo */}
         <Image src="/logo-icon-only.png" alt="Immivo" width={28} height={28} className="lg:hidden shrink-0" />
         <Icon className="w-4 h-4 text-gray-400 hidden lg:block" />
-        <h1 className="text-sm font-semibold text-gray-800">{title}</h1>
+        <h1 className="text-sm font-semibold text-gray-800">{t(titleKey)}</h1>
       </div>
 
       {/* Right: Actions */}
@@ -79,7 +93,7 @@ export default function PageHeader() {
         <button
           onClick={() => openDrawer('BUG_REPORT')}
           className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-          title="Bug melden"
+          title={t('reportBug')}
         >
           <Bug className="w-4 h-4" />
         </button>
@@ -88,7 +102,7 @@ export default function PageHeader() {
         <button
           onClick={toggleDarkMode}
           className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-          title={isDark ? 'Lichtmodus' : 'Nachtansicht'}
+          title={isDark ? t('lightMode') : t('darkMode')}
         >
           {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
@@ -98,13 +112,22 @@ export default function PageHeader() {
           onClick={handleRefresh}
           disabled={refreshing}
           className={`p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all ${refreshing ? 'animate-spin' : ''}`}
-          title="Aktualisieren"
+          title={t('refresh') as string}
         >
           <RefreshCw className="w-4 h-4" />
         </button>
 
         {/* Notifications */}
         <NotificationBell />
+
+        {/* Logout (mobile only) */}
+        <button
+          onClick={async () => { await signOut(); router.push('/login'); }}
+          className="lg:hidden p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+          title={t('signOut')}
+        >
+          <LogOut className="w-4 h-4" />
+        </button>
 
         {/* User Avatar (desktop only) — click to go to profile */}
         {user && (

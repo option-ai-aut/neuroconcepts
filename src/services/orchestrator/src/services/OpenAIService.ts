@@ -545,6 +545,7 @@ export class OpenAIService {
   // Non-streaming chat (legacy, used rarely)
   async chat(message: string, tenantId: string, history: any[] = [], userContext?: { name: string; email: string; role: string; pageContext?: string }) {
     const startTime = Date.now();
+    const MAX_ROUNDS = 5;
     const validHistory = history.filter(h => h.content != null && h.content !== '');
     
     const contextParts: string[] = [];
@@ -555,7 +556,7 @@ export class OpenAIService {
     }
     const userContextStr = contextParts.length > 0 ? contextParts.join('\n') : '';
 
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    const currentMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: 'system', content: getSystemPrompt() + userContextStr },
       ...validHistory.map(h => ({
         role: (h.role === 'assistant' || h.role === 'ASSISTANT' ? 'assistant' : 'user') as 'assistant' | 'user',
@@ -564,25 +565,33 @@ export class OpenAIService {
       { role: 'user', content: message },
     ];
 
-    const response = await this.client.chat.completions.create({ model: MODEL, messages, tools: convertToolsToOpenAI(CRM_TOOLS), tool_choice: 'auto' });
+    const openAITools = convertToolsToOpenAI(ALL_TOOLS);
 
-    if (response.usage) {
-      AiCostService.logUsage({ provider: 'openai', model: MODEL, endpoint: 'chat', inputTokens: response.usage.prompt_tokens || 0, outputTokens: response.usage.completion_tokens || 0, durationMs: Date.now() - startTime, tenantId }).catch(() => {});
-    }
+    for (let round = 0; round < MAX_ROUNDS; round++) {
+      const response = await this.client.chat.completions.create({
+        model: MODEL,
+        messages: currentMessages,
+        tools: openAITools,
+        tool_choice: 'auto',
+        max_completion_tokens: 4096,
+      });
 
-    const responseMessage = response.choices[0].message;
-
-    if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
-      const toolResults = await this.executeToolCalls(responseMessage.tool_calls, tenantId);
-      const followUpMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [...messages, responseMessage, ...toolResults];
-      const finalResponse = await this.client.chat.completions.create({ model: MODEL, messages: followUpMessages });
-      if (finalResponse.usage) {
-        AiCostService.logUsage({ provider: 'openai', model: MODEL, endpoint: 'chat', inputTokens: finalResponse.usage.prompt_tokens || 0, outputTokens: finalResponse.usage.completion_tokens || 0, durationMs: Date.now() - startTime, tenantId }).catch(() => {});
+      if (response.usage) {
+        AiCostService.logUsage({ provider: 'openai', model: MODEL, endpoint: 'chat', inputTokens: response.usage.prompt_tokens || 0, outputTokens: response.usage.completion_tokens || 0, durationMs: Date.now() - startTime, tenantId }).catch(() => {});
       }
-      return finalResponse.choices[0].message.content || '';
+
+      const responseMessage = response.choices[0].message;
+
+      if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+        const toolResults = await this.executeToolCalls(responseMessage.tool_calls, tenantId);
+        currentMessages.push(responseMessage, ...toolResults);
+        continue;
+      }
+
+      return responseMessage.content || '';
     }
 
-    return responseMessage.content || '';
+    return '(Maximale Verarbeitungstiefe erreicht)';
   }
 
   // Expose chat (still uses Chat Completions — different assistant with different tools)

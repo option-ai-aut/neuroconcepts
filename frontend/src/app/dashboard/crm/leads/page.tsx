@@ -6,6 +6,7 @@ import { useGlobalState } from '@/context/GlobalStateContext';
 import { useRouter } from 'next/navigation';
 import { Trash2, RefreshCw } from 'lucide-react';
 import useSWR from 'swr';
+import { useTranslations } from 'next-intl';
 
 export default function LeadsPage() {
   const { data: leads = [], mutate, isValidating } = useSWR<Lead[]>(API_ENDPOINTS.LEADS, fetcher, { 
@@ -15,6 +16,10 @@ export default function LeadsPage() {
   const { openDrawer, aiActionPerformed } = useGlobalState();
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const router = useRouter();
+  const t = useTranslations('crm.leads');
+  const ts = useTranslations('dashboard.status');
+  const tSrc = useTranslations('crm.sources');
+  const tc = useTranslations('common');
 
   // Refresh when AI performs an action
   useEffect(() => {
@@ -42,37 +47,51 @@ export default function LeadsPage() {
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Möchtest du ${selectedLeads.size} Leads wirklich löschen?`)) return;
+    if (!confirm(t('confirmDelete', { count: selectedLeads.size }))) return;
     
     try {
       await Promise.all(Array.from(selectedLeads).map(id => deleteLead(id)));
       setSelectedLeads(new Set());
       mutate();
     } catch (error) {
-      alert('Fehler beim Löschen: ' + error);
+      alert(t('deleteError') + error);
     }
+  };
+
+  const sourceLabels: Record<string, string> = {
+    WEBSITE: tSrc('website'),
+    EMAIL: tSrc('email'),
+    PHONE: tSrc('phone'),
+    REFERRAL: tSrc('referral'),
+  };
+
+  const statusLabels: Record<string, string> = {
+    NEW: ts('new'),
+    CONTACTED: ts('contacted'),
+    QUALIFIED: ts('qualified'),
+    CONVERTED: ts('converted'),
   };
 
   return (
     <div className="h-full flex flex-col">
       <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50/30">
         <div className="flex items-center space-x-4">
-          <span className="text-sm text-gray-500">{leads.length} Leads</span>
+          <span className="text-sm text-gray-500">{t('title', { count: leads.length })}</span>
           <button 
             onClick={() => mutate()}
             disabled={isValidating}
             className={`p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all ${isValidating ? 'animate-spin' : ''}`}
-            title="Aktualisieren"
+            title={tc('refresh')}
           >
             <RefreshCw className="w-4 h-4" />
           </button>
           {selectedLeads.size > 0 && (
             <div className="flex items-center space-x-2 bg-gray-50 px-3 py-1 rounded-md">
-              <span className="text-sm font-medium text-gray-700">{selectedLeads.size} ausgewählt</span>
+              <span className="text-sm font-medium text-gray-700">{t('selected', { count: selectedLeads.size })}</span>
               <button 
                 onClick={handleDelete}
                 className="text-blue-600 hover:text-red-600 p-1 rounded transition-colors"
-                title="Ausgewählte löschen"
+                title={t('deleteSelected')}
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -83,7 +102,7 @@ export default function LeadsPage() {
           onClick={() => openDrawer('LEAD')}
           className="bg-gray-900 text-white px-3 py-1.5 text-sm font-medium rounded-md hover:bg-gray-800 shadow-sm transition-colors"
         >
-          Neuer Lead
+          {t('newLead')}
         </button>
       </div>
 
@@ -99,19 +118,19 @@ export default function LeadsPage() {
                   onChange={toggleSelectAll}
                 />
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telefon</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quelle</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Erstellt</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('columns.name')}</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('columns.email')}</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('columns.phone')}</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('columns.source')}</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('columns.status')}</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('columns.created')}</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {leads.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-6 py-10 text-center text-gray-500">
-                  Keine Leads gefunden.
+                  {t('noLeads')}
                 </td>
               </tr>
             ) : (
@@ -148,11 +167,7 @@ export default function LeadsPage() {
                     </td>
                     <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
                       <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-                        {lead.source === 'WEBSITE' ? 'Website' :
-                         lead.source === 'EMAIL' ? 'E-Mail' :
-                         lead.source === 'PHONE' ? 'Telefon' :
-                         lead.source === 'REFERRAL' ? 'Empfehlung' :
-                         lead.source || 'Unbekannt'}
+                        {(lead.source && sourceLabels[lead.source]) || lead.source || tSrc('unknown')}
                       </span>
                     </td>
                     <td className="px-6 py-3 whitespace-nowrap text-sm">
@@ -163,11 +178,7 @@ export default function LeadsPage() {
                         lead.status === 'CONVERTED' ? 'bg-gray-100 text-gray-700' :
                         'bg-gray-100 text-gray-600'
                       }`}>
-                        {lead.status === 'NEW' ? 'Neu' :
-                         lead.status === 'CONTACTED' ? 'Kontaktiert' :
-                         lead.status === 'QUALIFIED' ? 'Qualifiziert' :
-                         lead.status === 'CONVERTED' ? 'Konvertiert' :
-                         lead.status || 'Neu'}
+                        {(lead.status && statusLabels[lead.status]) || lead.status || ts('new')}
                       </span>
                     </td>
                     <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">

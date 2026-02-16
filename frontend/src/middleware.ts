@@ -11,13 +11,26 @@ const APP_DOMAIN = 'app.immivo.ai';
 const ADMIN_DOMAIN = 'admin.immivo.ai';
 const MARKETING_DOMAIN = 'immivo.ai';
 
+const SUPPORTED_LOCALES = ['de', 'en'];
+const DEFAULT_LOCALE = 'de';
+
+function detectLocale(request: NextRequest): string | null {
+  const existingCookie = request.cookies.get('locale')?.value;
+  if (existingCookie && SUPPORTED_LOCALES.includes(existingCookie)) return null;
+
+  const acceptLang = request.headers.get('accept-language') || '';
+  const browserLocale = acceptLang
+    .split(',')
+    .map(l => l.split(';')[0].trim().split('-')[0].toLowerCase())
+    .find(l => SUPPORTED_LOCALES.includes(l));
+
+  return browserLocale || DEFAULT_LOCALE;
+}
+
 export function middleware(request: NextRequest) {
-  // CloudFront sets X-Forwarded-Host as a custom origin header with the real domain.
-  // The regular 'host' header gets replaced by CloudFront with the Lambda Function URL.
   const hostname = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
   const pathname = request.nextUrl.pathname;
 
-  // Skip API routes, static files, and Next.js internals
   if (
     pathname.startsWith('/api/') ||
     pathname.startsWith('/_next/') ||
@@ -30,14 +43,24 @@ export function middleware(request: NextRequest) {
 
   const isAppDomain = hostname.includes(APP_DOMAIN);
   const isAdminDomain = hostname.includes(ADMIN_DOMAIN);
-  // Marketing domain = immivo.ai but NOT app.immivo.ai or admin.immivo.ai
   const isMarketingDomain = hostname.includes(MARKETING_DOMAIN) && !isAppDomain && !isAdminDomain;
   const isLocalhost = hostname.includes('localhost') || hostname.includes('127.0.0.1');
+
+  // ========================================
+  // LOCALE DETECTION (all domains)
+  // Sets locale cookie on first visit based on Accept-Language header
+  // ========================================
+  const detectedLocale = detectLocale(request);
 
   // ========================================
   // LOCALHOST: Allow everything (development)
   // ========================================
   if (isLocalhost) {
+    if (detectedLocale) {
+      const response = NextResponse.next();
+      response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365 });
+      return response;
+    }
     return NextResponse.next();
   }
 
@@ -47,15 +70,11 @@ export function middleware(request: NextRequest) {
   // Everything else redirects to app.immivo.ai
   // ========================================
   if (isMarketingDomain) {
-    // Allow landing pages
-    if (LANDING_PAGES.includes(pathname)) {
-      return NextResponse.next();
+    if (LANDING_PAGES.includes(pathname) || LEGAL_PAGES.includes(pathname)) {
+      const response = NextResponse.next();
+      if (detectedLocale) response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365 });
+      return response;
     }
-    // Allow legal pages
-    if (LEGAL_PAGES.includes(pathname)) {
-      return NextResponse.next();
-    }
-    // Everything else -> redirect to app.immivo.ai (preserving path)
     return NextResponse.redirect(new URL(`https://${APP_DOMAIN}${pathname}`));
   }
 
@@ -73,8 +92,9 @@ export function middleware(request: NextRequest) {
     if (LANDING_PAGES.includes(pathname)) {
       return NextResponse.redirect(new URL(`https://${MARKETING_DOMAIN}${pathname}`));
     }
-    // Allow everything else (login, dashboard, etc.)
-    return NextResponse.next();
+    const response = NextResponse.next();
+    if (detectedLocale) response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365 });
+    return response;
   }
 
   // ========================================
@@ -88,11 +108,15 @@ export function middleware(request: NextRequest) {
     if (!pathname.startsWith('/admin')) {
       return NextResponse.redirect(new URL('/admin/login', request.url));
     }
-    return NextResponse.next();
+    const adminResponse = NextResponse.next();
+    if (detectedLocale) adminResponse.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365 });
+    return adminResponse;
   }
 
   // Unknown domain (e.g. Lambda Function URL) - allow everything
-  return NextResponse.next();
+  const response = NextResponse.next();
+  if (detectedLocale) response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365 });
+  return response;
 }
 
 export const config = {
