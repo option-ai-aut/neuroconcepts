@@ -64,7 +64,7 @@ const TOOL_CATEGORIES: Record<AgentCategory, string[]> = {
 const CLASSIFICATION_PROMPT = `Classify the user message into exactly ONE category. Reply with ONLY the category name.
 
 Categories:
-smalltalk = greetings, casual chat, humor, questions about yourself ("hey", "wer bist du", "was kannst du")
+smalltalk = greetings, casual chat, humor, questions about yourself, short/ambiguous messages, numbers, jokes, counting, anything that is NOT a clear work instruction
 crm = leads, properties, search, stats, assignments, uploading images/photos/files to properties or leads, property media management (Bilder hinzufügen, Fotos hochladen, Grundriss, etc.)
 email = read, write, send emails
 calendar = events, appointments, availability
@@ -72,7 +72,10 @@ expose = ONLY explicit exposé/PDF creation, templates, blocks, themes. NOT imag
 memory = past conversations ("was haben wir besprochen", "erinnerst du dich")
 multi = complex request clearly spanning multiple categories
 
-IMPORTANT: "Bild hinzufügen zu Objekt" or "Foto hochladen" = crm (NOT expose!)
+IMPORTANT RULES:
+- "Bild hinzufügen zu Objekt" or "Foto hochladen" = crm (NOT expose!)
+- Short/ambiguous messages like "1", "ok", "ja", "cool", "haha" = smalltalk (NOT crm!)
+- When in doubt between smalltalk and another category, prefer smalltalk.
 
 Reply with one word only: smalltalk, crm, email, calendar, expose, memory, or multi.`;
 
@@ -95,6 +98,13 @@ export class AgentRouter {
       /^(wer bist du|was kannst du|was bist du|hilfe|help)[\s!?.]*$/i,
     ];
     if (smalltalkPatterns.some(p => p.test(m))) return 'smalltalk';
+    
+    // Very short/ambiguous messages (1-3 chars, single numbers, etc.) → smalltalk
+    // These are casual messages, not actionable commands
+    if (m.length <= 10 && !/\b(erstell|anleg|lösch|such|zeig|send|schreib|aktualisier)\b/i.test(m)) {
+      if (/^\d+[\s!?.]*$/.test(m)) return 'smalltalk'; // just a number
+      if (m.length <= 3) return 'smalltalk'; // very short (e.g. "ok", "ja", "no")
+    }
     
     // Email patterns
     if (/\b(e-?mail|mail|postfach|inbox|entwurf|draft|senden|schreib.*mail|nachricht senden)\b/i.test(m)) return 'email';
