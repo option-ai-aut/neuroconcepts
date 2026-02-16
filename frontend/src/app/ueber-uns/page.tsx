@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Mail, MapPin, ArrowRight, Sparkles, Shield, Users, Target, Zap, Globe, Code, TrendingUp } from 'lucide-react';
+import { Mail, MapPin, ArrowRight, Sparkles, Shield, Users, Target, Code } from 'lucide-react';
 import PublicNavigation from '@/components/PublicNavigation';
 import PublicFooter from '@/components/PublicFooter';
 
@@ -17,10 +17,6 @@ export default function UeberUnsPage() {
           <div className="absolute bottom-0 left-0 w-[200px] sm:w-[400px] h-[200px] sm:h-[400px] bg-white/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" />
         </div>
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center px-4 py-2 rounded-full bg-white/10 text-sm font-medium mb-8 border border-white/10">
-            <Zap className="w-4 h-4 mr-2" />
-            Gegründet 2026 in Wien
-          </div>
           <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold mb-6 leading-tight">
             Wir machen Makler<br />
             <span className="text-gray-400">unaufhaltbar.</span>
@@ -56,19 +52,12 @@ export default function UeberUnsPage() {
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { icon: Code, label: 'Entwickelt', value: 'in Wien' },
-                { icon: Globe, label: 'Portale', value: '24+' },
-                { icon: Shield, label: 'Hosting', value: 'AWS EU' },
-                { icon: TrendingUp, label: 'Gründung', value: '2026' },
-              ].map((item, i) => (
-                <div key={i} className="bg-gray-50 rounded-2xl p-6 border border-gray-100 text-center">
-                  <item.icon className="w-6 h-6 text-gray-900 mx-auto mb-3" />
-                  <p className="text-2xl font-bold text-gray-900">{item.value}</p>
-                  <p className="text-sm text-gray-500">{item.label}</p>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 gap-4">
+              <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 text-center">
+                <Code className="w-6 h-6 text-gray-900 mx-auto mb-3" />
+                <p className="text-2xl font-bold text-gray-900">in Wien</p>
+                <p className="text-sm text-gray-500">Entwickelt</p>
+              </div>
             </div>
           </div>
         </div>
@@ -97,7 +86,7 @@ export default function UeberUnsPage() {
                 </div>
               </div>
               <p className="text-gray-600 text-sm leading-relaxed">
-                Strategie, Vertrieb & Unternehmensentwicklung
+                Strategie & Vertrieb
               </p>
               <div className="mt-6 pt-6 border-t border-gray-100">
                 <a href="mailto:josef.leutgeb@immivo.ai" className="inline-flex items-center gap-2 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors">
@@ -119,7 +108,7 @@ export default function UeberUnsPage() {
                 </div>
               </div>
               <p className="text-gray-600 text-sm leading-relaxed">
-                Technologie, Produktentwicklung & KI
+                Technologie & Produktentwicklung
               </p>
               <div className="mt-6 pt-6 border-t border-gray-100">
                 <a href="mailto:dennis.kral@immivo.ai" className="inline-flex items-center gap-2 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors">

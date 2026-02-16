@@ -9928,9 +9928,187 @@ app.get('/admin/ab-tests/:id/results', adminAuthMiddleware, async (req, res) => 
   res.json(results);
 });
 
-export const handler = serverless(app, {
+const serverlessHandler = serverless(app, {
   binary: ['multipart/form-data', 'image/*', 'application/octet-stream'],
 });
+
+// Cached Cognito JWT verifier for streaming handler
+let _streamVerifier: any;
+
+// Verify Cognito JWT token (standalone, no Express req/res needed)
+async function verifyToken(authHeader: string | undefined): Promise<any> {
+  if (!authHeader?.startsWith('Bearer ')) throw new Error('Missing token');
+  const token = authHeader.split(' ')[1];
+  if (!_streamVerifier) {
+    const { CognitoJwtVerifier } = await import('aws-jwt-verify');
+    _streamVerifier = CognitoJwtVerifier.create({
+      userPoolId: process.env.USER_POOL_ID!,
+      tokenUse: 'id' as const,
+      clientId: process.env.CLIENT_ID!,
+    });
+  }
+  return _streamVerifier.verify(token);
+}
+
+// Direct streaming handler for POST /chat/stream (bypasses serverless-http buffering)
+async function handleStreamingChat(event: any, responseStream: any): Promise<void> {
+  const awslambda = (globalThis as any).awslambda;
+  const writeSse = (data: any) => { responseStream.write(`data: ${JSON.stringify(data)}\n\n`); };
+
+  // CORS headers
+  const origin = event.headers?.origin || 'https://app.immivo.ai';
+  const corsHeaders: Record<string, string> = {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Credentials': 'true',
+  };
+
+  try {
+    // Auth
+    const payload = await verifyToken(event.headers?.authorization);
+    const db = prisma || (await initializePrisma());
+    const currentUser = await db.user.findUnique({ where: { email: payload.email } });
+    if (!currentUser) {
+      responseStream = awslambda.HttpResponseStream.from(responseStream, { statusCode: 401, headers: corsHeaders });
+      writeSse({ error: 'Unauthorized' });
+      responseStream.end();
+      return;
+    }
+
+    // Start SSE response
+    responseStream = awslambda.HttpResponseStream.from(responseStream, { statusCode: 200, headers: corsHeaders });
+
+    const tenantId = currentUser.tenantId;
+    const userId = currentUser.id;
+
+    // Cost cap check
+    const costCheck = await AiCostService.checkCostCap(tenantId);
+    if (costCheck.exceeded) {
+      const capUsd = (costCheck.capCents / 100).toFixed(2);
+      const usedUsd = (costCheck.currentCostCents / 100).toFixed(2);
+      writeSse({ chunk: `⚠️ Das monatliche KI-Budget deines Teams ist erreicht ($${usedUsd} / $${capUsd}).` });
+      writeSse({ done: true });
+      responseStream.end();
+      return;
+    }
+
+    // Parse body (JSON only for streaming path; file uploads fall back to API Gateway)
+    let body: any = {};
+    if (event.body) {
+      try { body = JSON.parse(event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString() : event.body); } catch {}
+    }
+    const message = body.message || '';
+    const pageContext = body.pageContext || '';
+
+    // Build user context
+    const tenant = await db.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true, description: true, phone: true, email: true, website: true, services: true, regions: true, slogan: true, address: true },
+    });
+    const userContext = {
+      name: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email,
+      email: currentUser.email,
+      role: currentUser.role,
+      pageContext: pageContext || undefined,
+      company: tenant ? {
+        name: tenant.name, description: tenant.description || undefined,
+        phone: tenant.phone || undefined, email: tenant.email || undefined,
+        website: tenant.website || undefined, address: tenant.address || undefined,
+        services: tenant.services.length > 0 ? tenant.services : undefined,
+        regions: tenant.regions.length > 0 ? tenant.regions : undefined,
+        slogan: tenant.slogan || undefined,
+      } : undefined,
+    };
+
+    // Stream AI response
+    const openai = new OpenAIService();
+    let fullResponse = '';
+    let hadFunctionCalls = false;
+    let toolsUsed: string[] = [];
+    let chunkCount = 0;
+
+    // Heartbeat to keep connection alive during tool execution
+    let lastDataTime = Date.now();
+    const heartbeatInterval = setInterval(() => {
+      if (Date.now() - lastDataTime > 4000) {
+        try { writeSse({ heartbeat: true }); } catch {}
+      }
+    }, 5000);
+
+    try {
+      for await (const result of openai.chatStream(message, tenantId, [], [], userId, userContext)) {
+        lastDataTime = Date.now();
+        fullResponse += result.chunk;
+        if (result.hadFunctionCalls) hadFunctionCalls = true;
+        if (result.toolsUsed) toolsUsed = result.toolsUsed;
+        chunkCount++;
+        writeSse(result.toolsUsed ? { chunk: result.chunk, toolsUsed: result.toolsUsed } : { chunk: result.chunk });
+      }
+    } finally {
+      clearInterval(heartbeatInterval);
+    }
+
+    writeSse({ done: true, hadFunctionCalls, toolsUsed });
+    console.log(`📡 Stream: ${chunkCount} chunks, ${fullResponse.length} chars`);
+
+    // Save chat history
+    await db.userChat.create({ data: { userId, role: 'USER', content: message } });
+    await db.userChat.create({ data: { userId, role: 'ASSISTANT', content: wrapAiResponse(fullResponse) } });
+  } catch (err: any) {
+    console.error('Streaming chat error:', err);
+    try {
+      // If headers not sent yet, set them now
+      if (!responseStream.headersSent) {
+        const awslambda2 = (globalThis as any).awslambda;
+        responseStream = awslambda2.HttpResponseStream.from(responseStream, { statusCode: 500, headers: corsHeaders });
+      }
+      writeSse({ error: 'AI Error' });
+    } catch {}
+  }
+  responseStream.end();
+}
+
+// Lambda handler: streams /chat/stream via Function URL, delegates rest to serverless-http
+export const handler = async (event: any, context: any) => {
+  const isFunctionUrl = !!event.requestContext?.http;
+  const path = event.rawPath || event.path || '';
+  const method = (event.requestContext?.http?.method || event.httpMethod || '').toUpperCase();
+
+  // Function URL: POST /chat/stream → real SSE streaming
+  if (isFunctionUrl && method === 'POST' && path === '/chat/stream') {
+    const awslambda = (globalThis as any).awslambda;
+    if (awslambda?.streamifyResponse) {
+      return awslambda.streamifyResponse(async (_ev: any, responseStream: any, _ctx: any) => {
+        await handleStreamingChat(event, responseStream);
+      })(event, context);
+    }
+  }
+
+  // Function URL: OPTIONS → CORS preflight
+  if (isFunctionUrl && method === 'OPTIONS') {
+    const awslambda = (globalThis as any).awslambda;
+    if (awslambda?.streamifyResponse) {
+      return awslambda.streamifyResponse(async (_ev: any, responseStream: any) => {
+        responseStream = awslambda.HttpResponseStream.from(responseStream, {
+          statusCode: 204,
+          headers: {
+            'Access-Control-Allow-Origin': event.headers?.origin || '*',
+            'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,PATCH,OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Admin-Secret',
+            'Access-Control-Allow-Credentials': 'true',
+            'Access-Control-Max-Age': '86400',
+          },
+        });
+        responseStream.end();
+      })(event, context);
+    }
+  }
+
+  // Everything else → serverless-http (API Gateway or Function URL non-streaming)
+  return serverlessHandler(event, context);
+};
 
 // Local dev support
 if (require.main === module) {

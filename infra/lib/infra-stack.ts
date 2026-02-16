@@ -444,7 +444,7 @@ export class ImmivoStack extends cdk.Stack {
         // RUNTIME_ vars are read at runtime by the /api/config endpoint
         // These work because they're not prefixed with NEXT_PUBLIC_ (which gets replaced at build time)
         RUNTIME_API_URL: api.url,
-        RUNTIME_STREAM_URL: functionUrl.url, // Lambda Function URL for streaming (120s timeout, bypasses API GW 29s limit)
+        RUNTIME_STREAM_URL: functionUrl.url, // Lambda Function URL — /chat/stream uses streamifyResponse for real SSE
         RUNTIME_USER_POOL_ID: this.userPool.userPoolId,
         RUNTIME_USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
         RUNTIME_ADMIN_USER_POOL_ID: this.adminUserPool.userPoolId,
