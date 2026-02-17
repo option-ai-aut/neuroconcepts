@@ -470,14 +470,8 @@ export class ImmivoStack extends cdk.Stack {
     });
 
     // --- 7. DNS & CDN (Route53, ACM, CloudFront) ---
-    // NOTE: Route53 Hosted Zone and ACM certificate were created manually in AWS Console.
-    // Existing CloudFront distributions (also manual):
-    //   - E1E8VMUP3UA4TJ: app.immivo.ai  -> Frontend Lambda URL
-    //   - E1F9SS8QE17ZZP: api.immivo.ai  -> API Gateway
-    //   - E1XYO1OK2QOZQA: admin.immivo.ai -> Frontend Lambda URL
-    //   - E24ZLYKGX22SZJ: immivo.ai      -> Frontend Lambda URL
-    //
-    // This section adds: S3 Media CDN (media.immivo.ai) — the only missing piece.
+    // Prod: Manually created CloudFront distributions for app/admin/api/root domains.
+    // Dev/Test: CDK-managed CloudFront + Route53 for {stage}.immivo.ai subdomains.
 
     // Import existing Route53 Hosted Zone (created manually, contains Resend DNS etc.)
     const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'ImmivoZone', {
@@ -485,7 +479,7 @@ export class ImmivoStack extends cdk.Stack {
       zoneName: 'immivo.ai',
     });
 
-    // Import existing ACM certificate (us-east-1, wildcard — created manually)
+    // Import existing ACM certificate (us-east-1, wildcard *.immivo.ai — created manually)
     const certificate = acm.Certificate.fromCertificateArn(
       this, 'ImmivoCert',
       'arn:aws:acm:us-east-1:463090596988:certificate/b61f08cd-54f2-4f62-8e0a-9a69264e0436'
@@ -496,11 +490,15 @@ export class ImmivoStack extends cdk.Stack {
       description: 'OAC for Immivo Media Bucket',
     });
 
-    // CloudFront Distribution for S3 Media Bucket
+    // --- Media CDN ---
+    const mediaDomain = props.stageName === 'prod'
+      ? 'media.immivo.ai'
+      : `${props.stageName}-media.immivo.ai`;
+
     const mediaDistribution = new cloudfront.Distribution(this, 'MediaCDN', {
       comment: `Immivo Media CDN (${props.stageName})`,
-      domainNames: props.stageName === 'prod' ? ['media.immivo.ai'] : [],
-      certificate: props.stageName === 'prod' ? certificate : undefined,
+      domainNames: [mediaDomain],
+      certificate: certificate,
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(mediaBucket, {
           originAccessControl: mediaOac,
@@ -511,33 +509,93 @@ export class ImmivoStack extends cdk.Stack {
         allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
       },
       httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
-      priceClass: cloudfront.PriceClass.PRICE_CLASS_100, // EU + NA (cheapest)
+      priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
       minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
     });
 
-    // Route53 A record for media.immivo.ai -> CloudFront (prod only)
-    if (props.stageName === 'prod') {
-      new route53.ARecord(this, 'MediaDnsRecord', {
+    new route53.ARecord(this, 'MediaDnsRecord', {
+      zone: hostedZone,
+      recordName: mediaDomain.replace('.immivo.ai', ''),
+      target: route53.RecordTarget.fromAlias(
+        new route53Targets.CloudFrontTarget(mediaDistribution)
+      ),
+    });
+
+    orchestratorLambda.addEnvironment('MEDIA_CDN_URL', `https://${mediaDomain}`);
+
+    // --- Frontend & API CDN (dev/test only — prod uses manually created distributions) ---
+    if (props.stageName !== 'prod') {
+      const frontendDomain = cdk.Fn.select(2, cdk.Fn.split('/', frontendUrl.url));
+      const apiDomain = `${cdk.Fn.select(2, cdk.Fn.split('/', api.url))}`;
+
+      // Frontend CloudFront: {stage}.immivo.ai -> Frontend Lambda URL
+      const frontendCdn = new cloudfront.Distribution(this, 'FrontendCDN', {
+        comment: `Immivo Frontend (${props.stageName})`,
+        domainNames: [`${props.stageName}.immivo.ai`],
+        certificate: certificate,
+        defaultBehavior: {
+          origin: new origins.HttpOrigin(frontendDomain, {
+            protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
+          }),
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        },
+        httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
+        priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
+        minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+      });
+
+      new route53.ARecord(this, 'FrontendDnsRecord', {
         zone: hostedZone,
-        recordName: 'media',
+        recordName: props.stageName,
         target: route53.RecordTarget.fromAlias(
-          new route53Targets.CloudFrontTarget(mediaDistribution)
+          new route53Targets.CloudFrontTarget(frontendCdn)
         ),
       });
-    }
 
-    // Pass Media CDN URL to orchestrator so it generates CDN URLs instead of S3 URLs
-    const mediaCdnDomain = props.stageName === 'prod'
-      ? 'media.immivo.ai'
-      : mediaDistribution.distributionDomainName;
-    orchestratorLambda.addEnvironment('MEDIA_CDN_URL', `https://${mediaCdnDomain}`);
+      // API CloudFront: {stage}-api.immivo.ai -> API Gateway
+      const apiGwDomain = cdk.Fn.select(0, cdk.Fn.split('/', cdk.Fn.select(1, cdk.Fn.split('://', api.url))));
+
+      const apiCdn = new cloudfront.Distribution(this, 'ApiCDN', {
+        comment: `Immivo API (${props.stageName})`,
+        domainNames: [`${props.stageName}-api.immivo.ai`],
+        certificate: certificate,
+        defaultBehavior: {
+          origin: new origins.HttpOrigin(apiGwDomain, {
+            originPath: `/${props.stageName}`,
+            protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
+          }),
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        },
+        httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
+        priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
+        minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+      });
+
+      new route53.ARecord(this, 'ApiDnsRecord', {
+        zone: hostedZone,
+        recordName: `${props.stageName}-api`,
+        target: route53.RecordTarget.fromAlias(
+          new route53Targets.CloudFrontTarget(apiCdn)
+        ),
+      });
+
+      // Outputs for non-prod custom domains
+      new cdk.CfnOutput(this, 'FrontendCustomUrl', { value: `https://${props.stageName}.immivo.ai` });
+      new cdk.CfnOutput(this, 'ApiCustomUrl', { value: `https://${props.stageName}-api.immivo.ai` });
+    }
 
     // --- Outputs ---
     new cdk.CfnOutput(this, 'VpcId', { value: this.vpc.vpcId });
     new cdk.CfnOutput(this, 'DBEndpoint', { value: this.dbEndpoint });
     new cdk.CfnOutput(this, 'EmailBucketName', { value: emailBucket.bucketName });
     new cdk.CfnOutput(this, 'MediaBucketName', { value: mediaBucket.bucketName });
-    new cdk.CfnOutput(this, 'MediaCDNUrl', { value: `https://${mediaCdnDomain}` });
+    new cdk.CfnOutput(this, 'MediaCDNUrl', { value: `https://${mediaDomain}` });
     new cdk.CfnOutput(this, 'MediaDistributionId', { value: mediaDistribution.distributionId });
     new cdk.CfnOutput(this, 'OrchestratorApiUrl', { value: api.url });
     new cdk.CfnOutput(this, 'FrontendUrl', { value: frontendUrl.url });
