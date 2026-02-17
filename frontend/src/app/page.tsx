@@ -341,7 +341,7 @@ export default function LandingPage() {
                 <span className="block text-[2.75rem] leading-tight whitespace-nowrap">
                   {t('hero.title1')}
                 </span>
-                <span className="block text-[4.5rem] leading-[1.05]">
+                <span className="block text-[6.5rem] leading-[1] -mt-1">
                   {t('hero.title2')}
                 </span>
               </h1>
