@@ -337,10 +337,11 @@ export default function LandingPage() {
                 {t('hero.badge')}
               </div>
               
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 mb-6 leading-[1.05]">
-                {t('hero.title1')}
-                <br />
-                <span className="font-extrabold text-gray-900">
+              <h1 className="font-extrabold tracking-tight text-gray-900 mb-6">
+                <span className="block text-[2.75rem] leading-tight whitespace-nowrap">
+                  {t('hero.title1')}
+                </span>
+                <span className="block text-[4.5rem] leading-[1.05]">
                   {t('hero.title2')}
                 </span>
               </h1>
