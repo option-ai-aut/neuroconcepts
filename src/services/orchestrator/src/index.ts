@@ -10205,7 +10205,14 @@ if (require.main === module) {
   const port = process.env.PORT || 3000;
   app.listen(port, () => {
     console.log(`Orchestrator service running on port ${port}`);
-    // Run cleanup on startup
-    cleanupOldChats();
+    // Delay cleanup on local dev so Neon DB has time to wake up
+    setTimeout(async () => {
+      try {
+        await cleanupOldChats();
+      } catch (err) {
+        console.warn('⏳ DB not ready yet, retrying cleanup in 30s...');
+        setTimeout(() => cleanupOldChats().catch(() => console.warn('⚠️ Cleanup skipped — DB unreachable')), 30000);
+      }
+    }, 10000);
   });
 }
