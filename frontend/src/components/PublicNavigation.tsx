@@ -12,6 +12,7 @@ interface PublicNavigationProps {
 
 export default function PublicNavigation({ currentPage }: PublicNavigationProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isDark, setIsDark] = useState(true);
   const t = useTranslations('publicNav');
 
   useEffect(() => {
@@ -25,6 +26,20 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
     };
   }, [mobileMenuOpen]);
 
+  useEffect(() => {
+    if (currentPage !== 'home') {
+      setIsDark(false);
+      return;
+    }
+    const onScroll = () => {
+      const heroHeight = window.innerHeight * 0.85;
+      setIsDark(window.scrollY < heroHeight);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [currentPage]);
+
   const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
     if (currentPage === 'home') {
       e.preventDefault();
@@ -37,17 +52,17 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
   };
 
   return (
-    <nav className="fixed w-full z-50 bg-white/95 backdrop-blur-xl border-b border-gray-100/50">
+    <nav className={`fixed w-full z-50 backdrop-blur-xl transition-all duration-500 shadow-sm ${isDark ? 'bg-gray-950/40 border-b border-white/[0.06] shadow-black/10' : 'bg-white/70 border-b border-gray-200/40 shadow-gray-200/30'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link href="/" className="flex items-center">
-            <Image src="/logo-icon-only.png" alt="Immivo" width={36} height={36} className="hidden lg:block" />
-            <Image src="/logo-black.png" alt="Immivo" width={180} height={60} className="lg:hidden h-12 w-auto" />
+            <Image src={isDark ? '/logo-icon-only.png' : '/logo-icon-only.png'} alt="Immivo" width={36} height={36} className="hidden lg:block" />
+            <Image src={isDark ? '/logo-white.png' : '/logo-black.png'} alt="Immivo" width={180} height={60} className="lg:hidden h-12 w-auto" />
           </Link>
 
           <div className="hidden lg:flex items-center space-x-6">
             <div className="relative group">
-              <button className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1">
+              <button className={`text-sm font-medium transition-colors flex items-center gap-1 ${isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
                 {t('product')}
                 <svg className="w-4 h-4 transition-transform group-hover:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -73,12 +88,12 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
               </div>
             </div>
 
-            <Link href="/preise" className={`text-sm font-medium transition-colors ${currentPage === 'preise' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'}`}>
+            <Link href="/preise" className={`text-sm font-medium transition-colors ${currentPage === 'preise' ? 'text-blue-600' : isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
               {t('pricing')}
             </Link>
             
             <div className="relative group">
-              <button className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1">
+              <button className={`text-sm font-medium transition-colors flex items-center gap-1 ${isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
                 {t('company')}
                 <svg className="w-4 h-4 transition-transform group-hover:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -95,29 +110,29 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
             </div>
 
             {currentPage === 'home' ? (
-              <a href="#demo" onClick={(e) => handleAnchorClick(e, 'demo')} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">{t('demo')}</a>
+              <a href="#demo" onClick={(e) => handleAnchorClick(e, 'demo')} className={`text-sm font-medium transition-colors ${isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>{t('demo')}</a>
             ) : (
-              <Link href="/#demo" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">{t('demo')}</Link>
+              <Link href="/#demo" className={`text-sm font-medium transition-colors ${isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>{t('demo')}</Link>
             )}
           </div>
 
           <div className="hidden lg:flex items-center space-x-4">
-            <Link href="/login" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+            <Link href="/login" className={`text-sm font-medium transition-colors ${isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
               {t('signIn')}
             </Link>
             <Link 
               href="/login?mode=register" 
-              className="bg-gray-900 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:shadow-lg hover:shadow-gray-500/20 transition-all hover:-translate-y-0.5"
+              className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all hover:-translate-y-0.5 ${isDark ? 'bg-white text-gray-900 hover:bg-gray-100 hover:shadow-lg hover:shadow-white/10' : 'bg-gray-900 text-white hover:shadow-lg hover:shadow-gray-500/20'}`}
             >
               {t('getStartedFree')}
             </Link>
           </div>
 
           <button 
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            className={`lg:hidden p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
-            {mobileMenuOpen ? <X className="w-6 h-6 text-gray-600" /> : <Menu className="w-6 h-6 text-gray-600" />}
+            {mobileMenuOpen ? <X className={`w-6 h-6 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} /> : <Menu className={`w-6 h-6 ${isDark ? 'text-gray-300' : 'text-gray-600'}`} />}
           </button>
         </div>
       </div>

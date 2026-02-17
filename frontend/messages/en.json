@@ -53,7 +53,8 @@
     "darkMode": "Dark mode",
     "mailbox": "Mailbox",
     "team": "Team",
-    "home": "Home"
+    "home": "Home",
+    "refresh": "Refresh"
   },
   "publicNav": {
     "product": "Product",
