@@ -529,18 +529,43 @@ export class ImmivoStack extends cdk.Stack {
       const apiDomain = `${cdk.Fn.select(2, cdk.Fn.split('/', api.url))}`;
 
       // Frontend CloudFront: {stage}.immivo.ai -> Frontend Lambda URL
+      const frontendOrigin = new origins.HttpOrigin(frontendDomain, {
+        protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
+      });
+
       const frontendCdn = new cloudfront.Distribution(this, 'FrontendCDN', {
         comment: `Immivo Frontend (${props.stageName})`,
         domainNames: [`${props.stageName}.immivo.ai`],
         certificate: certificate,
         defaultBehavior: {
-          origin: new origins.HttpOrigin(frontendDomain, {
-            protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
-          }),
+          origin: frontendOrigin,
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
           allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
           cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
           originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        },
+        additionalBehaviors: {
+          '/_next/static/*': {
+            origin: frontendOrigin,
+            viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+            cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+            compress: true,
+            allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+          },
+          '/_next/image*': {
+            origin: frontendOrigin,
+            viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+            cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+            compress: true,
+            allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+          },
+          '/favicon*': {
+            origin: frontendOrigin,
+            viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+            cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+            compress: true,
+            allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+          },
         },
         httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
         priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
