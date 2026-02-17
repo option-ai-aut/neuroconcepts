@@ -878,6 +878,14 @@
       "year": "Current year"
     }
   },
+  "cookieConsent": {
+    "title": "Cookie Settings",
+    "description": "We use essential cookies for platform functionality (authentication, session). Optional cookies help us analyze usage and improve the platform.",
+    "learnMore": "Learn more",
+    "acceptAll": "Accept all",
+    "essentialOnly": "Essential only",
+    "close": "Close"
+  },
   "imageStudio": {
     "styles": {
       "modern": { "name": "Modern", "desc": "Clean & minimalist" },

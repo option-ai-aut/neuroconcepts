@@ -886,6 +886,14 @@
       "year": "Aktuelles Jahr"
     }
   },
+  "cookieConsent": {
+    "title": "Cookie-Einstellungen",
+    "description": "Wir verwenden essenzielle Cookies für die Funktion der Plattform (Authentifizierung, Sitzung). Optionale Cookies helfen uns, die Nutzung zu analysieren und die Plattform zu verbessern.",
+    "learnMore": "Mehr erfahren",
+    "acceptAll": "Alle akzeptieren",
+    "essentialOnly": "Nur essenzielle",
+    "close": "Schließen"
+  },
   "imageStudio": {
     "styles": {
       "modern": { "name": "Modern", "desc": "Klar & minimalistisch" },

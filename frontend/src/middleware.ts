@@ -16,11 +16,21 @@ const DEV_TEST_PREFIXES = ['dev.immivo.ai', 'test.immivo.ai', 'dev-', 'test-'];
 
 const SUPPORTED_LOCALES = ['de', 'en'];
 const DEFAULT_LOCALE = 'de';
+const DACH_COUNTRIES = ['AT', 'DE', 'CH', 'LI'];
 
 function detectLocale(request: NextRequest): string | null {
   const existingCookie = request.cookies.get('locale')?.value;
   if (existingCookie && SUPPORTED_LOCALES.includes(existingCookie)) return null;
 
+  // 1. Geo-IP: DACH countries (AT/DE/CH/LI) always get German
+  const country = (
+    request.headers.get('cloudfront-viewer-country') ||
+    request.headers.get('x-vercel-ip-country') ||
+    ''
+  ).toUpperCase();
+  if (country && DACH_COUNTRIES.includes(country)) return 'de';
+
+  // 2. Fallback: Accept-Language header
   const acceptLang = request.headers.get('accept-language') || '';
   const browserLocale = acceptLang
     .split(',')

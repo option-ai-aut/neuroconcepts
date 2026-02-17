@@ -3,14 +3,15 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Cookie, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 export default function CookieConsent() {
+  const t = useTranslations('cookieConsent');
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     const consent = localStorage.getItem('cookie-consent');
     if (!consent) {
-      // Slight delay so it doesn't flash on load
       const timer = setTimeout(() => setIsVisible(true), 1000);
       return () => clearTimeout(timer);
     }
@@ -36,12 +37,11 @@ export default function CookieConsent() {
             <Cookie className="w-5 h-5 text-blue-600" />
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-gray-900 mb-1">Cookie-Einstellungen</h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">{t('title')}</h3>
             <p className="text-sm text-gray-600 leading-relaxed">
-              Wir verwenden essenzielle Cookies fuer die Funktion der Plattform (Authentifizierung, Sitzung). 
-              Optionale Cookies helfen uns, die Nutzung zu analysieren und die Plattform zu verbessern.{' '}
+              {t('description')}{' '}
               <Link href="/datenschutz" className="text-blue-600 hover:underline">
-                Mehr erfahren
+                {t('learnMore')}
               </Link>
             </p>
             <div className="flex flex-wrap gap-3 mt-4">
@@ -49,20 +49,20 @@ export default function CookieConsent() {
                 onClick={acceptAll}
                 className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
               >
-                Alle akzeptieren
+                {t('acceptAll')}
               </button>
               <button
                 onClick={acceptEssential}
                 className="px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
               >
-                Nur essenzielle
+                {t('essentialOnly')}
               </button>
             </div>
           </div>
           <button
             onClick={acceptEssential}
             className="p-1 text-gray-400 hover:text-gray-600 shrink-0"
-            aria-label="Schliessen"
+            aria-label={t('close')}
           >
             <X className="w-4 h-4" />
           </button>
