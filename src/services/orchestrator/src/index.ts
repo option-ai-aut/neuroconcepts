@@ -575,6 +575,7 @@ const allowedOrigins = [
   'http://localhost:3001',  // Local backend dev
   process.env.FRONTEND_URL, // Production frontend
   'https://dev.immivo.ai',
+  'https://test.immivo.ai', // Test/staging environment
   'https://app.immivo.ai',  // Production app subdomain
   'https://immivo.ai',
   'https://www.immivo.ai',

@@ -41,8 +41,8 @@ export function RuntimeConfigProvider({ children }: { children: ReactNode }) {
         if (res.ok) {
           const data = await res.json();
           const loaded: RuntimeConfig = {
-            apiUrl: data.apiUrl || '',
-            streamUrl: data.streamUrl || '',
+            apiUrl: (data.apiUrl || '').replace(/\/+$/, ''),
+            streamUrl: (data.streamUrl || '').replace(/\/+$/, ''),
             userPoolId: data.userPoolId || '',
             userPoolClientId: data.userPoolClientId || '',
             adminUserPoolId: data.adminUserPoolId || '',

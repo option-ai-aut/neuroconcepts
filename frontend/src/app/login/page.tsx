@@ -377,7 +377,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-white">
       {/* Left Side - Image/Brand */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-black overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 sticky top-0 h-screen bg-black overflow-hidden">
         <div className="absolute inset-0 bg-black z-10" />
         
         <style jsx>{`
@@ -388,9 +388,7 @@ export default function LoginPage() {
             100% { transform: translate(-50%, -50%) rotate(var(--angle)) translateX(var(--dist)); opacity: 0; }
           }
         `}</style>
-        <div className="relative z-20 flex flex-col justify-between h-full p-12 text-white">
-          <div />
-          
+        <div className="relative z-20 flex flex-col items-center justify-center h-full w-full p-12 text-white">
           <div className="flex flex-col items-center justify-center">
             <div className="relative mb-10">
               {/* Particles */}
@@ -417,7 +415,7 @@ export default function LoginPage() {
             </h2>
           </div>
           
-          <div className="text-sm text-gray-400">
+          <div className="absolute bottom-6 left-0 right-0 text-center text-sm text-gray-400">
             © 2026 Immivo AI
           </div>
         </div>

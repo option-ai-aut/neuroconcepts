@@ -205,6 +205,8 @@ export default function LandingPage() {
   const scrollRef = useScrollReveal();
 
   const [splashDone, setSplashDone] = useState(splashShownThisSession);
+  const heroRef = useRef<HTMLElement>(null);
+  const [heroScroll, setHeroScroll] = useState(0);
 
   const handleSplashComplete = useCallback(() => {
     splashShownThisSession = true;
@@ -219,6 +221,19 @@ export default function LandingPage() {
     }
     return () => { document.body.style.overflow = ''; };
   }, [splashDone]);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const el = heroRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const h = el.offsetHeight;
+      const progress = Math.max(0, Math.min(1, -rect.top / (h * 0.7)));
+      setHeroScroll(progress);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
     e.preventDefault();
@@ -305,12 +320,28 @@ export default function LandingPage() {
       {/* ══════════════════════════════════════════
           HERO — Clean, centered, massive typography
           ══════════════════════════════════════════ */}
-      <section className={`relative min-h-screen flex items-center justify-center bg-gray-950 overflow-hidden ${splashDone ? 'hero-go' : ''}`}>
-        {/* Minimal background */}
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,#111827_0%,#030712_70%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_50%,rgba(0,0,0,0.5)_100%)]" />
+      <section ref={heroRef} className={`relative min-h-screen flex items-center justify-center bg-gray-950 overflow-hidden ${splashDone ? 'hero-go' : ''}`}>
+        {/* Diorama background image with scroll parallax */}
+        <div
+          className="absolute inset-0 will-change-transform"
+          style={{
+            opacity: 1 - heroScroll * 1.2,
+            transform: `scale(${1 + heroScroll * 0.15}) translateY(${heroScroll * -60}px)`,
+          }}
+        >
+          <NextImage
+            src="/diorama-1.jpg"
+            alt=""
+            fill
+            className="object-cover object-center"
+            sizes="100vw"
+            priority
+            quality={85}
+          />
         </div>
+        {/* Gradient overlays for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/70 to-gray-950/30" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(3,7,18,0.6)_100%)]" />
 
         <div className="relative z-10 max-w-4xl mx-auto px-5 sm:px-6 text-center pt-24 sm:pt-28 pb-12 sm:pb-16">
           {/* Logo */}
