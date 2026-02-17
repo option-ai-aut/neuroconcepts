@@ -406,8 +406,13 @@ export default function LandingPage() {
                     </div>
                   </div>
                   
-                  {/* Dashboard Preview */}
+                  {/* Dashboard Preview — Logo + Stats */}
                   <div className="p-4 space-y-4">
+                    {/* Immivo Logo — centered, prominent */}
+                    <div className="flex items-center justify-center py-8">
+                      <NextImage src="/logo-white.png" alt="Immivo" width={320} height={320} className="w-52 h-auto drop-shadow-[0_0_40px_rgba(255,255,255,0.08)]" />
+                    </div>
+
                     {/* Stats Row */}
                     <div className="grid grid-cols-3 gap-3">
                       <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/30">

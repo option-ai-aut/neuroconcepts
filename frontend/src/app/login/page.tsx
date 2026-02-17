@@ -410,7 +410,7 @@ export default function LoginPage() {
                   }}
                 />
               ))}
-              <Image src="/logo-icon-only.png" alt="Immivo" width={240} height={240} className="relative z-10 drop-shadow-[0_0_60px_rgba(255,255,255,0.15)]" />
+              <Image src="/logo-white.png" alt="Immivo" width={280} height={280} className="relative z-10 w-56 h-auto drop-shadow-[0_0_60px_rgba(255,255,255,0.15)]" />
             </div>
             <h2 className="text-4xl font-bold text-center">
               {view === 'signUp' || view === 'confirmSignUp' ? t('welcomeNew') : t('welcomeBack')}
