@@ -42,7 +42,7 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
         <div className="flex justify-between items-center h-16">
           <Link href="/" className="flex items-center">
             <Image src="/logo-icon-only.png" alt="Immivo" width={36} height={36} className="hidden lg:block" />
-            <Image src="/logo-black.png" alt="Immivo" width={120} height={40} className="lg:hidden h-8 w-auto" />
+            <Image src="/logo-black.png" alt="Immivo" width={180} height={60} className="lg:hidden h-12 w-auto" />
           </Link>
 
           <div className="hidden lg:flex items-center space-x-6">
