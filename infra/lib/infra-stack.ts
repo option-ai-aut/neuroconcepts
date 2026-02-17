@@ -533,15 +533,11 @@ export class ImmivoStack extends cdk.Stack {
         protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
       });
 
-      // Custom origin request policy: all viewer headers (except Host) + CloudFront geo header
+      // Custom origin request policy: all viewer headers (except Host) + CloudFront-Viewer-Country
       const viewerPlusGeoPolicy = new cloudfront.OriginRequestPolicy(this, 'ViewerPlusGeoPolicy', {
         originRequestPolicyName: `Immivo-ViewerPlusGeo-${props.stageName}`,
         comment: 'All viewer headers (excl. Host) + CloudFront-Viewer-Country for locale detection',
-        headerBehavior: cloudfront.OriginRequestHeaderBehavior.allowList(
-          'Accept', 'Accept-Language', 'Accept-Encoding', 'Accept-Charset',
-          'Authorization', 'Content-Type', 'Origin', 'Referer', 'User-Agent',
-          'X-Forwarded-For', 'CloudFront-Viewer-Country'
-        ),
+        headerBehavior: cloudfront.OriginRequestHeaderBehavior.all('CloudFront-Viewer-Country'),
         queryStringBehavior: cloudfront.OriginRequestQueryStringBehavior.all(),
         cookieBehavior: cloudfront.OriginRequestCookieBehavior.all(),
       });
