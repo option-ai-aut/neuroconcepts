@@ -11,6 +11,9 @@ const APP_DOMAIN = 'app.immivo.ai';
 const ADMIN_DOMAIN = 'admin.immivo.ai';
 const MARKETING_DOMAIN = 'immivo.ai';
 
+// Dev/Test stage domains — serve everything without redirects
+const DEV_TEST_PREFIXES = ['dev.immivo.ai', 'test.immivo.ai', 'dev-', 'test-'];
+
 const SUPPORTED_LOCALES = ['de', 'en'];
 const DEFAULT_LOCALE = 'de';
 
@@ -41,10 +44,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const isAppDomain = hostname.includes(APP_DOMAIN);
-  const isAdminDomain = hostname.includes(ADMIN_DOMAIN);
-  const isMarketingDomain = hostname.includes(MARKETING_DOMAIN) && !isAppDomain && !isAdminDomain;
   const isLocalhost = hostname.includes('localhost') || hostname.includes('127.0.0.1');
+  const isDevTest = DEV_TEST_PREFIXES.some(p => hostname.includes(p));
+  const isAppDomain = hostname === APP_DOMAIN || hostname.endsWith(`.${APP_DOMAIN}`);
+  const isAdminDomain = hostname === ADMIN_DOMAIN || hostname.endsWith(`.${ADMIN_DOMAIN}`);
+  const isMarketingDomain = hostname === MARKETING_DOMAIN || hostname === `www.${MARKETING_DOMAIN}`;
 
   // ========================================
   // LOCALE DETECTION (all domains)
@@ -53,9 +57,10 @@ export function middleware(request: NextRequest) {
   const detectedLocale = detectLocale(request);
 
   // ========================================
-  // LOCALHOST: Allow everything (development)
+  // LOCALHOST & DEV/TEST: Allow everything
+  // dev.immivo.ai and test.immivo.ai serve all pages without redirects
   // ========================================
-  if (isLocalhost) {
+  if (isLocalhost || isDevTest) {
     if (detectedLocale) {
       const response = NextResponse.next();
       response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365 });
