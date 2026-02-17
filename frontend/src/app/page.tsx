@@ -407,38 +407,38 @@ export default function LandingPage() {
                   </div>
                   
                   {/* Dashboard Preview — Logo + Stats */}
-                  <div className="p-4 space-y-4">
-                    {/* Immivo Logo — centered, prominent */}
-                    <div className="flex items-center justify-center py-8">
-                      <NextImage src="/logo-white.png" alt="Immivo" width={320} height={320} className="w-52 h-auto drop-shadow-[0_0_40px_rgba(255,255,255,0.08)]" />
+                  <div className="p-4 space-y-3">
+                    {/* Immivo Logo — compact header */}
+                    <div className="flex items-center justify-center py-3">
+                      <NextImage src="/logo-white.png" alt="Immivo" width={240} height={240} className="w-32 h-auto drop-shadow-[0_0_30px_rgba(255,255,255,0.06)]" />
                     </div>
 
                     {/* Stats Row */}
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/30">
-                        <p className="text-xs text-gray-500 mb-1">{t('preview.newLeadsToday')}</p>
-                        <p className="text-2xl font-bold text-white">12</p>
-                        <p className="text-xs text-green-400 mt-1">+23% ↑</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/30">
+                        <p className="text-[10px] text-gray-500 mb-0.5">{t('preview.newLeadsToday')}</p>
+                        <p className="text-xl font-bold text-white">12</p>
+                        <p className="text-[10px] text-green-400 mt-0.5">+23% ↑</p>
                       </div>
-                      <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/30">
-                        <p className="text-xs text-gray-500 mb-1">{t('preview.appointmentsBooked')}</p>
-                        <p className="text-2xl font-bold text-white">8</p>
-                        <p className="text-xs text-green-400 mt-1">{t('preview.byJarvis')}</p>
+                      <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/30">
+                        <p className="text-[10px] text-gray-500 mb-0.5">{t('preview.appointmentsBooked')}</p>
+                        <p className="text-xl font-bold text-white">8</p>
+                        <p className="text-[10px] text-green-400 mt-0.5">{t('preview.byJarvis')}</p>
                       </div>
-                      <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/30">
-                        <p className="text-xs text-gray-500 mb-1">{t('preview.exposesSent')}</p>
-                        <p className="text-2xl font-bold text-white">15</p>
-                        <p className="text-xs text-blue-400 mt-1">{t('preview.automatic')}</p>
+                      <div className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/30">
+                        <p className="text-[10px] text-gray-500 mb-0.5">{t('preview.exposesSent')}</p>
+                        <p className="text-xl font-bold text-white">15</p>
+                        <p className="text-[10px] text-blue-400 mt-0.5">{t('preview.automatic')}</p>
                       </div>
                     </div>
 
                     {/* Jarvis Chat Preview */}
-                    <div className="bg-gradient-to-br from-gray-800/50 to-gray-700/50 rounded-xl p-4 border border-gray-600/30">
+                    <div className="bg-gradient-to-br from-gray-800/50 to-gray-700/50 rounded-xl p-3 border border-gray-600/30">
                       <div className="flex items-start gap-3">
-                        <NextImage src="/logo-icon.png" alt="Jarvis" width={40} height={40} className="flex-shrink-0 animate-pulse-glow rounded-xl" />
+                        <NextImage src="/logo-icon.png" alt="Jarvis" width={36} height={36} className="flex-shrink-0 animate-pulse-glow rounded-lg" />
                         <div>
-                          <p className="text-xs text-gray-400 mb-1">{t('preview.jarvisJustNow')}</p>
-                          <p className="text-sm text-white">
+                          <p className="text-[10px] text-gray-400 mb-0.5">{t('preview.jarvisJustNow')}</p>
+                          <p className="text-xs text-white leading-relaxed">
                             {t('preview.jarvisMessage')}
                           </p>
                         </div>
@@ -446,16 +446,16 @@ export default function LandingPage() {
                     </div>
 
                     {/* Activity Feed */}
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       {[
                         { icon: Mail, text: t('preview.activity1'), time: 'vor 2 Min', color: 'text-blue-400' },
                         { icon: Calendar, text: t('preview.activity2'), time: 'vor 5 Min', color: 'text-green-400' },
                         { icon: FileText, text: t('preview.activity3'), time: 'vor 8 Min', color: 'text-gray-400' },
                       ].map((item, i) => (
-                        <div key={i} className="flex items-center gap-3 bg-gray-800/30 rounded-lg px-3 py-2">
-                          <item.icon className={`w-4 h-4 ${item.color}`} />
-                          <span className="text-xs text-gray-300 flex-1">{item.text}</span>
-                          <span className="text-xs text-gray-500">{item.time}</span>
+                        <div key={i} className="flex items-center gap-2.5 bg-gray-800/30 rounded-lg px-3 py-1.5">
+                          <item.icon className={`w-3.5 h-3.5 ${item.color}`} />
+                          <span className="text-[11px] text-gray-300 flex-1">{item.text}</span>
+                          <span className="text-[10px] text-gray-500">{item.time}</span>
                         </div>
                       ))}
                     </div>
