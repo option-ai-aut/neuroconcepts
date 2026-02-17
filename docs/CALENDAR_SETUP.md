@@ -46,11 +46,15 @@ Diese Anleitung erklärt, wie Tenants ihre eigenen Google Calendar und Outlook C
 4. Konfigurieren Sie:
    - **Name**: Immivo Calendar Integration
    - **Authorized JavaScript origins**: 
-     - `http://localhost:3001` (Development)
-     - `https://your-production-domain.com` (Production)
+     - `http://localhost:3001` (Local)
+     - `https://dev-api.immivo.ai` (Dev)
+     - `https://test-api.immivo.ai` (Test)
+     - `https://api.immivo.ai` (Production)
    - **Authorized redirect URIs**:
-     - `http://localhost:3001/calendar/google/callback` (Development)
-     - `https://your-production-domain.com/calendar/google/callback` (Production)
+     - `http://localhost:3001/calendar/google/callback` (Local)
+     - `https://dev-api.immivo.ai/calendar/google/callback` (Dev)
+     - `https://test-api.immivo.ai/calendar/google/callback` (Test)
+     - `https://api.immivo.ai/calendar/google/callback` (Production)
 5. Klicken Sie auf "Create"
 6. Kopieren Sie **Client ID** und **Client Secret**
 
@@ -65,11 +69,14 @@ GOOGLE_CALENDAR_CLIENT_SECRET=your-client-secret-here
 GOOGLE_CALENDAR_REDIRECT_URI=http://localhost:3001/calendar/google/callback
 ```
 
-**Für Online Dev/Production:**
+**Für Online (Dev/Test/Prod) — in AWS Secrets Manager (`Immivo-App-Secret-{stage}`):**
 ```env
 GOOGLE_CALENDAR_CLIENT_ID=your-client-id-here
 GOOGLE_CALENDAR_CLIENT_SECRET=your-client-secret-here
-GOOGLE_CALENDAR_REDIRECT_URI=https://1rnmc2z8eg.execute-api.eu-central-1.amazonaws.com/dev/calendar/google/callback
+# Dev:  https://dev-api.immivo.ai/calendar/google/callback
+# Test: https://test-api.immivo.ai/calendar/google/callback
+# Prod: https://api.immivo.ai/calendar/google/callback
+GOOGLE_CALENDAR_REDIRECT_URI=https://{stage}-api.immivo.ai/calendar/google/callback
 ```
 
 ## Microsoft Outlook Calendar Setup
@@ -122,11 +129,14 @@ MICROSOFT_CLIENT_SECRET=your-client-secret-here
 MICROSOFT_REDIRECT_URI=http://localhost:3001/calendar/outlook/callback
 ```
 
-**Für Online Dev/Production:**
+**Für Online (Dev/Test/Prod) — in AWS Secrets Manager (`Immivo-App-Secret-{stage}`):**
 ```env
 MICROSOFT_CLIENT_ID=your-application-id-here
 MICROSOFT_CLIENT_SECRET=your-client-secret-here
-MICROSOFT_REDIRECT_URI=https://1rnmc2z8eg.execute-api.eu-central-1.amazonaws.com/dev/calendar/outlook/callback
+# Dev:  https://dev-api.immivo.ai/calendar/outlook/callback
+# Test: https://test-api.immivo.ai/calendar/outlook/callback
+# Prod: https://api.immivo.ai/calendar/outlook/callback
+MICROSOFT_REDIRECT_URI=https://{stage}-api.immivo.ai/calendar/outlook/callback
 ```
 
 ## Testing
@@ -181,16 +191,20 @@ npm run dev
 Sie müssen die Redirect URIs in beiden OAuth-Konsolen (Google Cloud & Azure Portal) konfigurieren:
 
 ### Google Cloud Console
-Fügen Sie beide URIs hinzu:
-- `http://localhost:3001/calendar/google/callback` (für lokale Entwicklung)
-- `https://1rnmc2z8eg.execute-api.eu-central-1.amazonaws.com/dev/calendar/google/callback` (für Online Dev)
+Fügen Sie alle benötigten URIs hinzu:
+- `http://localhost:3001/calendar/google/callback` (lokal)
+- `https://dev-api.immivo.ai/calendar/google/callback` (Dev)
+- `https://test-api.immivo.ai/calendar/google/callback` (Test)
+- `https://api.immivo.ai/calendar/google/callback` (Prod)
 
 ### Azure Portal
-Fügen Sie beide URIs hinzu:
-- `http://localhost:3001/calendar/outlook/callback` (für lokale Entwicklung)
-- `https://1rnmc2z8eg.execute-api.eu-central-1.amazonaws.com/dev/calendar/outlook/callback` (für Online Dev)
+Fügen Sie alle benötigten URIs hinzu:
+- `http://localhost:3001/calendar/outlook/callback` (lokal)
+- `https://dev-api.immivo.ai/calendar/outlook/callback` (Dev)
+- `https://test-api.immivo.ai/calendar/outlook/callback` (Test)
+- `https://api.immivo.ai/calendar/outlook/callback` (Prod)
 
-**Hinweis:** Sie können mehrere Redirect URIs in beiden Konsolen hinzufügen. Die OAuth-Bibliotheken wählen automatisch die richtige URI basierend auf der Umgebungsvariable.
+**Hinweis:** Sie können mehrere Redirect URIs in beiden Konsolen hinzufügen. Die OAuth-Bibliotheken wählen automatisch die richtige URI basierend auf der Umgebungsvariable in `Immivo-App-Secret-{stage}`.
 
 ## Production Deployment
 

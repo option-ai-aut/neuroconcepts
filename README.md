@@ -1,6 +1,6 @@
 # Immivo AI - B2B Real Estate Automation Platform
 
-**Status:** Phase 1 (MVP) - Live on AWS Lambda (Dev)  
+**Status:** Phase 1 (MVP) - Live on AWS (Dev/Test/Prod)  
 **Target Launch:** Q2 2026  
 **Focus:** DACH Region (Germany, Austria, Switzerland)
 
@@ -26,7 +26,7 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 ### Infrastructure & Backend
 - **Cloud:** AWS (Region: `eu-central-1` Frankfurt)
 - **Compute:** AWS Lambda (Serverless) + API Gateway
-- **Database:** PostgreSQL 16 (RDS t4g.micro for Dev/Stage, Aurora Serverless v2 for Prod, Neon.tech lokal)
+- **Database:** PostgreSQL 16 (RDS t4g.micro for Dev/Test, Aurora Serverless v2 for Prod, Neon.tech lokal)
 - **Language:** Node.js / TypeScript
 - **IaC:** AWS CDK
 
@@ -50,9 +50,9 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 - **Email Outbound (System):** Resend API
 - **Email Postfächer:** AWS WorkMail (4 Seats)
 - **Calendar:** AWS WorkMail CalDAV (geplant: Google Meet)
-- **Media Storage:** AWS S3 via CloudFront CDN (`media.immivo.ai`)
-- **CDN:** AWS CloudFront (app/api/admin/media.immivo.ai)
-- **DNS:** AWS Route53 (`immivo.ai` Hosted Zone)
+- **Media Storage:** AWS S3 via CloudFront CDN (`media.immivo.ai`, `{stage}-media.immivo.ai`)
+- **CDN:** AWS CloudFront — Prod: `app/api/admin/media.immivo.ai` | Dev: `dev.immivo.ai`, `dev-api.immivo.ai` | Test: `test.immivo.ai`, `test-api.immivo.ai`
+- **DNS:** AWS Route53 (`immivo.ai` Hosted Zone, Wildcard-Zertifikat `*.immivo.ai`)
 
 ### Frontend
 - **Framework:** Next.js 15 (App Router)

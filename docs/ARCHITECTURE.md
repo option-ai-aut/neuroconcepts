@@ -86,13 +86,14 @@ graph TD
 ### 3. Data Layer
 
 #### Datenbank-Infrastruktur
-*   **Dev/Stage:** RDS PostgreSQL 16 Single Instance (`t4g.micro`), **oeffentlich erreichbar** (Security Group erlaubt 0.0.0.0/0:5432). Lambda laeuft **ausserhalb** des VPC fuer schnellere Cold Starts.
+*   **Dev:** RDS PostgreSQL 16 Single Instance (`t4g.micro`), **oeffentlich erreichbar** (Security Group erlaubt 0.0.0.0/0:5432). Lambda laeuft **ausserhalb** des VPC fuer schnellere Cold Starts.
+*   **Test:** RDS PostgreSQL 16 Single Instance (`t4g.micro`), **privates Subnetz**. Lambda laeuft **innerhalb** des VPC (wie Prod).
 *   **Prod:** Aurora Serverless v2 (PostgreSQL 16.6), **privates Subnetz** (nicht oeffentlich erreichbar). Lambda laeuft **innerhalb** des VPC mit Security Group die nur DB-Zugriff erlaubt. Datenbankname: `immivo`.
 *   **Lokal:** Neon.tech (serverless Postgres) fuer lokale Entwicklung.
 *   **Connection Pooling:** Wird dynamisch an die `DATABASE_URL` angehaengt:
     *   Lambda: `connection_limit=3&pool_timeout=10&connect_timeout=5`
     *   Lokal: `connection_limit=10&pool_timeout=30&connect_timeout=5`
-*   **Credentials:** Dev/Stage: `.env`/`.env.local` | Prod: AWS Secrets Manager (`Immivo-DB-Secret-prod` fuer DB, `Immivo-App-Secret-prod` fuer App-Keys).
+*   **Credentials:** Alle Stages nutzen AWS Secrets Manager (`Immivo-DB-Secret-{stage}` fuer DB, `Immivo-App-Secret-{stage}` fuer App-Keys). Lokal: `.env`/`.env.local`.
 
 #### Prisma Schema & Models
 Die Datenschicht nutzt **Prisma ORM** (`schema.prisma`). Aktuelle Models:
@@ -212,29 +213,41 @@ Wir nutzen **AWS CDK (Cloud Development Kit)**, um die gesamte Infrastruktur im 
 *   **Fine-Tuning Data Export:** Endpoint available for exporting fine-tuning-ready data.
 
 ### CDN & DNS (CloudFront + Route53)
-*   **Route53 Hosted Zone:** `immivo.ai` — verwaltet DNS fuer alle Subdomains (app, api, admin, media) sowie Resend-Verifizierung.
+*   **Route53 Hosted Zone:** `immivo.ai` — verwaltet DNS fuer alle Subdomains (app, api, admin, media, dev, test) sowie Resend-Verifizierung.
 *   **ACM Wildcard-Zertifikat:** `*.immivo.ai` + `immivo.ai` (us-east-1, fuer CloudFront).
-*   **CloudFront Distributions:**
+*   **CloudFront Distributions (Prod — manuell verwaltet):**
     *   `app.immivo.ai` → Frontend Lambda URL (E1E8VMUP3UA4TJ)
     *   `api.immivo.ai` → API Gateway (E1F9SS8QE17ZZP)
     *   `admin.immivo.ai` → Frontend Lambda URL (E1XYO1OK2QOZQA)
     *   `immivo.ai` → Frontend Lambda URL (E24ZLYKGX22SZJ)
-    *   `media.immivo.ai` → S3 Media Bucket via OAC (**CDK-verwaltet**, Phase 4.2)
+    *   `media.immivo.ai` → S3 Media Bucket via OAC (**CDK-verwaltet**)
+*   **CloudFront Distributions (Dev/Test — CDK-verwaltet):**
+    *   `dev.immivo.ai` / `test.immivo.ai` → Frontend Lambda URL
+    *   `dev-api.immivo.ai` / `test-api.immivo.ai` → API Gateway
+    *   `dev-media.immivo.ai` / `test-media.immivo.ai` → S3 Media Bucket via OAC
+    *   Frontend-CDN fuer Dev/Test nutzt `CACHING_DISABLED` als Default + `CACHING_OPTIMIZED` fuer `/_next/static/*` (verhindert 429-Fehler).
 *   **Caching:** Media-CDN nutzt `CachePolicy.CACHING_OPTIMIZED` (TTL max 1 Jahr, gzip/brotli Kompression).
 *   **Protokoll:** HTTP/2+3, TLS 1.2+, Price Class 100 (EU + Nordamerika).
 
 ### Environment-Strategie
 1.  **Dev** (`Immivo-Dev`):
-    *   Für die tägliche Entwicklung.
-    *   **Deployment:** Automatisch bei Push auf `main` (GitHub Actions).
-    *   Ressourcen: RDS Micro, Lambda Frontend (Scale to Zero).
-2.  **Stage** (`Immivo-Stage`):
-    *   Spiegelbild der Produktion.
-    *   **Deployment:** Manuell via GitHub Actions (Workflow Dispatch).
+    *   Für die tägliche Entwicklung und schnelle Iteration.
+    *   **Branch:** `dev` → automatisches Deployment via GitHub Actions.
+    *   **Domain:** `dev.immivo.ai`, `dev-api.immivo.ai`, `dev-media.immivo.ai`
+    *   Ressourcen: RDS Micro (oeffentlich), Lambda ausserhalb VPC, eigener Cognito Pool.
+2.  **Test** (`Immivo-Test`):
+    *   Spiegelbild der Produktion (VPC, private Subnets).
+    *   **Branch:** `test` → automatisches Deployment via GitHub Actions.
+    *   **Domain:** `test.immivo.ai`, `test-api.immivo.ai`, `test-media.immivo.ai`
+    *   Ressourcen: RDS Micro (privat, wie Prod), Lambda innerhalb VPC, eigener Cognito Pool.
 3.  **Prod** (`Immivo-Prod`):
     *   Das Live-System.
-    *   **Deployment:** Manuell via GitHub Actions (Workflow Dispatch).
-    *   Backups und High-Availability aktiviert.
+    *   **Branch:** `main` → automatisches Deployment via GitHub Actions.
+    *   **Domain:** `app.immivo.ai`, `api.immivo.ai`, `admin.immivo.ai`, `immivo.ai`, `media.immivo.ai`
+    *   Ressourcen: Aurora Serverless v2, Lambda innerhalb VPC, Backups und High-Availability.
+    *   **Middleware:** Domainbasiertes Routing (app → Dashboard, admin → Admin-Panel, immivo.ai → Marketing).
+
+**Workflow:** Entwicklung auf `dev` → Testen auf `test` → Release auf `main` (Prod). Jede Stage hat isolierte Datenbank, Cognito Pool und Secrets.
 
 ### Lokale Entwicklung
 *   **Frontend:** `npm run dev` auf Port 3000

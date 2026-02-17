@@ -8,9 +8,9 @@ The stack (`lib/infra-stack.ts`) provisions the following resources:
 
 1.  **VPC (Network):**
     - **Dev:** Public subnets only (cheaper, no NAT Gateway needed).
-    - **Stage/Prod:** Public & Private subnets with NAT Gateway for security.
+    - **Test/Prod:** Public & Private subnets with NAT Gateway for security.
 2.  **Database (RDS):**
-    - **Dev:** PostgreSQL `t4g.micro` instance.
+    - **Dev/Test:** PostgreSQL `t4g.micro` instance.
     - **Prod:** Aurora Serverless v2 (PostgreSQL compatible).
 3.  **Authentication:** AWS Cognito User Pool (Users) + Admin User Pool (Platform Admins).
 4.  **Backend API:** AWS Lambda (Node.js) + API Gateway.
@@ -28,7 +28,12 @@ We use **GitHub Actions** for CI/CD (`.github/workflows/deploy.yml`).
 - Pushing to `test` → deploys **Test** (`Immivo-Test`)
 
 ### Manual Deployment
-- You can manually trigger a deployment to **Stage** or **Prod** via the GitHub Actions "Run workflow" button.
+- You can manually trigger a deployment to **Dev**, **Test** or **Prod** via the GitHub Actions "Run workflow" button.
+
+### Custom Domains
+- **Dev:** `dev.immivo.ai` (Frontend), `dev-api.immivo.ai` (API), `dev-media.immivo.ai` (Media)
+- **Test:** `test.immivo.ai` (Frontend), `test-api.immivo.ai` (API), `test-media.immivo.ai` (Media)
+- **Prod:** `app.immivo.ai` / `immivo.ai` (Frontend), `api.immivo.ai` (API), `admin.immivo.ai` (Admin), `media.immivo.ai` (Media)
 
 ## 🛠 Local Development
 

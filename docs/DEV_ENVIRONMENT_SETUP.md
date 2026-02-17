@@ -1,6 +1,6 @@
 # Dev Environment Setup & Stack Updates
 
-Wenn du einen neuen CloudFormation Stack deployst (z.B. weil du den alten gelöscht hast oder eine neue Stage wie `Immivo-Stage` aufsetzt), ändern sich die **IDs und URLs** der AWS-Ressourcen (Datenbank, Cognito User Pool, API Gateway).
+Wenn du einen neuen CloudFormation Stack deployst (z.B. weil du den alten gelöscht hast oder eine neue Stage wie `Immivo-Test` aufsetzt), ändern sich die **IDs und URLs** der AWS-Ressourcen (Datenbank, Cognito User Pool, API Gateway).
 
 Damit deine lokale Entwicklungsumgebung (`localhost`) weiterhin funktioniert, musst du diese neuen Werte in die lokalen Konfigurationsdateien übertragen.
 
@@ -76,15 +76,19 @@ DATABASE_URL="postgresql://neondb_owner:PASSWORD@ep-xxx.eu-central-1.aws.neon.te
 
 ## 4. Google/Microsoft OAuth (Falls benötigt)
 
-Wenn sich die Frontend-URL geändert hat (z.B. bei einer neuen Stage auf AWS Lambda), musst du die **Authorized Redirect URI** anpassen:
+Wenn sich die Frontend-URL geändert hat, musst du die **Authorized Redirect URI** anpassen:
 
 ### Google Cloud Console
 *   Lokal: `http://localhost:3000/dashboard/settings/integrations`
-*   Live (Dev/Stage): `https://NEUE-LAMBDA-URL.on.aws/dashboard/settings/integrations`
+*   Dev: `https://dev.immivo.ai/dashboard/settings/integrations`
+*   Test: `https://test.immivo.ai/dashboard/settings/integrations`
+*   Prod: `https://app.immivo.ai/dashboard/settings/integrations`
 
 ### Microsoft Azure Portal
 *   Lokal: `http://localhost:3000/dashboard/settings/integrations`
-*   Live (Dev/Stage): `https://NEUE-LAMBDA-URL.on.aws/dashboard/settings/integrations`
+*   Dev: `https://dev.immivo.ai/dashboard/settings/integrations`
+*   Test: `https://test.immivo.ai/dashboard/settings/integrations`
+*   Prod: `https://app.immivo.ai/dashboard/settings/integrations`
 
 ## 5. Neustart
 
@@ -129,9 +133,14 @@ npx prisma studio
 
 **Hinweis:** Manche DB-Objekte (pgvector Embeddings, tsvector Spalten, Trigger) sind **nicht** im Prisma-Schema, da Prisma die Typen nicht nativ unterstuetzt. Diese werden nur per Raw SQL in den Migrationen verwaltet. Siehe Kommentar oben in `schema.prisma`.
 
-## 7. AWS Secrets Manager (Production)
+## 7. AWS Secrets Manager (Alle Stages)
 
-In Production werden Secrets nicht über `.env` geladen, sondern aus dem **AWS Secrets Manager** (`Immivo-App-Secret-prod`). Der Orchestrator liest diese automatisch beim Lambda-Start.
+In allen AWS-Stages (Dev, Test, Prod) werden Secrets aus dem **AWS Secrets Manager** geladen:
+- `Immivo-App-Secret-dev` — Dev-Stage
+- `Immivo-App-Secret-test` — Test-Stage
+- `Immivo-App-Secret-prod` — Production
+
+Der Orchestrator liest diese automatisch beim Lambda-Start.
 
 Folgende Keys müssen im Secret hinterlegt sein:
 - `DATABASE_URL`
@@ -139,10 +148,10 @@ Folgende Keys müssen im Secret hinterlegt sein:
 - `GEMINI_API_KEY`
 - `RESEND_API_KEY`
 - `ENCRYPTION_KEY`
-- `FRONTEND_URL`
+- `FRONTEND_URL` (Dev: `https://dev.immivo.ai`, Test: `https://test.immivo.ai`, Prod: `https://app.immivo.ai`)
 - Google/Microsoft OAuth Keys (wenn benötigt)
 
-**Hinzufügen:** AWS Console → Secrets Manager → `Immivo-App-Secret-prod` → Retrieve secret value → Edit → Add row.
+**Hinzufügen:** AWS Console → Secrets Manager → `Immivo-App-Secret-{stage}` → Retrieve secret value → Edit → Add row.
 
 ## 8. Medien-Uploads
 

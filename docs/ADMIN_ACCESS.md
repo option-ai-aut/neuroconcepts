@@ -6,8 +6,9 @@ Der Admin-Bereich ist das Herzstück der Plattform für dich als Founder und dei
 
 ### Wie komme ich hin?
 
-**Production:** `https://app.immivo.ai/admin`  
-**Dev:** `https://LAMBDA-URL.lambda-url.eu-central-1.on.aws/admin`
+**Production:** `https://admin.immivo.ai` (oder `https://app.immivo.ai/admin`)  
+**Test:** `https://test.immivo.ai/admin`  
+**Dev:** `https://dev.immivo.ai/admin`
 
 Der Admin-Bereich ist über `/admin` erreichbar und durch einen separaten **Admin Cognito User Pool** geschützt.
 
