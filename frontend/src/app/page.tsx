@@ -154,12 +154,71 @@ function BeforeAfterSlider() {
   );
 }
 
+/* ─────────────────────────────────────────────
+   Splash Screen — 3-second blur-reveal intro
+   ───────────────────────────────────────────── */
+function SplashScreen({ onComplete }: { onComplete: () => void }) {
+  const [phase, setPhase] = useState<'reveal' | 'text-exit' | 'exit'>('reveal');
+  const phrase = 'Close More. Stress Less.';
+  const chars = phrase.split('');
+
+  useEffect(() => {
+    const textExit = setTimeout(() => setPhase('text-exit'), 2100);
+    const slideExit = setTimeout(() => setPhase('exit'), 2400);
+    const doneTimer = setTimeout(onComplete, 3200);
+    return () => { clearTimeout(textExit); clearTimeout(slideExit); clearTimeout(doneTimer); };
+  }, [onComplete]);
+
+  return (
+    <div
+      className={`fixed inset-0 z-[100] bg-gray-950 flex items-center justify-center px-6 transition-transform duration-[800ms] ease-[cubic-bezier(0.65,0,0.35,1)] ${
+        phase === 'exit' ? '-translate-y-full' : 'translate-y-0'
+      }`}
+    >
+      <p
+        className={`flex flex-wrap justify-center transition-all duration-[800ms] ease-[cubic-bezier(0.65,0,0.35,1)] ${
+          phase === 'text-exit' || phase === 'exit' ? '-translate-y-[50vh] opacity-0' : ''
+        }`}
+        aria-label={phrase}
+      >
+        {chars.map((char, i) => (
+          <span
+            key={i}
+            className="splash-char"
+            style={{ animationDelay: `${300 + i * 55}ms` } as React.CSSProperties}
+          >
+            {char === ' ' ? '\u00A0' : char}
+          </span>
+        ))}
+      </p>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════
    LANDING PAGE
    ═══════════════════════════════════════════════ */
+let splashShownThisSession = false;
+
 export default function LandingPage() {
   const t = useTranslations('landing');
   const scrollRef = useScrollReveal();
+
+  const [splashDone, setSplashDone] = useState(splashShownThisSession);
+
+  const handleSplashComplete = useCallback(() => {
+    splashShownThisSession = true;
+    setSplashDone(true);
+  }, []);
+
+  useEffect(() => {
+    if (!splashDone) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [splashDone]);
 
   const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
     e.preventDefault();
@@ -169,8 +228,27 @@ export default function LandingPage() {
   return (
     <div ref={scrollRef} className="min-h-screen bg-white font-sans text-gray-900 overflow-x-hidden scroll-smooth">
 
+      {/* ── Splash Screen ── */}
+      {!splashDone && <SplashScreen onComplete={handleSplashComplete} />}
+
       {/* ── Global reveal styles ── */}
       <style jsx global>{`
+        /* ── Splash blur-reveal ── */
+        @keyframes splash-blur-in {
+          0%   { filter: blur(12px); opacity: 0; transform: translateY(4px); }
+          100% { filter: blur(0px); opacity: 1; transform: translateY(0); }
+        }
+        .splash-char {
+          display: inline-block;
+          opacity: 0;
+          filter: blur(12px);
+          animation: splash-blur-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          font-size: clamp(1.4rem, 4vw, 2.8rem);
+          font-weight: 300;
+          color: white;
+          letter-spacing: 0.12em;
+        }
+
         /* Base reveal class — hidden state */
         .rv {
           opacity: 0;
@@ -186,12 +264,16 @@ export default function LandingPage() {
           transform: translateY(0);
         }
 
-        /* Hero entry — separate because it runs on load, not on scroll */
+        /* Hero entry — only runs when splash is done (parent has .hero-go) */
         @keyframes hero-enter {
           from { opacity: 0; transform: translateY(36px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        .hero-enter {
+        .hero-el {
+          opacity: 0;
+          transform: translateY(36px);
+        }
+        .hero-go .hero-el {
           animation: hero-enter 1s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
 
@@ -223,87 +305,87 @@ export default function LandingPage() {
       {/* ══════════════════════════════════════════
           HERO — Clean, centered, massive typography
           ══════════════════════════════════════════ */}
-      <section className="relative min-h-screen flex items-center justify-center bg-gray-950 overflow-hidden">
+      <section className={`relative min-h-screen flex items-center justify-center bg-gray-950 overflow-hidden ${splashDone ? 'hero-go' : ''}`}>
         {/* Minimal background */}
         <div className="absolute inset-0">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,#111827_0%,#030712_70%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_50%,rgba(0,0,0,0.5)_100%)]" />
         </div>
 
-        <div className="relative z-10 max-w-4xl mx-auto px-6 text-center pt-28 pb-16">
+        <div className="relative z-10 max-w-4xl mx-auto px-5 sm:px-6 text-center pt-24 sm:pt-28 pb-12 sm:pb-16">
           {/* Logo */}
-          <div className="hero-enter" style={{ animationDelay: '0.1s' }}>
+          <div className="hero-el" style={{ animationDelay: '0.1s' }}>
             <NextImage
               src="/logo-white.png"
               alt="Immivo"
-              width={280}
-              height={280}
-              className="w-28 sm:w-36 lg:w-44 h-auto mx-auto mb-10 sm:mb-14"
+              width={600}
+              height={600}
+              className="w-24 sm:w-36 lg:w-[32rem] h-auto mx-auto mb-8 sm:mb-14"
               priority
             />
           </div>
 
           {/* Headline */}
-          <div className="hero-enter" style={{ animationDelay: '0.3s' }}>
+          <div className="hero-el" style={{ animationDelay: '0.3s' }}>
             <h1 className="font-extrabold tracking-tight leading-[1.05]">
-              <span className="block text-lg sm:text-2xl lg:text-3xl text-gray-500 mb-2">
+              <span className="block text-base sm:text-2xl lg:text-3xl text-gray-500 mb-1.5 sm:mb-2">
                 {t('hero.title1')}
               </span>
-              <span className="block text-5xl sm:text-7xl lg:text-[6.5rem] bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
+              <span className="block text-[2.5rem] sm:text-7xl lg:text-[6.5rem] bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
                 {t('hero.title2')}
               </span>
             </h1>
           </div>
 
           {/* Subtitle */}
-          <div className="hero-enter" style={{ animationDelay: '0.55s' }}>
-            <p className="mt-6 sm:mt-8 text-base sm:text-lg lg:text-xl text-gray-400 max-w-xl mx-auto leading-relaxed">
+          <div className="hero-el" style={{ animationDelay: '0.55s' }}>
+            <p className="mt-5 sm:mt-8 text-sm sm:text-lg lg:text-xl text-gray-400 max-w-xl mx-auto leading-relaxed">
               {t.rich('hero.subtitle', { bold: (chunks) => <span className="text-white font-medium">{chunks}</span> })}
             </p>
           </div>
 
           {/* CTAs */}
-          <div className="hero-enter flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mt-10 sm:mt-12" style={{ animationDelay: '0.75s' }}>
+          <div className="hero-el flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mt-8 sm:mt-12" style={{ animationDelay: '0.75s' }}>
             <Link
               href="/login?mode=register"
-              className="group inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold text-gray-900 bg-white rounded-full hover:bg-gray-100 transition-all duration-300 hover:-translate-y-0.5 shadow-[0_0_40px_rgba(255,255,255,0.08)]"
+              className="group w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-semibold text-gray-900 bg-white rounded-full hover:bg-gray-100 transition-all duration-300 hover:-translate-y-0.5 shadow-[0_0_40px_rgba(255,255,255,0.08)]"
             >
               {t('hero.ctaPrimary')}
-              <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+              <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform duration-300" />
             </Link>
             <a
               href="#demo"
               onClick={(e) => handleAnchorClick(e, 'demo')}
-              className="group inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold text-gray-400 border border-white/15 rounded-full hover:bg-white/5 hover:border-white/30 hover:text-gray-200 transition-all duration-300"
+              className="group w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-semibold text-gray-400 border border-white/15 rounded-full hover:bg-white/5 hover:border-white/30 hover:text-gray-200 transition-all duration-300"
             >
-              <Calendar className="mr-2 w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity" />
+              <Calendar className="mr-2 w-4 h-4 sm:w-5 sm:h-5 opacity-60 group-hover:opacity-100 transition-opacity" />
               {t('hero.ctaSecondary')}
             </a>
           </div>
 
           {/* Trust */}
-          <div className="hero-enter flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-12 sm:mt-16 text-xs sm:text-sm text-gray-600" style={{ animationDelay: '0.95s' }}>
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500/60" />
+          <div className="hero-el flex flex-wrap items-center justify-center gap-x-4 sm:gap-x-6 gap-y-2 mt-8 sm:mt-16 text-[11px] sm:text-sm text-gray-600" style={{ animationDelay: '0.95s' }}>
+            <span className="flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500/60" />
               {t('hero.trustNoCard')}
             </span>
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500/60" />
+            <span className="flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500/60" />
               {t('hero.trust7Days')}
             </span>
-            <span className="flex items-center gap-1.5">
-              <Shield className="w-3.5 h-3.5 text-gray-600" />
+            <span className="flex items-center gap-1">
+              <Shield className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-600" />
               {t('hero.trustGdpr')}
             </span>
-            <span className="flex items-center gap-1.5">
-              <Server className="w-3.5 h-3.5 text-gray-600" />
+            <span className="flex items-center gap-1">
+              <Server className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-600" />
               {t('hero.awsHosting')}
             </span>
           </div>
         </div>
 
         {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 hero-enter" style={{ animationDelay: '1.3s' }}>
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 hero-el" style={{ animationDelay: '1.3s' }}>
           <ChevronDown className="w-5 h-5 text-gray-600" style={{ animation: 'scroll-bounce 2.5s ease-in-out infinite' }} />
         </div>
       </section>
@@ -311,21 +393,21 @@ export default function LandingPage() {
       {/* ══════════════════════════════════════════
           PROBLEM / WHY
           ══════════════════════════════════════════ */}
-      <section id="warum" className="py-20 sm:py-32 lg:py-40">
-        <div className="max-w-6xl mx-auto px-6">
+      <section id="warum" className="py-16 sm:py-32 lg:py-40">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6">
           {/* Heading */}
-          <div className="text-center mb-16 sm:mb-20">
-            <p className="rv text-blue-600 font-semibold text-sm tracking-widest uppercase mb-4">{t('problem.sectionLabel')}</p>
-            <h2 className="rv text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight" style={{ '--d': '100ms' } as React.CSSProperties}>
+          <div className="text-center mb-12 sm:mb-20">
+            <p className="rv text-blue-600 font-semibold text-xs sm:text-sm tracking-widest uppercase mb-3 sm:mb-4">{t('problem.sectionLabel')}</p>
+            <h2 className="rv text-2xl sm:text-5xl lg:text-6xl font-bold tracking-tight" style={{ '--d': '100ms' } as React.CSSProperties}>
               {t('problem.title')}
             </h2>
-            <p className="rv text-lg sm:text-xl text-gray-500 mt-5 max-w-2xl mx-auto leading-relaxed" style={{ '--d': '200ms' } as React.CSSProperties}>
+            <p className="rv text-sm sm:text-xl text-gray-500 mt-3 sm:mt-5 max-w-2xl mx-auto leading-relaxed" style={{ '--d': '200ms' } as React.CSSProperties}>
               {t('problem.subtitle')}
             </p>
           </div>
 
           {/* Cards */}
-          <div className="grid sm:grid-cols-3 gap-5 sm:gap-6">
+          <div className="grid sm:grid-cols-3 gap-4 sm:gap-6">
             {[
               { icon: Mail, title: t('problem.emailFlood'), problem: t('problem.emailProblem'), solution: t('problem.emailSolution') },
               { icon: Calendar, title: t('problem.appointmentChaos'), problem: t('problem.appointmentProblem'), solution: t('problem.appointmentSolution') },
@@ -333,13 +415,13 @@ export default function LandingPage() {
             ].map((item, i) => (
               <div
                 key={i}
-                className="rv group bg-gray-50 rounded-2xl p-7 sm:p-8 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-500 border border-transparent hover:border-gray-100"
+                className="rv group bg-gray-50 rounded-xl sm:rounded-2xl p-5 sm:p-8 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-500 border border-transparent hover:border-gray-100"
                 style={{ '--d': `${200 + i * 120}ms` } as React.CSSProperties}
               >
-                <div className="w-12 h-12 bg-gray-900 rounded-xl flex items-center justify-center mb-6 group-hover:scale-105 transition-transform duration-500">
-                  <item.icon className="w-6 h-6 text-white" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-900 rounded-lg sm:rounded-xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-105 transition-transform duration-500">
+                  <item.icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-4">{item.title}</h3>
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">{item.title}</h3>
                 <div className="space-y-3 text-sm">
                   <div className="flex items-start gap-2.5">
                     <span className="text-red-400 mt-0.5">✗</span>
@@ -359,8 +441,8 @@ export default function LandingPage() {
       {/* ══════════════════════════════════════════
           JARVIS AI
           ══════════════════════════════════════════ */}
-      <section id="jarvis" className="py-20 sm:py-32 lg:py-40 bg-gray-950 text-white overflow-hidden">
-        <div className="max-w-6xl mx-auto px-6">
+      <section id="jarvis" className="py-16 sm:py-32 lg:py-40 bg-gray-950 text-white overflow-hidden">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             {/* Text */}
             <div>
@@ -369,11 +451,11 @@ export default function LandingPage() {
                 {t('jarvis.badge')}
               </p>
 
-              <h2 className="rv text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1] mb-6" style={{ '--d': '100ms' } as React.CSSProperties}>
+              <h2 className="rv text-2xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1] mb-4 sm:mb-6" style={{ '--d': '100ms' } as React.CSSProperties}>
                 {t.rich('jarvis.title', { bold: (chunks) => <span className="text-gray-300">{chunks}</span> })}
               </h2>
 
-              <p className="rv text-base sm:text-lg text-gray-400 leading-relaxed mb-8" style={{ '--d': '200ms' } as React.CSSProperties}>
+              <p className="rv text-sm sm:text-lg text-gray-400 leading-relaxed mb-6 sm:mb-8" style={{ '--d': '200ms' } as React.CSSProperties}>
                 {t.rich('jarvis.subtitle', { bold: (chunks) => <span className="text-white font-medium">{chunks}</span> })}
               </p>
 
@@ -391,7 +473,7 @@ export default function LandingPage() {
               <div className="rv" style={{ '--d': '600ms' } as React.CSSProperties}>
                 <Link
                   href="/login"
-                  className="inline-flex items-center px-7 py-3 bg-white text-gray-900 rounded-full font-semibold text-sm hover:bg-gray-100 transition-all duration-300 hover:-translate-y-0.5"
+                  className="w-full sm:w-auto inline-flex items-center justify-center px-7 py-3 bg-white text-gray-900 rounded-full font-semibold text-sm hover:bg-gray-100 transition-all duration-300 hover:-translate-y-0.5"
                 >
                   {t('jarvis.cta')}
                   <ArrowRight className="ml-2 w-4 h-4" />
@@ -459,21 +541,21 @@ export default function LandingPage() {
       {/* ══════════════════════════════════════════
           RESULTS / ROI
           ══════════════════════════════════════════ */}
-      <section id="ergebnisse" className="py-20 sm:py-32 lg:py-40">
-        <div className="max-w-6xl mx-auto px-6">
+      <section id="ergebnisse" className="py-16 sm:py-32 lg:py-40">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6">
           {/* Heading */}
-          <div className="text-center mb-16 sm:mb-20">
-            <p className="rv text-blue-600 font-semibold text-sm tracking-widest uppercase mb-4">{t('results.sectionLabel')}</p>
-            <h2 className="rv text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight" style={{ '--d': '100ms' } as React.CSSProperties}>
+          <div className="text-center mb-12 sm:mb-20">
+            <p className="rv text-blue-600 font-semibold text-xs sm:text-sm tracking-widest uppercase mb-3 sm:mb-4">{t('results.sectionLabel')}</p>
+            <h2 className="rv text-2xl sm:text-5xl lg:text-6xl font-bold tracking-tight" style={{ '--d': '100ms' } as React.CSSProperties}>
               {t('results.title')}
             </h2>
-            <p className="rv text-lg sm:text-xl text-gray-500 mt-5 max-w-2xl mx-auto leading-relaxed" style={{ '--d': '200ms' } as React.CSSProperties}>
+            <p className="rv text-sm sm:text-xl text-gray-500 mt-3 sm:mt-5 max-w-2xl mx-auto leading-relaxed" style={{ '--d': '200ms' } as React.CSSProperties}>
               {t('results.subtitle')}
             </p>
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-5 mb-16">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-5 mb-16">
             {[
               { value: 15, suffix: 'h', label: t('results.timeSaving'), icon: Clock },
               { value: 40, suffix: '%', label: t('results.moreLeads'), icon: Target },
@@ -482,27 +564,27 @@ export default function LandingPage() {
             ].map((stat, i) => (
               <div
                 key={i}
-                className="rv text-center p-6 sm:p-8 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-lg transition-all duration-500 border border-transparent hover:border-gray-100"
+                className="rv text-center p-4 sm:p-8 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-lg transition-all duration-500 border border-transparent hover:border-gray-100"
                 style={{ '--d': `${200 + i * 100}ms` } as React.CSSProperties}
               >
-                <stat.icon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400 mx-auto mb-3" />
-                <div className="text-3xl sm:text-5xl font-bold text-gray-900 mb-1">
+                <stat.icon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400 mx-auto mb-2 sm:mb-3" />
+                <div className="text-2xl sm:text-5xl font-bold text-gray-900 mb-1">
                   <AnimatedCounter end={stat.value} suffix={stat.suffix} />
                 </div>
-                <p className="text-xs sm:text-sm text-gray-500">{stat.label}</p>
+                <p className="text-[11px] sm:text-sm text-gray-500">{stat.label}</p>
               </div>
             ))}
           </div>
 
           {/* Portals */}
-          <div className="rv bg-gray-950 rounded-3xl p-8 sm:p-12" style={{ '--d': '300ms' } as React.CSSProperties}>
-            <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white/10 rounded-2xl flex items-center justify-center flex-shrink-0">
-                <Globe className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
+          <div className="rv bg-gray-950 rounded-2xl sm:rounded-3xl p-5 sm:p-12" style={{ '--d': '300ms' } as React.CSSProperties}>
+            <div className="flex flex-col md:flex-row items-center gap-4 md:gap-10">
+              <div className="w-14 h-14 sm:w-20 sm:h-20 bg-white/10 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0">
+                <Globe className="w-7 h-7 sm:w-10 sm:h-10 text-white" />
               </div>
               <div>
-                <h3 className="text-xl sm:text-2xl font-bold text-white mb-3">{t('results.portalsTitle')}</h3>
-                <p className="text-sm sm:text-base text-gray-400 mb-4 leading-relaxed">{t('results.portalsSubtitle')}</p>
+                <h3 className="text-lg sm:text-2xl font-bold text-white mb-2 sm:mb-3">{t('results.portalsTitle')}</h3>
+                <p className="text-xs sm:text-base text-gray-400 mb-3 sm:mb-4 leading-relaxed">{t('results.portalsSubtitle')}</p>
                 <div className="flex flex-wrap gap-2">
                   {['ImmoScout24', 'Willhaben', 'Immowelt', 'Homegate', 'Kleinanzeigen', t('results.morePortals')].map((portal, i) => (
                     <span key={i} className={`px-3 py-1 rounded-full text-xs font-medium ${i === 5 ? 'bg-white/15 text-white' : 'bg-white/8 text-gray-400 border border-white/10'}`}>
@@ -519,21 +601,21 @@ export default function LandingPage() {
       {/* ══════════════════════════════════════════
           FEATURES GRID
           ══════════════════════════════════════════ */}
-      <section id="features" className="py-20 sm:py-32 lg:py-40 bg-gray-50/60">
-        <div className="max-w-6xl mx-auto px-6">
+      <section id="features" className="py-16 sm:py-32 lg:py-40 bg-gray-50/60">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6">
           {/* Heading */}
-          <div className="text-center mb-16 sm:mb-20">
-            <p className="rv text-blue-600 font-semibold text-sm tracking-widest uppercase mb-4">{t('features.sectionLabel')}</p>
-            <h2 className="rv text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight" style={{ '--d': '100ms' } as React.CSSProperties}>
+          <div className="text-center mb-12 sm:mb-20">
+            <p className="rv text-blue-600 font-semibold text-xs sm:text-sm tracking-widest uppercase mb-3 sm:mb-4">{t('features.sectionLabel')}</p>
+            <h2 className="rv text-2xl sm:text-5xl lg:text-6xl font-bold tracking-tight" style={{ '--d': '100ms' } as React.CSSProperties}>
               {t('features.title')}
             </h2>
-            <p className="rv text-lg sm:text-xl text-gray-500 mt-5 max-w-2xl mx-auto leading-relaxed" style={{ '--d': '200ms' } as React.CSSProperties}>
+            <p className="rv text-sm sm:text-xl text-gray-500 mt-3 sm:mt-5 max-w-2xl mx-auto leading-relaxed" style={{ '--d': '200ms' } as React.CSSProperties}>
               {t('features.subtitle')}
             </p>
           </div>
 
           {/* Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
             {[
               { icon: Bot, title: t('features.jarvisTitle'), desc: t('features.jarvisDesc') },
               { icon: Wand2, title: t('features.imageTitle'), desc: t('features.imageDesc') },
@@ -548,14 +630,14 @@ export default function LandingPage() {
             ].map((f, i) => (
               <div
                 key={i}
-                className="rv group bg-white rounded-2xl p-5 sm:p-6 border border-gray-100 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-500"
+                className="rv group bg-white rounded-xl sm:rounded-2xl p-3.5 sm:p-6 border border-gray-100 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-500"
                 style={{ '--d': `${150 + i * 80}ms` } as React.CSSProperties}
               >
-                <div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center mb-4 group-hover:scale-105 transition-transform duration-500">
-                  <f.icon className="w-5 h-5 text-white" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-900 rounded-lg sm:rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-105 transition-transform duration-500">
+                  <f.icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
-                <h3 className="text-sm sm:text-base font-bold text-gray-900 mb-1.5">{f.title}</h3>
-                <p className="text-gray-500 text-xs sm:text-sm leading-relaxed">{f.desc}</p>
+                <h3 className="text-xs sm:text-base font-bold text-gray-900 mb-1">{f.title}</h3>
+                <p className="text-gray-500 text-[11px] sm:text-sm leading-relaxed">{f.desc}</p>
               </div>
             ))}
           </div>
@@ -565,20 +647,20 @@ export default function LandingPage() {
       {/* ══════════════════════════════════════════
           VIRTUAL STAGING
           ══════════════════════════════════════════ */}
-      <section id="bildbearbeitung" className="py-20 sm:py-32 lg:py-40 overflow-hidden">
-        <div className="max-w-6xl mx-auto px-6">
+      <section id="bildbearbeitung" className="py-16 sm:py-32 lg:py-40 overflow-hidden">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             {/* Image */}
             <div className="rv relative" style={{ '--d': '100ms' } as React.CSSProperties}>
               <BeforeAfterSlider />
-              <div className="absolute -right-2 sm:-right-4 -bottom-2 sm:-bottom-4 bg-white rounded-xl shadow-xl p-3 sm:p-4 border border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="w-5 h-5 text-emerald-600" />
+              <div className="absolute -right-1 sm:-right-4 -bottom-1 sm:-bottom-4 bg-white rounded-lg sm:rounded-xl shadow-xl p-2.5 sm:p-4 border border-gray-100">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-50 rounded-md sm:rounded-lg flex items-center justify-center">
+                    <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">{t('staging.moreAttention')}</p>
-                    <p className="text-lg font-bold text-gray-900">{t('staging.moreAttentionValue')}</p>
+                    <p className="text-[10px] sm:text-xs text-gray-500">{t('staging.moreAttention')}</p>
+                    <p className="text-sm sm:text-lg font-bold text-gray-900">{t('staging.moreAttentionValue')}</p>
                   </div>
                 </div>
               </div>
@@ -591,11 +673,11 @@ export default function LandingPage() {
                 {t('staging.badge')}
               </p>
 
-              <h2 className="rv text-3xl sm:text-5xl font-bold tracking-tight leading-tight mb-5" style={{ '--d': '100ms' } as React.CSSProperties}>
+              <h2 className="rv text-2xl sm:text-5xl font-bold tracking-tight leading-tight mb-4 sm:mb-5" style={{ '--d': '100ms' } as React.CSSProperties}>
                 {t.rich('staging.title', { bold: (chunks) => <strong>{chunks}</strong> })}
               </h2>
 
-              <p className="rv text-base sm:text-lg text-gray-500 leading-relaxed mb-8" style={{ '--d': '200ms' } as React.CSSProperties}>
+              <p className="rv text-sm sm:text-lg text-gray-500 leading-relaxed mb-6 sm:mb-8" style={{ '--d': '200ms' } as React.CSSProperties}>
                 {t.rich('staging.subtitle', { bold: (chunks) => <span className="text-gray-900 font-medium">{chunks}</span> })}
               </p>
 
@@ -613,7 +695,7 @@ export default function LandingPage() {
               <div className="rv" style={{ '--d': '700ms' } as React.CSSProperties}>
                 <Link
                   href="/login"
-                  className="inline-flex items-center px-7 py-3 bg-gray-900 text-white rounded-full font-semibold text-sm hover:shadow-lg hover:shadow-gray-400/20 transition-all duration-300 hover:-translate-y-0.5"
+                  className="w-full sm:w-auto inline-flex items-center justify-center px-7 py-3 bg-gray-900 text-white rounded-full font-semibold text-sm hover:shadow-lg hover:shadow-gray-400/20 transition-all duration-300 hover:-translate-y-0.5"
                 >
                   {t('staging.cta')}
                   <ArrowRight className="ml-2 w-4 h-4" />
@@ -627,11 +709,11 @@ export default function LandingPage() {
       {/* ══════════════════════════════════════════
           HOW IT WORKS
           ══════════════════════════════════════════ */}
-      <section className="py-20 sm:py-32 lg:py-40 bg-gray-50/60">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="text-center mb-16 sm:mb-20">
-            <p className="rv text-blue-600 font-semibold text-sm tracking-widest uppercase mb-4">{t('howItWorks.sectionLabel')}</p>
-            <h2 className="rv text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight" style={{ '--d': '100ms' } as React.CSSProperties}>
+      <section className="py-16 sm:py-32 lg:py-40 bg-gray-50/60">
+        <div className="max-w-5xl mx-auto px-5 sm:px-6">
+          <div className="text-center mb-12 sm:mb-20">
+            <p className="rv text-blue-600 font-semibold text-xs sm:text-sm tracking-widest uppercase mb-3 sm:mb-4">{t('howItWorks.sectionLabel')}</p>
+            <h2 className="rv text-2xl sm:text-5xl lg:text-6xl font-bold tracking-tight" style={{ '--d': '100ms' } as React.CSSProperties}>
               {t('howItWorks.title')}
             </h2>
           </div>
@@ -662,8 +744,8 @@ export default function LandingPage() {
       {/* ══════════════════════════════════════════
           DEMO BOOKING
           ══════════════════════════════════════════ */}
-      <section id="demo" className="py-20 sm:py-32 lg:py-40">
-        <div className="max-w-6xl mx-auto px-6">
+      <section id="demo" className="py-16 sm:py-32 lg:py-40">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             {/* Text */}
             <div>
@@ -672,11 +754,11 @@ export default function LandingPage() {
                 {t('demo.badge')}
               </p>
 
-              <h2 className="rv text-3xl sm:text-5xl font-bold tracking-tight leading-tight mb-5" style={{ '--d': '100ms' } as React.CSSProperties}>
+              <h2 className="rv text-2xl sm:text-5xl font-bold tracking-tight leading-tight mb-4 sm:mb-5" style={{ '--d': '100ms' } as React.CSSProperties}>
                 {t.rich('demo.title', { bold: (chunks) => <strong>{chunks}</strong> })}
               </h2>
 
-              <p className="rv text-base sm:text-lg text-gray-500 leading-relaxed mb-8" style={{ '--d': '200ms' } as React.CSSProperties}>
+              <p className="rv text-sm sm:text-lg text-gray-500 leading-relaxed mb-6 sm:mb-8" style={{ '--d': '200ms' } as React.CSSProperties}>
                 {t('demo.subtitle')}
               </p>
 
@@ -703,15 +785,15 @@ export default function LandingPage() {
       {/* ══════════════════════════════════════════
           FINAL CTA
           ══════════════════════════════════════════ */}
-      <section className="py-20 sm:py-32 lg:py-40 bg-gray-950 text-white relative overflow-hidden">
+      <section className="py-16 sm:py-32 lg:py-40 bg-gray-950 text-white relative overflow-hidden">
         <div className="absolute inset-0">
           <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-white/[0.03] rounded-full blur-[100px]" />
           <div className="absolute bottom-1/4 right-1/4 w-[300px] h-[300px] bg-blue-500/[0.04] rounded-full blur-[100px]" />
         </div>
 
-        <div className="max-w-3xl mx-auto px-6 text-center relative z-10">
+        <div className="max-w-3xl mx-auto px-5 sm:px-6 text-center relative z-10">
           <div className="rv">
-            <NextImage src="/logo-white.png" alt="Immivo" width={480} height={480} className="mx-auto mb-8 w-80 sm:w-96 h-auto" />
+            <NextImage src="/logo-white.png" alt="Immivo" width={480} height={480} className="mx-auto mb-6 sm:mb-8 w-48 sm:w-80 lg:w-96 h-auto" />
           </div>
 
           <div className="rv" style={{ '--d': '100ms' } as React.CSSProperties}>
@@ -721,25 +803,25 @@ export default function LandingPage() {
             </span>
           </div>
 
-          <h2 className="rv text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-5" style={{ '--d': '200ms' } as React.CSSProperties}>
+          <h2 className="rv text-2xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-4 sm:mb-5" style={{ '--d': '200ms' } as React.CSSProperties}>
             {t('cta.title')}
           </h2>
 
-          <p className="rv text-base sm:text-lg text-gray-400 mb-10 max-w-xl mx-auto leading-relaxed" style={{ '--d': '300ms' } as React.CSSProperties}>
+          <p className="rv text-sm sm:text-lg text-gray-400 mb-8 sm:mb-10 max-w-xl mx-auto leading-relaxed" style={{ '--d': '300ms' } as React.CSSProperties}>
             {t('cta.subtitle')}
           </p>
 
           <div className="rv flex flex-col sm:flex-row justify-center gap-3 sm:gap-4" style={{ '--d': '400ms' } as React.CSSProperties}>
             <Link
               href="/login?mode=register"
-              className="group inline-flex items-center justify-center px-8 py-3.5 text-base font-bold text-gray-900 bg-white rounded-full hover:bg-gray-100 transition-all duration-300 hover:-translate-y-0.5 shadow-[0_0_40px_rgba(255,255,255,0.06)]"
+              className="group w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-bold text-gray-900 bg-white rounded-full hover:bg-gray-100 transition-all duration-300 hover:-translate-y-0.5 shadow-[0_0_40px_rgba(255,255,255,0.06)]"
             >
               {t('cta.primary')}
-              <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+              <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform duration-300" />
             </Link>
             <a
               href="mailto:office@immivo.ai"
-              className="inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold text-gray-300 border border-white/15 rounded-full hover:bg-white/5 hover:border-white/30 transition-all duration-300"
+              className="w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-semibold text-gray-300 border border-white/15 rounded-full hover:bg-white/5 hover:border-white/30 transition-all duration-300"
             >
               {t('cta.secondary')}
             </a>

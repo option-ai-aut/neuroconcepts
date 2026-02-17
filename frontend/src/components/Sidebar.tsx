@@ -52,7 +52,7 @@ export default function Sidebar() {
     >
       {/* Logo */}
       <div className="flex items-center h-16 px-5 shrink-0 overflow-hidden">
-        <Image src="/logo-icon-only.png" alt="Immivo" width={32} height={32} className="shrink-0 ml-1" />
+        <Image src="/logo-white-no-text.png" alt="Immivo" width={32} height={32} className="shrink-0 ml-1" />
         <span 
           className="ml-3 text-white font-semibold text-lg tracking-wide whitespace-nowrap transition-opacity duration-200"
           style={{ opacity: isHovered ? 1 : 0 }}

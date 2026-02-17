@@ -427,7 +427,7 @@ export default function LoginPage() {
       <div className="flex-1 flex flex-col py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-12 xl:px-20 bg-white overflow-y-auto">
         <div className="flex-shrink-0 mb-3 sm:mb-4 lg:mb-6">
           <a 
-            href="https://immivo.ai" 
+            href="/" 
             className="group inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-full transition-all"
           >
             <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 group-hover:-translate-x-1 transition-transform" />

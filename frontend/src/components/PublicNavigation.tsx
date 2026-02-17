@@ -56,18 +56,18 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link href="/" className="flex items-center">
-            <Image src={isDark ? '/logo-icon-only.png' : '/logo-icon-only.png'} alt="Immivo" width={36} height={36} className="hidden lg:block" />
-            <Image src={isDark ? '/logo-white.png' : '/logo-black.png'} alt="Immivo" width={180} height={60} className="lg:hidden h-12 w-auto" />
+            <Image src="/logo-white-no-text.png" alt="Immivo" width={36} height={36} className={`hidden lg:block transition-all duration-500 ${isDark ? '' : 'invert'}`} />
+            <Image src="/logo-white-no-text.png" alt="Immivo" width={44} height={44} className={`lg:hidden h-10 w-auto transition-all duration-500 ${isDark ? '' : 'invert'}`} />
           </Link>
 
           <div className="hidden lg:flex items-center space-x-6">
             <div className="relative group">
-              <button className={`text-sm font-medium transition-colors flex items-center gap-1 ${isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
+              <Link href="/" className={`text-sm font-medium transition-colors flex items-center gap-1 ${isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
                 {t('product')}
                 <svg className="w-4 h-4 transition-transform group-hover:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
-              </button>
+              </Link>
               <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
                 <div className="bg-white rounded-xl shadow-xl border border-gray-100 py-2 min-w-[200px]">
                   {currentPage === 'home' ? (
@@ -83,7 +83,6 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
                       <Link href="/#bildbearbeitung" className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">{t('aiImageEditing')}</Link>
                     </>
                   )}
-                  <Link href="/preise" className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">{t('pricing')}</Link>
                 </div>
               </div>
             </div>
@@ -93,12 +92,12 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
             </Link>
             
             <div className="relative group">
-              <button className={`text-sm font-medium transition-colors flex items-center gap-1 ${isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
+              <Link href="/ueber-uns" className={`text-sm font-medium transition-colors flex items-center gap-1 ${isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
                 {t('company')}
                 <svg className="w-4 h-4 transition-transform group-hover:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
-              </button>
+              </Link>
               <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
                 <div className="bg-white rounded-xl shadow-xl border border-gray-100 py-2 min-w-[200px]">
                   <Link href="/ueber-uns" className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">{t('aboutUs')}</Link>
@@ -155,7 +154,6 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
                   <Link href="/#bildbearbeitung" className="block py-2 text-gray-600 hover:text-gray-900" onClick={() => setMobileMenuOpen(false)}>{t('aiImageEditing')}</Link>
                 </>
               )}
-              <Link href="/preise" className="block py-2 text-gray-600 hover:text-gray-900" onClick={() => setMobileMenuOpen(false)}>{t('pricing')}</Link>
             </div>
 
             <div className="border-t border-gray-100 pt-4">
