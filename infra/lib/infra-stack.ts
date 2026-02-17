@@ -533,11 +533,18 @@ export class ImmivoStack extends cdk.Stack {
         protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
       });
 
-      // Origin request policy that forwards all viewer headers + CloudFront geo headers (for locale detection)
-      const allViewerAndGeoPolicy = cloudfront.OriginRequestPolicy.fromOriginRequestPolicyId(
-        this, 'AllViewerAndCFHeaders',
-        '33f36d7e-f396-46d9-90e0-52428a34d9dc' // Managed-AllViewerAndCloudFrontHeaders-2022-06
-      );
+      // Custom origin request policy: all viewer headers (except Host) + CloudFront geo header
+      const viewerPlusGeoPolicy = new cloudfront.OriginRequestPolicy(this, 'ViewerPlusGeoPolicy', {
+        originRequestPolicyName: `Immivo-ViewerPlusGeo-${props.stageName}`,
+        comment: 'All viewer headers (excl. Host) + CloudFront-Viewer-Country for locale detection',
+        headerBehavior: cloudfront.OriginRequestHeaderBehavior.allowList(
+          'Accept', 'Accept-Language', 'Accept-Encoding', 'Accept-Charset',
+          'Authorization', 'Content-Type', 'Origin', 'Referer', 'User-Agent',
+          'X-Forwarded-For', 'CloudFront-Viewer-Country'
+        ),
+        queryStringBehavior: cloudfront.OriginRequestQueryStringBehavior.all(),
+        cookieBehavior: cloudfront.OriginRequestCookieBehavior.all(),
+      });
 
       const frontendCdn = new cloudfront.Distribution(this, 'FrontendCDN', {
         comment: `Immivo Frontend (${props.stageName})`,
@@ -548,7 +555,7 @@ export class ImmivoStack extends cdk.Stack {
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
           allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
           cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-          originRequestPolicy: allViewerAndGeoPolicy,
+          originRequestPolicy: viewerPlusGeoPolicy,
         },
         additionalBehaviors: {
           '/_next/static/*': {
