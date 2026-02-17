@@ -17,14 +17,13 @@ export default function ImpressumPage() {
             <section>
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Angaben gemäß § 5 ECG</h2>
               <div className="text-gray-600 space-y-1 text-sm leading-relaxed">
-                <p><strong>Dynamo Lab Technologies GmbH</strong></p>
-                <p className="inline-flex items-center gap-2"><span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-medium rounded">In Gründung</span></p>
+                <p><strong>Leutgeb Holding &amp; Management GmbH</strong></p>
                 <p>Sterngasse 3</p>
                 <p>1010 Wien</p>
                 <p>Österreich</p>
-                <p className="pt-2">Firmenbuchnummer: in Vergebung</p>
+                <p className="pt-2">Firmenbuchnummer: FN 499420 t</p>
                 <p>Firmenbuchgericht: Handelsgericht Wien</p>
-                <p>UID-Nummer: in Vergebung</p>
+                <p>UID-Nummer: ATU73967718</p>
                 <p className="pt-2">Geschäftsführer: Josef Leutgeb</p>
                 <p>Aufsichtsbehörde: Magistratisches Bezirksamt des I. Bezirks</p>
               </div>
@@ -94,7 +93,7 @@ export default function ImpressumPage() {
             <section>
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Medieninhaber gemäß § 25 MedienG</h2>
               <div className="text-gray-600 space-y-2 text-sm leading-relaxed">
-                <p><strong>Dynamo Lab Technologies GmbH</strong> <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-medium rounded">In Gründung</span></p>
+                <p><strong>Leutgeb Holding &amp; Management GmbH</strong></p>
                 <p>Sterngasse 3, 1010 Wien, Österreich</p>
                 <p className="pt-2">Unternehmensgegenstand: Entwicklung und Vertrieb von KI-gestützter Software für die Immobilienbranche</p>
               </div>

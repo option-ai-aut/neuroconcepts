@@ -28,7 +28,7 @@ export default function PublicFooter() {
               </a>
               <div className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>Dynamo Lab Technologies GmbH<br />Sterngasse 3, 1010 Wien</span>
+                <span>Leutgeb Holding &amp; Management GmbH<br />Sterngasse 3, 1010 Wien</span>
               </div>
             </div>
           </div>

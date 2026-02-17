@@ -166,7 +166,7 @@ export default function UeberUnsPage() {
             </Link>
           </div>
           <div className="pt-8 border-t border-white/10">
-            <p className="font-semibold text-lg mb-4">Dynamo Lab Technologies GmbH</p>
+            <p className="font-semibold text-lg mb-4">Leutgeb Holding &amp; Management GmbH</p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-gray-400">
               <a href="https://maps.google.com/?q=Sterngasse+3,+1010+Wien" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-white transition-colors">
                 <MapPin className="w-4 h-4" /> Sterngasse 3, 1010 Wien

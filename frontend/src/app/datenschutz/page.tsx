@@ -30,7 +30,7 @@ export default function DatenschutzPage() {
                 Verantwortlich für die Datenverarbeitung im Sinne der Datenschutz-Grundverordnung (DSGVO) ist:
               </p>
               <address className="mt-3 not-italic text-gray-600 leading-relaxed">
-                <strong>Dynamo Lab Technologies GmbH</strong> <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-medium rounded not-italic">In Gründung</span><br />
+                <strong>Leutgeb Holding &amp; Management GmbH</strong><br />
                 Sterngasse 3<br />
                 1010 Wien, Österreich<br />
                 E-Mail:{' '}

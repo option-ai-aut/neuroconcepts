@@ -95,7 +95,7 @@ function baseTemplate(content: string): string {
           <tr>
             <td style="padding: 20px 36px 28px; border-top: 1px solid ${BORDER};">
               <p style="margin: 0; font-family: ${FONT}; font-size: 12px; line-height: 18px; color: ${TEXT_MUTED};">
-                Dynamo Lab Technologies GmbH &middot; Sterngasse 3, 1010 Wien
+                Leutgeb Holding &amp; Management GmbH &middot; Sterngasse 3, 1010 Wien
               </p>
               <p style="margin: 6px 0 0; font-family: ${FONT}; font-size: 12px; line-height: 18px; color: ${TEXT_MUTED};">
                 Diese E-Mail wurde automatisch versendet. Bitte nicht direkt antworten.
