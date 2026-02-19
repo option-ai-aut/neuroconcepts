@@ -46,6 +46,13 @@ const nextConfig = {
   },
 
   async headers() {
+    const isDev = process.env.NODE_ENV === 'development';
+
+    // In development, allow localhost:3001 (local backend) and localhost:3000 (Next.js dev server)
+    const devConnectSrc = isDev
+      ? ' http://localhost:3001 ws://localhost:3001 http://localhost:3000 ws://localhost:3000'
+      : '';
+
     return [
       {
         source: '/(.*)',
@@ -54,7 +61,8 @@ const nextConfig = {
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+          // HSTS nur in production senden (in dev kein HTTPS)
+          ...(!isDev ? [{ key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' }] : []),
           {
             key: 'Content-Security-Policy',
             value: [
@@ -64,12 +72,12 @@ const nextConfig = {
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https://*.immivo.ai https://*.amazonaws.com",
               "media-src 'self' https://*.immivo.ai",
-              "connect-src 'self' https://*.immivo.ai https://*.amazonaws.com https://cognito-idp.eu-central-1.amazonaws.com",
+              `connect-src 'self' https://*.immivo.ai https://*.amazonaws.com https://*.on.aws https://cognito-idp.eu-central-1.amazonaws.com${devConnectSrc}`,
               "frame-src 'self'",
               "base-uri 'self'",
               "form-action 'self'",
               "frame-ancestors 'none'",
-              "upgrade-insecure-requests",
+              ...(!isDev ? ["upgrade-insecure-requests"] : []),
             ].join('; ')
           },
         ],

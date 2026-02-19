@@ -10,8 +10,8 @@ export function validate(schema: ZodSchema) {
   return (req: Request, res: Response, next: NextFunction) => {
     const result = schema.safeParse(req.body);
     if (!result.success) {
-      const errors = result.error.errors.map(e => ({
-        field: e.path.join('.'),
+      const errors = result.error.issues.map(e => ({
+        field: e.path.map(String).join('.'),
         message: e.message,
       }));
       return res.status(400).json({ error: 'Validation failed', details: errors });
@@ -28,8 +28,8 @@ export function validateQuery(schema: ZodSchema) {
   return (req: Request, res: Response, next: NextFunction) => {
     const result = schema.safeParse(req.query);
     if (!result.success) {
-      const errors = result.error.errors.map(e => ({
-        field: e.path.join('.'),
+      const errors = result.error.issues.map(e => ({
+        field: e.path.map(String).join('.'),
         message: e.message,
       }));
       return res.status(400).json({ error: 'Validation failed', details: errors });

@@ -37,7 +37,7 @@ async def run_agent(prompt: str) -> str:
     env = {**os.environ, "CURSOR_API_KEY": CURSOR_API_KEY}
     try:
         result = await asyncio.create_subprocess_exec(
-            AGENT_PATH, prompt, "--print",
+            AGENT_PATH, prompt, "--print", "--trust",
             cwd=WORKSPACE_DIR,
             env=env,
             stdout=asyncio.subprocess.PIPE,

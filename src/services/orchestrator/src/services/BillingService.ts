@@ -29,7 +29,7 @@ export function getStripe(): Stripe {
     if (!key.startsWith('sk_test_') && !key.startsWith('sk_live_') && !key.startsWith('rk_test_') && !key.startsWith('rk_live_')) {
       throw new Error('STRIPE_SECRET_KEY has invalid format — must start with sk_test_, sk_live_, rk_test_, or rk_live_');
     }
-    _stripe = new Stripe(key, { apiVersion: '2025-01-27.acacia', typescript: true });
+    _stripe = new Stripe(key, { apiVersion: '2026-01-28.clover', typescript: true });
   }
   return _stripe;
 }

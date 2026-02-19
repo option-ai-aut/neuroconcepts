@@ -243,11 +243,20 @@ async function initializePrisma() {
   }
   
   // Auto-apply pending schema migrations (safe: uses IF NOT EXISTS / IF EXISTS)
-  await applyPendingMigrations(prisma);
-  
+  // Non-fatal: a migration error must not block all API requests
+  try {
+    await applyPendingMigrations(prisma);
+  } catch (err) {
+    structuredLog('warn', 'applyPendingMigrations failed (non-fatal)', { error: String(err) });
+  }
+
   // Auto-create missing tables (Admin, Blog, Newsletter, Jobs, etc.)
-  await ensureAdminTables(prisma);
-  
+  try {
+    await ensureAdminTables(prisma);
+  } catch (err) {
+    structuredLog('warn', 'ensureAdminTables failed (non-fatal)', { error: String(err) });
+  }
+
   return prisma;
 }
 
@@ -579,7 +588,6 @@ app.post('/admin/db-migrate', express.json({ limit: '1mb' }), async (req, res) =
     }
 
     // Delegate to the in-app migration system which uses versioned, pre-defined SQL
-    const { applyPendingMigrations } = await import('./services/MigrationService');
     await applyPendingMigrations(db);
     
     const updatedTables = await db.$queryRaw<any[]>`SELECT tablename FROM pg_tables WHERE schemaname = 'public'`;
