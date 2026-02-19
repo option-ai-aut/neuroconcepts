@@ -10686,18 +10686,29 @@ async function handleStreamingChat(event: any, responseStream: any): Promise<voi
 const _awslambda = (globalThis as any).awslambda;
 
 const _streamingHandler = async (event: any, responseStream: any, context: any) => {
+  // When Lambda is invoked via API Gateway (not Function URL), streamifyResponse-wrapped
+  // handlers are called as (event, context) — i.e. responseStream receives the Lambda context
+  // object. Detect this by checking for isFunctionUrl (Function URL sets requestContext.http).
   const isFunctionUrl = !!event.requestContext?.http;
-  const rawPath = event.rawPath || event.path || '';
-  const method = (event.requestContext?.http?.method || event.httpMethod || '').toUpperCase();
 
-  // Function URL: POST /chat/stream → real SSE streaming
-  if (isFunctionUrl && method === 'POST' && rawPath === '/chat/stream') {
+  if (!isFunctionUrl) {
+    // API Gateway invocation: responseStream is actually the Lambda context object.
+    // Delegate directly to serverless-http with the real context.
+    return serverlessHandler(event, responseStream);
+  }
+
+  // Function URL invocation — responseStream is a real writable stream.
+  const rawPath = event.rawPath || event.path || '';
+  const method = (event.requestContext?.http?.method || '').toUpperCase();
+
+  // POST /chat/stream → real SSE streaming
+  if (method === 'POST' && rawPath === '/chat/stream') {
     await handleStreamingChat(event, responseStream);
     return;
   }
 
-  // Function URL: OPTIONS → CORS preflight
-  if (isFunctionUrl && method === 'OPTIONS') {
+  // OPTIONS → CORS preflight
+  if (method === 'OPTIONS') {
     const corsStream = _awslambda.HttpResponseStream.from(responseStream, {
       statusCode: 204,
       headers: {
@@ -10712,8 +10723,7 @@ const _streamingHandler = async (event: any, responseStream: any, context: any) 
     return;
   }
 
-  // Everything else (API Gateway or non-streaming Function URL) → serverless-http
-  // serverless-http returns { statusCode, headers, body } — pipe it through the stream
+  // Other Function URL routes (non-streaming) → serverless-http, pipe result to stream
   const result: any = await serverlessHandler(event, context);
   const outStream = _awslambda.HttpResponseStream.from(responseStream, {
     statusCode: result.statusCode || 200,
