@@ -36,6 +36,7 @@ import { authMiddleware, adminAuthMiddleware } from './middleware/auth';
 import { AiSafetyMiddleware, wrapAiResponse } from './middleware/aiSafety';
 import { validate, schemas } from './middleware/validation';
 import { AiCostService } from './services/AiCostService';
+import { getStripe, BILLING_ENABLED, getPriceId, parsePlan, StripeConfig, PlanId, BillingCycle } from './services/BillingService';
 import * as AWS from 'aws-sdk';
 import multer from 'multer';
 import path from 'path';
@@ -155,6 +156,8 @@ async function loadAppSecrets() {
           'WORKMAIL_EMAIL',
           'WORKMAIL_PASSWORD',
           'WORKMAIL_EWS_URL',
+          'STRIPE_SECRET_KEY',
+          'STRIPE_WEBHOOK_SECRET',
         ];
         for (const key of keysToLoad) {
           if (secrets[key]) process.env[key] = secrets[key];
@@ -658,6 +661,116 @@ setInterval(() => {
   }
 }, 120_000);
 
+// ─── Stripe Webhook (RAW body — must be before express.json) ──────────────────
+app.post('/billing/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'] as string;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    console.error('[Billing] STRIPE_WEBHOOK_SECRET not configured');
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+
+  let event: any;
+  try {
+    event = getStripe().webhooks.constructEvent(req.body, sig, webhookSecret);
+  } catch (err: any) {
+    console.error('[Billing] Webhook signature verification failed:', err.message);
+    return res.status(400).json({ error: 'Bad Request' });
+  }
+
+  try {
+    const db = prisma || (await initializePrisma());
+
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        const tenantId = session.metadata?.tenantId;
+        const plan = session.metadata?.plan as PlanId;
+        const billingCycle = session.metadata?.billingCycle as BillingCycle;
+        if (!tenantId) break;
+
+        const subscription = await getStripe().subscriptions.retrieve(session.subscription);
+        const stripeConfig: StripeConfig = {
+          customerId: session.customer,
+          subscriptionId: subscription.id,
+          plan,
+          status: subscription.status,
+          currentPeriodEnd: (subscription as any).current_period_end,
+          billingCycle,
+        };
+        await db.tenantSettings.upsert({
+          where: { tenantId },
+          update: { stripeConfig: stripeConfig as any },
+          create: { tenantId, stripeConfig: stripeConfig as any },
+        });
+        console.log(`[Billing] Checkout completed for tenant ${tenantId}, plan: ${plan}`);
+        break;
+      }
+
+      case 'customer.subscription.updated': {
+        const sub = event.data.object;
+        const tenantSettings = await db.tenantSettings.findFirst({
+          where: { stripeConfig: { path: ['customerId'], equals: sub.customer } },
+        });
+        if (!tenantSettings) break;
+
+        const priceId = sub.items.data[0]?.price?.id;
+        const updatedPlan = parsePlan(priceId);
+        const existing = (tenantSettings.stripeConfig || {}) as StripeConfig;
+        await db.tenantSettings.update({
+          where: { id: tenantSettings.id },
+          data: {
+            stripeConfig: {
+              ...existing,
+              subscriptionId: sub.id,
+              plan: updatedPlan,
+              status: sub.status,
+              currentPeriodEnd: sub.current_period_end,
+            } as any,
+          },
+        });
+        console.log(`[Billing] Subscription updated for customer ${sub.customer}, status: ${sub.status}`);
+        break;
+      }
+
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object;
+        const tenantSettings = await db.tenantSettings.findFirst({
+          where: { stripeConfig: { path: ['customerId'], equals: sub.customer } },
+        });
+        if (!tenantSettings) break;
+
+        const existing = (tenantSettings.stripeConfig || {}) as StripeConfig;
+        await db.tenantSettings.update({
+          where: { id: tenantSettings.id },
+          data: {
+            stripeConfig: {
+              ...existing,
+              plan: 'free',
+              status: 'canceled',
+              subscriptionId: undefined,
+            } as any,
+          },
+        });
+        console.log(`[Billing] Subscription canceled for customer ${sub.customer}`);
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object;
+        console.warn(`[Billing] Payment failed for customer ${invoice.customer}, invoice: ${invoice.id}`);
+        break;
+      }
+    }
+
+    res.json({ received: true });
+  } catch (error) {
+    console.error('[Billing] Webhook handler error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 app.use(express.json({ limit: '5mb' }));
 
 // Multer setup for file uploads (memory storage for S3 upload)
@@ -974,6 +1087,189 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// BILLING ENDPOINTS
+// BILLING_ENABLED=false → all users get free access (test phase)
+// ═══════════════════════════════════════════════════════════════════
+
+// GET /billing/subscription — current plan info
+app.get('/billing/subscription', authMiddleware, async (req: any, res) => {
+  try {
+    const db = prisma || (await initializePrisma());
+    const settings = await db.tenantSettings.findUnique({ where: { tenantId: req.user.tenantId } });
+    const cfg = (settings?.stripeConfig || {}) as StripeConfig;
+
+    // Test phase: billing not enabled → everyone is "free"
+    if (!BILLING_ENABLED) {
+      return res.json({
+        plan: cfg.plan || 'free',
+        status: 'active',
+        billingEnabled: false,
+        customerId: cfg.customerId || null,
+        subscriptionId: cfg.subscriptionId || null,
+        currentPeriodEnd: cfg.currentPeriodEnd || null,
+        billingCycle: cfg.billingCycle || null,
+        paymentMethod: null,
+        invoices: [],
+      });
+    }
+
+    if (!cfg.subscriptionId) {
+      return res.json({ plan: 'free', status: 'none', billingEnabled: true });
+    }
+
+    const stripe = getStripe();
+    const sub = await stripe.subscriptions.retrieve(cfg.subscriptionId, {
+      expand: ['default_payment_method'],
+    });
+
+    const pm = sub.default_payment_method as any;
+    return res.json({
+      plan: cfg.plan || parsePlan(sub.items.data[0]?.price?.id),
+      status: sub.status,
+      billingEnabled: true,
+      customerId: cfg.customerId,
+      subscriptionId: sub.id,
+      currentPeriodEnd: (sub as any).current_period_end,
+      billingCycle: cfg.billingCycle,
+      paymentMethod: pm?.card ? {
+        brand: pm.card.brand,
+        last4: pm.card.last4,
+        expiry: `${pm.card.exp_month}/${pm.card.exp_year}`,
+      } : null,
+    });
+  } catch (error) {
+    console.error('[Billing] GET /billing/subscription error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// GET /billing/invoices — invoice list
+app.get('/billing/invoices', authMiddleware, async (req: any, res) => {
+  try {
+    if (!BILLING_ENABLED) return res.json([]);
+
+    const db = prisma || (await initializePrisma());
+    const settings = await db.tenantSettings.findUnique({ where: { tenantId: req.user.tenantId } });
+    const cfg = (settings?.stripeConfig || {}) as StripeConfig;
+
+    if (!cfg.customerId) return res.json([]);
+
+    const stripe = getStripe();
+    const invoices = await stripe.invoices.list({ customer: cfg.customerId, limit: 24 });
+
+    return res.json(invoices.data.map(inv => ({
+      id: inv.number || inv.id,
+      date: new Date((inv as any).created * 1000).toISOString(),
+      amount: (inv.amount_paid || 0) / 100,
+      status: inv.status === 'paid' ? 'paid' : inv.status === 'open' ? 'pending' : 'failed',
+      pdfUrl: inv.invoice_pdf,
+    })));
+  } catch (error) {
+    console.error('[Billing] GET /billing/invoices error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// POST /billing/checkout — create Stripe Checkout Session
+app.post('/billing/checkout', authMiddleware, async (req: any, res) => {
+  try {
+    // Test phase: billing not enabled
+    if (!BILLING_ENABLED) {
+      return res.json({ billingEnabled: false, redirectUrl: '/dashboard' });
+    }
+
+    const { plan, billingCycle = 'monthly' } = req.body as { plan: 'solo' | 'team'; billingCycle: BillingCycle };
+    if (!plan || !['solo', 'team'].includes(plan)) {
+      return res.status(400).json({ error: 'Bad Request' });
+    }
+
+    const db = prisma || (await initializePrisma());
+    const settings = await db.tenantSettings.findUnique({ where: { tenantId: req.user.tenantId } });
+    const cfg = (settings?.stripeConfig || {}) as StripeConfig;
+
+    const stripe = getStripe();
+    const frontendUrl = process.env.FRONTEND_URL || 'https://dev.immivo.ai';
+    const priceId = getPriceId(plan, billingCycle);
+
+    const sessionParams: any = {
+      mode: 'subscription',
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${frontendUrl}/dashboard/settings/billing?session_id={CHECKOUT_SESSION_ID}&success=1`,
+      cancel_url: `${frontendUrl}/preise`,
+      metadata: { tenantId: req.user.tenantId, plan, billingCycle },
+      allow_promotion_codes: true,
+    };
+
+    if (cfg.customerId) {
+      sessionParams.customer = cfg.customerId;
+    } else {
+      sessionParams.customer_email = req.user.email;
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
+    return res.json({ url: session.url, billingEnabled: true });
+  } catch (error) {
+    console.error('[Billing] POST /billing/checkout error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// POST /billing/portal — open Stripe Customer Portal
+app.post('/billing/portal', authMiddleware, async (req: any, res) => {
+  try {
+    if (!BILLING_ENABLED) {
+      return res.status(400).json({ error: 'Billing not enabled' });
+    }
+
+    const db = prisma || (await initializePrisma());
+    const settings = await db.tenantSettings.findUnique({ where: { tenantId: req.user.tenantId } });
+    const cfg = (settings?.stripeConfig || {}) as StripeConfig;
+
+    if (!cfg.customerId) {
+      return res.status(400).json({ error: 'No Stripe customer found' });
+    }
+
+    const stripe = getStripe();
+    const frontendUrl = process.env.FRONTEND_URL || 'https://dev.immivo.ai';
+    const session = await stripe.billingPortal.sessions.create({
+      customer: cfg.customerId,
+      return_url: `${frontendUrl}/dashboard/settings/billing`,
+    });
+
+    return res.json({ url: session.url });
+  } catch (error) {
+    console.error('[Billing] POST /billing/portal error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// DELETE /billing/subscription — cancel at period end
+app.delete('/billing/subscription', authMiddleware, async (req: any, res) => {
+  try {
+    if (!BILLING_ENABLED) {
+      return res.status(400).json({ error: 'Billing not enabled' });
+    }
+
+    const db = prisma || (await initializePrisma());
+    const settings = await db.tenantSettings.findUnique({ where: { tenantId: req.user.tenantId } });
+    const cfg = (settings?.stripeConfig || {}) as StripeConfig;
+
+    if (!cfg.subscriptionId) {
+      return res.status(400).json({ error: 'No active subscription' });
+    }
+
+    const stripe = getStripe();
+    await stripe.subscriptions.update(cfg.subscriptionId, { cancel_at_period_end: true });
+    return res.json({ success: true, message: 'Subscription will be canceled at period end' });
+  } catch (error) {
+    console.error('[Billing] DELETE /billing/subscription error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
 
 // Get Current User Profile
 app.get('/me', authMiddleware, async (req, res) => {

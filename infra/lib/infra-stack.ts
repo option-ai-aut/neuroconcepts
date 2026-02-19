@@ -273,6 +273,8 @@ export class ImmivoStack extends cdk.Stack {
         ADMIN_USER_POOL_ID: this.adminUserPool.userPoolId,
         ADMIN_CLIENT_ID: this.adminUserPoolClient.userPoolClientId,
         APP_SECRET_ARN: appSecret.secretArn,
+        // Flip to 'true' when ready to charge customers
+        BILLING_ENABLED: 'false',
       },
       bundling: { 
         minify: true, 
