@@ -1,27 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { 
-  Users, 
-  Building2, 
-  Clock,
-  TrendingUp,
-  AlertCircle,
-  ArrowRight,
-  Plus,
-  Calendar,
-  Mail,
-  Phone,
-  Eye,
-  CheckCircle2,
-  XCircle,
-  Loader2
+import {
+  Users, Building2, Plus, Calendar, Mail, Phone,
+  AlertCircle, ArrowRight, Loader2, MessageSquare,
+  TrendingUp, Clock, CheckCircle2, Zap, ChevronRight,
+  UserPlus, Bell, X
 } from 'lucide-react';
-import { getAuthHeaders } from '@/lib/api';
-import { getRuntimeConfig } from '@/components/EnvProvider';
+import { getAuthHeaders, getApiUrl } from '@/lib/api';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { useTranslations } from 'next-intl';
+
+// ─── Interfaces ───────────────────────────────────────────────────────────────
 
 interface DashboardStats {
   user: {
@@ -47,6 +38,7 @@ interface DashboardStats {
       id: string;
       name: string;
       email: string;
+      phone?: string;
       propertyTitle: string | null;
       createdAt: string;
       daysSinceCreated: number;
@@ -55,6 +47,7 @@ interface DashboardStats {
       id: string;
       name: string;
       email: string;
+      phone?: string;
       status: string;
       propertyTitle: string | null;
       createdAt: string;
@@ -71,86 +64,440 @@ interface DashboardStats {
     type: string;
     description: string;
     leadName: string;
+    leadId?: string;
     createdAt: string;
   }>;
 }
 
-const statusColors: Record<string, string> = {
-  NEW: 'bg-gray-100 text-gray-700',
-  CONTACTED: 'bg-yellow-100 text-yellow-700',
-  CONVERSATION: 'bg-gray-100 text-gray-700',
-  BOOKED: 'bg-green-100 text-green-700',
-  LOST: 'bg-gray-100 text-gray-500'
+interface CalendarEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  description?: string;
+  attendees?: Array<{ email: string; name?: string }>;
+}
+
+// ─── Feed item type ────────────────────────────────────────────────────────────
+
+type FeedItemKind = 'new_lead' | 'jarvis_reply' | 'lead_reply' | 'overdue' | 'status_change' | 'activity';
+
+interface FeedItem {
+  id: string;
+  kind: FeedItemKind;
+  priority: number;
+  time: Date;
+  leadId?: string;
+  leadName?: string;
+  leadEmail?: string;
+  leadPhone?: string;
+  propertyTitle?: string | null;
+  description?: string;
+  daysSince?: number;
+  newStatus?: string;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatTimeAgo(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMins < 1) return 'gerade eben';
+  if (diffMins < 60) return `vor ${diffMins} Min.`;
+  if (diffHours < 24) return `vor ${diffHours} Std.`;
+  if (diffDays === 1) return 'gestern';
+  if (diffDays < 7) return `vor ${diffDays} Tagen`;
+  return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+}
+
+function formatEventTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
+function isToday(iso: string): boolean {
+  const d = new Date(iso);
+  const now = new Date();
+  return d.toDateString() === now.toDateString();
+}
+
+function isTomorrow(iso: string): boolean {
+  const d = new Date(iso);
+  const tom = new Date();
+  tom.setDate(tom.getDate() + 1);
+  return d.toDateString() === tom.toDateString();
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  NEW: 'Neu',
+  CONTACTED: 'Kontaktiert',
+  CONVERSATION: 'Im Gespräch',
+  BOOKED: 'Gebucht',
+  LOST: 'Verloren',
 };
 
-const activityIcons: Record<string, any> = {
-  STATUS_CHANGE: TrendingUp,
-  EMAIL_SENT: Mail,
-  EMAIL_RECEIVED: Mail,
-  CALL: Phone,
-  VIEWING: Eye,
-  NOTE: Clock,
-  CREATED: Plus
+const STATUS_DOT: Record<string, string> = {
+  NEW: 'bg-gray-800',
+  CONTACTED: 'bg-yellow-500',
+  CONVERSATION: 'bg-blue-500',
+  BOOKED: 'bg-green-500',
+  LOST: 'bg-gray-300',
 };
+
+// ─── Build feed from stats ─────────────────────────────────────────────────────
+
+function buildFeed(stats: DashboardStats): FeedItem[] {
+  const items: FeedItem[] = [];
+
+  // 1. New leads (today + this week)
+  for (const lead of stats.leads.recent) {
+    const time = new Date(lead.createdAt);
+    const diffDays = Math.floor((Date.now() - time.getTime()) / 86400000);
+    if (diffDays > 7) continue;
+    items.push({
+      id: `lead-${lead.id}`,
+      kind: 'new_lead',
+      priority: 1,
+      time,
+      leadId: lead.id,
+      leadName: lead.name,
+      leadEmail: lead.email,
+      leadPhone: (lead as any).phone,
+      propertyTitle: lead.propertyTitle,
+    });
+  }
+
+  // 2. Jarvis / lead replies from activities
+  for (const act of stats.activities) {
+    const time = new Date(act.createdAt);
+    const diffDays = Math.floor((Date.now() - time.getTime()) / 86400000);
+    if (diffDays > 7) continue;
+
+    if (act.type === 'EMAIL_RECEIVED' || act.type === 'JARVIS_REPLY' || act.type === 'MESSAGE_RECEIVED') {
+      items.push({
+        id: `act-reply-${act.id}`,
+        kind: act.type === 'EMAIL_RECEIVED' ? 'lead_reply' : 'jarvis_reply',
+        priority: 2,
+        time,
+        leadId: act.leadId,
+        leadName: act.leadName,
+        description: act.description,
+      });
+    } else if (act.type === 'STATUS_CHANGE') {
+      items.push({
+        id: `act-status-${act.id}`,
+        kind: 'status_change',
+        priority: 4,
+        time,
+        leadId: act.leadId,
+        leadName: act.leadName,
+        description: act.description,
+      });
+    }
+  }
+
+  // 3. Overdue leads (no contact > 2 days)
+  for (const lead of stats.leads.needingAttention) {
+    if (lead.daysSinceCreated <= 2) continue;
+    // Skip if already in recent (would be duplicate)
+    const alreadyInFeed = items.some(i => i.leadId === lead.id);
+    if (alreadyInFeed) continue;
+    items.push({
+      id: `overdue-${lead.id}`,
+      kind: 'overdue',
+      priority: 3,
+      time: new Date(lead.createdAt),
+      leadId: lead.id,
+      leadName: lead.name,
+      leadEmail: lead.email,
+      leadPhone: (lead as any).phone,
+      propertyTitle: lead.propertyTitle,
+      daysSince: lead.daysSinceCreated,
+    });
+  }
+
+  // Sort: priority ASC, then time DESC within same priority
+  items.sort((a, b) => {
+    if (a.priority !== b.priority) return a.priority - b.priority;
+    return b.time.getTime() - a.time.getTime();
+  });
+
+  return items;
+}
+
+// ─── Sub-components ────────────────────────────────────────────────────────────
+
+function FeedCard({ item, onDismiss }: { item: FeedItem; onDismiss: (id: string) => void }) {
+  const isOverdue = item.kind === 'overdue';
+  const isNew = item.kind === 'new_lead';
+  const isReply = item.kind === 'lead_reply' || item.kind === 'jarvis_reply';
+
+  const icon = isNew ? (
+    <UserPlus className="w-3.5 h-3.5 text-gray-900" />
+  ) : item.kind === 'jarvis_reply' ? (
+    <Zap className="w-3.5 h-3.5 text-gray-600" />
+  ) : item.kind === 'lead_reply' ? (
+    <Mail className="w-3.5 h-3.5 text-gray-600" />
+  ) : isOverdue ? (
+    <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+  ) : (
+    <TrendingUp className="w-3.5 h-3.5 text-gray-400" />
+  );
+
+  const badge = isNew ? (
+    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-900 text-white">NEU</span>
+  ) : item.kind === 'jarvis_reply' ? (
+    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">Jarvis</span>
+  ) : item.kind === 'lead_reply' ? (
+    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">Antwort</span>
+  ) : isOverdue ? (
+    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">{item.daysSince}d ohne Kontakt</span>
+  ) : null;
+
+  const content = isNew || isOverdue ? (
+    <div>
+      <div className="flex items-center gap-2 mb-0.5">
+        <span className="font-semibold text-gray-900 text-sm">{item.leadName}</span>
+        {badge}
+      </div>
+      {item.propertyTitle && (
+        <p className="text-xs text-gray-500 truncate">{item.propertyTitle}</p>
+      )}
+    </div>
+  ) : (
+    <div>
+      <div className="flex items-center gap-2 mb-0.5">
+        <span className="font-semibold text-gray-900 text-sm">{item.leadName}</span>
+        {badge}
+      </div>
+      {item.description && (
+        <p className="text-xs text-gray-500 line-clamp-1">{item.description}</p>
+      )}
+    </div>
+  );
+
+  const actions = (isNew || isOverdue) ? (
+    <div className="flex items-center gap-1.5 mt-3">
+      {item.leadPhone && (
+        <a
+          href={`tel:${item.leadPhone}`}
+          className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+        >
+          <Phone className="w-3 h-3" />
+          Anrufen
+        </a>
+      )}
+      {item.leadEmail && (
+        <a
+          href={`mailto:${item.leadEmail}`}
+          className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+        >
+          <Mail className="w-3 h-3" />
+          Mail
+        </a>
+      )}
+      {item.leadId && (
+        <Link
+          href={`/dashboard/crm/leads/${item.leadId}`}
+          className="ml-auto text-xs text-gray-400 hover:text-gray-700 transition-colors flex items-center gap-0.5"
+        >
+          Öffnen <ChevronRight className="w-3 h-3" />
+        </Link>
+      )}
+    </div>
+  ) : item.leadId ? (
+    <div className="mt-2.5">
+      <Link
+        href={`/dashboard/crm/leads/${item.leadId}`}
+        className="text-xs text-gray-500 hover:text-gray-900 transition-colors flex items-center gap-0.5 font-medium"
+      >
+        Zum Lead <ChevronRight className="w-3 h-3" />
+      </Link>
+    </div>
+  ) : null;
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-xl p-3.5 active:bg-gray-50 transition-colors group">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2.5 flex-1 min-w-0">
+          <div className="mt-0.5 p-1.5 bg-gray-50 rounded-lg flex-shrink-0">
+            {icon}
+          </div>
+          <div className="flex-1 min-w-0">
+            {content}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
+          <span className="text-[10px] text-gray-400">{formatTimeAgo(item.time)}</span>
+          {/* Always visible on mobile, hover-only on desktop */}
+          <button
+            onClick={() => onDismiss(item.id)}
+            className="lg:opacity-0 lg:group-hover:opacity-100 transition-opacity p-1 rounded text-gray-300 hover:text-gray-500 hover:bg-gray-100 active:bg-gray-200"
+            title="Ausblenden"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+      {actions}
+    </div>
+  );
+}
+
+function CalendarSection({ events }: { events: CalendarEvent[] }) {
+  const todayEvents = events.filter(e => isToday(e.start)).sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+  const tomorrowEvents = events.filter(e => isTomorrow(e.start));
+
+  if (todayEvents.length === 0 && tomorrowEvents.length === 0) {
+    return (
+      <div className="text-center py-6">
+        <Calendar className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+        <p className="text-sm text-gray-400">Keine Termine heute</p>
+        <Link href="/dashboard/calendar" className="text-xs text-gray-500 hover:text-gray-700 mt-1 inline-block">Kalender öffnen →</Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      {todayEvents.length > 0 && (
+        <>
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Heute</p>
+          {todayEvents.map(ev => (
+            <div key={ev.id} className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
+              <span className="text-xs font-mono text-gray-500 flex-shrink-0 pt-0.5 w-10">{formatEventTime(ev.start)}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{ev.title}</p>
+                {ev.description && (
+                  <p className="text-xs text-gray-400 truncate">{ev.description}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+      {tomorrowEvents.length > 0 && (
+        <div className="pt-3">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Morgen</p>
+          {tomorrowEvents.slice(0, 3).map(ev => (
+            <div key={ev.id} className="flex items-start gap-3 py-1.5">
+              <span className="text-xs font-mono text-gray-400 flex-shrink-0 pt-0.5 w-10">{formatEventTime(ev.start)}</span>
+              <p className="text-xs text-gray-600 truncate flex-1">{ev.title}</p>
+            </div>
+          ))}
+          {tomorrowEvents.length > 3 && (
+            <p className="text-xs text-gray-400 mt-1">+{tomorrowEvents.length - 3} weitere</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PipelineBar({ byStatus, total }: { byStatus: DashboardStats['leads']['byStatus']; total: number }) {
+  const segments = [
+    { key: 'NEW', label: 'Neu', color: 'bg-gray-800' },
+    { key: 'CONTACTED', label: 'Kontaktiert', color: 'bg-yellow-400' },
+    { key: 'CONVERSATION', label: 'Im Gespräch', color: 'bg-gray-500' },
+    { key: 'BOOKED', label: 'Gebucht', color: 'bg-green-500' },
+  ] as const;
+
+  const activeTotal = Object.entries(byStatus)
+    .filter(([k]) => k !== 'LOST')
+    .reduce((s, [, v]) => s + v, 0);
+
+  return (
+    <div>
+      <div className="flex h-2 rounded-full overflow-hidden gap-px bg-gray-100">
+        {segments.map(({ key, color }) => {
+          const count = byStatus[key] ?? 0;
+          const pct = activeTotal > 0 ? (count / activeTotal) * 100 : 0;
+          if (pct === 0) return null;
+          return (
+            <Link
+              key={key}
+              href={`/dashboard/crm/leads?status=${key}`}
+              className={`${color} hover:opacity-80 transition-opacity`}
+              style={{ width: `${pct}%` }}
+              title={`${STATUS_LABELS[key]}: ${count}`}
+            />
+          );
+        })}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+        {segments.map(({ key, color }) => {
+          const count = byStatus[key] ?? 0;
+          return (
+            <Link
+              key={key}
+              href={`/dashboard/crm/leads?status=${key}`}
+              className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-800 transition-colors"
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${color} flex-shrink-0`} />
+              {count} {STATUS_LABELS[key]}
+            </Link>
+          );
+        })}
+        {byStatus.LOST > 0 && (
+          <span className="flex items-center gap-1 text-[10px] text-gray-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-300 flex-shrink-0" />
+            {byStatus.LOST} Verloren
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main page ─────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [mobileTab, setMobileTab] = useState<'feed' | 'today'>('feed');
   const { openDrawer } = useGlobalState();
   const t = useTranslations('dashboard');
-  const tc = useTranslations('common');
 
-  const statusLabels: Record<string, string> = {
-    NEW: t('status.new'),
-    CONTACTED: t('status.contacted'),
-    CONVERSATION: t('status.inConversation'),
-    BOOKED: t('status.booked'),
-    LOST: t('status.lost')
-  };
-
-  function formatTimeAgo(dateString: string): string {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return tc('justNow');
-    if (diffMins < 60) return tc('minutesAgo', { count: diffMins });
-    if (diffHours < 24) return tc('hoursAgo', { count: diffHours });
-    if (diffDays === 1) return tc('yesterday');
-    if (diffDays < 7) return tc('daysAgo', { count: diffDays });
-    return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-  }
+  const dismissItem = useCallback((id: string) => setDismissedIds(prev => new Set([...prev, id])), []);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const load = async () => {
       try {
         const headers = await getAuthHeaders();
-        const config = getRuntimeConfig();
-        const res = await fetch(`${config.apiUrl}/dashboard/stats`, { headers });
-        
-        if (!res.ok) throw new Error('Failed to fetch dashboard stats');
-        
-        const data = await res.json();
-        setStats(data);
-      } catch (err) {
-        console.error('Dashboard error:', err);
-        setError('load_error');
+        const base = getApiUrl();
+
+        const [statsRes, calRes] = await Promise.all([
+          fetch(`${base}/dashboard/stats`, { headers }),
+          fetch(`${base}/calendar/events?limit=20`, { headers }).catch(() => null),
+        ]);
+
+        if (!statsRes.ok) throw new Error('stats failed');
+        const statsData: DashboardStats = await statsRes.json();
+        setStats(statsData);
+
+        if (calRes && calRes.ok) {
+          const calData = await calRes.json();
+          setCalendarEvents(Array.isArray(calData) ? calData : (calData.events ?? []));
+        }
+      } catch {
+        setError(true);
       } finally {
         setLoading(false);
       }
     };
-
-    fetchStats();
+    load();
   }, []);
 
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center bg-white">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
       </div>
     );
   }
@@ -159,294 +506,220 @@ export default function DashboardPage() {
     return (
       <div className="h-full flex items-center justify-center bg-white">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <p className="text-gray-600">{tc('noData')}</p>
+          <AlertCircle className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-sm text-gray-500">Daten konnten nicht geladen werden.</p>
         </div>
       </div>
     );
   }
 
-  const activeLeads = stats.leads.total - stats.leads.byStatus.BOOKED - stats.leads.byStatus.LOST;
-  const conversionRate = stats.leads.total > 0 
-    ? Math.round((stats.leads.byStatus.BOOKED / stats.leads.total) * 100) 
-    : 0;
+  const allFeed = buildFeed(stats);
+  const feed = allFeed.filter(i => !dismissedIds.has(i.id));
+  const dismissAll = () => setDismissedIds(prev => new Set([...prev, ...allFeed.map(i => i.id)]));
+  const todayEventCount = calendarEvents.filter(e => isToday(e.start)).length;
+  const newLeadsToday = stats.leads.newToday;
+  const uncontacted = stats.leads.byStatus.NEW;
+  const jarvisActivity = stats.activities.filter(a =>
+    a.type === 'JARVIS_REPLY' || a.type === 'EMAIL_RECEIVED' || a.type === 'MESSAGE_RECEIVED'
+  ).length;
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Guten Morgen' : hour < 18 ? 'Guten Tag' : 'Guten Abend';
+
+  // Summary chips
+  const chips = [
+    newLeadsToday > 0 && { label: `${newLeadsToday} neuer Lead${newLeadsToday !== 1 ? 's' : ''}`, icon: UserPlus, urgent: false },
+    jarvisActivity > 0 && { label: `${jarvisActivity} Jarvis-Aktivität${jarvisActivity !== 1 ? 'en' : ''}`, icon: Zap, urgent: false },
+    todayEventCount > 0 && { label: `${todayEventCount} Termin${todayEventCount !== 1 ? 'e' : ''} heute`, icon: Calendar, urgent: false },
+    uncontacted > 0 && { label: `${uncontacted} warten auf Kontakt`, icon: AlertCircle, urgent: true },
+  ].filter(Boolean) as Array<{ label: string; icon: any; urgent: boolean }>;
+
+  // ── Shared blocks ──────────────────────────────────────────────────────────
+
+  const statsRow = (
+    <div className="grid grid-cols-3 gap-2">
+      <Link href="/dashboard/crm/leads" className="bg-gray-50 rounded-xl p-3 active:bg-gray-100 transition-colors text-center">
+        <div className="text-xl font-bold text-gray-900">{stats.leads.total - stats.leads.byStatus.LOST - stats.leads.byStatus.BOOKED}</div>
+        <div className="text-[10px] text-gray-500 mt-0.5 leading-tight">Aktive<br/>Leads</div>
+      </Link>
+      <Link href="/dashboard/crm/properties" className="bg-gray-50 rounded-xl p-3 active:bg-gray-100 transition-colors text-center">
+        <div className="text-xl font-bold text-gray-900">{stats.properties.active}</div>
+        <div className="text-[10px] text-gray-500 mt-0.5 leading-tight">Aktive<br/>Objekte</div>
+      </Link>
+      <Link href="/dashboard/crm/leads?status=NEW" className={`rounded-xl p-3 transition-colors text-center ${uncontacted > 0 ? 'bg-amber-50 active:bg-amber-100' : 'bg-gray-50 active:bg-gray-100'}`}>
+        <div className={`text-xl font-bold ${uncontacted > 0 ? 'text-amber-700' : 'text-gray-900'}`}>{uncontacted}</div>
+        <div className={`text-[10px] mt-0.5 leading-tight ${uncontacted > 0 ? 'text-amber-600' : 'text-gray-500'}`}>Warten auf<br/>Kontakt</div>
+      </Link>
+    </div>
+  );
+
+  const feedBlock = (
+    <>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Neuigkeiten</h2>
+        <div className="flex items-center gap-3">
+          {feed.length > 0 && (
+            <button onClick={dismissAll} className="text-xs text-gray-400 active:text-gray-700 transition-colors">
+              Alles gelesen
+            </button>
+          )}
+          <Link href="/dashboard/crm/leads" className="text-xs text-gray-400 hover:text-gray-700 transition-colors flex items-center gap-0.5">
+            Alle Leads <ChevronRight className="w-3 h-3" />
+          </Link>
+        </div>
+      </div>
+      {feed.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <CheckCircle2 className="w-9 h-9 text-gray-200 mx-auto mb-3" />
+          <p className="text-sm font-medium text-gray-500">Alles auf dem neuesten Stand</p>
+          <p className="text-xs text-gray-400 mt-1">Keine offenen Aktionen.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {feed.map(item => (
+            <FeedCard key={item.id} item={item} onDismiss={dismissItem} />
+          ))}
+        </div>
+      )}
+    </>
+  );
+
+  const todayBlock = (
+    <>
+      {/* Calendar */}
+      <div className="mb-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Heute & Morgen</h2>
+          <Link href="/dashboard/calendar" className="text-xs text-gray-400 hover:text-gray-700 transition-colors flex items-center gap-0.5">
+            Kalender <ChevronRight className="w-3 h-3" />
+          </Link>
+        </div>
+        <CalendarSection events={calendarEvents} />
+      </div>
+      {/* Pipeline */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Pipeline</h2>
+          <Link href="/dashboard/crm/leads" className="text-xs text-gray-400 hover:text-gray-700 transition-colors flex items-center gap-0.5">
+            CRM <ChevronRight className="w-3 h-3" />
+          </Link>
+        </div>
+        <PipelineBar byStatus={stats.leads.byStatus} total={stats.leads.total} />
+      </div>
+    </>
+  );
 
   return (
-    <div className="h-full flex flex-col bg-white">
-      {/* Header */}
-      <div className="pt-4 md:pt-6 px-4 md:px-8 pb-4">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-          <div>
-            <h2 className="text-xl md:text-2xl font-bold text-gray-900">
-              {new Date().getHours() < 12 ? t('greeting.morning') : new Date().getHours() < 18 ? t('greeting.afternoon') : t('greeting.evening')}, {stats.user.firstName}
-            </h2>
-            <p className="text-gray-500 text-xs md:text-sm mt-0.5">
-              {stats.leads.newToday > 0 
-                ? t('subtitle.newLeads', { count: stats.leads.newToday, suffix: stats.leads.newToday === 1 ? 'r' : '', plural: stats.leads.newToday === 1 ? '' : 's' })
-                : t('subtitle.noNewLeads')}
-              {stats.leads.byStatus.NEW > 0 && ` · ${t('subtitle.waitingForContact', { count: stats.leads.byStatus.NEW })}`}
-            </p>
+    <div className="h-full flex flex-col bg-white overflow-hidden">
+
+      {/* ── Header ── */}
+      <div className="px-4 lg:px-6 pt-4 pb-3 border-b border-gray-100 flex-shrink-0">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-base font-semibold text-gray-900">
+              {greeting}, {stats.user.firstName}
+            </h1>
+            {chips.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {chips.map((chip, i) => (
+                  <span
+                    key={i}
+                    className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium ${
+                      chip.urgent
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    <chip.icon className="w-2.5 h-2.5" />
+                    {chip.label}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 mt-0.5">Alles auf dem neuesten Stand.</p>
+            )}
           </div>
-          <div className="flex gap-2 md:gap-3">
+          <div className="flex gap-1.5 flex-shrink-0">
             <button
               onClick={() => openDrawer('LEAD')}
-              className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-xs md:text-sm font-medium"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:bg-gray-700 transition-colors text-xs font-medium"
             >
-              <Plus className="w-4 h-4" />
-              {t('newLead')}
+              <Plus className="w-3.5 h-3.5" />
+              Lead
             </button>
             <button
               onClick={() => openDrawer('PROPERTY')}
-              className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-xs md:text-sm font-medium"
+              className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors text-xs font-medium"
             >
-              <Plus className="w-4 h-4" />
-              {t('newProperty')}
+              <Plus className="w-3.5 h-3.5" />
+              Objekt
             </button>
           </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto px-4 md:px-8 pb-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
-          {/* Active Leads */}
-          <Link 
-            href="/dashboard/crm/leads"
-            className="bg-white rounded-xl border border-gray-100 p-4 md:p-6 hover:shadow-md transition-all group"
+      {/* ── Mobile: Stats + Tabs ── */}
+      <div className="lg:hidden flex-shrink-0">
+        {/* Stats strip */}
+        <div className="px-4 pt-3 pb-2">
+          {statsRow}
+        </div>
+        {/* Tab bar */}
+        <div className="flex border-b border-gray-100">
+          <button
+            onClick={() => setMobileTab('feed')}
+            className={`flex-1 py-2.5 text-xs font-semibold transition-colors relative ${
+              mobileTab === 'feed' ? 'text-gray-900' : 'text-gray-400'
+            }`}
           >
-            <div className="flex items-center justify-between mb-3 md:mb-4">
-              <div className="p-2 md:p-3 bg-gray-50 rounded-lg">
-                <Users className="w-4 md:w-5 h-4 md:h-5 text-blue-600" />
-              </div>
-              <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" />
-            </div>
-            <div className="text-2xl md:text-3xl font-bold text-gray-900">{activeLeads}</div>
-            <div className="text-xs md:text-sm text-gray-500 mt-1">{t('stats.activeLeads')}</div>
-            {stats.leads.newThisWeek > 0 && (
-              <div className="text-xs text-green-600 mt-2 flex items-center gap-1">
-                <TrendingUp className="w-3 h-3" />
-                +{stats.leads.newThisWeek} {tc('thisWeek')}
-              </div>
+            Neuigkeiten
+            {feed.length > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-900 text-white text-[9px] font-bold">
+                {feed.length}
+              </span>
             )}
-          </Link>
-
-          {/* Properties */}
-          <Link 
-            href="/dashboard/crm/properties"
-            className="bg-white rounded-xl border border-gray-100 p-4 md:p-6 hover:shadow-md transition-all group"
+            {mobileTab === 'feed' && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 rounded-full" />
+            )}
+          </button>
+          <button
+            onClick={() => setMobileTab('today')}
+            className={`flex-1 py-2.5 text-xs font-semibold transition-colors relative ${
+              mobileTab === 'today' ? 'text-gray-900' : 'text-gray-400'
+            }`}
           >
-            <div className="flex items-center justify-between mb-3 md:mb-4">
-              <div className="p-2 md:p-3 bg-gray-50 rounded-lg">
-                <Building2 className="w-4 md:w-5 h-4 md:h-5 text-gray-600" />
-              </div>
-              <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
-            </div>
-            <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats.properties.active}</div>
-            <div className="text-xs md:text-sm text-gray-500 mt-1">{t('stats.activeProperties')}</div>
-            {stats.properties.reserved > 0 && (
-              <div className="text-xs text-orange-600 mt-2">
-                {stats.properties.reserved} {t('stats.reserved')}
-              </div>
+            Heute & Pipeline
+            {todayEventCount > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-100 text-gray-600 text-[9px] font-bold">
+                {todayEventCount}
+              </span>
             )}
-          </Link>
-
-          {/* Conversion Rate */}
-          <div className="bg-white rounded-xl border border-gray-100 p-4 md:p-6">
-            <div className="flex items-center justify-between mb-3 md:mb-4">
-              <div className="p-2 md:p-3 bg-green-50 rounded-lg">
-                <CheckCircle2 className="w-4 md:w-5 h-4 md:h-5 text-green-600" />
-              </div>
-            </div>
-            <div className="text-2xl md:text-3xl font-bold text-gray-900">{conversionRate}%</div>
-            <div className="text-xs md:text-sm text-gray-500 mt-1">{t('stats.conversionRate')}</div>
-            <div className="text-xs text-gray-400 mt-2">
-              {stats.leads.byStatus.BOOKED} {t('stats.ofLeads', { total: stats.leads.total })}
-            </div>
-          </div>
-
-          {/* Needs Attention */}
-          <div className="bg-white rounded-xl border border-gray-100 p-4 md:p-6">
-            <div className="flex items-center justify-between mb-3 md:mb-4">
-              <div className={`p-2 md:p-3 rounded-lg ${stats.leads.byStatus.NEW > 0 ? 'bg-amber-50' : 'bg-gray-50'}`}>
-                <AlertCircle className={`w-4 md:w-5 h-4 md:h-5 ${stats.leads.byStatus.NEW > 0 ? 'text-amber-600' : 'text-gray-400'}`} />
-              </div>
-            </div>
-            <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats.leads.byStatus.NEW}</div>
-            <div className="text-xs md:text-sm text-gray-500 mt-1">{t('stats.waitingForContact')}</div>
-            {stats.leads.needingAttention.length > 0 && stats.leads.needingAttention[0].daysSinceCreated > 0 && (
-              <div className="text-xs text-amber-600 mt-2">
-                {t('stats.oldest', { days: stats.leads.needingAttention[0].daysSinceCreated, suffix: stats.leads.needingAttention[0].daysSinceCreated !== 1 ? 'e' : '' })}
-              </div>
+            {mobileTab === 'today' && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 rounded-full" />
             )}
-          </div>
-        </div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-          {/* Leads needing attention */}
-          <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 p-4 md:p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-gray-900">{t('actionRequired')}</h2>
-              <Link 
-                href="/dashboard/crm/leads?status=NEW" 
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-              >
-                {tc('showAll')}
-              </Link>
-            </div>
-
-            {stats.leads.needingAttention.length === 0 ? (
-              <div className="text-center py-12">
-                <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-3" />
-                <p className="text-gray-500">{t('allContacted')}</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {stats.leads.needingAttention.map((lead) => (
-                  <Link
-                    key={lead.id}
-                    href={`/dashboard/crm/leads/${lead.id}`}
-                    className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors group"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 font-medium">
-                        {lead.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="font-medium text-gray-900">{lead.name}</div>
-                        <div className="text-sm text-gray-500">
-                          {lead.propertyTitle || lead.email}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {lead.daysSinceCreated > 2 && (
-                        <span className="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded-full">
-                          {lead.daysSinceCreated} {tc('days')}
-                        </span>
-                      )}
-<span className="text-xs px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full">
-                                        {t('status.new')}
-                                      </span>
-                      <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" />
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Recent Activity */}
-          <div className="bg-white rounded-xl border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-5">{t('recentActivities')}</h2>
-            
-            {stats.activities.length === 0 ? (
-              <div className="text-center py-8">
-                <Clock className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 text-sm">{t('noActivities')}</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {stats.activities.slice(0, 6).map((activity) => {
-                  const Icon = activityIcons[activity.type] || Clock;
-                  return (
-                    <div key={activity.id} className="flex items-start gap-3">
-                      <div className="p-1.5 bg-gray-100 rounded-lg mt-0.5">
-                        <Icon className="w-3.5 h-3.5 text-gray-500" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-700 truncate">{activity.description}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {activity.leadName} · {formatTimeAgo(activity.createdAt)}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Pipeline Overview */}
-        <div className="mt-4 md:mt-6 bg-white rounded-xl border border-gray-100 p-4 md:p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg font-semibold text-gray-900">{t('leadPipeline')}</h2>
-            <Link 
-              href="/dashboard/crm/leads" 
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              {t('openCrm')}
-            </Link>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            {Object.entries(stats.leads.byStatus).map(([status, count]) => {
-              if (status === 'LOST') return null;
-              const percentage = stats.leads.total > 0 ? (count / stats.leads.total) * 100 : 0;
-              if (percentage === 0) return null;
-              
-              return (
-                <div 
-                  key={status}
-                  className="relative group"
-                  style={{ flex: Math.max(percentage, 5) }}
-                >
-                  <div 
-                    className={`h-8 rounded-lg ${statusColors[status]?.replace('text-', 'bg-').replace('-700', '-200').replace('-500', '-200')} flex items-center justify-center transition-all hover:opacity-80`}
-                  >
-                    {percentage >= 10 && (
-                      <span className={`text-xs font-medium ${statusColors[status]?.split(' ')[1]}`}>
-                        {count}
-                      </span>
-                    )}
-                  </div>
-                  <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                    <span className="text-xs text-gray-500">{statusLabels[status]}: {count}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          
-          {/* Legend */}
-          <div className="flex items-center gap-4 mt-8 pt-4 border-t border-gray-100">
-            {Object.entries(statusLabels).map(([status, label]) => {
-              if (status === 'LOST') return null;
-              return (
-                <div key={status} className="flex items-center gap-1.5">
-                  <div className={`w-2.5 h-2.5 rounded-full ${statusColors[status]?.replace('text-', 'bg-').replace('-700', '-500').replace('-500', '-400')}`} />
-                  <span className="text-xs text-gray-500">{label}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Quick Stats Footer */}
-        <div className="mt-4 md:mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          <div className="bg-gray-50 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-gray-900">{stats.leads.newThisMonth}</div>
-            <div className="text-xs text-gray-500 mt-1">{t('leadsThisMonth')}</div>
-          </div>
-          <div className="bg-gray-50 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-gray-900">{stats.leads.byStatus.CONTACTED}</div>
-            <div className="text-xs text-gray-500 mt-1">{t('status.contacted')}</div>
-          </div>
-          <div className="bg-gray-50 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-gray-900">{stats.leads.byStatus.CONVERSATION}</div>
-            <div className="text-xs text-gray-500 mt-1">{t('status.inConversation')}</div>
-          </div>
-          <div className="bg-gray-50 rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-green-600 flex items-center justify-center gap-1">
-              <CheckCircle2 className="w-5 h-5" />
-              {stats.leads.byStatus.BOOKED}
-            </div>
-            <div className="text-xs text-gray-500 mt-1">{t('status.booked')}</div>
-          </div>
+          </button>
         </div>
       </div>
+
+      {/* ── Mobile: Tab content ── */}
+      <div className="lg:hidden flex-1 overflow-y-auto px-4 py-4">
+        {mobileTab === 'feed' ? feedBlock : todayBlock}
+      </div>
+
+      {/* ── Desktop: Side-by-side layout ── */}
+      <div className="hidden lg:flex flex-1 overflow-hidden">
+        {/* Left: Feed */}
+        <div className="flex-1 min-w-0 px-6 py-4 border-r border-gray-100 overflow-y-auto">
+          {feedBlock}
+        </div>
+        {/* Right: Stats + Today + Pipeline */}
+        <div className="w-80 flex-shrink-0 px-5 py-4 space-y-5 overflow-y-auto">
+          {statsRow}
+          <div className="border-t border-gray-50" />
+          {todayBlock}
+        </div>
+      </div>
+
     </div>
   );
 }
