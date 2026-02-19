@@ -667,6 +667,16 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           // #endregion
           throw new Error(errData.error || `Server-Fehler (${res.status})`);
         }
+
+        // #region agent log
+        const ct = res.headers.get('content-type') || '';
+        if (!ct.includes('text/event-stream')) {
+          const rawBody = await res.clone().text().catch(() => '(unlesbar)');
+          console.error('[Jarvis-Debug] WRONG content-type! body:', rawBody.slice(0, 500));
+          fetch('http://127.0.0.1:7757/ingest/9b82a237-50c5-4c6a-aa16-234d3ee20ca3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3d1d39'},body:JSON.stringify({sessionId:'3d1d39',location:'AiChatSidebar.tsx:stream',message:'wrong-content-type',data:{ct,status:res.status,body:rawBody.slice(0,500)},timestamp:Date.now()})}).catch(()=>{});
+        }
+        // #endregion
+
         if (!res.body) throw new Error('No response body');
 
         // Add empty assistant message that we'll update
