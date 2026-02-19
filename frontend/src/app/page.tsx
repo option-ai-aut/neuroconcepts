@@ -118,7 +118,7 @@ function SplashScreen({ onComplete }: { onComplete: () => void }) {
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [onComplete]);
   return (
-    <div className={`fixed inset-0 z-[100] bg-[#07070f] flex items-center justify-center px-6 transition-transform duration-[800ms] ease-[cubic-bezier(0.65,0,0.35,1)] ${phase === 'exit' ? '-translate-y-full' : 'translate-y-0'}`}>
+    <div className={`fixed inset-0 z-[100] bg-black flex items-center justify-center px-6 transition-transform duration-[800ms] ease-[cubic-bezier(0.65,0,0.35,1)] ${phase === 'exit' ? '-translate-y-full' : 'translate-y-0'}`}>
       <p className={`flex flex-wrap justify-center transition-all duration-[800ms] ease-[cubic-bezier(0.65,0,0.35,1)] ${phase === 'text-exit' || phase === 'exit' ? '-translate-y-[50vh] opacity-0' : ''}`} aria-label={phrase}>
         {phrase.split('').map((char, i) => (
           <span key={i} className="splash-char" style={{ opacity: 0, animationDelay: `${300 + i * 55}ms` } as React.CSSProperties}>{char === ' ' ? '\u00A0' : char}</span>
@@ -131,8 +131,8 @@ function SplashScreen({ onComplete }: { onComplete: () => void }) {
 /* ═══════════════════════════════════════════════
    STYLE CONSTANTS
    ═══════════════════════════════════════════════ */
-const S_DARK = 'bg-[#07070f]';
-const S_ALT = 'bg-[#0d1424]';
+const S_DARK = 'bg-black';
+const S_ALT = 'bg-[#0d1117]';
 
 /* ═══════════════════════════════════════════════
    SECTION WRAPPER — each slide is 100vh
@@ -553,7 +553,7 @@ export default function LandingPage() {
               <div className="absolute inset-0 z-0 overflow-hidden">
                 <video
                   ref={heroVideoRef}
-                  src="/Hyperlapse-scroll.mp4"
+                  src={`${process.env.NEXT_PUBLIC_MEDIA_CDN_URL || ''}/public/Hyperlapse-scroll.mp4`}
                   poster="/Hyperlapse-poster.jpg"
                   muted
                   playsInline

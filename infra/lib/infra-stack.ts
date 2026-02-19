@@ -436,6 +436,7 @@ export class ImmivoStack extends cdk.Stack {
       code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, '../../frontend'), {
         buildArgs: {
           NEXT_PUBLIC_AWS_REGION: this.region,
+          NEXT_PUBLIC_MEDIA_CDN_URL: `https://${props.stageName === 'prod' ? 'media' : `${props.stageName}-media`}.immivo.ai`,
         },
       }),
       memorySize: 2048, // Next.js needs some memory

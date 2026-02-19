@@ -62,13 +62,19 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
     ? 'bg-white text-gray-900 hover:bg-gray-100 hover:shadow-white/10'
     : 'bg-gray-900 text-white hover:bg-gray-800 hover:shadow-black/10';
   const logoFilter = isDark ? 'none' : 'invert(1)';
-  const dropdownBg = 'backdrop-blur-xl bg-gray-900/90 border-white/10';
+  const dropdownBg = 'backdrop-blur-xl border-white/10';
+  const dropdownStyle = { background: 'rgba(15,15,15,0.95)' };
   const dropdownText = 'text-gray-300 hover:bg-white/10 hover:text-white';
+
+  const navBg = isDark
+    ? 'rgba(0,0,0,0.55)'
+    : 'rgba(255,255,255,0.75)';
 
   return (
     <nav
       ref={navRef}
       className="fixed w-full z-50 backdrop-blur-2xl"
+      style={{ background: navBg, transition: 'background 0.4s ease' }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative flex justify-between items-center h-16">
@@ -86,7 +92,7 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
                 </svg>
               </Link>
               <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                <div className={`${dropdownBg} rounded-xl shadow-xl border py-2 min-w-[200px]`}>
+                <div className={`${dropdownBg} rounded-xl shadow-xl border py-2 min-w-[200px]`} style={dropdownStyle}>
                   {currentPage === 'home' ? (
                     <>
                       <a href="#jarvis" onClick={(e) => handleAnchorClick(e, 'jarvis')} className={`block px-4 py-2 text-sm ${dropdownText}`}>{t('jarvisAi')}</a>
@@ -116,7 +122,7 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
                 </svg>
               </Link>
               <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                <div className={`${dropdownBg} rounded-xl shadow-xl border py-2 min-w-[200px]`}>
+                <div className={`${dropdownBg} rounded-xl shadow-xl border py-2 min-w-[200px]`} style={dropdownStyle}>
                   <Link href="/ueber-uns" prefetch={false} className={`block px-4 py-2 text-sm ${dropdownText}`}>{t('aboutUs')}</Link>
                   <Link href="/blog" prefetch={false} className={`block px-4 py-2 text-sm ${dropdownText}`}>{t('blog')}</Link>
                   <Link href="/karriere" prefetch={false} className={`block px-4 py-2 text-sm ${dropdownText}`}>{t('careers')}</Link>
@@ -125,11 +131,7 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
               </div>
             </div>
 
-            {currentPage === 'home' ? (
-              <a href="#demo" onClick={(e) => handleAnchorClick(e, 'demo')} className={`text-sm font-medium transition-colors ${textClass}`}>{t('demo')}</a>
-            ) : (
-              <Link href="/#demo" prefetch={false} className={`text-sm font-medium transition-colors ${textClass}`}>{t('demo')}</Link>
-            )}
+            <Link href="/demo" prefetch={false} className={`text-sm font-medium transition-colors ${currentPage === 'demo' ? activeTextClass : textClass}`}>{t('demo')}</Link>
           </div>
 
           <div className="hidden lg:flex items-center space-x-4 relative z-10">
@@ -189,11 +191,7 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
             </div>
 
             <div className="border-t border-white/[0.06] pt-4">
-              {currentPage === 'home' ? (
-                <a href="#demo" onClick={(e) => handleAnchorClick(e, 'demo')} className="block py-2 font-medium text-white">{t('demoBook')}</a>
-              ) : (
-                <Link href="/#demo" prefetch={false} className="block py-2 font-medium text-white" onClick={() => setMobileMenuOpen(false)}>{t('demoBook')}</Link>
-              )}
+              <Link href="/demo" prefetch={false} className={`block py-2 font-medium ${currentPage === 'demo' ? 'text-blue-400' : 'text-white'}`} onClick={() => setMobileMenuOpen(false)}>{t('demoBook')}</Link>
             </div>
 
             <div className="border-t border-white/[0.06] pt-4 space-y-3">
