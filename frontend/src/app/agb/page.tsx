@@ -10,7 +10,7 @@ export default function AGBPage() {
       <PublicNavigation currentPage="agb" />
 
       <section className="pt-24 sm:pt-32 pb-16 sm:pb-24">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 animate-fade-in">
           <header className="mb-10 sm:mb-12">
             <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
               Allgemeine Geschäftsbedingungen
@@ -23,7 +23,7 @@ export default function AGBPage() {
           <div className="space-y-10">
             {/* Anbieter */}
             <section className="rounded-xl bg-gray-50 p-6 border border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900 mb-3">
+              <h2 className="text-lg font-semibold text-gray-900 mb-3 border-l-2 border-blue-600 pl-3">
                 Anbieter
               </h2>
               <address className="not-italic text-gray-600 leading-relaxed">
@@ -39,7 +39,7 @@ export default function AGBPage() {
 
             {/* § 1 */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 § 1 Geltungsbereich
               </h2>
               <p className="text-gray-600 leading-relaxed">
@@ -52,7 +52,7 @@ export default function AGBPage() {
 
             {/* § 2 */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 § 2 Vertragsgegenstand
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -72,7 +72,7 @@ export default function AGBPage() {
 
             {/* § 3 */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 § 3 Vertragsschluss und Registrierung
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -93,7 +93,7 @@ export default function AGBPage() {
 
             {/* § 4 */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 § 4 Kostenlose Testphase
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -118,7 +118,7 @@ export default function AGBPage() {
 
             {/* § 5 */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 § 5 Leistungsumfang und Tarife
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -147,7 +147,7 @@ export default function AGBPage() {
 
             {/* § 6 */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 § 6 Preise und Zahlung
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -169,7 +169,7 @@ export default function AGBPage() {
 
             {/* § 7 */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 § 7 Kündigung
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -195,7 +195,7 @@ export default function AGBPage() {
 
             {/* § 8 - KI */}
             <section className="rounded-xl border-2 border-amber-100 bg-amber-50/50 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 § 8 KI-Dienste und Haftung
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -218,7 +218,7 @@ export default function AGBPage() {
 
             {/* § 9 */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 § 9 Nutzungsrechte und Pflichten
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -242,7 +242,7 @@ export default function AGBPage() {
 
             {/* § 10 */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 § 10 Datenschutz
               </h2>
               <p className="text-gray-600 leading-relaxed">
@@ -258,7 +258,7 @@ export default function AGBPage() {
 
             {/* § 11 */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 § 11 Verfügbarkeit
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -275,7 +275,7 @@ export default function AGBPage() {
 
             {/* § 12 */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 § 12 Haftungsbeschränkung
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -298,7 +298,7 @@ export default function AGBPage() {
 
             {/* § 13 */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 § 13 Gewährleistung
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -315,7 +315,7 @@ export default function AGBPage() {
 
             {/* § 14 */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 § 14 Änderungen der AGB
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -334,7 +334,7 @@ export default function AGBPage() {
 
             {/* § 15 */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 § 15 Schlussbestimmungen
               </h2>
               <ul className="list-disc pl-6 space-y-2 text-gray-600">
@@ -351,6 +351,22 @@ export default function AGBPage() {
           </div>
         </div>
       </section>
+
+      <style jsx global>{`
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out forwards;
+        }
+      `}</style>
 
       <PublicFooter />
     </div>

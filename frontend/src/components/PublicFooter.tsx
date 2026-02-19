@@ -6,12 +6,12 @@ import { Mail, MapPin, Lock } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 
-export default function PublicFooter() {
+export default function PublicFooter({ bare = false }: { bare?: boolean }) {
   const t = useTranslations('footer');
   const nav = useTranslations('publicNav');
 
-  return (
-    <footer className="bg-gray-900 text-white py-12 md:py-16">
+  const footer = (
+    <footer className="bg-[#111111] text-white py-12 md:py-16 rounded-2xl sm:rounded-3xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 md:gap-12 mb-8 md:mb-12">
           <div className="col-span-2">
@@ -79,5 +79,13 @@ export default function PublicFooter() {
         </div>
       </div>
     </footer>
+  );
+
+  if (bare) return footer;
+
+  return (
+    <div className="mx-auto mb-[10px]" style={{ maxWidth: 'calc(100vw - 20px)' }}>
+      {footer}
+    </div>
   );
 }

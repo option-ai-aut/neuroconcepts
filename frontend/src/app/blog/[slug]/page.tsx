@@ -135,7 +135,7 @@ export default function BlogPostPage() {
                 Zurück zum Blog
               </Link>
 
-              <article>
+              <article className="animate-fade-in">
                 {post.category && (
                   <span className="inline-block px-3 py-1 bg-blue-50 text-blue-600 rounded-md text-sm font-medium mb-4">
                     {post.category}
@@ -231,6 +231,22 @@ export default function BlogPostPage() {
           )}
         </div>
       </main>
+
+      <style jsx global>{`
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out forwards;
+        }
+      `}</style>
 
       <PublicFooter />
     </div>

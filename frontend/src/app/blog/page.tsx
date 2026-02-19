@@ -1,11 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Clock, Mail, Loader2 } from 'lucide-react';
 import PublicNavigation from '@/components/PublicNavigation';
 import PublicFooter from '@/components/PublicFooter';
 import { getApiUrl, getImageUrl } from '@/lib/api';
+
+function useInView() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [isInView, setIsInView] = useState(false);
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) setIsInView(true);
+    }, { threshold: 0.1 });
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+  return { ref, isInView };
+}
 
 interface BlogPost {
   id: string;
@@ -26,6 +39,8 @@ export default function BlogPage() {
   const [subscribeName, setSubscribeName] = useState('');
   const [subscribeStatus, setSubscribeStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [subscribeError, setSubscribeError] = useState<string | null>(null);
+  const heroInView = useInView();
+  const newsletterInView = useInView();
 
   useEffect(() => {
     async function fetchPosts() {
@@ -89,8 +104,11 @@ export default function BlogPage() {
       <PublicNavigation currentPage="blog" />
 
       {/* Hero */}
-      <section className="pt-24 sm:pt-32 pb-12 sm:pb-16 bg-gradient-to-b from-gray-50 to-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section className="pt-24 sm:pt-32 pb-12 sm:pb-16 bg-white">
+        <div 
+          ref={heroInView.ref}
+          className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center transition-opacity duration-700 ${heroInView.isInView ? 'opacity-100' : 'opacity-0'}`}
+        >
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-4 sm:mb-6">
             Blog
           </h1>
@@ -120,10 +138,15 @@ export default function BlogPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-              {posts.map((post) => (
+              {posts.map((post, index) => (
                 <article
                   key={post.id}
                   className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all"
+                  style={{
+                    animationDelay: `${Math.floor(index / 3) * 100}ms`,
+                    animation: 'fadeInUp 0.6s ease-out forwards',
+                    opacity: 0
+                  }}
                 >
                   <Link href={`/blog/${post.slug}`} className="block">
                     <div className="aspect-[16/9] bg-gray-100 relative overflow-hidden">
@@ -178,8 +201,11 @@ export default function BlogPage() {
       </section>
 
       {/* Newsletter */}
-      <section className="py-12 sm:py-16 bg-gray-50">
-        <div className="max-w-2xl mx-auto px-4 text-center">
+      <section className="py-12 sm:py-16 bg-white">
+        <div 
+          ref={newsletterInView.ref}
+          className={`max-w-2xl mx-auto px-4 text-center transition-opacity duration-700 ${newsletterInView.isInView ? 'opacity-100' : 'opacity-0'}`}
+        >
           <div className="flex justify-center mb-4">
             <div className="p-3 bg-blue-50 rounded-full">
               <Mail className="w-8 h-8 text-blue-600" />
@@ -234,6 +260,19 @@ export default function BlogPage() {
           )}
         </div>
       </section>
+
+      <style jsx global>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
 
       <PublicFooter />
     </div>

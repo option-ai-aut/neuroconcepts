@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Bot, TrendingUp, Clock, ArrowRight, CheckCircle2,
   Users, Building2, Mail, Calendar, FileText, Zap, Shield,
-  Star, BarChart3, MessageSquare, Brain, Rocket, Target, Award, Globe,
+  BarChart3, MessageSquare, Brain, Rocket, Target, Award, Globe,
   Wand2, Server, ChevronDown
 } from 'lucide-react';
 import NextImage from 'next/image';
@@ -14,181 +14,114 @@ import PublicFooter from '@/components/PublicFooter';
 import DemoBooking from '@/components/DemoBooking';
 import { useTranslations } from 'next-intl';
 
-/* ─────────────────────────────────────────────
-   Scroll-Reveal System (single IntersectionObserver)
-   Elements with class "rv" start hidden and transition
-   to visible when they enter the viewport.
-   Stagger via inline style --d (delay in ms).
-   ───────────────────────────────────────────── */
-function useScrollReveal() {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const root = containerRef.current;
-    if (!root) return;
-
-    const elements = root.querySelectorAll('.rv');
-    const obs = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) {
-            (e.target as HTMLElement).classList.add('revealed');
-            obs.unobserve(e.target);
-          }
-        });
-      },
-      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
-    );
-    elements.forEach((el) => obs.observe(el));
-    return () => obs.disconnect();
-  }, []);
-
-  return containerRef;
-}
-
-/* ─────────────────────────────────────────────
-   Animated Counter
-   ───────────────────────────────────────────── */
-function AnimatedCounter({ end, duration = 2000, suffix = '' }: { end: number; duration?: number; suffix?: string }) {
+/* ═══════════════════════════════════════════════
+   ANIMATED COUNTER
+   ═══════════════════════════════════════════════ */
+function AnimatedCounter({ end, suffix = '' }: { end: number; suffix?: string }) {
   const [count, setCount] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
   const triggered = useRef(false);
-
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !triggered.current) {
-          triggered.current = true;
-          let start: number;
-          const step = (ts: number) => {
-            if (!start) start = ts;
-            const p = Math.min((ts - start) / duration, 1);
-            setCount(Math.floor(p * end));
-            if (p < 1) requestAnimationFrame(step);
-          };
-          requestAnimationFrame(step);
-          obs.disconnect();
-        }
-      },
-      { threshold: 0.3 }
-    );
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !triggered.current) {
+        triggered.current = true;
+        let start: number;
+        const dur = 1600;
+        const step = (ts: number) => {
+          if (!start) start = ts;
+          const p = Math.min((ts - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          setCount(Math.round(eased * end));
+          if (p < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }
+    }, { threshold: 0.3 });
     obs.observe(el);
     return () => obs.disconnect();
-  }, [end, duration]);
-
+  }, [end]);
   return <span ref={ref}>{count}{suffix}</span>;
 }
 
-/* ─────────────────────────────────────────────
-   Before / After Slider
-   ───────────────────────────────────────────── */
-function BeforeAfterSlider() {
+/* ═══════════════════════════════════════════════
+   BEFORE / AFTER — auto-animated, no manual slider
+   ═══════════════════════════════════════════════ */
+function BeforeAfterSlider({ active }: { active: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [sliderPos, setSliderPos] = useState(50);
-  const [isDragging, setIsDragging] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
+  const autoRaf = useRef<number>(0);
+  const autoStartTime = useRef(0);
   const t = useTranslations('landing');
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      setContainerWidth(entry.contentRect.width);
-    });
-    ro.observe(el);
-    setContainerWidth(el.offsetWidth);
+    const ro = new ResizeObserver(([entry]) => setContainerWidth(entry.contentRect.width));
+    ro.observe(el); setContainerWidth(el.offsetWidth);
     return () => ro.disconnect();
   }, []);
 
-  const updatePosition = useCallback((clientX: number) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
-    setSliderPos((x / rect.width) * 100);
-  }, []);
-
   useEffect(() => {
-    if (!isDragging) return;
-    const move = (e: MouseEvent | TouchEvent) => {
-      e.preventDefault();
-      const cx = 'touches' in e ? e.touches[0].clientX : e.clientX;
-      updatePosition(cx);
+    if (!active) { cancelAnimationFrame(autoRaf.current); setSliderPos(50); return; }
+    autoStartTime.current = performance.now();
+    const HALF = 3500;
+    const CYCLE = HALF * 2;
+    const tick = (now: number) => {
+      const elapsed = now - autoStartTime.current;
+      let pos: number;
+      if (elapsed < HALF) {
+        const t = elapsed / HALF;
+        const ease = 0.5 - 0.5 * Math.cos(t * Math.PI);
+        pos = 50 - ease * 50;
+      } else {
+        const loopElapsed = (elapsed - HALF) % CYCLE;
+        const progress = loopElapsed / CYCLE;
+        const ease = 0.5 - 0.5 * Math.cos(progress * 2 * Math.PI);
+        pos = ease * 100;
+      }
+      setSliderPos(pos);
+      autoRaf.current = requestAnimationFrame(tick);
     };
-    const up = () => setIsDragging(false);
-    window.addEventListener('mousemove', move);
-    window.addEventListener('touchmove', move, { passive: false });
-    window.addEventListener('mouseup', up);
-    window.addEventListener('touchend', up);
-    return () => {
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('touchmove', move);
-      window.removeEventListener('mouseup', up);
-      window.removeEventListener('touchend', up);
-    };
-  }, [isDragging, updatePosition]);
+    autoRaf.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(autoRaf.current);
+  }, [active]);
 
   return (
-    <div
-      ref={containerRef}
-      className="relative rounded-2xl overflow-hidden shadow-2xl cursor-col-resize select-none"
-      onMouseDown={(e) => { setIsDragging(true); updatePosition(e.clientX); }}
-      onTouchStart={(e) => { setIsDragging(true); updatePosition(e.touches[0].clientX); }}
-    >
-      <div className="aspect-[4/3] relative">
-        <NextImage src="/Neu.jpg" alt={t('beforeAfter.afterAlt')} fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" priority />
+    <div ref={containerRef} className="relative h-full overflow-hidden select-none">
+      <div className="h-full relative">
+        <NextImage src="/Neu.jpg" alt={t('beforeAfter.afterAlt')} fill className="object-cover" sizes="100vw" quality={95} style={{ objectPosition: 'center calc(70% - 4px)' }} priority />
         <div className="absolute inset-0 overflow-hidden" style={{ width: `${sliderPos}%` }}>
-          <NextImage src="/Alt.jpg" alt={t('beforeAfter.beforeAlt')} fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" style={{ minWidth: containerWidth > 0 ? `${containerWidth}px` : '100%' }} priority />
+          <NextImage src="/Alt.jpg" alt={t('beforeAfter.beforeAlt')} fill className="object-cover" sizes="100vw" style={{ minWidth: containerWidth > 0 ? `${containerWidth}px` : '100%', objectPosition: 'center 70%' }} priority />
         </div>
         <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1.5 rounded-full z-20 pointer-events-none">{t('beforeAfter.before')}</div>
         <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-gray-900 text-xs font-semibold px-3 py-1.5 rounded-full z-20 pointer-events-none">{t('beforeAfter.after')}</div>
-        <div className="absolute inset-y-0 z-30 pointer-events-none" style={{ left: `${sliderPos}%` }}>
-          <div className="absolute inset-y-0 w-0.5 bg-white shadow-lg -translate-x-1/2" />
-          <div className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center pointer-events-auto cursor-col-resize">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M5 3L2 8L5 13M11 3L14 8L11 13" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </div>
-        </div>
       </div>
     </div>
   );
 }
 
-/* ─────────────────────────────────────────────
-   Splash Screen — 3-second blur-reveal intro
-   ───────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════
+   SPLASH SCREEN
+   ═══════════════════════════════════════════════ */
+let splashShownThisSession = false;
+
 function SplashScreen({ onComplete }: { onComplete: () => void }) {
   const [phase, setPhase] = useState<'reveal' | 'text-exit' | 'exit'>('reveal');
   const phrase = 'Close More. Stress Less.';
-  const chars = phrase.split('');
-
   useEffect(() => {
-    const textExit = setTimeout(() => setPhase('text-exit'), 2100);
-    const slideExit = setTimeout(() => setPhase('exit'), 2400);
-    const doneTimer = setTimeout(onComplete, 3200);
-    return () => { clearTimeout(textExit); clearTimeout(slideExit); clearTimeout(doneTimer); };
+    const t1 = setTimeout(() => setPhase('text-exit'), 2100);
+    const t2 = setTimeout(() => setPhase('exit'), 2400);
+    const t3 = setTimeout(onComplete, 3200);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [onComplete]);
-
   return (
-    <div
-      className={`fixed inset-0 z-[100] bg-gray-950 flex items-center justify-center px-6 transition-transform duration-[800ms] ease-[cubic-bezier(0.65,0,0.35,1)] ${
-        phase === 'exit' ? '-translate-y-full' : 'translate-y-0'
-      }`}
-    >
-      <p
-        className={`flex flex-wrap justify-center transition-all duration-[800ms] ease-[cubic-bezier(0.65,0,0.35,1)] ${
-          phase === 'text-exit' || phase === 'exit' ? '-translate-y-[50vh] opacity-0' : ''
-        }`}
-        aria-label={phrase}
-      >
-        {chars.map((char, i) => (
-          <span
-            key={i}
-            className="splash-char"
-            style={{ animationDelay: `${300 + i * 55}ms` } as React.CSSProperties}
-          >
-            {char === ' ' ? '\u00A0' : char}
-          </span>
+    <div className={`fixed inset-0 z-[100] bg-[#07070f] flex items-center justify-center px-6 transition-transform duration-[800ms] ease-[cubic-bezier(0.65,0,0.35,1)] ${phase === 'exit' ? '-translate-y-full' : 'translate-y-0'}`}>
+      <p className={`flex flex-wrap justify-center transition-all duration-[800ms] ease-[cubic-bezier(0.65,0,0.35,1)] ${phase === 'text-exit' || phase === 'exit' ? '-translate-y-[50vh] opacity-0' : ''}`} aria-label={phrase}>
+        {phrase.split('').map((char, i) => (
+          <span key={i} className="splash-char" style={{ opacity: 0, animationDelay: `${300 + i * 55}ms` } as React.CSSProperties}>{char === ' ' ? '\u00A0' : char}</span>
         ))}
       </p>
     </div>
@@ -196,684 +129,936 @@ function SplashScreen({ onComplete }: { onComplete: () => void }) {
 }
 
 /* ═══════════════════════════════════════════════
-   LANDING PAGE
+   STYLE CONSTANTS
    ═══════════════════════════════════════════════ */
-let splashShownThisSession = false;
+const S_DARK = 'bg-[#07070f]';
+const S_ALT = 'bg-[#0d1424]';
 
+/* ═══════════════════════════════════════════════
+   SECTION WRAPPER — each slide is 100vh
+   ═══════════════════════════════════════════════ */
+function Slide({ children, className = '', active, idx }: { children: React.ReactNode; className?: string; active: boolean; idx: number }) {
+  return (
+    <section
+      className={`snap-slide h-screen w-full flex-shrink-0 relative overflow-hidden ${className}`}
+      data-idx={idx}
+    >
+      <div className={`h-full transition-opacity duration-700 ease-out ${active ? 'opacity-100' : 'opacity-0'}`}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   STAGGER CHILDREN — animate children in on active
+   ═══════════════════════════════════════════════ */
+function Stagger({ children, active, className = '', delay = 0 }: { children: React.ReactNode; active: boolean; className?: string; delay?: number }) {
+  return (
+    <div
+      className={`transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${className}`}
+      style={{
+        transitionDelay: active ? `${delay}ms` : '0ms',
+        opacity: active ? 1 : 0,
+        transform: active ? 'translateY(0)' : 'translateY(40px)',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   MAIN LANDING PAGE
+   ═══════════════════════════════════════════════ */
 export default function LandingPage() {
   const t = useTranslations('landing');
-  const scrollRef = useScrollReveal();
-
   const [splashDone, setSplashDone] = useState(splashShownThisSession);
-  const heroRef = useRef<HTMLElement>(null);
-  const [heroScroll, setHeroScroll] = useState(0);
+  const handleSplashComplete = useCallback(() => { splashShownThisSession = true; setSplashDone(true); }, []);
 
-  const handleSplashComplete = useCallback(() => {
-    splashShownThisSession = true;
-    setSplashDone(true);
-  }, []);
+  /* ── Scroll Controller ── */
+  const [activeIdx, setActiveIdx] = useState(0);
+  const activeIdxRef = useRef(0);
+  useEffect(() => { activeIdxRef.current = activeIdx; }, [activeIdx]);
+  const isAnimating = useRef(false);
+  const SECTION_COUNT = 10;
+  const TRANSITION_MS = 800;
+
+  const [orbitalPhase, setOrbitalPhase] = useState<'orbital' | 'shrinking' | 'expanding' | 'results'>('orbital');
+  const orbitalPhaseRef = useRef(orbitalPhase);
+  useEffect(() => { orbitalPhaseRef.current = orbitalPhase; }, [orbitalPhase]);
 
   useEffect(() => {
-    if (!splashDone) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
+    document.body.style.overflow = splashDone ? '' : 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, [splashDone]);
 
+  // Jump to section based on URL hash (e.g. /#demo, /#features)
   useEffect(() => {
-    const onScroll = () => {
-      const el = heroRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const h = el.offsetHeight;
-      const progress = Math.max(0, Math.min(1, -rect.top / (h * 0.7)));
-      setHeroScroll(progress);
+    if (!splashDone) return;
+    const hash = window.location.hash;
+    const hashMap: Record<string, number> = {
+      '#demo': 7,
+      '#features': 4,
+      '#jarvis': 2,
+      '#bildbearbeitung': 5,
     };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    const target = hashMap[hash];
+    if (target !== undefined) {
+      // Clear hash without page reload
+      window.history.replaceState(null, '', window.location.pathname);
+      setTimeout(() => {
+        setActiveIdx(target);
+        if (target === 3) setOrbitalPhase('results');
+      }, 100);
+    }
+  }, [splashDone]);
+
+  const isLightSection = (activeIdx >= 1 && activeIdx <= 2) || (activeIdx === 3 && (orbitalPhase === 'orbital' || orbitalPhase === 'shrinking')) || activeIdx === 4 || activeIdx === 5 || activeIdx === 7 || activeIdx === 9;
+  useEffect(() => {
+    document.documentElement.dataset.navTheme = isLightSection ? 'light' : 'dark';
+    return () => { delete document.documentElement.dataset.navTheme; };
+  }, [isLightSection]);
+
+  const handleAnchorClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>, targetIdx: number) => {
+    e.preventDefault();
+    setActiveIdx(targetIdx);
   }, []);
 
-  const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
-    e.preventDefault();
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  /* ── Data ── */
+  const problemCards = [
+    { icon: Mail, title: t('problem.emailFlood'), problem: t('problem.emailProblem'), solution: t('problem.emailSolution') },
+    { icon: Calendar, title: t('problem.appointmentChaos'), problem: t('problem.appointmentProblem'), solution: t('problem.appointmentSolution') },
+    { icon: FileText, title: t('problem.exposeMarathon'), problem: t('problem.exposeProblem'), solution: t('problem.exposeSolution') },
+  ];
+
+  const featureItems = [
+    { icon: Bot, title: t('features.jarvisTitle'), desc: t('features.jarvisDesc') },
+    { icon: Wand2, title: t('features.imageTitle'), desc: t('features.imageDesc') },
+    { icon: Users, title: t('features.crmTitle'), desc: t('features.crmDesc') },
+    { icon: Building2, title: t('features.propertiesTitle'), desc: t('features.propertiesDesc') },
+    { icon: FileText, title: t('features.exposeTitle'), desc: t('features.exposeDesc') },
+    { icon: Calendar, title: t('features.calendarTitle'), desc: t('features.calendarDesc') },
+    { icon: Mail, title: t('features.emailTitle'), desc: t('features.emailDesc') },
+    { icon: Globe, title: t('features.portalsTitle'), desc: t('features.portalsDesc') },
+    { icon: BarChart3, title: t('features.analyticsTitle'), desc: t('features.analyticsDesc') },
+    { icon: Shield, title: t('features.hostingTitle'), desc: t('features.hostingDesc') },
+  ];
+
+  const statItems = [
+    { value: 15, suffix: 'h', label: t('results.timeSaving'), icon: Clock },
+    { value: 40, suffix: '%', label: t('results.moreLeads'), icon: Target },
+    { value: 3, suffix: 'x', label: t('results.fasterResponse'), icon: Zap },
+    { value: 25, suffix: '%', label: t('results.higherConversion'), icon: TrendingUp },
+  ];
+
+  const jarvisTitleText = String(t.raw('jarvis.title')).replace(/<[^>]*>/g, '');
+  const heroVideoRef = useRef<HTMLVideoElement>(null);
+  const [heroPhase, setHeroPhase] = useState<'idle' | 'revealing' | 'rewinding'>('idle');
+  const heroRaf = useRef<number>(0);
+  const PLAYBACK_SPEED = 3;
+
+  const triggerHeroReveal = useCallback(() => {
+    if (heroPhase !== 'idle') return;
+    isAnimating.current = true;
+    setHeroPhase('revealing');
+    const vid = heroVideoRef.current;
+    if (!vid) return;
+    vid.pause();
+    if (vid.currentTime > 0.1) vid.currentTime = 0;
+
+    let lastTs = 0;
+    const step = (ts: number) => {
+      if (!lastTs) lastTs = ts;
+      const dt = (ts - lastTs) / 1000;
+      lastTs = ts;
+      vid.currentTime = Math.min(vid.duration, vid.currentTime + dt * PLAYBACK_SPEED);
+      if (vid.currentTime >= vid.duration - 0.05) {
+        vid.currentTime = vid.duration;
+        setTimeout(() => { isAnimating.current = false; }, TRANSITION_MS + 100);
+        setActiveIdx(1);
+        return;
+      }
+      heroRaf.current = requestAnimationFrame(step);
+    };
+    heroRaf.current = requestAnimationFrame(step);
+  }, [heroPhase, TRANSITION_MS]);
+
+  const triggerHeroRewind = useCallback(() => {
+    isAnimating.current = true;
+    setHeroPhase('rewinding');
+    setActiveIdx(0);
+    const vid = heroVideoRef.current;
+    if (!vid) { setHeroPhase('idle'); isAnimating.current = false; return; }
+    vid.pause();
+
+    let lastTs = 0;
+    const step = (ts: number) => {
+      if (!lastTs) lastTs = ts;
+      const dt = (ts - lastTs) / 1000;
+      lastTs = ts;
+      vid.currentTime = Math.max(0, vid.currentTime - dt * PLAYBACK_SPEED);
+      if (vid.currentTime <= 0.05) {
+        vid.currentTime = 0;
+        setHeroPhase('idle');
+        setTimeout(() => { isAnimating.current = false; }, 300);
+        return;
+      }
+      heroRaf.current = requestAnimationFrame(step);
+    };
+    heroRaf.current = requestAnimationFrame(step);
+  }, []);
+
+  useEffect(() => {
+    return () => { if (heroRaf.current) cancelAnimationFrame(heroRaf.current); };
+  }, []);
+
+  useEffect(() => {
+    const vid = heroVideoRef.current;
+    if (!vid) return;
+    const warmUp = () => { vid.currentTime = 0.001; };
+    if (vid.readyState >= 2) {
+      warmUp();
+    } else {
+      vid.addEventListener('loadeddata', warmUp, { once: true });
+    }
+  }, []);
+
+  const [featureStep, setFeatureStep] = useState(0);
+  const featureStepRef = useRef(0);
+  useEffect(() => { featureStepRef.current = featureStep; }, [featureStep]);
+  const FEATURE_MAX_STEP = 2;
+
+  useEffect(() => {
+    if (activeIdx !== 4) {
+      const t = setTimeout(() => setFeatureStep(0), 800);
+      return () => clearTimeout(t);
+    }
+  }, [activeIdx]);
+
+  const expandOrbital = useCallback(() => {
+    if (orbitalPhase !== 'orbital') return;
+    isAnimating.current = true;
+    setOrbitalPhase('shrinking');
+    setTimeout(() => {
+      setOrbitalPhase('expanding');
+      setTimeout(() => {
+        setOrbitalPhase('results');
+        setTimeout(() => { isAnimating.current = false; }, 500);
+      }, 650);
+    }, 450);
+  }, [orbitalPhase]);
+
+  const collapseOrbital = useCallback(() => {
+    if (orbitalPhase !== 'results') return;
+    isAnimating.current = true;
+    setOrbitalPhase('expanding');
+    setTimeout(() => {
+      setOrbitalPhase('shrinking');
+      setTimeout(() => {
+        setOrbitalPhase('orbital');
+        setTimeout(() => { isAnimating.current = false; }, 400);
+      }, 500);
+    }, 500);
+  }, [orbitalPhase]);
+
+  useEffect(() => {
+    if (activeIdx !== 3) {
+      if (activeIdx > 3 && orbitalPhase !== 'results') setOrbitalPhase('results');
+      else if (activeIdx < 3 && orbitalPhase !== 'orbital') setOrbitalPhase('orbital');
+    }
+  }, [activeIdx, orbitalPhase]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    if (isMobile) return;
+
+    const COOLDOWN = TRANSITION_MS + 500;
+
+    const lock = () => {
+      isAnimating.current = true;
+      setTimeout(() => { isAnimating.current = false; }, COOLDOWN);
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      if (isAnimating.current) return;
+      if (Math.abs(e.deltaY) < 5) return;
+      if (e.deltaY > 0 && activeIdxRef.current === 0) {
+        triggerHeroReveal();
+        return;
+      }
+      if (e.deltaY < 0 && activeIdxRef.current === 1) {
+        triggerHeroRewind();
+        return;
+      }
+      if (e.deltaY > 0 && activeIdxRef.current === 3 && orbitalPhaseRef.current === 'orbital') {
+        expandOrbital();
+        return;
+      }
+      if (e.deltaY < 0 && activeIdxRef.current === 3 && orbitalPhaseRef.current === 'results') {
+        collapseOrbital();
+        return;
+      }
+      if (e.deltaY > 0 && activeIdxRef.current === 4 && featureStepRef.current < FEATURE_MAX_STEP) {
+        lock();
+        setFeatureStep(prev => prev + 1);
+        return;
+      }
+      if (e.deltaY < 0 && activeIdxRef.current === 4 && featureStepRef.current > 0) {
+        lock();
+        setFeatureStep(prev => prev - 1);
+        return;
+      }
+      const dir = e.deltaY > 0 ? 1 : -1;
+      lock();
+      setActiveIdx(prev => Math.max(0, Math.min(SECTION_COUNT - 1, prev + dir)));
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isAnimating.current) return;
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+        e.preventDefault();
+        if (activeIdxRef.current === 0) { triggerHeroReveal(); return; }
+        if (activeIdxRef.current === 3 && orbitalPhaseRef.current === 'orbital') { expandOrbital(); return; }
+        if (activeIdxRef.current === 4 && featureStepRef.current < FEATURE_MAX_STEP) { lock(); setFeatureStep(prev => prev + 1); return; }
+        lock();
+        setActiveIdx(prev => Math.min(SECTION_COUNT - 1, prev + 1));
+      } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+        e.preventDefault();
+        if (activeIdxRef.current === 1) { triggerHeroRewind(); return; }
+        if (activeIdxRef.current === 3 && orbitalPhaseRef.current === 'results') { collapseOrbital(); return; }
+        if (activeIdxRef.current === 4 && featureStepRef.current > 0) { lock(); setFeatureStep(prev => prev - 1); return; }
+        lock();
+        setActiveIdx(prev => Math.max(0, prev - 1));
+      }
+    };
+
+    window.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('wheel', onWheel);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [SECTION_COUNT, TRANSITION_MS, triggerHeroReveal, triggerHeroRewind, expandOrbital, collapseOrbital]);
 
   return (
-    <div ref={scrollRef} className="min-h-screen bg-white font-sans text-gray-900 overflow-x-hidden scroll-smooth">
-
-      {/* ── Splash Screen ── */}
+    <div className={`${S_DARK} font-sans text-white`}>
       {!splashDone && <SplashScreen onComplete={handleSplashComplete} />}
+      <PublicNavigation currentPage="home" />
 
-      {/* ── Global reveal styles ── */}
+      {/* ═══ GLOBAL STYLES ═══ */}
       <style jsx global>{`
-        /* ── Splash blur-reveal ── */
         @keyframes splash-blur-in {
           0%   { filter: blur(12px); opacity: 0; transform: translateY(4px); }
-          100% { filter: blur(0px); opacity: 1; transform: translateY(0); }
+          100% { filter: blur(0); opacity: 1; transform: translateY(0); }
         }
         .splash-char {
-          display: inline-block;
-          opacity: 0;
-          filter: blur(12px);
+          display: inline-block; opacity: 0; filter: blur(12px);
           animation: splash-blur-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          font-size: clamp(1.4rem, 4vw, 2.8rem);
-          font-weight: 300;
-          color: white;
-          letter-spacing: 0.12em;
+          font-size: clamp(1.4rem, 4vw, 2.8rem); font-weight: 300; color: white; letter-spacing: 0.12em;
         }
-
-        /* Base reveal class — hidden state */
-        .rv {
-          opacity: 0;
-          transform: translateY(50px);
-          transition:
-            opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
-            transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
-          transition-delay: var(--d, 0ms);
-          will-change: opacity, transform;
+        @keyframes hero-in {
+          from { opacity: 0; transform: translateY(32px); filter: blur(4px); }
+          to   { opacity: 1; transform: translateY(0); filter: blur(0); }
         }
-        .rv.revealed {
-          opacity: 1;
-          transform: translateY(0);
-        }
-
-        /* Hero entry — only runs when splash is done (parent has .hero-go) */
-        @keyframes hero-enter {
-          from { opacity: 0; transform: translateY(36px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .hero-el {
-          opacity: 0;
-          transform: translateY(36px);
-        }
-        .hero-go .hero-el {
-          animation: hero-enter 1s cubic-bezier(0.16, 1, 0.3, 1) both;
-        }
-
-        /* Scroll indicator bounce */
+        .hero-el { opacity: 0; }
+        .hero-go .hero-el { animation: hero-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) both; }
         @keyframes scroll-bounce {
           0%, 100% { transform: translateY(0); opacity: 0.5; }
           50%      { transform: translateY(8px); opacity: 1; }
         }
-
-        /* Subtle scale variant */
-        .rv-scale {
-          opacity: 0;
-          transform: scale(0.95);
-          transition:
-            opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
-            transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
-          transition-delay: var(--d, 0ms);
-          will-change: opacity, transform;
+        @keyframes float-slow {
+          0%, 100% { transform: translateY(0); }
+          50%      { transform: translateY(-12px); }
         }
-        .rv-scale.revealed {
-          opacity: 1;
-          transform: scale(1);
+        @keyframes spin-slow {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        .orbital-ring {
+          animation: spin-slow 30s linear infinite;
+          will-change: transform;
+        }
+        .orbital-ring-reverse {
+          animation: spin-slow 20s linear infinite reverse;
+          will-change: transform;
+        }
+        .orbital-icons {
+          animation: spin-slow 25s linear infinite;
+          will-change: transform;
+        }
+        .orbital-icon-inner {
+          animation: spin-slow 25s linear infinite reverse;
+          will-change: transform;
+        }
+        /* Feature cards — Fixa style */
+        .feat-card {
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          aspect-ratio: 1 / 1;
+          padding: 28px;
+          border-radius: 20px;
+          background: #f2f2f2;
+          border: none;
+          transition: background 200ms ease;
+        }
+        .feat-card:hover {
+          background: #ebebeb;
+        }
+        @media (max-width: 640px) {
+          .feat-card { aspect-ratio: auto; min-height: 180px; padding: 22px; border-radius: 16px; }
+        }
+
+        /* Desktop: snap track */
+        @media (min-width: 769px) {
+          .snap-outer {
+            height: 100vh; overflow: hidden; position: relative;
+          }
+          .snap-track {
+            transition: transform ${TRANSITION_MS}ms cubic-bezier(0.65, 0, 0.35, 1);
+            will-change: transform;
+          }
+        }
+
+        /* Mobile: normal scroll */
+        @media (max-width: 768px) {
+          .snap-outer { height: auto; overflow: visible; }
+          .snap-track { transform: none !important; }
+          .snap-slide { height: auto !important; min-height: auto; }
+        }
+
+        .glass-card-hover { transition: transform 0.3s, box-shadow 0.3s; }
+        .glass-card-hover:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 20px 60px -15px rgba(0,0,0,0.4), inset 0 1px 0 0 rgba(255,255,255,0.06);
         }
       `}</style>
 
-      {/* ── Navigation ── */}
-      <PublicNavigation currentPage="home" />
-
-      {/* ══════════════════════════════════════════
-          HERO — Clean, centered, massive typography
-          ══════════════════════════════════════════ */}
-      <section ref={heroRef} className={`relative min-h-screen flex items-center justify-center bg-gray-950 overflow-hidden ${splashDone ? 'hero-go' : ''}`}>
-        {/* Diorama background image with scroll parallax */}
+      {/* ═══ SNAP CONTAINER ═══ */}
+      <div className="snap-outer">
         <div
-          className="absolute inset-0 will-change-transform"
-          style={{
-            opacity: 1 - heroScroll * 1.2,
-            transform: `scale(${1 + heroScroll * 0.15}) translateY(${heroScroll * -60}px)`,
-          }}
+          className="snap-track"
+          style={{ transform: `translateY(-${activeIdx * 100}vh)` }}
         >
-          <NextImage
-            src="/diorama-1.jpg"
-            alt=""
-            fill
-            className="object-cover object-center"
-            sizes="100vw"
-            priority
-            quality={85}
-          />
-        </div>
-        {/* Gradient overlays for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/70 to-gray-950/30" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(3,7,18,0.6)_100%)]" />
 
-        <div className="relative z-10 max-w-4xl mx-auto px-5 sm:px-6 text-center pt-24 sm:pt-28 pb-12 sm:pb-16">
-          {/* Logo */}
-          <div className="hero-el" style={{ animationDelay: '0.1s' }}>
-            <NextImage
-              src="/logo-white.png"
-              alt="Immivo"
-              width={600}
-              height={600}
-              className="w-24 sm:w-36 lg:w-[32rem] h-auto mx-auto mb-8 sm:mb-14"
-              priority
-            />
-          </div>
-
-          {/* Headline */}
-          <div className="hero-el" style={{ animationDelay: '0.3s' }}>
-            <h1 className="font-extrabold tracking-tight leading-[1.05]">
-              <span className="block text-base sm:text-2xl lg:text-3xl text-gray-500 mb-1.5 sm:mb-2">
-                {t('hero.title1')}
-              </span>
-              <span className="block text-[2.5rem] sm:text-7xl lg:text-[6.5rem] bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
-                {t('hero.title2')}
-              </span>
-            </h1>
-          </div>
-
-          {/* Subtitle */}
-          <div className="hero-el" style={{ animationDelay: '0.55s' }}>
-            <p className="mt-5 sm:mt-8 text-sm sm:text-lg lg:text-xl text-gray-400 max-w-xl mx-auto leading-relaxed">
-              {t.rich('hero.subtitle', { bold: (chunks) => <span className="text-white font-medium">{chunks}</span> })}
-            </p>
-          </div>
-
-          {/* CTAs */}
-          <div className="hero-el flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mt-8 sm:mt-12" style={{ animationDelay: '0.75s' }}>
-            <Link
-              href="/login?mode=register"
-              className="group w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-semibold text-gray-900 bg-white rounded-full hover:bg-gray-100 transition-all duration-300 hover:-translate-y-0.5 shadow-[0_0_40px_rgba(255,255,255,0.08)]"
-            >
-              {t('hero.ctaPrimary')}
-              <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform duration-300" />
-            </Link>
-            <a
-              href="#demo"
-              onClick={(e) => handleAnchorClick(e, 'demo')}
-              className="group w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-semibold text-gray-400 border border-white/15 rounded-full hover:bg-white/5 hover:border-white/30 hover:text-gray-200 transition-all duration-300"
-            >
-              <Calendar className="mr-2 w-4 h-4 sm:w-5 sm:h-5 opacity-60 group-hover:opacity-100 transition-opacity" />
-              {t('hero.ctaSecondary')}
-            </a>
-          </div>
-
-          {/* Trust */}
-          <div className="hero-el flex flex-wrap items-center justify-center gap-x-4 sm:gap-x-6 gap-y-2 mt-8 sm:mt-16 text-[11px] sm:text-sm text-gray-600" style={{ animationDelay: '0.95s' }}>
-            <span className="flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500/60" />
-              {t('hero.trustNoCard')}
-            </span>
-            <span className="flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500/60" />
-              {t('hero.trust7Days')}
-            </span>
-            <span className="flex items-center gap-1">
-              <Shield className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-600" />
-              {t('hero.trustGdpr')}
-            </span>
-            <span className="flex items-center gap-1">
-              <Server className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-600" />
-              {t('hero.awsHosting')}
-            </span>
-          </div>
-        </div>
-
-        {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 hero-el" style={{ animationDelay: '1.3s' }}>
-          <ChevronDown className="w-5 h-5 text-gray-600" style={{ animation: 'scroll-bounce 2.5s ease-in-out infinite' }} />
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════
-          PROBLEM / WHY
-          ══════════════════════════════════════════ */}
-      <section id="warum" className="py-16 sm:py-32 lg:py-40">
-        <div className="max-w-6xl mx-auto px-5 sm:px-6">
-          {/* Heading */}
-          <div className="text-center mb-12 sm:mb-20">
-            <p className="rv text-blue-600 font-semibold text-xs sm:text-sm tracking-widest uppercase mb-3 sm:mb-4">{t('problem.sectionLabel')}</p>
-            <h2 className="rv text-2xl sm:text-5xl lg:text-6xl font-bold tracking-tight" style={{ '--d': '100ms' } as React.CSSProperties}>
-              {t('problem.title')}
-            </h2>
-            <p className="rv text-sm sm:text-xl text-gray-500 mt-3 sm:mt-5 max-w-2xl mx-auto leading-relaxed" style={{ '--d': '200ms' } as React.CSSProperties}>
-              {t('problem.subtitle')}
-            </p>
-          </div>
-
-          {/* Cards */}
-          <div className="grid sm:grid-cols-3 gap-4 sm:gap-6">
-            {[
-              { icon: Mail, title: t('problem.emailFlood'), problem: t('problem.emailProblem'), solution: t('problem.emailSolution') },
-              { icon: Calendar, title: t('problem.appointmentChaos'), problem: t('problem.appointmentProblem'), solution: t('problem.appointmentSolution') },
-              { icon: FileText, title: t('problem.exposeMarathon'), problem: t('problem.exposeProblem'), solution: t('problem.exposeSolution') },
-            ].map((item, i) => (
-              <div
-                key={i}
-                className="rv group bg-gray-50 rounded-xl sm:rounded-2xl p-5 sm:p-8 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-500 border border-transparent hover:border-gray-100"
-                style={{ '--d': `${200 + i * 120}ms` } as React.CSSProperties}
-              >
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-900 rounded-lg sm:rounded-xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-105 transition-transform duration-500">
-                  <item.icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                </div>
-                <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">{item.title}</h3>
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-start gap-2.5">
-                    <span className="text-red-400 mt-0.5">✗</span>
-                    <span className="text-gray-500">{item.problem}</span>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <span className="text-emerald-500 mt-0.5">✓</span>
-                    <span className="text-gray-900 font-medium">{item.solution}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════
-          JARVIS AI
-          ══════════════════════════════════════════ */}
-      <section id="jarvis" className="py-16 sm:py-32 lg:py-40 bg-gray-950 text-white overflow-hidden">
-        <div className="max-w-6xl mx-auto px-5 sm:px-6">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-            {/* Text */}
-            <div>
-              <p className="rv inline-flex items-center px-3.5 py-1.5 rounded-full bg-white/8 text-gray-400 text-xs font-medium mb-6 border border-white/10">
-                <Brain className="w-3.5 h-3.5 mr-1.5" />
-                {t('jarvis.badge')}
-              </p>
-
-              <h2 className="rv text-2xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1] mb-4 sm:mb-6" style={{ '--d': '100ms' } as React.CSSProperties}>
-                {t.rich('jarvis.title', { bold: (chunks) => <span className="text-gray-300">{chunks}</span> })}
-              </h2>
-
-              <p className="rv text-sm sm:text-lg text-gray-400 leading-relaxed mb-6 sm:mb-8" style={{ '--d': '200ms' } as React.CSSProperties}>
-                {t.rich('jarvis.subtitle', { bold: (chunks) => <span className="text-white font-medium">{chunks}</span> })}
-              </p>
-
-              <div className="space-y-3 mb-10">
-                {[t('jarvis.feature1'), t('jarvis.feature2'), t('jarvis.feature3')].map((item, i) => (
-                  <div key={i} className="rv flex items-center gap-3" style={{ '--d': `${300 + i * 100}ms` } as React.CSSProperties}>
-                    <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
-                    </div>
-                    <span className="text-gray-300 text-sm">{item}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="rv" style={{ '--d': '600ms' } as React.CSSProperties}>
-                <Link
-                  href="/login"
-                  className="w-full sm:w-auto inline-flex items-center justify-center px-7 py-3 bg-white text-gray-900 rounded-full font-semibold text-sm hover:bg-gray-100 transition-all duration-300 hover:-translate-y-0.5"
-                >
-                  {t('jarvis.cta')}
-                  <ArrowRight className="ml-2 w-4 h-4" />
-                </Link>
-              </div>
-            </div>
-
-            {/* Visual */}
-            <div className="rv-scale rv flex items-center justify-center" style={{ '--d': '300ms' } as React.CSSProperties}>
-              {/* Mobile: Grid */}
-              <div className="grid grid-cols-3 gap-3 lg:hidden w-full">
-                {[
-                  { icon: Mail, label: t('jarvis.emails') },
-                  { icon: Calendar, label: t('jarvis.appointments') },
-                  { icon: FileText, label: t('jarvis.exposesLabel') },
-                  { icon: Users, label: t('jarvis.leads') },
-                  { icon: Building2, label: t('jarvis.properties') },
-                  { icon: MessageSquare, label: t('jarvis.chat') },
-                ].map((item, i) => (
-                  <div key={i} className="bg-white/5 backdrop-blur-sm rounded-xl p-3.5 flex flex-col items-center justify-center border border-white/10">
-                    <item.icon className="w-5 h-5 text-gray-400 mb-1.5" />
-                    <span className="text-[11px] text-gray-500">{item.label}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Desktop: Logo */}
-              <div className="hidden lg:flex relative items-center justify-center h-[380px] w-full">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-[300px] h-[300px] rounded-full bg-white/[0.02] border border-white/[0.05]" />
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-[200px] h-[200px] rounded-full bg-white/[0.03] border border-white/[0.06]" />
-                </div>
-                <NextImage
-                  src="/logo-icon-only.png"
-                  alt="Jarvis"
-                  width={140}
-                  height={140}
-                  className="relative z-10 drop-shadow-[0_0_60px_rgba(255,255,255,0.06)]"
-                  priority
+          {/* ══════════════════════════════════════════
+              0. HERO
+              ══════════════════════════════════════════ */}
+          <Slide idx={0} active={activeIdx === 0} className={S_DARK}>
+            <div className="h-full flex items-center justify-center relative">
+              {/* Video background — poster visible initially, plays on scroll */}
+              <div className="absolute inset-0 z-0 overflow-hidden">
+                <video
+                  ref={heroVideoRef}
+                  src="/Hyperlapse-scroll.mp4"
+                  poster="/Hyperlapse-poster.jpg"
+                  muted
+                  playsInline
+                  preload="auto"
+                  className="absolute inset-0 w-full h-full object-cover"
                 />
-                {/* Orbiting dots */}
-                {[Mail, Calendar, FileText, Users, Building2, MessageSquare].map((Icon, i) => {
-                  const angle = (i / 6) * 360 - 90;
-                  const radius = 150;
-                  const x = Math.cos((angle * Math.PI) / 180) * radius;
-                  const y = Math.sin((angle * Math.PI) / 180) * radius;
-                  return (
-                    <div
-                      key={i}
-                      className="absolute w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-sm"
-                      style={{ left: `calc(50% + ${x}px - 20px)`, top: `calc(50% + ${y}px - 20px)` }}
-                    >
-                      <Icon className="w-4 h-4 text-gray-500" />
-                    </div>
-                  );
-                })}
+                <div className="absolute inset-0 bg-gradient-to-b from-[#07070f]/40 via-[#07070f]/15 to-[#07070f]/50" />
+              </div>
+
+              {/* Blur overlay — visible in idle, fades during reveal/rewind */}
+              <div
+                className="absolute inset-0 z-[1] pointer-events-none transition-all ease-out"
+                style={{
+                  backdropFilter: heroPhase === 'idle' ? 'blur(10px)' : 'blur(0px)',
+                  background: heroPhase === 'idle' ? 'rgba(7,7,15,0.45)' : 'rgba(7,7,15,0)',
+                  transitionDuration: heroPhase === 'idle' ? '800ms' : '1200ms',
+                }}
+              />
+
+              {/* Hero content — hidden during reveal & rewind, visible in idle */}
+              <div
+                className={`relative z-10 max-w-4xl mx-auto px-5 sm:px-6 text-center transition-all duration-[800ms] ease-[cubic-bezier(0.65,0,0.35,1)] ${splashDone ? 'hero-go' : ''}`}
+                style={{
+                  opacity: heroPhase !== 'idle' ? 0 : undefined,
+                  transform: heroPhase !== 'idle' ? 'translateY(-120px)' : undefined,
+                }}
+              >
+                <div className="hero-el opacity-0" style={{ animationDelay: '0.2s' }}>
+                  <h1 className="font-extrabold tracking-tight leading-[1.05]">
+                    <span className="block text-sm sm:text-xl lg:text-2xl text-gray-400 uppercase tracking-[0.2em] mb-3 sm:mb-4">
+                      {t('hero.title1')}
+                    </span>
+                    <span className="block text-[2.5rem] sm:text-7xl lg:text-[6.5rem] bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
+                      {t('hero.title2')}
+                    </span>
+                  </h1>
+                </div>
+                <div className="hero-el opacity-0" style={{ animationDelay: '0.45s' }}>
+                  <p className="mt-5 sm:mt-8 text-sm sm:text-lg lg:text-xl text-gray-400 max-w-xl mx-auto leading-relaxed">
+                    {t.rich('hero.subtitle', { bold: (chunks) => <span className="text-white font-medium">{chunks}</span> })}
+                  </p>
+                </div>
+                <div className="hero-el opacity-0 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mt-8 sm:mt-12" style={{ animationDelay: '0.65s' }}>
+                  <Link href="/login?mode=register" className="group w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-semibold text-white backdrop-blur-xl bg-white/[0.12] border border-white/[0.2] rounded-full hover:bg-white/[0.2] transition-all duration-300 hover:-translate-y-0.5 shadow-[0_0_30px_rgba(255,255,255,0.06),inset_0_1px_0_rgba(255,255,255,0.1)]">
+                    {t('hero.ctaPrimary')}<ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform duration-300" />
+                  </Link>
+                  <a href="#demo" onClick={(e) => handleAnchorClick(e, 7)} className="group w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-semibold text-gray-300 backdrop-blur-xl bg-white/[0.06] border border-white/[0.12] rounded-full hover:bg-white/[0.1] hover:text-white transition-all duration-300">
+                    <Calendar className="mr-2 w-4 h-4 sm:w-5 sm:h-5 opacity-60" />{t('hero.ctaSecondary')}
+                  </a>
+                </div>
+                <div className="hero-el opacity-0 flex flex-wrap items-center justify-center gap-x-4 sm:gap-x-6 gap-y-2 mt-8 sm:mt-14 text-[11px] sm:text-sm text-gray-500" style={{ animationDelay: '0.85s' }}>
+                  <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500/60" />{t('hero.trustNoCard')}</span>
+                  <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500/60" />{t('hero.trust7Days')}</span>
+                  <span className="flex items-center gap-1"><Shield className="w-3 h-3 sm:w-3.5 sm:h-3.5" />{t('hero.trustGdpr')}</span>
+                  <span className="flex items-center gap-1"><Server className="w-3 h-3 sm:w-3.5 sm:h-3.5" />{t('hero.awsHosting')}</span>
+                </div>
+              </div>
+
+              {/* Logo — visible during reveal & rewind, hidden in idle */}
+              <div
+                className="absolute inset-0 z-[5] flex items-center justify-center pointer-events-none transition-all ease-out"
+                style={{
+                  opacity: heroPhase === 'idle' ? 0 : 1,
+                  filter: heroPhase === 'idle' ? 'blur(16px)' : 'blur(0px)',
+                  transform: heroPhase === 'idle' ? 'scale(0.85)' : 'scale(1)',
+                  transitionDuration: heroPhase === 'idle' ? '600ms' : '1400ms',
+                }}
+              >
+                <NextImage src="/logo-white.png" alt="Immivo" width={480} height={480} className="w-64 sm:w-80 lg:w-[28rem] h-auto" priority />
+              </div>
+
+              {/* Scroll hint */}
+              <div className={`absolute bottom-8 left-1/2 -translate-x-1/2 z-20 hidden sm:flex flex-col items-center gap-2 transition-opacity duration-500 ${heroPhase === 'idle' ? 'opacity-100' : 'opacity-0'}`}>
+                <span className="text-xs text-gray-500 tracking-widest uppercase">Scroll</span>
+                <ChevronDown className="w-4 h-4 text-gray-500" style={{ animation: 'scroll-bounce 2.5s ease-in-out infinite' }} />
               </div>
             </div>
-          </div>
-        </div>
-      </section>
+          </Slide>
 
-      {/* ══════════════════════════════════════════
-          RESULTS / ROI
-          ══════════════════════════════════════════ */}
-      <section id="ergebnisse" className="py-16 sm:py-32 lg:py-40">
-        <div className="max-w-6xl mx-auto px-5 sm:px-6">
-          {/* Heading */}
-          <div className="text-center mb-12 sm:mb-20">
-            <p className="rv text-blue-600 font-semibold text-xs sm:text-sm tracking-widest uppercase mb-3 sm:mb-4">{t('results.sectionLabel')}</p>
-            <h2 className="rv text-2xl sm:text-5xl lg:text-6xl font-bold tracking-tight" style={{ '--d': '100ms' } as React.CSSProperties}>
-              {t('results.title')}
-            </h2>
-            <p className="rv text-sm sm:text-xl text-gray-500 mt-3 sm:mt-5 max-w-2xl mx-auto leading-relaxed" style={{ '--d': '200ms' } as React.CSSProperties}>
-              {t('results.subtitle')}
-            </p>
-          </div>
+          {/* ══════════════════════════════════════════
+              1. PROBLEM
+              ══════════════════════════════════════════ */}
+          <Slide idx={1} active={activeIdx === 1} className="bg-white text-gray-900">
+            <div className="h-full flex flex-col items-center justify-center px-5 sm:px-10">
+              <Stagger active={activeIdx === 1} delay={0}>
+                <p className="text-blue-600 font-semibold text-xs sm:text-sm tracking-widest uppercase mb-3 sm:mb-4 text-center">{t('problem.sectionLabel')}</p>
+              </Stagger>
+              <Stagger active={activeIdx === 1} delay={80}>
+                <h2 className="text-2xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 text-center">{t('problem.title')}</h2>
+              </Stagger>
+              <Stagger active={activeIdx === 1} delay={160}>
+                <p className="text-sm sm:text-xl text-gray-500 mt-3 sm:mt-5 max-w-2xl text-center">{t('problem.subtitle')}</p>
+              </Stagger>
+              <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 mt-10 sm:mt-14 max-w-5xl w-full">
+                {problemCards.map((card, i) => (
+                  <Stagger key={i} active={activeIdx === 1} delay={280 + i * 100} className="flex-1">
+                    <div className="bg-gray-50 rounded-2xl border border-gray-200/60 p-5 sm:p-6 h-full">
+                      <card.icon className="w-5 h-5 text-gray-400 mb-3" />
+                      <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-2">{card.title}</h3>
+                      <p className="text-xs sm:text-sm text-gray-400 leading-relaxed line-through decoration-gray-300 mb-2">{card.problem}</p>
+                      <p className="text-xs sm:text-sm text-gray-900 font-medium leading-relaxed">{card.solution}</p>
+                    </div>
+                  </Stagger>
+                ))}
+              </div>
+            </div>
+          </Slide>
 
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-5 mb-16">
-            {[
-              { value: 15, suffix: 'h', label: t('results.timeSaving'), icon: Clock },
-              { value: 40, suffix: '%', label: t('results.moreLeads'), icon: Target },
-              { value: 3, suffix: 'x', label: t('results.fasterResponse'), icon: Zap },
-              { value: 25, suffix: '%', label: t('results.higherConversion'), icon: TrendingUp },
-            ].map((stat, i) => (
+          {/* ══════════════════════════════════════════
+              2. JARVIS
+              ══════════════════════════════════════════ */}
+          <Slide idx={2} active={activeIdx === 2} className="bg-white text-gray-900">
+            <div className="h-full flex flex-col items-center justify-center px-5 sm:px-10 relative overflow-hidden">
+              <Stagger active={activeIdx === 2} delay={0}>
+                <h2 className="font-extrabold tracking-tight text-gray-900 text-center px-2" style={{ fontSize: 'clamp(1.3rem, 5vw, 4.5rem)', lineHeight: 1.1 }}>
+                  {jarvisTitleText}
+                </h2>
+              </Stagger>
+              <Stagger active={activeIdx === 2} delay={120}>
+                <p className="text-xs sm:text-lg text-gray-500 max-w-xl text-center leading-relaxed mt-4 sm:mt-8 px-2">
+                  {t.rich('jarvis.subtitle', { bold: (chunks) => <span className="text-gray-900 font-medium">{chunks}</span> })}
+                </p>
+              </Stagger>
+              <div className="mt-5 sm:mt-10 space-y-2.5 sm:space-y-3">
+                {[String(t('jarvis.feature1')), String(t('jarvis.feature2')), String(t('jarvis.feature3'))].map((item, i) => (
+                  <Stagger key={i} active={activeIdx === 2} delay={260 + i * 100}>
+                    <div className="flex items-center gap-2.5 sm:gap-3">
+                      <div className="w-5 h-5 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />
+                      </div>
+                      <span className="text-gray-600 text-xs sm:text-base">{item}</span>
+                    </div>
+                  </Stagger>
+                ))}
+              </div>
+            </div>
+          </Slide>
+
+          {/* ══════════════════════════════════════════
+              3. ORBITAL → RESULTS (internal phases)
+              ══════════════════════════════════════════ */}
+          <Slide idx={3} active={activeIdx === 3} className={orbitalPhase === 'results' ? 'bg-black' : 'bg-white text-gray-900'}>
+            <div
+              className="h-full flex items-center justify-center relative overflow-hidden"
+              style={{ cursor: orbitalPhase === 'orbital' ? 'pointer' : 'default' }}
+              onClick={() => { if (orbitalPhase === 'orbital' && !isAnimating.current) expandOrbital(); }}
+            >
+
+              {/* Orbital icons — visible in 'orbital', shrinks in 'shrinking' */}
               <div
-                key={i}
-                className="rv text-center p-4 sm:p-8 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-lg transition-all duration-500 border border-transparent hover:border-gray-100"
-                style={{ '--d': `${200 + i * 100}ms` } as React.CSSProperties}
+                className="z-10 flex items-center justify-center pointer-events-none"
+                style={{
+                  opacity: orbitalPhase === 'orbital' ? 1 : 0,
+                  transform: orbitalPhase === 'orbital' ? 'scale(1)' : 'scale(0)',
+                  transition: 'opacity 400ms cubic-bezier(0.65,0,0.35,1), transform 400ms cubic-bezier(0.65,0,0.35,1)',
+                }}
               >
-                <stat.icon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400 mx-auto mb-2 sm:mb-3" />
-                <div className="text-2xl sm:text-5xl font-bold text-gray-900 mb-1">
-                  <AnimatedCounter end={stat.value} suffix={stat.suffix} />
+                <div className="relative w-[300px] h-[300px] sm:w-[380px] sm:h-[380px] lg:w-[420px] lg:h-[420px]">
+                  <div className="orbital-ring absolute inset-0 rounded-full border border-gray-200/60" />
+                  <div className="orbital-ring-reverse absolute inset-[15%] rounded-full border border-gray-200/40" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <NextImage src="/logo-icon-only.png" alt="Jarvis" width={80} height={80} className="w-14 sm:w-20" />
+                  </div>
+                  <div className="orbital-icons absolute inset-0">
+                    {[Mail, Calendar, FileText, Users, Building2, MessageSquare].map((Icon, i) => {
+                      const angle = (i / 6) * 360 - 90;
+                      const rad = (angle * Math.PI) / 180;
+                      return (
+                        <div
+                          key={i}
+                          className="absolute left-1/2 top-1/2 w-10 h-10 sm:w-12 sm:h-12"
+                          style={{
+                            marginLeft: `${Math.cos(rad) * 46}%`,
+                            marginTop: `${Math.sin(rad) * 46}%`,
+                            transform: 'translate(-50%, -50%)',
+                          }}
+                        >
+                          <div className="orbital-icon-inner w-full h-full rounded-xl flex items-center justify-center bg-white border border-gray-200 shadow-md">
+                            <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <p className="text-[11px] sm:text-sm text-gray-500">{stat.label}</p>
               </div>
-            ))}
-          </div>
 
-          {/* Portals */}
-          <div className="rv bg-gray-950 rounded-2xl sm:rounded-3xl p-5 sm:p-12" style={{ '--d': '300ms' } as React.CSSProperties}>
-            <div className="flex flex-col md:flex-row items-center gap-4 md:gap-10">
-              <div className="w-14 h-14 sm:w-20 sm:h-20 bg-white/10 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0">
-                <Globe className="w-7 h-7 sm:w-10 sm:h-10 text-white" />
+              {/* Black rectangle — scales up from center */}
+              <div
+                className="absolute z-20 bg-black pointer-events-none"
+                style={{
+                  inset: orbitalPhase === 'results' ? '0px' : '20px',
+                  transform: orbitalPhase === 'expanding' || orbitalPhase === 'results' ? 'scale(1)' : 'scale(0)',
+                  borderRadius: orbitalPhase === 'results' ? '0px' : '2.5rem',
+                  opacity: 1,
+                  transition: 'transform 700ms cubic-bezier(0.65,0,0.35,1), border-radius 500ms cubic-bezier(0.65,0,0.35,1), inset 500ms cubic-bezier(0.65,0,0.35,1)',
+                }}
+              />
+
+              {/* Results content */}
+              <div
+                className="absolute inset-0 z-30 flex flex-col justify-center px-5 sm:px-10 lg:px-[100px] text-white"
+                style={{
+                  opacity: orbitalPhase === 'expanding' || orbitalPhase === 'results' ? 1 : 0,
+                  transition: 'opacity 600ms cubic-bezier(0.16,1,0.3,1)',
+                  transitionDelay: orbitalPhase === 'expanding' ? '500ms' : '0ms',
+                  pointerEvents: orbitalPhase === 'results' || orbitalPhase === 'expanding' ? 'auto' : 'none',
+                }}
+              >
+                <div className="relative z-10 text-center max-w-4xl mx-auto">
+                  <Stagger active={orbitalPhase === 'expanding' || orbitalPhase === 'results'} delay={0}>
+                    <p className="text-blue-400 font-semibold text-xs sm:text-sm tracking-widest uppercase mb-3 sm:mb-4">{t('results.sectionLabel')}</p>
+                  </Stagger>
+                  <Stagger active={orbitalPhase === 'expanding' || orbitalPhase === 'results'} delay={80}>
+                    <h2 className="text-2xl sm:text-4xl lg:text-5xl font-bold tracking-tight">{t('results.title')}</h2>
+                  </Stagger>
+                  <Stagger active={orbitalPhase === 'expanding' || orbitalPhase === 'results'} delay={160}>
+                    <p className="text-sm sm:text-lg text-gray-400 mt-3 sm:mt-5 max-w-xl mx-auto">{t('results.subtitle')}</p>
+                  </Stagger>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mt-8 sm:mt-12 mb-8 sm:mb-12">
+                    {statItems.map((stat, i) => (
+                      <Stagger key={i} active={orbitalPhase === 'expanding' || orbitalPhase === 'results'} delay={250 + i * 100} className="p-4 sm:p-6 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
+                        <stat.icon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400 mx-auto mb-2 sm:mb-3" />
+                        <div className="text-2xl sm:text-4xl font-bold mb-1"><AnimatedCounter end={stat.value} suffix={stat.suffix} /></div>
+                        <p className="text-[11px] sm:text-sm text-gray-500">{stat.label}</p>
+                      </Stagger>
+                    ))}
+                  </div>
+                  <Stagger active={orbitalPhase === 'expanding' || orbitalPhase === 'results'} delay={650}>
+                    <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+                      {['ImmoScout24', 'Willhaben', 'Immowelt', 'Homegate', 'Kleinanzeigen', t('results.morePortals')].map((portal, i) => (
+                        <span key={i} className={`px-3 sm:px-4 py-1.5 rounded-full text-xs font-medium ${i === 5 ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-white/[0.06] text-gray-400 border border-white/[0.08]'}`}>{portal}</span>
+                      ))}
+                    </div>
+                  </Stagger>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg sm:text-2xl font-bold text-white mb-2 sm:mb-3">{t('results.portalsTitle')}</h3>
-                <p className="text-xs sm:text-base text-gray-400 mb-3 sm:mb-4 leading-relaxed">{t('results.portalsSubtitle')}</p>
-                <div className="flex flex-wrap gap-2">
-                  {['ImmoScout24', 'Willhaben', 'Immowelt', 'Homegate', 'Kleinanzeigen', t('results.morePortals')].map((portal, i) => (
-                    <span key={i} className={`px-3 py-1 rounded-full text-xs font-medium ${i === 5 ? 'bg-white/15 text-white' : 'bg-white/8 text-gray-400 border border-white/10'}`}>
-                      {portal}
-                    </span>
+            </div>
+          </Slide>
+
+          {/* ══════════════════════════════════════════
+              4. FEATURES — horizontal slider
+              ══════════════════════════════════════════ */}
+          <Slide idx={4} active={activeIdx === 4} className="bg-white text-gray-900">
+            <div className="h-full flex flex-col justify-center relative">
+
+              {/* Header — centered */}
+              <div className="px-5 sm:px-10 text-center mb-8 sm:mb-12">
+                <Stagger active={activeIdx === 4} delay={0}>
+                  <p className="text-blue-600 font-semibold text-[10px] sm:text-xs tracking-widest uppercase mb-2 sm:mb-3">{t('features.sectionLabel')}</p>
+                </Stagger>
+                <Stagger active={activeIdx === 4} delay={80}>
+                  <h2 className="text-2xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-gray-900">{t('features.title')}</h2>
+                </Stagger>
+                <Stagger active={activeIdx === 4} delay={160}>
+                  <p className="text-xs sm:text-base text-gray-500 mt-2 sm:mt-3 max-w-xl mx-auto">{t('features.subtitle')}</p>
+                </Stagger>
+              </div>
+
+              {/* Horizontal card track */}
+              <div className="overflow-hidden">
+                <div
+                  className="flex"
+                  style={{
+                    transition: 'transform 600ms cubic-bezier(0.4, 0, 0.2, 1)',
+                    transform: `translateX(-${featureStep * 100}%)`,
+                  }}
+                >
+                  {[0, 1, 2].map(groupIdx => {
+                    const groupItems = featureItems.slice(groupIdx * 4, groupIdx * 4 + 4);
+                    const isCentered = groupItems.length < 4;
+                    return (
+                      <div key={groupIdx} className="w-full flex-shrink-0 px-6 sm:px-12 lg:px-20">
+                        <div className={`grid gap-3 sm:gap-4 ${isCentered ? 'grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 max-w-6xl mx-auto'}`}>
+                          {groupItems.map((f, i) => (
+                            <div
+                              key={i}
+                              className="feat-card"
+                              style={{
+                                opacity: activeIdx === 4 ? 1 : 0,
+                                transform: activeIdx === 4 ? 'none' : 'translateX(40px)',
+                                transition: `opacity 500ms ease, transform 500ms ease`,
+                                transitionDelay: activeIdx === 4 ? `${300 + i * 80}ms` : '0ms',
+                              }}
+                            >
+                              <f.icon className="w-7 h-7 sm:w-8 sm:h-8 text-gray-800" strokeWidth={1.5} />
+                              <div>
+                                <h3 className="text-[15px] sm:text-base font-semibold text-gray-900 mb-1.5">{f.title}</h3>
+                                <p className="text-xs sm:text-[13px] text-gray-500 leading-relaxed line-clamp-2">{f.desc}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Mobile dots */}
+              <div className="sm:hidden flex items-center justify-center gap-2 mt-6">
+                {Array.from({ length: FEATURE_MAX_STEP + 1 }).map((_, i) => (
+                  <button
+                    key={i}
+                    className="h-1 rounded-full transition-all duration-500"
+                    style={{
+                      width: featureStep === i ? '20px' : '6px',
+                      background: featureStep === i ? '#111827' : 'rgba(0,0,0,0.1)',
+                    }}
+                    onClick={() => setFeatureStep(i)}
+                  />
+                ))}
+              </div>
+            </div>
+          </Slide>
+
+          {/* ══════════════════════════════════════════
+              5. VIRTUAL STAGING — Fixa-style image + stat bars
+              ══════════════════════════════════════════ */}
+          <Slide idx={5} active={activeIdx === 5} className="bg-white text-gray-900">
+            <div className="h-full flex flex-col items-center justify-center">
+              {/* Title */}
+              <div className="text-center mb-6 sm:mb-8 px-4">
+                <Stagger active={activeIdx === 5} delay={0}>
+                  <p className="text-blue-600 font-semibold text-[10px] sm:text-xs tracking-widest uppercase mb-2">{t('staging.badge')}</p>
+                </Stagger>
+                <Stagger active={activeIdx === 5} delay={80}>
+                  <h2 className="text-2xl sm:text-4xl lg:text-5xl font-bold tracking-tight leading-tight max-w-3xl">
+                    {t.rich('staging.title', { bold: (chunks) => <strong>{chunks}</strong> })}
+                  </h2>
+                </Stagger>
+                <Stagger active={activeIdx === 5} delay={160}>
+                  <p className="text-xs sm:text-base text-gray-500 mt-2 max-w-xl mx-auto">
+                    {t.rich('staging.subtitle', { bold: (chunks) => <span className="text-gray-900 font-medium">{chunks}</span> })}
+                  </p>
+                </Stagger>
+              </div>
+
+              {/* Image — edge to edge with 20px padding */}
+              <Stagger active={activeIdx === 5} delay={250} className="w-full">
+                <div className="relative w-full h-[260px] sm:h-[400px] lg:h-[600px] rounded-2xl sm:rounded-3xl overflow-hidden mx-auto" style={{ maxWidth: 'calc(100vw - 20px)' }}>
+                  <BeforeAfterSlider active={activeIdx === 5} />
+                  {/* Stat tag */}
+                  <div
+                    className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 h-8 sm:h-9 rounded-full bg-black/45 backdrop-blur-md px-3 sm:px-4"
+                    style={{
+                      opacity: activeIdx === 5 ? 1 : 0,
+                      transform: activeIdx === 5 ? 'translateY(0)' : 'translateY(8px)',
+                      transition: 'opacity 500ms ease, transform 500ms ease',
+                      transitionDelay: '700ms',
+                    }}
+                  >
+                    <span className="text-white/70 text-[11px] sm:text-xs font-medium">Attention</span>
+                    <span className="text-white text-xs sm:text-sm font-semibold tabular-nums">+73%</span>
+                  </div>
+                </div>
+              </Stagger>
+            </div>
+          </Slide>
+
+          {/* ══════════════════════════════════════════
+              6. HOW IT WORKS
+              ══════════════════════════════════════════ */}
+          <Slide idx={6} active={activeIdx === 6} className={S_DARK}>
+            <div className="h-full flex flex-col items-center justify-center px-5 sm:px-10">
+              <div className="text-center max-w-4xl mx-auto">
+                <Stagger active={activeIdx === 6} delay={0}>
+                  <p className="text-blue-400 font-semibold text-xs sm:text-sm tracking-widest uppercase mb-3 sm:mb-4">{t('howItWorks.sectionLabel')}</p>
+                </Stagger>
+                <Stagger active={activeIdx === 6} delay={80}>
+                  <h2 className="text-2xl sm:text-4xl lg:text-5xl font-bold tracking-tight">{t('howItWorks.title')}</h2>
+                </Stagger>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mt-8 sm:mt-12">
+                  {[
+                    { step: '01', title: t('howItWorks.step1Title'), desc: t('howItWorks.step1Desc'), icon: Rocket },
+                    { step: '02', title: t('howItWorks.step2Title'), desc: t('howItWorks.step2Desc'), icon: Brain },
+                    { step: '03', title: t('howItWorks.step3Title'), desc: t('howItWorks.step3Desc'), icon: Award },
+                  ].map((item, i) => (
+                    <Stagger key={i} active={activeIdx === 6} delay={250 + i * 100} className="p-4 sm:p-6 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-center">
+                      <div className="relative inline-flex mb-3 sm:mb-4">
+                        <item.icon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+                        <span className="absolute -top-2 -right-4 text-[10px] font-bold text-gray-500">{item.step}</span>
+                      </div>
+                      <h3 className="text-sm sm:text-lg font-bold mb-1.5 sm:mb-2">{item.title}</h3>
+                      <p className="text-gray-500 text-xs sm:text-sm leading-relaxed">{item.desc}</p>
+                    </Stagger>
                   ))}
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
+          </Slide>
 
-      {/* ══════════════════════════════════════════
-          FEATURES GRID
-          ══════════════════════════════════════════ */}
-      <section id="features" className="py-16 sm:py-32 lg:py-40 bg-gray-50/60">
-        <div className="max-w-6xl mx-auto px-5 sm:px-6">
-          {/* Heading */}
-          <div className="text-center mb-12 sm:mb-20">
-            <p className="rv text-blue-600 font-semibold text-xs sm:text-sm tracking-widest uppercase mb-3 sm:mb-4">{t('features.sectionLabel')}</p>
-            <h2 className="rv text-2xl sm:text-5xl lg:text-6xl font-bold tracking-tight" style={{ '--d': '100ms' } as React.CSSProperties}>
-              {t('features.title')}
-            </h2>
-            <p className="rv text-sm sm:text-xl text-gray-500 mt-3 sm:mt-5 max-w-2xl mx-auto leading-relaxed" style={{ '--d': '200ms' } as React.CSSProperties}>
-              {t('features.subtitle')}
-            </p>
-          </div>
-
-          {/* Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
-            {[
-              { icon: Bot, title: t('features.jarvisTitle'), desc: t('features.jarvisDesc') },
-              { icon: Wand2, title: t('features.imageTitle'), desc: t('features.imageDesc') },
-              { icon: Users, title: t('features.crmTitle'), desc: t('features.crmDesc') },
-              { icon: Building2, title: t('features.propertiesTitle'), desc: t('features.propertiesDesc') },
-              { icon: FileText, title: t('features.exposeTitle'), desc: t('features.exposeDesc') },
-              { icon: Calendar, title: t('features.calendarTitle'), desc: t('features.calendarDesc') },
-              { icon: Mail, title: t('features.emailTitle'), desc: t('features.emailDesc') },
-              { icon: Globe, title: t('features.portalsTitle'), desc: t('features.portalsDesc') },
-              { icon: BarChart3, title: t('features.analyticsTitle'), desc: t('features.analyticsDesc') },
-              { icon: Shield, title: t('features.hostingTitle'), desc: t('features.hostingDesc') },
-            ].map((f, i) => (
-              <div
-                key={i}
-                className="rv group bg-white rounded-xl sm:rounded-2xl p-3.5 sm:p-6 border border-gray-100 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-500"
-                style={{ '--d': `${150 + i * 80}ms` } as React.CSSProperties}
-              >
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-900 rounded-lg sm:rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-105 transition-transform duration-500">
-                  <f.icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+          {/* ══════════════════════════════════════════
+              7. DEMO
+              ══════════════════════════════════════════ */}
+          <Slide idx={7} active={activeIdx === 7} className="bg-white text-gray-900">
+            <div className="h-full flex flex-col items-center justify-center px-5 sm:px-10">
+              <div className="text-center max-w-2xl mx-auto">
+                <Stagger active={activeIdx === 7} delay={0}>
+                  <p className="text-blue-600 font-semibold text-[10px] sm:text-xs tracking-widest uppercase mb-2 sm:mb-3">{t('demo.badge')}</p>
+                </Stagger>
+                <Stagger active={activeIdx === 7} delay={80}>
+                  <h2 className="text-2xl sm:text-4xl lg:text-5xl font-bold tracking-tight leading-tight mb-3 sm:mb-4">
+                    {t.rich('demo.title', { bold: (chunks) => <strong>{chunks}</strong> })}
+                  </h2>
+                </Stagger>
+                <Stagger active={activeIdx === 7} delay={160}>
+                  <p className="text-xs sm:text-base text-gray-500 leading-relaxed mb-6 sm:mb-8 max-w-lg mx-auto">{t('demo.subtitle')}</p>
+                </Stagger>
+                <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-8 sm:mb-10">
+                  {[t('demo.feature1'), t('demo.feature2'), t('demo.feature3'), t('demo.feature4')].map((item, i) => (
+                    <Stagger key={i} active={activeIdx === 7} delay={240 + i * 60}>
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200/60">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                        <span className="text-gray-600 text-xs sm:text-sm">{item}</span>
+                      </div>
+                    </Stagger>
+                  ))}
                 </div>
-                <h3 className="text-xs sm:text-base font-bold text-gray-900 mb-1">{f.title}</h3>
-                <p className="text-gray-500 text-[11px] sm:text-sm leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════
-          VIRTUAL STAGING
-          ══════════════════════════════════════════ */}
-      <section id="bildbearbeitung" className="py-16 sm:py-32 lg:py-40 overflow-hidden">
-        <div className="max-w-6xl mx-auto px-5 sm:px-6">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-            {/* Image */}
-            <div className="rv relative" style={{ '--d': '100ms' } as React.CSSProperties}>
-              <BeforeAfterSlider />
-              <div className="absolute -right-1 sm:-right-4 -bottom-1 sm:-bottom-4 bg-white rounded-lg sm:rounded-xl shadow-xl p-2.5 sm:p-4 border border-gray-100">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-50 rounded-md sm:rounded-lg flex items-center justify-center">
-                    <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] sm:text-xs text-gray-500">{t('staging.moreAttention')}</p>
-                    <p className="text-sm sm:text-lg font-bold text-gray-900">{t('staging.moreAttentionValue')}</p>
-                  </div>
-                </div>
+                <Stagger active={activeIdx === 7} delay={500} className="w-full max-w-lg mx-auto">
+                  <DemoBooking />
+                </Stagger>
               </div>
             </div>
+          </Slide>
 
-            {/* Content */}
-            <div>
-              <p className="rv inline-flex items-center px-3.5 py-1.5 rounded-full bg-gray-100 text-gray-600 text-xs font-medium mb-6 border border-gray-200">
-                <Wand2 className="w-3.5 h-3.5 mr-1.5" />
-                {t('staging.badge')}
-              </p>
-
-              <h2 className="rv text-2xl sm:text-5xl font-bold tracking-tight leading-tight mb-4 sm:mb-5" style={{ '--d': '100ms' } as React.CSSProperties}>
-                {t.rich('staging.title', { bold: (chunks) => <strong>{chunks}</strong> })}
-              </h2>
-
-              <p className="rv text-sm sm:text-lg text-gray-500 leading-relaxed mb-6 sm:mb-8" style={{ '--d': '200ms' } as React.CSSProperties}>
-                {t.rich('staging.subtitle', { bold: (chunks) => <span className="text-gray-900 font-medium">{chunks}</span> })}
-              </p>
-
-              <div className="space-y-3 mb-8">
-                {[t('staging.feature1'), t('staging.feature2'), t('staging.feature3'), t('staging.feature4')].map((item, i) => (
-                  <div key={i} className="rv flex items-center gap-3" style={{ '--d': `${300 + i * 100}ms` } as React.CSSProperties}>
-                    <div className="w-5 h-5 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                    </div>
-                    <span className="text-gray-600 text-sm">{item}</span>
+          {/* ══════════════════════════════════════════
+              8. FINAL CTA
+              ══════════════════════════════════════════ */}
+          <Slide idx={8} active={activeIdx === 8} className={S_DARK}>
+            <div className="h-full flex flex-col items-center justify-center px-5 sm:px-10">
+              <div className="text-center max-w-2xl mx-auto">
+                <Stagger active={activeIdx === 8} delay={0}>
+                  <NextImage src="/logo-white.png" alt="Immivo" width={480} height={480} className="mx-auto mb-6 sm:mb-8 w-32 sm:w-40 lg:w-48 h-auto" />
+                </Stagger>
+                <Stagger active={activeIdx === 8} delay={100}>
+                  <h2 className="text-2xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-3 sm:mb-4">{t('cta.title')}</h2>
+                </Stagger>
+                <Stagger active={activeIdx === 8} delay={200}>
+                  <p className="text-xs sm:text-base text-gray-400 mb-8 sm:mb-10 max-w-lg mx-auto">{t('cta.subtitle')}</p>
+                </Stagger>
+                <Stagger active={activeIdx === 8} delay={300}>
+                  <div className="flex flex-col sm:flex-row justify-center gap-3 mb-8 sm:mb-10">
+                    <Link href="/login?mode=register" className="group w-full sm:w-auto inline-flex items-center justify-center px-8 py-3.5 text-sm font-bold text-gray-900 bg-white rounded-full hover:bg-gray-100 transition-all duration-300 hover:-translate-y-0.5 shadow-[0_0_40px_rgba(255,255,255,0.08)]">
+                      {t('cta.primary')}<ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
+                    </Link>
+                    <a href="mailto:office@immivo.ai" className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3.5 text-sm font-semibold text-gray-300 border border-white/15 rounded-full hover:bg-white/5 transition-all duration-300">
+                      {t('cta.secondary')}
+                    </a>
                   </div>
-                ))}
+                </Stagger>
+                <Stagger active={activeIdx === 8} delay={400}>
+                  <div className="flex justify-center items-center gap-2 flex-wrap">
+                    {[t('cta.google'), t('cta.microsoft')].map((name, i) => (
+                      <div key={i} className="px-3 py-1.5 bg-white/[0.04] border border-white/[0.06] rounded-full text-xs font-medium text-gray-500">{name}</div>
+                    ))}
+                  </div>
+                </Stagger>
               </div>
+            </div>
+          </Slide>
 
-              <div className="rv" style={{ '--d': '700ms' } as React.CSSProperties}>
-                <Link
-                  href="/login"
-                  className="w-full sm:w-auto inline-flex items-center justify-center px-7 py-3 bg-gray-900 text-white rounded-full font-semibold text-sm hover:shadow-lg hover:shadow-gray-400/20 transition-all duration-300 hover:-translate-y-0.5"
+          {/* ══════════════════════════════════════════
+              9. FOOTER
+              ══════════════════════════════════════════ */}
+          <Slide idx={9} active={activeIdx === 9} className="bg-white">
+            <div className="h-full relative overflow-hidden">
+              {/* Large text — overlaps with footer top edge */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ paddingBottom: '10vh' }}>
+                <h2
+                  className="text-[20vw] sm:text-[16vw] lg:text-[13vw] font-bold tracking-tighter leading-[0.85] text-center select-none"
+                  style={{
+                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.04) 70%, transparent 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                    opacity: activeIdx === 9 ? 1 : 0,
+                    transform: activeIdx === 9 ? 'translateY(0)' : 'translateY(60px)',
+                    transition: 'opacity 1.8s cubic-bezier(0.16, 1, 0.3, 1), transform 2s cubic-bezier(0.16, 1, 0.3, 1)',
+                    transitionDelay: '400ms',
+                  }}
                 >
-                  {t('staging.cta')}
-                  <ArrowRight className="ml-2 w-4 h-4" />
-                </Link>
+                  Stress Less
+                </h2>
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* ══════════════════════════════════════════
-          HOW IT WORKS
-          ══════════════════════════════════════════ */}
-      <section className="py-16 sm:py-32 lg:py-40 bg-gray-50/60">
-        <div className="max-w-5xl mx-auto px-5 sm:px-6">
-          <div className="text-center mb-12 sm:mb-20">
-            <p className="rv text-blue-600 font-semibold text-xs sm:text-sm tracking-widest uppercase mb-3 sm:mb-4">{t('howItWorks.sectionLabel')}</p>
-            <h2 className="rv text-2xl sm:text-5xl lg:text-6xl font-bold tracking-tight" style={{ '--d': '100ms' } as React.CSSProperties}>
-              {t('howItWorks.title')}
-            </h2>
-          </div>
-
-          <div className="grid sm:grid-cols-3 gap-8 sm:gap-12">
-            {[
-              { step: '01', title: t('howItWorks.step1Title'), desc: t('howItWorks.step1Desc'), icon: Rocket },
-              { step: '02', title: t('howItWorks.step2Title'), desc: t('howItWorks.step2Desc'), icon: Brain },
-              { step: '03', title: t('howItWorks.step3Title'), desc: t('howItWorks.step3Desc'), icon: Award },
-            ].map((item, i) => (
-              <div key={i} className="rv text-center" style={{ '--d': `${200 + i * 150}ms` } as React.CSSProperties}>
-                <div className="relative inline-block mb-6">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-2xl border border-gray-200 flex items-center justify-center shadow-sm">
-                    <item.icon className="w-7 h-7 sm:w-8 sm:h-8 text-gray-600" />
-                  </div>
-                  <div className="absolute -top-2 -right-2 w-7 h-7 bg-gray-900 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                    {item.step}
-                  </div>
+              {/* Footer pinned to bottom with padding + rounded top */}
+              <div
+                className="absolute inset-x-0 bottom-0"
+                style={{
+                  opacity: activeIdx === 9 ? 1 : 0,
+                  transform: activeIdx === 9 ? 'translateY(0)' : 'translateY(40px)',
+                  transition: 'opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1)',
+                  transitionDelay: '300ms',
+                }}
+              >
+                <div className="overflow-hidden mx-auto mb-[10px]" style={{ maxWidth: 'calc(100vw - 20px)' }}>
+                  <PublicFooter bare />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">{item.title}</h3>
-                <p className="text-gray-500 text-sm leading-relaxed">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════
-          DEMO BOOKING
-          ══════════════════════════════════════════ */}
-      <section id="demo" className="py-16 sm:py-32 lg:py-40">
-        <div className="max-w-6xl mx-auto px-5 sm:px-6">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-            {/* Text */}
-            <div>
-              <p className="rv inline-flex items-center px-3.5 py-1.5 rounded-full bg-blue-50 text-blue-600 text-xs font-medium mb-6 border border-blue-100">
-                <Calendar className="w-3.5 h-3.5 mr-1.5" />
-                {t('demo.badge')}
-              </p>
-
-              <h2 className="rv text-2xl sm:text-5xl font-bold tracking-tight leading-tight mb-4 sm:mb-5" style={{ '--d': '100ms' } as React.CSSProperties}>
-                {t.rich('demo.title', { bold: (chunks) => <strong>{chunks}</strong> })}
-              </h2>
-
-              <p className="rv text-sm sm:text-lg text-gray-500 leading-relaxed mb-6 sm:mb-8" style={{ '--d': '200ms' } as React.CSSProperties}>
-                {t('demo.subtitle')}
-              </p>
-
-              <div className="space-y-3">
-                {[t('demo.feature1'), t('demo.feature2'), t('demo.feature3'), t('demo.feature4')].map((item, i) => (
-                  <div key={i} className="rv flex items-center gap-3" style={{ '--d': `${300 + i * 100}ms` } as React.CSSProperties}>
-                    <div className="w-5 h-5 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                    </div>
-                    <span className="text-gray-600 text-sm">{item}</span>
-                  </div>
-                ))}
               </div>
             </div>
+          </Slide>
 
-            {/* Calendar */}
-            <div className="rv" style={{ '--d': '200ms' } as React.CSSProperties}>
-              <DemoBooking />
-            </div>
-          </div>
         </div>
-      </section>
-
-      {/* ══════════════════════════════════════════
-          FINAL CTA
-          ══════════════════════════════════════════ */}
-      <section className="py-16 sm:py-32 lg:py-40 bg-gray-950 text-white relative overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-white/[0.03] rounded-full blur-[100px]" />
-          <div className="absolute bottom-1/4 right-1/4 w-[300px] h-[300px] bg-blue-500/[0.04] rounded-full blur-[100px]" />
-        </div>
-
-        <div className="max-w-3xl mx-auto px-5 sm:px-6 text-center relative z-10">
-          <div className="rv">
-            <NextImage src="/logo-white.png" alt="Immivo" width={480} height={480} className="mx-auto mb-6 sm:mb-8 w-48 sm:w-80 lg:w-96 h-auto" />
-          </div>
-
-          <div className="rv" style={{ '--d': '100ms' } as React.CSSProperties}>
-            <span className="inline-flex items-center px-3.5 py-1.5 rounded-full bg-white/10 text-gray-300 text-xs font-medium mb-8 border border-white/10">
-              <Star className="w-3.5 h-3.5 mr-1.5 text-amber-400" />
-              {t('cta.badge')}
-            </span>
-          </div>
-
-          <h2 className="rv text-2xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-4 sm:mb-5" style={{ '--d': '200ms' } as React.CSSProperties}>
-            {t('cta.title')}
-          </h2>
-
-          <p className="rv text-sm sm:text-lg text-gray-400 mb-8 sm:mb-10 max-w-xl mx-auto leading-relaxed" style={{ '--d': '300ms' } as React.CSSProperties}>
-            {t('cta.subtitle')}
-          </p>
-
-          <div className="rv flex flex-col sm:flex-row justify-center gap-3 sm:gap-4" style={{ '--d': '400ms' } as React.CSSProperties}>
-            <Link
-              href="/login?mode=register"
-              className="group w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-bold text-gray-900 bg-white rounded-full hover:bg-gray-100 transition-all duration-300 hover:-translate-y-0.5 shadow-[0_0_40px_rgba(255,255,255,0.06)]"
-            >
-              {t('cta.primary')}
-              <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform duration-300" />
-            </Link>
-            <a
-              href="mailto:office@immivo.ai"
-              className="w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-semibold text-gray-300 border border-white/15 rounded-full hover:bg-white/5 hover:border-white/30 transition-all duration-300"
-            >
-              {t('cta.secondary')}
-            </a>
-          </div>
-
-          {/* Partners */}
-          <div className="rv mt-16 pt-8 border-t border-white/10" style={{ '--d': '500ms' } as React.CSSProperties}>
-            <p className="text-xs text-gray-600 mb-5">{t('cta.connectedWith')}</p>
-            <div className="flex justify-center items-center gap-4 flex-wrap">
-              {[t('cta.portals'), t('cta.google'), t('cta.microsoft')].map((name, i) => (
-                <div key={i} className="px-4 py-2 bg-white/5 border border-white/8 rounded-lg text-xs font-medium text-gray-500">
-                  {name}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Footer ── */}
-      <PublicFooter />
+      </div>
     </div>
   );
 }

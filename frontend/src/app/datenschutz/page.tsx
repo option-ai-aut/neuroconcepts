@@ -10,7 +10,7 @@ export default function DatenschutzPage() {
       <PublicNavigation currentPage="datenschutz" />
 
       <section className="pt-24 sm:pt-32 pb-16 sm:pb-24">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 animate-fade-in">
           <header className="mb-10 sm:mb-12">
             <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
               Datenschutzerklärung
@@ -23,7 +23,7 @@ export default function DatenschutzPage() {
           <div className="space-y-10">
             {/* 1. Verantwortlicher */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 1. Verantwortlicher
               </h2>
               <p className="text-gray-600 leading-relaxed">
@@ -45,7 +45,7 @@ export default function DatenschutzPage() {
 
             {/* 2. Erhebung und Verarbeitung personenbezogener Daten */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 2. Erhebung und Verarbeitung personenbezogener Daten
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -62,7 +62,7 @@ export default function DatenschutzPage() {
 
             {/* 3. Rechtsgrundlagen */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 3. Rechtsgrundlagen
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -77,7 +77,7 @@ export default function DatenschutzPage() {
 
             {/* 4. Zwecke der Verarbeitung */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 4. Zwecke der Verarbeitung
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -93,7 +93,7 @@ export default function DatenschutzPage() {
 
             {/* 5. KI und automatisierte Verarbeitung */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 5. Künstliche Intelligenz und automatisierte Verarbeitung
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -173,7 +173,7 @@ export default function DatenschutzPage() {
 
             {/* 6. Hosting und Cloud-Dienste */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 6. Hosting und Cloud-Dienste
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -187,7 +187,7 @@ export default function DatenschutzPage() {
 
             {/* 7. E-Mail-Dienste */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 7. E-Mail-Dienste
               </h2>
               <p className="text-gray-600 leading-relaxed">
@@ -197,7 +197,7 @@ export default function DatenschutzPage() {
 
             {/* 8. Authentifizierung */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 8. Authentifizierung
               </h2>
               <p className="text-gray-600 leading-relaxed">
@@ -207,7 +207,7 @@ export default function DatenschutzPage() {
 
             {/* 9. Zahlungsabwicklung */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 9. Zahlungsabwicklung
               </h2>
               <p className="text-gray-600 leading-relaxed">
@@ -217,7 +217,7 @@ export default function DatenschutzPage() {
 
             {/* 10. Cookies und Tracking */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 10. Cookies und Tracking
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -227,7 +227,7 @@ export default function DatenschutzPage() {
 
             {/* 11. Drittanbieter und Auftragsverarbeiter */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 11. Drittanbieter und Auftragsverarbeiter
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -244,7 +244,7 @@ export default function DatenschutzPage() {
 
             {/* 12. Datensicherheit */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 12. Datensicherheit
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -261,7 +261,7 @@ export default function DatenschutzPage() {
 
             {/* 13. Speicherdauer */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 13. Speicherdauer
               </h2>
               <p className="text-gray-600 leading-relaxed">
@@ -271,7 +271,7 @@ export default function DatenschutzPage() {
 
             {/* 14. Ihre Rechte */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 14. Ihre Rechte
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -295,7 +295,7 @@ export default function DatenschutzPage() {
 
             {/* 15. Beschwerderecht */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 15. Beschwerderecht
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
@@ -319,7 +319,7 @@ export default function DatenschutzPage() {
 
             {/* 16. Aenderungen */}
             <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">
                 16. Änderungen dieser Datenschutzerklärung
               </h2>
               <p className="text-gray-600 leading-relaxed">
@@ -329,6 +329,22 @@ export default function DatenschutzPage() {
           </div>
         </div>
       </section>
+
+      <style jsx global>{`
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out forwards;
+        }
+      `}</style>
 
       <PublicFooter />
     </div>

@@ -9,13 +9,13 @@ export default function ImpressumPage() {
       <PublicNavigation currentPage="impressum" />
 
       <section className="pt-24 sm:pt-32 pb-16 sm:pb-24">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 animate-fade-in">
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-12">Impressum</h1>
 
           <div className="space-y-10">
             {/* § 5 ECG */}
             <section>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Angaben gemäß § 5 ECG</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">Angaben gemäß § 5 ECG</h2>
               <div className="text-gray-600 space-y-1 text-sm leading-relaxed">
                 <p><strong>Leutgeb Holding &amp; Management GmbH</strong></p>
                 <p>Sterngasse 3</p>
@@ -31,7 +31,7 @@ export default function ImpressumPage() {
 
             {/* Kontakt */}
             <section>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Kontakt</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">Kontakt</h2>
               <div className="text-gray-600 space-y-1 text-sm leading-relaxed">
                 <p>E-Mail: <a href="mailto:office@immivo.ai" className="text-gray-900 hover:underline">office@immivo.ai</a></p>
               </div>
@@ -39,7 +39,7 @@ export default function ImpressumPage() {
 
             {/* EU-Streitschlichtung */}
             <section>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">EU-Streitschlichtung</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">EU-Streitschlichtung</h2>
               <p className="text-gray-600 text-sm leading-relaxed">
                 Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit:{' '}
                 <a
@@ -58,7 +58,7 @@ export default function ImpressumPage() {
 
             {/* Haftung für Inhalte */}
             <section>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Haftung für Inhalte</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">Haftung für Inhalte</h2>
               <p className="text-gray-600 text-sm leading-relaxed">
                 Als Diensteanbieter sind wir gemäß § 7 Abs. 1 ECG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 ECG sind wir als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen.
               </p>
@@ -69,7 +69,7 @@ export default function ImpressumPage() {
 
             {/* Haftung für Links */}
             <section>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Haftung für Links</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">Haftung für Links</h2>
               <p className="text-gray-600 text-sm leading-relaxed">
                 Unser Angebot enthält Links zu externen Websites Dritter, auf deren Inhalte wir keinen Einfluss haben. Deshalb können wir für diese fremden Inhalte auch keine Gewähr übernehmen. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber der Seiten verantwortlich. Die verlinkten Seiten wurden zum Zeitpunkt der Verlinkung auf mögliche Rechtsverstöße überprüft. Rechtswidrige Inhalte waren zum Zeitpunkt der Verlinkung nicht erkennbar.
               </p>
@@ -80,7 +80,7 @@ export default function ImpressumPage() {
 
             {/* Urheberrecht */}
             <section>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Urheberrecht</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">Urheberrecht</h2>
               <p className="text-gray-600 text-sm leading-relaxed">
                 Die durch die Seitenbetreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem österreichischen Urheberrecht. Die Vervielfältigung, Bearbeitung, Verbreitung und jede Art der Verwertung außerhalb der Grenzen des Urheberrechtes bedürfen der schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers. Downloads und Kopien dieser Seite sind nur für den privaten, nicht kommerziellen Gebrauch gestattet.
               </p>
@@ -91,7 +91,7 @@ export default function ImpressumPage() {
 
             {/* Medieninhaber § 25 MedienG */}
             <section>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Medieninhaber gemäß § 25 MedienG</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">Medieninhaber gemäß § 25 MedienG</h2>
               <div className="text-gray-600 space-y-2 text-sm leading-relaxed">
                 <p><strong>Leutgeb Holding &amp; Management GmbH</strong></p>
                 <p>Sterngasse 3, 1010 Wien, Österreich</p>
@@ -101,7 +101,7 @@ export default function ImpressumPage() {
 
             {/* Verantwortlich für den Inhalt */}
             <section>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Verantwortlich für den Inhalt</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 border-l-2 border-blue-600 pl-3">Verantwortlich für den Inhalt</h2>
               <p className="text-gray-600 text-sm leading-relaxed">
                 Josef Leutgeb
               </p>
@@ -109,6 +109,22 @@ export default function ImpressumPage() {
           </div>
         </div>
       </section>
+
+      <style jsx global>{`
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out forwards;
+        }
+      `}</style>
 
       <PublicFooter />
     </div>

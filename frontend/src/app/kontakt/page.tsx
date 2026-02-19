@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Mail,
   Phone,
@@ -35,8 +35,26 @@ const BETREFF_KEYS: BetreffKey[] = [
   'other',
 ];
 
+function useInView() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [isInView, setIsInView] = useState(false);
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) setIsInView(true);
+    }, { threshold: 0.1 });
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+  return { ref, isInView };
+}
+
 export default function KontaktPage() {
   const t = useTranslations('contact');
+  const heroRef = useInView();
+  const contactInfoRef = useInView();
+  const contactFormRef = useInView();
+  const demoRef = useInView();
+  const directContactRef = useInView();
   const [formData, setFormData] = useState<FormData>({
     vorname: '',
     nachname: '',
@@ -79,8 +97,16 @@ export default function KontaktPage() {
       <PublicNavigation currentPage="kontakt" />
 
       {/* Hero */}
-      <section className="pt-24 sm:pt-32 pb-12 sm:pb-16 bg-gradient-to-b from-gray-50 to-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section className="pt-24 sm:pt-32 pb-12 sm:pb-16 bg-white">
+        <div 
+          ref={heroRef.ref}
+          className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center"
+          style={{
+            opacity: heroRef.isInView ? 1 : 0,
+            transform: heroRef.isInView ? 'translateY(0)' : 'translateY(30px)',
+            transition: 'opacity 0.7s ease, transform 0.7s ease',
+          }}
+        >
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-4 sm:mb-6">
             {t('title')}
           </h1>
@@ -95,7 +121,14 @@ export default function KontaktPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-2 gap-8 sm:gap-16">
             {/* Contact Info */}
-            <div>
+            <div
+              ref={contactInfoRef.ref}
+              style={{
+                opacity: contactInfoRef.isInView ? 1 : 0,
+                transform: contactInfoRef.isInView ? 'translateX(0)' : 'translateX(-30px)',
+                transition: 'opacity 0.7s ease, transform 0.7s ease',
+              }}
+            >
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 sm:mb-8">
                 {t('reachUs')}
               </h2>
@@ -172,7 +205,16 @@ export default function KontaktPage() {
               </div>
 
               {/* Demo Section */}
-              <div className="mt-8 sm:mt-12 p-4 sm:p-6 bg-blue-50 rounded-xl border border-blue-100">
+              <div
+                ref={demoRef.ref}
+                className="mt-8 sm:mt-12 p-4 sm:p-6 bg-blue-50 rounded-xl border border-blue-100"
+                style={{
+                  opacity: demoRef.isInView ? 1 : 0,
+                  transform: demoRef.isInView ? 'translateY(0)' : 'translateY(20px)',
+                  transition: 'opacity 0.7s ease, transform 0.7s ease',
+                  transitionDelay: '100ms',
+                }}
+              >
                 <h3 className="font-semibold text-gray-900 mb-2 text-sm sm:text-base">
                   {t('personalDemo')}
                 </h3>
@@ -189,7 +231,16 @@ export default function KontaktPage() {
               </div>
 
               {/* Founders Direct Contact */}
-              <div className="mt-8 sm:mt-12 p-4 sm:p-6 bg-gray-50 rounded-xl">
+              <div
+                ref={directContactRef.ref}
+                className="mt-8 sm:mt-12 p-4 sm:p-6 bg-gray-50 rounded-xl"
+                style={{
+                  opacity: directContactRef.isInView ? 1 : 0,
+                  transform: directContactRef.isInView ? 'translateY(0)' : 'translateY(20px)',
+                  transition: 'opacity 0.7s ease, transform 0.7s ease',
+                  transitionDelay: '200ms',
+                }}
+              >
                 <h3 className="font-semibold text-gray-900 mb-4 text-sm sm:text-base">
                   {t('directContact')}
                 </h3>
@@ -229,7 +280,14 @@ export default function KontaktPage() {
             </div>
 
             {/* Contact Form */}
-            <div>
+            <div
+              ref={contactFormRef.ref}
+              style={{
+                opacity: contactFormRef.isInView ? 1 : 0,
+                transform: contactFormRef.isInView ? 'translateX(0)' : 'translateX(30px)',
+                transition: 'opacity 0.7s ease, transform 0.7s ease',
+              }}
+            >
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 sm:mb-8">
                 {t('sendMessage')}
               </h2>

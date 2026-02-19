@@ -48,6 +48,7 @@ export default function PreisePage() {
   const heroRef = useInView();
   const cardsRef = useInView();
   const faqRef = useInView();
+  const contactRef = useInView();
 
   const plans = [
     {
@@ -146,21 +147,19 @@ export default function PreisePage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <style jsx global>{`
-        @keyframes slide-up {
-          from { opacity: 0; transform: translateY(40px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-slide-up { animation: slide-up 0.8s ease-out forwards; }
-      `}</style>
 
       <PublicNavigation currentPage="preise" />
 
       {/* Hero */}
-      <section className="pt-24 sm:pt-32 pb-8 sm:pb-12 bg-gradient-to-b from-gray-50 to-white">
+      <section className="pt-24 sm:pt-32 pb-8 sm:pb-12 bg-white">
         <div
           ref={heroRef.ref}
-          className={`max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center ${heroRef.isInView ? 'animate-slide-up' : 'opacity-0'}`}
+          className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center"
+          style={{
+            opacity: heroRef.isInView ? 1 : 0,
+            transform: heroRef.isInView ? 'translateY(0)' : 'translateY(30px)',
+            transition: 'opacity 0.6s ease, transform 0.6s ease',
+          }}
         >
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-4 sm:mb-6">
             {t('title')}
@@ -211,10 +210,7 @@ export default function PreisePage() {
 
       {/* Pricing Cards */}
       <section className="py-8 sm:py-16">
-        <div
-          ref={cardsRef.ref}
-          className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${cardsRef.isInView ? 'animate-slide-up' : 'opacity-0'}`}
-        >
+        <div ref={cardsRef.ref} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
             {plans.map((plan, i) => (
               <div
@@ -224,9 +220,15 @@ export default function PreisePage() {
                     ? 'bg-gray-900 text-white shadow-xl ring-2 ring-gray-900 ring-offset-4 lg:scale-[1.02]'
                     : 'bg-white border border-gray-200'
                 }`}
+                style={{
+                  opacity: cardsRef.isInView ? 1 : 0,
+                  transform: cardsRef.isInView ? 'translateY(0)' : 'translateY(30px)',
+                  transition: 'opacity 0.6s ease, transform 0.6s ease',
+                  transitionDelay: `${i * 100}ms`,
+                }}
               >
                 {plan.badge && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-amber-400 text-amber-900 text-sm font-semibold rounded-full whitespace-nowrap">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-blue-600 text-white text-sm font-semibold rounded-full whitespace-nowrap">
                     {plan.badge}
                   </div>
                 )}
@@ -376,7 +378,7 @@ export default function PreisePage() {
 
                 <Link
                   href={plan.href}
-                  className={`w-full flex items-center justify-center px-6 py-3 rounded-xl font-semibold transition-all hover:-translate-y-0.5 ${
+                  className={`w-full flex items-center justify-center px-6 py-3 rounded-full font-semibold transition-all hover:-translate-y-0.5 ${
                     plan.popular
                       ? 'bg-white text-gray-900 hover:bg-gray-100'
                       : 'bg-gray-900 text-white hover:bg-gray-800'
@@ -392,10 +394,15 @@ export default function PreisePage() {
       </section>
 
       {/* FAQ */}
-      <section className="py-12 sm:py-16 bg-gray-50">
+      <section className="py-12 sm:py-16 bg-white">
         <div
           ref={faqRef.ref}
-          className={`max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 ${faqRef.isInView ? 'animate-slide-up' : 'opacity-0'}`}
+          className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8"
+          style={{
+            opacity: faqRef.isInView ? 1 : 0,
+            transform: faqRef.isInView ? 'translateY(0)' : 'translateY(30px)',
+            transition: 'opacity 0.6s ease, transform 0.6s ease',
+          }}
         >
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-8 sm:mb-12 flex items-center justify-center gap-2">
             <HelpCircle className="w-8 h-8 text-gray-500" />
@@ -422,7 +429,15 @@ export default function PreisePage() {
 
       {/* Contact CTA */}
       <section className="py-12 sm:py-16 bg-white">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div
+          ref={contactRef.ref}
+          className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center"
+          style={{
+            opacity: contactRef.isInView ? 1 : 0,
+            transform: contactRef.isInView ? 'translateY(0)' : 'translateY(30px)',
+            transition: 'opacity 0.6s ease, transform 0.6s ease',
+          }}
+        >
           <p className="text-gray-600 mb-4">
             {t('stillQuestions')}
           </p>
