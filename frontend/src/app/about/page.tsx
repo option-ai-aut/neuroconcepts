@@ -149,7 +149,7 @@ export default function UeberUnsPage() {
                 {t('josefDesc')}
               </p>
               <div className="mt-6 pt-6 border-t border-gray-100">
-                <a href="mailto:josef.leutgeb@immivo.ai" className="inline-flex items-center gap-2 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors">
+                <a href="mailto:josef.leutgeb@immivo.ai" className="inline-flex items-center gap-2 text-sm font-medium text-gray-900 hover:text-gray-500 transition-colors">
                   <Mail className="w-4 h-4" />
                   josef.leutgeb@immivo.ai
                 </a>
@@ -179,7 +179,7 @@ export default function UeberUnsPage() {
                 {t('dennisDesc')}
               </p>
               <div className="mt-6 pt-6 border-t border-gray-100">
-                <a href="mailto:dennis.kral@immivo.ai" className="inline-flex items-center gap-2 text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors">
+                <a href="mailto:dennis.kral@immivo.ai" className="inline-flex items-center gap-2 text-sm font-medium text-gray-900 hover:text-gray-500 transition-colors">
                   <Mail className="w-4 h-4" />
                   dennis.kral@immivo.ai
                 </a>

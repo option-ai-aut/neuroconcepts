@@ -1104,41 +1104,63 @@ export default function LandingPage() {
               9. FOOTER
               ══════════════════════════════════════════ */}
           <Slide idx={9} active={activeIdx === 9} className="bg-white" fullOnMobile>
-            <div className="h-full relative overflow-hidden">
-              {/* Large text — overlaps with footer top edge */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ paddingBottom: '28vh' }}>
-                <h2
-                  className="text-[20vw] sm:text-[16vw] lg:text-[13vw] font-bold tracking-tighter leading-[0.85] text-center select-none"
-                  style={{
-                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.07) 60%, transparent 100%)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                    opacity: isMobile || activeIdx === 9 ? 1 : 0,
-                    transform: isMobile || activeIdx === 9 ? 'translateY(0)' : 'translateY(60px)',
-                    transition: isMobile ? 'none' : 'opacity 1.8s cubic-bezier(0.16, 1, 0.3, 1), transform 2s cubic-bezier(0.16, 1, 0.3, 1)',
-                    transitionDelay: activeIdx === 9 && !isMobile ? '400ms' : '0ms',
-                  }}
-                >
-                  Stress Less
-                </h2>
-              </div>
-
-              {/* Footer pinned to bottom with padding + rounded top */}
-              <div
-                className="absolute inset-x-0 bottom-0"
-                style={{
-                  opacity: isMobile || activeIdx === 9 ? 1 : 0,
-                  transform: isMobile || activeIdx === 9 ? 'translateY(0)' : 'translateY(40px)',
-                  transition: isMobile ? 'none' : 'opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1)',
-                  transitionDelay: isMobile ? '0ms' : '300ms',
-                }}
-              >
-                <div className="overflow-hidden mx-auto mb-[10px]" style={{ maxWidth: 'calc(100vw - 20px)' }}>
+            {isMobile ? (
+              /* Mobile: normal flow, "Stress Less" on top, footer below */
+              <div className="flex flex-col min-h-full pt-16 pb-3">
+                {/* Stress Less text */}
+                <div className="flex-1 flex items-center justify-center pointer-events-none py-8">
+                  <h2
+                    className="text-[22vw] font-bold tracking-tighter leading-[0.85] text-center select-none"
+                    style={{
+                      background: 'linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.2) 70%, transparent 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundClip: 'text',
+                    }}
+                  >
+                    Stress Less
+                  </h2>
+                </div>
+                {/* Footer */}
+                <div className="overflow-hidden mx-auto w-full" style={{ maxWidth: 'calc(100vw - 20px)' }}>
                   <PublicFooter bare />
                 </div>
               </div>
-            </div>
+            ) : (
+              /* Desktop: absolute positioning */
+              <div className="h-full relative overflow-hidden">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ paddingBottom: '28vh' }}>
+                  <h2
+                    className="text-[16vw] lg:text-[13vw] font-bold tracking-tighter leading-[0.85] text-center select-none"
+                    style={{
+                      background: 'linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.07) 60%, transparent 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundClip: 'text',
+                      opacity: activeIdx === 9 ? 1 : 0,
+                      transform: activeIdx === 9 ? 'translateY(0)' : 'translateY(60px)',
+                      transition: 'opacity 1.8s cubic-bezier(0.16, 1, 0.3, 1), transform 2s cubic-bezier(0.16, 1, 0.3, 1)',
+                      transitionDelay: activeIdx === 9 ? '400ms' : '0ms',
+                    }}
+                  >
+                    Stress Less
+                  </h2>
+                </div>
+                <div
+                  className="absolute inset-x-0 bottom-0"
+                  style={{
+                    opacity: activeIdx === 9 ? 1 : 0,
+                    transform: activeIdx === 9 ? 'translateY(0)' : 'translateY(40px)',
+                    transition: 'opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1)',
+                    transitionDelay: '300ms',
+                  }}
+                >
+                  <div className="overflow-hidden mx-auto mb-[10px]" style={{ maxWidth: 'calc(100vw - 20px)' }}>
+                    <PublicFooter bare />
+                  </div>
+                </div>
+              </div>
+            )}
           </Slide>
 
         </div>

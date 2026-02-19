@@ -263,7 +263,7 @@ export default function PreisePage() {
                 }}
               >
                 {plan.badge && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-blue-600 text-white text-sm font-semibold rounded-full whitespace-nowrap">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gray-900 text-white text-sm font-semibold rounded-full whitespace-nowrap">
                     {plan.badge}
                   </div>
                 )}
@@ -348,12 +348,7 @@ export default function PreisePage() {
                           plan.popular ? 'text-white' : 'text-gray-900'
                         }`}
                       >
-                        {yearly
-                          ? plan.priceYearly.toLocaleString('de-DE', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })
-                          : plan.price}
+                          {yearly ? plan.priceYearly : plan.price}
                         €
                       </span>
                       <span
