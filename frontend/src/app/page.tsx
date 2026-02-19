@@ -154,13 +154,19 @@ function Slide({ children, className = '', active: _active, idx }: { children: R
    STAGGER CHILDREN — animate children in on active
    ═══════════════════════════════════════════════ */
 function Stagger({ children, active, className = '', delay = 0 }: { children: React.ReactNode; active: boolean; className?: string; delay?: number }) {
+  // Track whether this element has ever been made visible.
+  // Before first activation → hidden (will animate in).
+  // After first activation → stay fully visible on exit so the slide block slides away cleanly.
+  const hasShown = useRef(false);
+  if (active) hasShown.current = true;
+
+  const shown = hasShown.current;
   return (
     <div
       className={className}
       style={{
-        opacity: active ? 1 : 0,
-        transform: active ? 'translateY(0)' : 'translateY(32px)',
-        // Enter: smooth stagger. Exit: instant reset so slide block slides away cleanly.
+        opacity: active || shown ? 1 : 0,
+        transform: active || shown ? 'translateY(0)' : 'translateY(32px)',
         transition: active
           ? `opacity 700ms cubic-bezier(0.16,1,0.3,1) ${delay}ms, transform 700ms cubic-bezier(0.16,1,0.3,1) ${delay}ms`
           : 'none',
@@ -334,7 +340,8 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (activeIdx !== 4) {
-      const t = setTimeout(() => setFeatureStep(0), 800);
+      // Wait well after the slide transition (800ms) before resetting to avoid a visible flash
+      const t = setTimeout(() => setFeatureStep(0), 1600);
       return () => clearTimeout(t);
     }
   }, [activeIdx]);
@@ -895,9 +902,9 @@ export default function LandingPage() {
                 </Stagger>
               </div>
 
-              {/* Image — edge to edge with 20px padding, height adapts to remaining space */}
-              <Stagger active={activeIdx === 5} delay={250} className="w-full flex-1 min-h-0">
-                <div className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden mx-auto" style={{ maxWidth: 'calc(100vw - 20px)', height: 'min(calc(100dvh - 220px), 600px)', minHeight: '200px' }}>
+              {/* Image — edge to edge with 10px padding on each side */}
+              <Stagger active={activeIdx === 5} delay={250} className="w-full px-[10px]">
+                <div className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden" style={{ height: 'clamp(200px, calc(100dvh - 200px), 560px)' }}>
                   <BeforeAfterSlider active={activeIdx === 5} />
                   {/* Stat tag */}
                   <div
@@ -1032,7 +1039,7 @@ export default function LandingPage() {
           <Slide idx={9} active={activeIdx === 9} className="bg-white">
             <div className="h-full relative overflow-hidden">
               {/* Large text — overlaps with footer top edge */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ paddingBottom: '10vh' }}>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ paddingBottom: '28vh' }}>
                 <h2
                   className="text-[20vw] sm:text-[16vw] lg:text-[13vw] font-bold tracking-tighter leading-[0.85] text-center select-none"
                   style={{

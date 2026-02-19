@@ -36,7 +36,7 @@ import { authMiddleware, adminAuthMiddleware } from './middleware/auth';
 import { AiSafetyMiddleware, wrapAiResponse } from './middleware/aiSafety';
 import { validate, schemas } from './middleware/validation';
 import { AiCostService } from './services/AiCostService';
-import { getStripe, BILLING_ENABLED, getPriceId, parsePlan, StripeConfig, PlanId, BillingCycle } from './services/BillingService';
+import { getStripe, BILLING_ENABLED, getPriceId, parsePlan, StripeConfig, PlanId, BillingCycle, checkoutIdempotencyKey } from './services/BillingService';
 import * as AWS from 'aws-sdk';
 import multer from 'multer';
 import path from 'path';
@@ -662,6 +662,10 @@ setInterval(() => {
 }, 120_000);
 
 // ─── Stripe Webhook (RAW body — must be before express.json) ──────────────────
+// In-memory set for webhook event idempotency (prevents duplicate processing)
+const processedWebhookEvents = new Set<string>();
+const WEBHOOK_DEDUP_TTL = 300_000; // 5 minutes
+
 app.post('/billing/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'] as string;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -669,6 +673,10 @@ app.post('/billing/webhook', express.raw({ type: 'application/json' }), async (r
   if (!webhookSecret) {
     console.error('[Billing] STRIPE_WEBHOOK_SECRET not configured');
     return res.status(500).json({ error: 'Internal Server Error' });
+  }
+
+  if (!sig) {
+    return res.status(400).json({ error: 'Bad Request' });
   }
 
   let event: any;
@@ -679,8 +687,23 @@ app.post('/billing/webhook', express.raw({ type: 'application/json' }), async (r
     return res.status(400).json({ error: 'Bad Request' });
   }
 
+  // Idempotency: skip already-processed events
+  if (processedWebhookEvents.has(event.id)) {
+    console.log(`[Billing] Skipping duplicate webhook event: ${event.id}`);
+    return res.json({ received: true, duplicate: true });
+  }
+  processedWebhookEvents.add(event.id);
+  setTimeout(() => processedWebhookEvents.delete(event.id), WEBHOOK_DEDUP_TTL);
+
   try {
     const db = prisma || (await initializePrisma());
+
+    // Helper: find tenant by Stripe customer ID
+    const findTenantByCustomer = async (customerId: string) => {
+      return db.tenantSettings.findFirst({
+        where: { stripeConfig: { path: ['customerId'], equals: customerId } },
+      });
+    };
 
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -689,6 +712,14 @@ app.post('/billing/webhook', express.raw({ type: 'application/json' }), async (r
         const plan = session.metadata?.plan as PlanId;
         const billingCycle = session.metadata?.billingCycle as BillingCycle;
         if (!tenantId) break;
+
+        // Verify tenant-customer relationship: if tenant already has a different customer, reject
+        const existingSettings = await db.tenantSettings.findUnique({ where: { tenantId } });
+        const existingCfg = (existingSettings?.stripeConfig || {}) as StripeConfig;
+        if (existingCfg.customerId && existingCfg.customerId !== session.customer) {
+          console.error(`[Billing] Customer mismatch for tenant ${tenantId}: expected ${existingCfg.customerId}, got ${session.customer}`);
+          break;
+        }
 
         const subscription = await getStripe().subscriptions.retrieve(session.subscription);
         const stripeConfig: StripeConfig = {
@@ -710,9 +741,7 @@ app.post('/billing/webhook', express.raw({ type: 'application/json' }), async (r
 
       case 'customer.subscription.updated': {
         const sub = event.data.object;
-        const tenantSettings = await db.tenantSettings.findFirst({
-          where: { stripeConfig: { path: ['customerId'], equals: sub.customer } },
-        });
+        const tenantSettings = await findTenantByCustomer(sub.customer);
         if (!tenantSettings) break;
 
         const priceId = sub.items.data[0]?.price?.id;
@@ -736,9 +765,7 @@ app.post('/billing/webhook', express.raw({ type: 'application/json' }), async (r
 
       case 'customer.subscription.deleted': {
         const sub = event.data.object;
-        const tenantSettings = await db.tenantSettings.findFirst({
-          where: { stripeConfig: { path: ['customerId'], equals: sub.customer } },
-        });
+        const tenantSettings = await findTenantByCustomer(sub.customer);
         if (!tenantSettings) break;
 
         const existing = (tenantSettings.stripeConfig || {}) as StripeConfig;
@@ -760,8 +787,50 @@ app.post('/billing/webhook', express.raw({ type: 'application/json' }), async (r
       case 'invoice.payment_failed': {
         const invoice = event.data.object;
         console.warn(`[Billing] Payment failed for customer ${invoice.customer}, invoice: ${invoice.id}`);
+
+        // Update subscription status so the app knows payment failed
+        const tenantSettings = await findTenantByCustomer(invoice.customer as string);
+        if (tenantSettings) {
+          const existing = (tenantSettings.stripeConfig || {}) as StripeConfig;
+          await db.tenantSettings.update({
+            where: { id: tenantSettings.id },
+            data: {
+              stripeConfig: { ...existing, status: 'past_due' } as any,
+            },
+          });
+        }
         break;
       }
+
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object;
+        console.log(`[Billing] Payment succeeded for customer ${invoice.customer}, invoice: ${invoice.id}`);
+
+        // Refresh subscription status after successful payment (e.g. past_due → active)
+        if (invoice.subscription) {
+          const tenantSettings = await findTenantByCustomer(invoice.customer as string);
+          if (tenantSettings) {
+            const sub = await getStripe().subscriptions.retrieve(invoice.subscription as string);
+            const existing = (tenantSettings.stripeConfig || {}) as StripeConfig;
+            await db.tenantSettings.update({
+              where: { id: tenantSettings.id },
+              data: {
+                stripeConfig: { ...existing, status: sub.status, currentPeriodEnd: (sub as any).current_period_end } as any,
+              },
+            });
+          }
+        }
+        break;
+      }
+
+      case 'customer.subscription.trial_will_end': {
+        const sub = event.data.object;
+        console.log(`[Billing] Trial ending soon for customer ${sub.customer}`);
+        break;
+      }
+
+      default:
+        console.log(`[Billing] Unhandled event type: ${event.type}`);
     }
 
     res.json({ received: true });
@@ -1093,8 +1162,34 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
 // BILLING_ENABLED=false → all users get free access (test phase)
 // ═══════════════════════════════════════════════════════════════════
 
+// Billing-specific rate limit: 10 requests per minute per user (prevents checkout/cancel abuse)
+const billingRateLimit: Record<string, { count: number; resetTime: number }> = {};
+const BILLING_RATE_LIMIT = 10;
+const BILLING_RATE_WINDOW = 60_000;
+
+function billingRateLimitMiddleware(req: any, res: any, next: any) {
+  const userId = req.user?.sub || req.user?.email || req.ip;
+  const now = Date.now();
+  if (!billingRateLimit[userId] || now > billingRateLimit[userId].resetTime) {
+    billingRateLimit[userId] = { count: 1, resetTime: now + BILLING_RATE_WINDOW };
+    return next();
+  }
+  if (billingRateLimit[userId].count >= BILLING_RATE_LIMIT) {
+    res.setHeader('Retry-After', String(Math.ceil((billingRateLimit[userId].resetTime - now) / 1000)));
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
+  billingRateLimit[userId].count++;
+  next();
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const key of Object.keys(billingRateLimit)) {
+    if (now > billingRateLimit[key].resetTime) delete billingRateLimit[key];
+  }
+}, 120_000);
+
 // GET /billing/subscription — current plan info
-app.get('/billing/subscription', authMiddleware, async (req: any, res) => {
+app.get('/billing/subscription', authMiddleware, billingRateLimitMiddleware, async (req: any, res) => {
   try {
     const db = prisma || (await initializePrisma());
     const settings = await db.tenantSettings.findUnique({ where: { tenantId: req.user.tenantId } });
@@ -1146,7 +1241,7 @@ app.get('/billing/subscription', authMiddleware, async (req: any, res) => {
 });
 
 // GET /billing/invoices — invoice list
-app.get('/billing/invoices', authMiddleware, async (req: any, res) => {
+app.get('/billing/invoices', authMiddleware, billingRateLimitMiddleware, async (req: any, res) => {
   try {
     if (!BILLING_ENABLED) return res.json([]);
 
@@ -1173,7 +1268,7 @@ app.get('/billing/invoices', authMiddleware, async (req: any, res) => {
 });
 
 // POST /billing/checkout — create Stripe Checkout Session
-app.post('/billing/checkout', authMiddleware, async (req: any, res) => {
+app.post('/billing/checkout', authMiddleware, billingRateLimitMiddleware, async (req: any, res) => {
   try {
     // Test phase: billing not enabled
     if (!BILLING_ENABLED) {
@@ -1182,6 +1277,9 @@ app.post('/billing/checkout', authMiddleware, async (req: any, res) => {
 
     const { plan, billingCycle = 'monthly' } = req.body as { plan: 'solo' | 'team'; billingCycle: BillingCycle };
     if (!plan || !['solo', 'team'].includes(plan)) {
+      return res.status(400).json({ error: 'Bad Request' });
+    }
+    if (!['monthly', 'yearly'].includes(billingCycle)) {
       return res.status(400).json({ error: 'Bad Request' });
     }
 
@@ -1208,7 +1306,10 @@ app.post('/billing/checkout', authMiddleware, async (req: any, res) => {
       sessionParams.customer_email = req.user.email;
     }
 
-    const session = await stripe.checkout.sessions.create(sessionParams);
+    const idempotencyKey = checkoutIdempotencyKey(req.user.tenantId, plan, billingCycle);
+    const session = await stripe.checkout.sessions.create(sessionParams, {
+      idempotencyKey,
+    });
     return res.json({ url: session.url, billingEnabled: true });
   } catch (error) {
     console.error('[Billing] POST /billing/checkout error:', error);
@@ -1217,7 +1318,7 @@ app.post('/billing/checkout', authMiddleware, async (req: any, res) => {
 });
 
 // POST /billing/portal — open Stripe Customer Portal
-app.post('/billing/portal', authMiddleware, async (req: any, res) => {
+app.post('/billing/portal', authMiddleware, billingRateLimitMiddleware, async (req: any, res) => {
   try {
     if (!BILLING_ENABLED) {
       return res.status(400).json({ error: 'Billing not enabled' });
@@ -1246,7 +1347,7 @@ app.post('/billing/portal', authMiddleware, async (req: any, res) => {
 });
 
 // DELETE /billing/subscription — cancel at period end
-app.delete('/billing/subscription', authMiddleware, async (req: any, res) => {
+app.delete('/billing/subscription', authMiddleware, billingRateLimitMiddleware, async (req: any, res) => {
   try {
     if (!BILLING_ENABLED) {
       return res.status(400).json({ error: 'Billing not enabled' });
