@@ -52,6 +52,7 @@ function BeforeAfterSlider({ active }: { active: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [sliderPos, setSliderPos] = useState(50);
   const [containerWidth, setContainerWidth] = useState(0);
+  const [inView, setInView] = useState(false);
   const autoRaf = useRef<number>(0);
   const autoStartTime = useRef(0);
   const t = useTranslations('landing');
@@ -64,8 +65,25 @@ function BeforeAfterSlider({ active }: { active: boolean }) {
     return () => ro.disconnect();
   }, []);
 
+  // Mobile: start/stop via IntersectionObserver instead of active prop
   useEffect(() => {
-    if (!active) { cancelAnimationFrame(autoRaf.current); setSliderPos(50); return; }
+    const el = containerRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setInView(true);
+      } else if (window.innerWidth < 768) {
+        setInView(false);
+      }
+    }, { threshold: 0.1 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  const shouldAnimate = active || inView;
+
+  useEffect(() => {
+    if (!shouldAnimate) { cancelAnimationFrame(autoRaf.current); setSliderPos(50); return; }
     autoStartTime.current = performance.now();
     const HALF = 3500;
     const CYCLE = HALF * 2;
@@ -73,8 +91,8 @@ function BeforeAfterSlider({ active }: { active: boolean }) {
       const elapsed = now - autoStartTime.current;
       let pos: number;
       if (elapsed < HALF) {
-        const t = elapsed / HALF;
-        const ease = 0.5 - 0.5 * Math.cos(t * Math.PI);
+        const easeT = elapsed / HALF;
+        const ease = 0.5 - 0.5 * Math.cos(easeT * Math.PI);
         pos = 50 - ease * 50;
       } else {
         const loopElapsed = (elapsed - HALF) % CYCLE;
@@ -87,10 +105,10 @@ function BeforeAfterSlider({ active }: { active: boolean }) {
     };
     autoRaf.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(autoRaf.current);
-  }, [active]);
+  }, [shouldAnimate]);
 
   return (
-    <div ref={containerRef} className="relative h-full overflow-hidden select-none">
+    <div ref={containerRef} className="relative overflow-hidden select-none" style={{ height: '100%', minHeight: '1px' }}>
       <div className="h-full relative">
         <NextImage src="/Neu.jpg" alt={t('beforeAfter.afterAlt')} fill className="object-cover" sizes="100vw" quality={95} style={{ objectPosition: 'center calc(70% - 4px)' }} priority />
         <div className="absolute inset-0 overflow-hidden" style={{ width: `${sliderPos}%` }}>
@@ -761,103 +779,125 @@ export default function LandingPage() {
           {/* ══════════════════════════════════════════
               3. ORBITAL → RESULTS (internal phases)
               ══════════════════════════════════════════ */}
-          <Slide idx={3} active={activeIdx === 3} className={orbitalPhase === 'results' ? 'bg-black' : 'bg-white text-gray-900'}>
-            <div
-              className="h-full flex items-center justify-center relative overflow-hidden"
-              style={{ cursor: orbitalPhase === 'orbital' ? 'pointer' : 'default' }}
-              onClick={() => { if (orbitalPhase === 'orbital' && !isAnimating.current) expandOrbital(); }}
-            >
-
-              {/* Orbital icons — visible in 'orbital', shrinks in 'shrinking' */}
-              <div
-                className="z-10 flex items-center justify-center pointer-events-none"
-                style={{
-                  opacity: orbitalPhase === 'orbital' ? 1 : 0,
-                  transform: orbitalPhase === 'orbital' ? 'scale(1)' : 'scale(0)',
-                  transition: 'opacity 400ms cubic-bezier(0.65,0,0.35,1), transform 400ms cubic-bezier(0.65,0,0.35,1)',
-                }}
-              >
-                <div className="relative w-[300px] h-[300px] sm:w-[380px] sm:h-[380px] lg:w-[420px] lg:h-[420px]">
-                  <div className="orbital-ring absolute inset-0 rounded-full border border-gray-200/60" />
-                  <div className="orbital-ring-reverse absolute inset-[15%] rounded-full border border-gray-200/40" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <NextImage src="/logo-icon-only.png" alt="Jarvis" width={80} height={80} className="w-14 sm:w-20" />
-                  </div>
-                  <div className="orbital-icons absolute inset-0">
-                    {[Mail, Calendar, FileText, Users, Building2, MessageSquare].map((Icon, i) => {
-                      const angle = (i / 6) * 360 - 90;
-                      const rad = (angle * Math.PI) / 180;
-                      return (
-                        <div
-                          key={i}
-                          className="absolute left-1/2 top-1/2 w-10 h-10 sm:w-12 sm:h-12"
-                          style={{
-                            marginLeft: `${Math.cos(rad) * 46}%`,
-                            marginTop: `${Math.sin(rad) * 46}%`,
-                            transform: 'translate(-50%, -50%)',
-                          }}
-                        >
-                          <div className="orbital-icon-inner w-full h-full rounded-xl flex items-center justify-center bg-white border border-gray-200 shadow-md">
-                            <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+          <Slide idx={3} active={activeIdx === 3} className="bg-black text-white">
+            {isMobile ? (
+              /* ── Mobile: clean vertical layout, no orbital animation ── */
+              <div className="w-full px-5 py-20 text-center">
+                <Stagger active delay={0}>
+                  <p className="text-gray-400 font-semibold text-xs tracking-widest uppercase mb-3">{t('results.sectionLabel')}</p>
+                </Stagger>
+                <Stagger active delay={80}>
+                  <h2 className="text-3xl font-bold tracking-tight mb-4">{t('results.title')}</h2>
+                </Stagger>
+                <Stagger active delay={160}>
+                  <p className="text-sm text-gray-400 max-w-xs mx-auto mb-10">{t('results.subtitle')}</p>
+                </Stagger>
+                <div className="grid grid-cols-2 gap-3 mb-10">
+                  {statItems.map((stat, i) => (
+                    <Stagger key={i} active delay={250 + i * 80} className="p-4 rounded-2xl bg-white/[0.06] border border-white/[0.08] text-center">
+                      <stat.icon className="w-5 h-5 text-gray-400 mx-auto mb-2" />
+                      <div className="text-3xl font-bold mb-1"><AnimatedCounter end={stat.value} suffix={stat.suffix} /></div>
+                      <p className="text-[11px] text-gray-500 leading-tight">{stat.label}</p>
+                    </Stagger>
+                  ))}
                 </div>
-              </div>
-
-              {/* Black rectangle — scales up from center */}
-              <div
-                className="absolute z-20 bg-black pointer-events-none"
-                style={{
-                  inset: orbitalPhase === 'results' ? '0px' : '20px',
-                  transform: orbitalPhase === 'expanding' || orbitalPhase === 'results' ? 'scale(1)' : 'scale(0)',
-                  borderRadius: orbitalPhase === 'results' ? '0px' : '2.5rem',
-                  opacity: 1,
-                  transition: 'transform 700ms cubic-bezier(0.65,0,0.35,1), border-radius 500ms cubic-bezier(0.65,0,0.35,1), inset 500ms cubic-bezier(0.65,0,0.35,1)',
-                }}
-              />
-
-              {/* Results content */}
-              <div
-                className="absolute inset-0 z-30 flex flex-col justify-center px-5 sm:px-10 lg:px-[100px] text-white"
-                style={{
-                  opacity: orbitalPhase === 'expanding' || orbitalPhase === 'results' ? 1 : 0,
-                  transition: 'opacity 600ms cubic-bezier(0.16,1,0.3,1)',
-                  transitionDelay: orbitalPhase === 'expanding' ? '500ms' : '0ms',
-                  pointerEvents: orbitalPhase === 'results' || orbitalPhase === 'expanding' ? 'auto' : 'none',
-                }}
-              >
-                <div className="relative z-10 text-center max-w-4xl mx-auto">
-                  <Stagger active={orbitalPhase === 'expanding' || orbitalPhase === 'results'} delay={0}>
-                    <p className="text-blue-400 font-semibold text-xs sm:text-sm tracking-widest uppercase mb-3 sm:mb-4">{t('results.sectionLabel')}</p>
-                  </Stagger>
-                  <Stagger active={orbitalPhase === 'expanding' || orbitalPhase === 'results'} delay={80}>
-                    <h2 className="text-2xl sm:text-4xl lg:text-5xl font-bold tracking-tight">{t('results.title')}</h2>
-                  </Stagger>
-                  <Stagger active={orbitalPhase === 'expanding' || orbitalPhase === 'results'} delay={160}>
-                    <p className="text-sm sm:text-lg text-gray-400 mt-3 sm:mt-5 max-w-xl mx-auto">{t('results.subtitle')}</p>
-                  </Stagger>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mt-8 sm:mt-12 mb-8 sm:mb-12">
-                    {statItems.map((stat, i) => (
-                      <Stagger key={i} active={orbitalPhase === 'expanding' || orbitalPhase === 'results'} delay={250 + i * 100} className="p-4 sm:p-6 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
-                        <stat.icon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400 mx-auto mb-2 sm:mb-3" />
-                        <div className="text-2xl sm:text-4xl font-bold mb-1"><AnimatedCounter end={stat.value} suffix={stat.suffix} /></div>
-                        <p className="text-[11px] sm:text-sm text-gray-500">{stat.label}</p>
-                      </Stagger>
+                <Stagger active delay={500}>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {['ImmoScout24', 'Willhaben', 'Immowelt', 'Homegate', 'Kleinanzeigen', t('results.morePortals')].map((portal, i) => (
+                      <span key={i} className="px-3 py-1.5 rounded-full text-xs font-medium bg-white/[0.06] text-gray-400 border border-white/[0.08]">{portal}</span>
                     ))}
                   </div>
-                  <Stagger active={orbitalPhase === 'expanding' || orbitalPhase === 'results'} delay={650}>
-                    <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
-                      {['ImmoScout24', 'Willhaben', 'Immowelt', 'Homegate', 'Kleinanzeigen', t('results.morePortals')].map((portal, i) => (
-                        <span key={i} className={`px-3 sm:px-4 py-1.5 rounded-full text-xs font-medium ${i === 5 ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-white/[0.06] text-gray-400 border border-white/[0.08]'}`}>{portal}</span>
+                </Stagger>
+              </div>
+            ) : (
+              /* ── Desktop: orbital animation + expanding black rectangle ── */
+              <div
+                className="h-full flex items-center justify-center relative overflow-hidden"
+                style={{ cursor: orbitalPhase === 'orbital' ? 'pointer' : 'default', background: orbitalPhase === 'results' ? '#000' : '#fff', color: orbitalPhase === 'results' ? '#fff' : '#111', transition: 'background 300ms, color 300ms' }}
+                onClick={() => { if (orbitalPhase === 'orbital' && !isAnimating.current) expandOrbital(); }}
+              >
+                {/* Orbital icons */}
+                <div
+                  className="z-10 flex items-center justify-center pointer-events-none"
+                  style={{
+                    opacity: orbitalPhase === 'orbital' ? 1 : 0,
+                    transform: orbitalPhase === 'orbital' ? 'scale(1)' : 'scale(0)',
+                    transition: 'opacity 400ms cubic-bezier(0.65,0,0.35,1), transform 400ms cubic-bezier(0.65,0,0.35,1)',
+                  }}
+                >
+                  <div className="relative w-[300px] h-[300px] sm:w-[380px] sm:h-[380px] lg:w-[420px] lg:h-[420px]">
+                    <div className="orbital-ring absolute inset-0 rounded-full border border-gray-200/60" />
+                    <div className="orbital-ring-reverse absolute inset-[15%] rounded-full border border-gray-200/40" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <NextImage src="/logo-icon-only.png" alt="Jarvis" width={80} height={80} className="w-14 sm:w-20" />
+                    </div>
+                    <div className="orbital-icons absolute inset-0">
+                      {[Mail, Calendar, FileText, Users, Building2, MessageSquare].map((Icon, i) => {
+                        const angle = (i / 6) * 360 - 90;
+                        const rad = (angle * Math.PI) / 180;
+                        return (
+                          <div key={i} className="absolute left-1/2 top-1/2 w-10 h-10 sm:w-12 sm:h-12" style={{ marginLeft: `${Math.cos(rad) * 46}%`, marginTop: `${Math.sin(rad) * 46}%`, transform: 'translate(-50%, -50%)' }}>
+                            <div className="orbital-icon-inner w-full h-full rounded-xl flex items-center justify-center bg-white border border-gray-200 shadow-md">
+                              <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Black expanding rectangle */}
+                <div
+                  className="absolute z-20 bg-black pointer-events-none"
+                  style={{
+                    inset: orbitalPhase === 'results' ? '0px' : '20px',
+                    transform: orbitalPhase === 'expanding' || orbitalPhase === 'results' ? 'scale(1)' : 'scale(0)',
+                    borderRadius: orbitalPhase === 'results' ? '0px' : '2.5rem',
+                    transition: 'transform 700ms cubic-bezier(0.65,0,0.35,1), border-radius 500ms cubic-bezier(0.65,0,0.35,1), inset 500ms cubic-bezier(0.65,0,0.35,1)',
+                  }}
+                />
+
+                {/* Results content */}
+                <div
+                  className="absolute inset-0 z-30 flex flex-col justify-center px-5 sm:px-10 lg:px-[100px] text-white text-center"
+                  style={{
+                    opacity: orbitalPhase === 'expanding' || orbitalPhase === 'results' ? 1 : 0,
+                    transition: 'opacity 600ms cubic-bezier(0.16,1,0.3,1)',
+                    transitionDelay: orbitalPhase === 'expanding' ? '500ms' : '0ms',
+                    pointerEvents: orbitalPhase === 'results' || orbitalPhase === 'expanding' ? 'auto' : 'none',
+                  }}
+                >
+                  <div className="max-w-4xl mx-auto w-full">
+                    <Stagger active={orbitalPhase === 'expanding' || orbitalPhase === 'results'} delay={0}>
+                      <p className="text-gray-400 font-semibold text-xs sm:text-sm tracking-widest uppercase mb-3 sm:mb-4">{t('results.sectionLabel')}</p>
+                    </Stagger>
+                    <Stagger active={orbitalPhase === 'expanding' || orbitalPhase === 'results'} delay={80}>
+                      <h2 className="text-2xl sm:text-4xl lg:text-5xl font-bold tracking-tight">{t('results.title')}</h2>
+                    </Stagger>
+                    <Stagger active={orbitalPhase === 'expanding' || orbitalPhase === 'results'} delay={160}>
+                      <p className="text-sm sm:text-lg text-gray-400 mt-3 sm:mt-5 max-w-xl mx-auto">{t('results.subtitle')}</p>
+                    </Stagger>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mt-8 sm:mt-12 mb-8 sm:mb-12">
+                      {statItems.map((stat, i) => (
+                        <Stagger key={i} active={orbitalPhase === 'expanding' || orbitalPhase === 'results'} delay={250 + i * 100} className="p-4 sm:p-6 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
+                          <stat.icon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400 mx-auto mb-2 sm:mb-3" />
+                          <div className="text-2xl sm:text-4xl font-bold mb-1"><AnimatedCounter end={stat.value} suffix={stat.suffix} /></div>
+                          <p className="text-[11px] sm:text-sm text-gray-500">{stat.label}</p>
+                        </Stagger>
                       ))}
                     </div>
-                  </Stagger>
+                    <Stagger active={orbitalPhase === 'expanding' || orbitalPhase === 'results'} delay={650}>
+                      <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+                        {['ImmoScout24', 'Willhaben', 'Immowelt', 'Homegate', 'Kleinanzeigen', t('results.morePortals')].map((portal, i) => (
+                          <span key={i} className="px-3 sm:px-4 py-1.5 rounded-full text-xs font-medium bg-white/[0.06] text-gray-400 border border-white/[0.08]">{portal}</span>
+                        ))}
+                      </div>
+                    </Stagger>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </Slide>
 
           {/* ══════════════════════════════════════════
@@ -1103,26 +1143,21 @@ export default function LandingPage() {
           {/* ══════════════════════════════════════════
               9. FOOTER
               ══════════════════════════════════════════ */}
-          <Slide idx={9} active={activeIdx === 9} className="bg-white" fullOnMobile>
+          <Slide idx={9} active={activeIdx === 9} className="bg-white">
             {isMobile ? (
-              /* Mobile: normal flow, "Stress Less" on top, footer below */
-              <div className="flex flex-col min-h-full pt-16 pb-3">
+              /* Mobile: natural flow — no height constraint, no overflow clipping */
+              <div className="flex flex-col" style={{ paddingTop: '5rem', paddingBottom: '10px' }}>
                 {/* Stress Less text */}
-                <div className="flex-1 flex items-center justify-center pointer-events-none py-8">
+                <div className="flex items-center justify-center pointer-events-none py-10">
                   <h2
                     className="text-[22vw] font-bold tracking-tighter leading-[0.85] text-center select-none"
-                    style={{
-                      background: 'linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.2) 70%, transparent 100%)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      backgroundClip: 'text',
-                    }}
+                    style={{ color: '#cacaca' }}
                   >
                     Stress Less
                   </h2>
                 </div>
                 {/* Footer */}
-                <div className="overflow-hidden mx-auto w-full" style={{ maxWidth: 'calc(100vw - 20px)' }}>
+                <div className="mx-auto w-full" style={{ maxWidth: 'calc(100vw - 20px)' }}>
                   <PublicFooter bare />
                 </div>
               </div>
@@ -1133,7 +1168,7 @@ export default function LandingPage() {
                   <h2
                     className="text-[16vw] lg:text-[13vw] font-bold tracking-tighter leading-[0.85] text-center select-none"
                     style={{
-                      background: 'linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.07) 60%, transparent 100%)',
+                      backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.07) 60%, transparent 100%)',
                       WebkitBackgroundClip: 'text',
                       WebkitTextFillColor: 'transparent',
                       backgroundClip: 'text',
