@@ -381,8 +381,6 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const isMobile = window.matchMedia('(max-width: 768px)').matches;
-    if (isMobile) return;
 
     const COOLDOWN = TRANSITION_MS + 500;
 
@@ -391,65 +389,54 @@ export default function LandingPage() {
       setTimeout(() => { isAnimating.current = false; }, COOLDOWN);
     };
 
+    const navigateDown = () => {
+      if (activeIdxRef.current === 0) { triggerHeroReveal(); return; }
+      if (activeIdxRef.current === 3 && orbitalPhaseRef.current === 'orbital') { expandOrbital(); return; }
+      if (activeIdxRef.current === 4 && featureStepRef.current < FEATURE_MAX_STEP) { lock(); setFeatureStep(prev => prev + 1); return; }
+      lock();
+      setActiveIdx(prev => Math.min(SECTION_COUNT - 1, prev + 1));
+    };
+
+    const navigateUp = () => {
+      if (activeIdxRef.current === 1) { triggerHeroRewind(); return; }
+      if (activeIdxRef.current === 3 && orbitalPhaseRef.current === 'results') { collapseOrbital(); return; }
+      if (activeIdxRef.current === 4 && featureStepRef.current > 0) { lock(); setFeatureStep(prev => prev - 1); return; }
+      lock();
+      setActiveIdx(prev => Math.max(0, prev - 1));
+    };
+
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       if (isAnimating.current) return;
       if (Math.abs(e.deltaY) < 5) return;
-      if (e.deltaY > 0 && activeIdxRef.current === 0) {
-        triggerHeroReveal();
-        return;
-      }
-      if (e.deltaY < 0 && activeIdxRef.current === 1) {
-        triggerHeroRewind();
-        return;
-      }
-      if (e.deltaY > 0 && activeIdxRef.current === 3 && orbitalPhaseRef.current === 'orbital') {
-        expandOrbital();
-        return;
-      }
-      if (e.deltaY < 0 && activeIdxRef.current === 3 && orbitalPhaseRef.current === 'results') {
-        collapseOrbital();
-        return;
-      }
-      if (e.deltaY > 0 && activeIdxRef.current === 4 && featureStepRef.current < FEATURE_MAX_STEP) {
-        lock();
-        setFeatureStep(prev => prev + 1);
-        return;
-      }
-      if (e.deltaY < 0 && activeIdxRef.current === 4 && featureStepRef.current > 0) {
-        lock();
-        setFeatureStep(prev => prev - 1);
-        return;
-      }
-      const dir = e.deltaY > 0 ? 1 : -1;
-      lock();
-      setActiveIdx(prev => Math.max(0, Math.min(SECTION_COUNT - 1, prev + dir)));
+      if (e.deltaY > 0) navigateDown(); else navigateUp();
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (isAnimating.current) return;
-      if (e.key === 'ArrowDown' || e.key === 'PageDown') {
-        e.preventDefault();
-        if (activeIdxRef.current === 0) { triggerHeroReveal(); return; }
-        if (activeIdxRef.current === 3 && orbitalPhaseRef.current === 'orbital') { expandOrbital(); return; }
-        if (activeIdxRef.current === 4 && featureStepRef.current < FEATURE_MAX_STEP) { lock(); setFeatureStep(prev => prev + 1); return; }
-        lock();
-        setActiveIdx(prev => Math.min(SECTION_COUNT - 1, prev + 1));
-      } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
-        e.preventDefault();
-        if (activeIdxRef.current === 1) { triggerHeroRewind(); return; }
-        if (activeIdxRef.current === 3 && orbitalPhaseRef.current === 'results') { collapseOrbital(); return; }
-        if (activeIdxRef.current === 4 && featureStepRef.current > 0) { lock(); setFeatureStep(prev => prev - 1); return; }
-        lock();
-        setActiveIdx(prev => Math.max(0, prev - 1));
-      }
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); navigateDown(); }
+      else if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); navigateUp(); }
+    };
+
+    // Touch swipe
+    let touchStartY = 0;
+    const onTouchStart = (e: TouchEvent) => { touchStartY = e.touches[0].clientY; };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (isAnimating.current) return;
+      const delta = touchStartY - e.changedTouches[0].clientY;
+      if (Math.abs(delta) < 50) return;
+      if (delta > 0) navigateDown(); else navigateUp();
     };
 
     window.addEventListener('wheel', onWheel, { passive: false });
     window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchend', onTouchEnd, { passive: true });
     return () => {
       window.removeEventListener('wheel', onWheel);
       window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchend', onTouchEnd);
     };
   }, [SECTION_COUNT, TRANSITION_MS, triggerHeroReveal, triggerHeroRewind, expandOrbital, collapseOrbital]);
 
@@ -522,22 +509,21 @@ export default function LandingPage() {
           .feat-card { aspect-ratio: auto; min-height: 180px; padding: 22px; border-radius: 16px; }
         }
 
-        /* Desktop: snap track */
-        @media (min-width: 769px) {
-          .snap-outer {
-            height: 100vh; overflow: hidden; position: relative;
-          }
-          .snap-track {
-            transition: transform ${TRANSITION_MS}ms cubic-bezier(0.65, 0, 0.35, 1);
-            will-change: transform;
-          }
+        /* Snap system — same on all screen sizes */
+        .snap-outer {
+          height: 100dvh; overflow: hidden; position: relative;
+        }
+        .snap-track {
+          transition: transform ${TRANSITION_MS}ms cubic-bezier(0.65, 0, 0.35, 1);
+          will-change: transform;
+        }
+        .snap-slide {
+          height: 100dvh !important;
         }
 
-        /* Mobile: normal scroll */
+        /* Mobile tweaks */
         @media (max-width: 768px) {
-          .snap-outer { height: auto; overflow: visible; }
-          .snap-track { transform: none !important; }
-          .snap-slide { height: auto !important; min-height: auto; }
+          .feat-card { aspect-ratio: auto; min-height: 0; }
         }
 
         .glass-card-hover { transition: transform 0.3s, box-shadow 0.3s; }
@@ -551,7 +537,7 @@ export default function LandingPage() {
       <div className="snap-outer">
         <div
           className="snap-track"
-          style={{ transform: `translateY(-${activeIdx * 100}vh)` }}
+          style={{ transform: `translateY(calc(-${activeIdx} * 100dvh))` }}
         >
 
           {/* ══════════════════════════════════════════
@@ -839,15 +825,9 @@ export default function LandingPage() {
                       <div key={groupIdx} className="w-full flex-shrink-0 px-6 sm:px-12 lg:px-20">
                         <div className={`grid gap-3 sm:gap-4 ${isCentered ? 'grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 max-w-6xl mx-auto'}`}>
                           {groupItems.map((f, i) => (
+                            <Stagger key={i} active={activeIdx === 4} delay={300 + i * 80}>
                             <div
-                              key={i}
                               className="feat-card"
-                              style={{
-                                opacity: activeIdx === 4 ? 1 : 0,
-                                transform: activeIdx === 4 ? 'none' : 'translateX(40px)',
-                                transition: `opacity 500ms ease, transform 500ms ease`,
-                                transitionDelay: activeIdx === 4 ? `${300 + i * 80}ms` : '0ms',
-                              }}
                             >
                               <f.icon className="w-7 h-7 sm:w-8 sm:h-8 text-gray-800" strokeWidth={1.5} />
                               <div>
@@ -855,6 +835,7 @@ export default function LandingPage() {
                                 <p className="text-xs sm:text-[13px] text-gray-500 leading-relaxed line-clamp-2">{f.desc}</p>
                               </div>
                             </div>
+                            </Stagger>
                           ))}
                         </div>
                       </div>
@@ -961,38 +942,54 @@ export default function LandingPage() {
               ══════════════════════════════════════════ */}
           <Slide idx={7} active={activeIdx === 7} className="bg-white text-gray-900">
             <div className="h-full flex items-center justify-center px-5 sm:px-8 lg:px-12 py-6">
-              <div className="w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-14 items-center">
+              {/* Mobile: compact text + CTA only (DemoBooking is too tall) */}
+              <div className="lg:hidden w-full max-w-lg mx-auto flex flex-col items-center text-center gap-5">
+                <Stagger active={activeIdx === 7} delay={0}>
+                  <p className="text-blue-600 font-semibold text-[10px] tracking-widest uppercase">{t('demo.badge')}</p>
+                </Stagger>
+                <Stagger active={activeIdx === 7} delay={80}>
+                  <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight">
+                    {t.rich('demo.title', { bold: (chunks) => <strong>{chunks}</strong> })}
+                  </h2>
+                </Stagger>
+                <Stagger active={activeIdx === 7} delay={160}>
+                  <p className="text-sm text-gray-500 leading-relaxed max-w-sm">{t('demo.subtitle')}</p>
+                </Stagger>
+                <Stagger active={activeIdx === 7} delay={240}>
+                  <Link href="/demo" className="inline-flex items-center gap-2 px-7 py-3.5 bg-gray-900 text-white text-sm font-semibold rounded-full hover:bg-gray-700 transition-colors">
+                    {t('demo.cta')}<ArrowRight className="w-4 h-4" />
+                  </Link>
+                </Stagger>
+              </div>
 
-                {/* Left: Text */}
-                <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
+              {/* Desktop: two-column with booking widget */}
+              <div className="hidden lg:grid w-full max-w-6xl mx-auto grid-cols-2 gap-14 items-center">
+                <div className="flex flex-col items-start text-left">
                   <Stagger active={activeIdx === 7} delay={0}>
-                    <p className="text-blue-600 font-semibold text-[10px] sm:text-xs tracking-widest uppercase mb-2">{t('demo.badge')}</p>
+                    <p className="text-blue-600 font-semibold text-xs tracking-widest uppercase mb-2">{t('demo.badge')}</p>
                   </Stagger>
                   <Stagger active={activeIdx === 7} delay={80}>
-                    <h2 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold tracking-tight leading-tight mb-3">
+                    <h2 className="text-4xl xl:text-5xl font-bold tracking-tight leading-tight mb-3">
                       {t.rich('demo.title', { bold: (chunks) => <strong>{chunks}</strong> })}
                     </h2>
                   </Stagger>
                   <Stagger active={activeIdx === 7} delay={160}>
-                    <p className="text-xs sm:text-sm lg:text-base text-gray-500 leading-relaxed mb-5 max-w-md">{t('demo.subtitle')}</p>
+                    <p className="text-base text-gray-500 leading-relaxed mb-5 max-w-md">{t('demo.subtitle')}</p>
                   </Stagger>
-                  <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2">
+                  <div className="flex flex-wrap items-center justify-start gap-2">
                     {[t('demo.feature1'), t('demo.feature2'), t('demo.feature3'), t('demo.feature4')].map((item, i) => (
                       <Stagger key={i} active={activeIdx === 7} delay={240 + i * 60}>
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200/60">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                          <span className="text-gray-600 text-xs sm:text-sm">{item}</span>
+                          <span className="text-gray-600 text-sm">{item}</span>
                         </div>
                       </Stagger>
                     ))}
                   </div>
                 </div>
-
-                {/* Right: Booking widget */}
                 <Stagger active={activeIdx === 7} delay={300} className="w-full">
                   <DemoBooking />
                 </Stagger>
-
               </div>
             </div>
           </Slide>
