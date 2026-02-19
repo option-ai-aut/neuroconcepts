@@ -127,7 +127,7 @@ export class ImmivoStack extends cdk.Stack {
         // Test: private subnet → Lambda is in VPC → no public IP needed.
         publiclyAccessible: props.stageName === 'dev',
         storageEncrypted: true,
-        removalPolicy: cdk.RemovalPolicy.DESTROY,
+        removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
       });
       this.dbEndpoint = instance.dbInstanceEndpointAddress;
     } else {
@@ -393,7 +393,8 @@ export class ImmivoStack extends cdk.Stack {
     const allowedStreamOrigins = [
       'https://dev.immivo.ai', 'https://test.immivo.ai',
       'https://app.immivo.ai', 'https://immivo.ai',
-      'https://admin.immivo.ai', 'http://localhost:3000',
+      'https://admin.immivo.ai',
+      ...(props.stageName === 'dev' ? ['http://localhost:3000'] : []),
     ];
     const functionUrl = orchestratorLambda.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,

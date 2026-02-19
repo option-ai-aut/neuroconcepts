@@ -3,9 +3,9 @@ import { fetchAuthSession } from 'aws-amplify/auth';
 
 export const getApiUrl = () => {
   const config = getRuntimeConfig();
-  const url = config.apiUrl || 'https://lcbsl3olre.execute-api.eu-central-1.amazonaws.com/dev';
-  // Remove trailing slash to prevent double slashes
-  return url.replace(/\/+$/, '');
+  // Never fall back to a hardcoded URL — returning empty string causes the fetch
+  // to fail visibly (404 from Next.js) rather than silently hitting the wrong stage.
+  return (config.apiUrl || '').replace(/\/+$/, '');
 };
 
 /**

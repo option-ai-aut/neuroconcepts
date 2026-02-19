@@ -1212,7 +1212,9 @@ setInterval(() => {
 app.get('/billing/subscription', authMiddleware, billingRateLimitMiddleware, async (req: any, res) => {
   try {
     const db = prisma || (await initializePrisma());
-    const settings = await db.tenantSettings.findUnique({ where: { tenantId: req.user.tenantId } });
+    const currentUser = await db.user.findUnique({ where: { id: req.user.sub } });
+    if (!currentUser) return res.status(404).json({ error: 'User not found' });
+    const settings = await db.tenantSettings.findUnique({ where: { tenantId: currentUser.tenantId } });
     const cfg = (settings?.stripeConfig || {}) as StripeConfig;
 
     const trialEndsAt = cfg.trialEndsAt ?? null;
@@ -1273,7 +1275,9 @@ app.get('/billing/invoices', authMiddleware, billingRateLimitMiddleware, async (
     if (!BILLING_ENABLED) return res.json([]);
 
     const db = prisma || (await initializePrisma());
-    const settings = await db.tenantSettings.findUnique({ where: { tenantId: req.user.tenantId } });
+    const currentUser = await db.user.findUnique({ where: { id: req.user.sub } });
+    if (!currentUser) return res.status(404).json({ error: 'User not found' });
+    const settings = await db.tenantSettings.findUnique({ where: { tenantId: currentUser.tenantId } });
     const cfg = (settings?.stripeConfig || {}) as StripeConfig;
 
     if (!cfg.customerId) return res.json([]);
@@ -1304,7 +1308,9 @@ app.post('/billing/checkout', authMiddleware, billingRateLimitMiddleware, valida
     const { plan, billingCycle } = req.body as { plan: 'solo' | 'team'; billingCycle: BillingCycle };
 
     const db = prisma || (await initializePrisma());
-    const settings = await db.tenantSettings.findUnique({ where: { tenantId: req.user.tenantId } });
+    const currentUser = await db.user.findUnique({ where: { id: req.user.sub } });
+    if (!currentUser) return res.status(404).json({ error: 'User not found' });
+    const settings = await db.tenantSettings.findUnique({ where: { tenantId: currentUser.tenantId } });
     const cfg = (settings?.stripeConfig || {}) as StripeConfig;
 
     const stripe = getStripe();
@@ -1316,17 +1322,17 @@ app.post('/billing/checkout', authMiddleware, billingRateLimitMiddleware, valida
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${frontendUrl}/dashboard/settings/billing?session_id={CHECKOUT_SESSION_ID}&success=1`,
       cancel_url: `${frontendUrl}/pricing`,
-      metadata: { tenantId: req.user.tenantId, plan, billingCycle },
+      metadata: { tenantId: currentUser.tenantId, plan, billingCycle },
       allow_promotion_codes: true,
     };
 
     if (cfg.customerId) {
       sessionParams.customer = cfg.customerId;
     } else {
-      sessionParams.customer_email = req.user.email;
+      sessionParams.customer_email = currentUser.email;
     }
 
-    const idempotencyKey = checkoutIdempotencyKey(req.user.tenantId, plan, billingCycle);
+    const idempotencyKey = checkoutIdempotencyKey(currentUser.tenantId, plan, billingCycle);
     const session = await stripe.checkout.sessions.create(sessionParams, {
       idempotencyKey,
     });
@@ -1345,7 +1351,9 @@ app.post('/billing/portal', authMiddleware, billingRateLimitMiddleware, async (r
     }
 
     const db = prisma || (await initializePrisma());
-    const settings = await db.tenantSettings.findUnique({ where: { tenantId: req.user.tenantId } });
+    const currentUser = await db.user.findUnique({ where: { id: req.user.sub } });
+    if (!currentUser) return res.status(404).json({ error: 'User not found' });
+    const settings = await db.tenantSettings.findUnique({ where: { tenantId: currentUser.tenantId } });
     const cfg = (settings?.stripeConfig || {}) as StripeConfig;
 
     if (!cfg.customerId) {
@@ -1374,7 +1382,9 @@ app.delete('/billing/subscription', authMiddleware, billingRateLimitMiddleware, 
     }
 
     const db = prisma || (await initializePrisma());
-    const settings = await db.tenantSettings.findUnique({ where: { tenantId: req.user.tenantId } });
+    const currentUser = await db.user.findUnique({ where: { id: req.user.sub } });
+    if (!currentUser) return res.status(404).json({ error: 'User not found' });
+    const settings = await db.tenantSettings.findUnique({ where: { tenantId: currentUser.tenantId } });
     const cfg = (settings?.stripeConfig || {}) as StripeConfig;
 
     if (!cfg.subscriptionId) {
@@ -3212,9 +3222,14 @@ app.post('/messages/:id/send', authMiddleware, async (req, res) => {
 // --- Template Management ---
 // POST /templates/render - Render a template (requires auth)
 app.post('/templates/render', authMiddleware, (req, res) => {
-  const { templateBody, context } = req.body;
-  const result = TemplateService.render(templateBody, context);
-  res.json({ result });
+  try {
+    const { templateBody, context } = req.body;
+    const result = TemplateService.render(templateBody, context);
+    res.json({ result });
+  } catch (error) {
+    console.error('[Templates] render error:', error);
+    res.status(500).json({ error: 'Template render failed' });
+  }
 });
 
 // --- Exposé Templates ---
@@ -10413,7 +10428,10 @@ app.get('/admin/finance/tenant-costs', adminAuthMiddleware, async (_req, res) =>
 // GET /leads/:id/prediction — Conversion prediction for a lead
 app.get('/leads/:id/prediction', authMiddleware, async (req: any, res) => {
   try {
-    const prediction = await PredictiveService.predictConversion(req.params.id, req.user.tenantId);
+    const db = prisma || (await initializePrisma());
+    const currentUser = await db.user.findUnique({ where: { id: req.user.sub } });
+    if (!currentUser) return res.status(404).json({ error: 'User not found' });
+    const prediction = await PredictiveService.predictConversion(req.params.id, currentUser.tenantId);
     res.json(prediction);
   } catch (error: any) {
     console.error('Prediction error:', error.message);
@@ -10424,7 +10442,10 @@ app.get('/leads/:id/prediction', authMiddleware, async (req: any, res) => {
 // GET /analytics/contact-time — Optimal contact time prediction
 app.get('/analytics/contact-time', authMiddleware, async (req: any, res) => {
   try {
-    const prediction = await PredictiveService.predictContactTime(req.user.tenantId);
+    const db = prisma || (await initializePrisma());
+    const currentUser = await db.user.findUnique({ where: { id: req.user.sub } });
+    if (!currentUser) return res.status(404).json({ error: 'User not found' });
+    const prediction = await PredictiveService.predictContactTime(currentUser.tenantId);
     res.json(prediction);
   } catch (error: any) {
     res.status(500).json({ error: 'Internal Server Error' });
@@ -10434,8 +10455,11 @@ app.get('/analytics/contact-time', authMiddleware, async (req: any, res) => {
 // POST /analytics/price-estimate — Property price estimation
 app.post('/analytics/price-estimate', authMiddleware, express.json(), async (req: any, res) => {
   try {
+    const db = prisma || (await initializePrisma());
+    const currentUser = await db.user.findUnique({ where: { id: req.user.sub } });
+    if (!currentUser) return res.status(404).json({ error: 'User not found' });
     const estimation = await PredictiveService.estimatePrice({
-      tenantId: req.user.tenantId,
+      tenantId: currentUser.tenantId,
       ...req.body,
     });
     res.json(estimation);
