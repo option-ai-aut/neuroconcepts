@@ -10550,6 +10550,7 @@ async function verifyToken(authHeader: string | undefined): Promise<any> {
 // Direct streaming handler for POST /chat/stream (bypasses serverless-http buffering)
 async function handleStreamingChat(event: any, responseStream: any): Promise<void> {
   const awslambda = (globalThis as any).awslambda;
+  let headersStarted = false;
   const writeSse = (data: any) => { responseStream.write(`data: ${JSON.stringify(data)}\n\n`); };
 
   // CORS headers
@@ -10569,13 +10570,15 @@ async function handleStreamingChat(event: any, responseStream: any): Promise<voi
     const currentUser = await db.user.findUnique({ where: { email: payload.email } });
     if (!currentUser) {
       responseStream = awslambda.HttpResponseStream.from(responseStream, { statusCode: 401, headers: corsHeaders });
+      headersStarted = true;
       writeSse({ error: 'Unauthorized' });
-      responseStream.end();
+      (responseStream as any).end?.();
       return;
     }
 
     // Start SSE response
     responseStream = awslambda.HttpResponseStream.from(responseStream, { statusCode: 200, headers: corsHeaders });
+    headersStarted = true;
 
     const tenantId = currentUser.tenantId;
     const userId = currentUser.id;
@@ -10587,7 +10590,7 @@ async function handleStreamingChat(event: any, responseStream: any): Promise<voi
       const usedUsd = (costCheck.currentCostCents / 100).toFixed(2);
       writeSse({ chunk: `⚠️ Das monatliche KI-Budget deines Teams ist erreicht ($${usedUsd} / $${capUsd}).` });
       writeSse({ done: true });
-      responseStream.end();
+      (responseStream as any).end?.();
       return;
     }
 
@@ -10666,15 +10669,15 @@ async function handleStreamingChat(event: any, responseStream: any): Promise<voi
   } catch (err: any) {
     console.error('Streaming chat error:', err);
     try {
-      // If headers not sent yet, set them now
-      if (!responseStream.headersSent) {
+      // If headers not sent yet, set them now (headersSent doesn't exist on Lambda streams — check via flag)
+      if (!headersStarted) {
         const awslambda2 = (globalThis as any).awslambda;
         responseStream = awslambda2.HttpResponseStream.from(responseStream, { statusCode: 500, headers: corsHeaders });
       }
       writeSse({ error: 'AI Error' });
     } catch {}
   }
-  responseStream.end();
+  (responseStream as any).end?.();
 }
 
 // Lambda handler: streams /chat/stream via Function URL, delegates rest to serverless-http
