@@ -11,7 +11,7 @@ export default function PublicFooter({ bare = false }: { bare?: boolean }) {
   const nav = useTranslations('publicNav');
 
   const footer = (
-    <footer className="bg-[#111111] text-white py-12 md:py-16 rounded-2xl sm:rounded-3xl">
+    <footer className="bg-[#111111] text-white py-8 md:py-16 rounded-2xl sm:rounded-3xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 md:gap-12 mb-8 md:mb-12">
           <div className="col-span-2">
@@ -63,19 +63,23 @@ export default function PublicFooter({ bare = false }: { bare?: boolean }) {
           </div>
         </div>
 
-        <div className="pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-gray-500 text-center md:text-left">{t('copyright')}</p>
-          <div className="flex items-center gap-4">
+        <div className="pt-8 border-t border-gray-800 flex flex-col gap-4">
+          {/* Badges row */}
+          <div className="flex flex-wrap items-center justify-center md:justify-between gap-x-5 gap-y-3">
             <LanguageSwitcher variant="footer" />
-            <div className="flex items-center gap-1.5 text-sm text-gray-500">
-              <Lock className="w-3.5 h-3.5" />
-              {t('securePayment')}
-            </div>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <span className="flex w-2 h-2 bg-green-500 rounded-full"></span>
-              {t('systemsOperational')}
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+              <div className="flex items-center gap-1.5 text-sm text-gray-500">
+                <Lock className="w-3.5 h-3.5 flex-shrink-0" />
+                {t('securePayment')}
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <span className="flex w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></span>
+                {t('systemsOperational')}
+              </div>
             </div>
           </div>
+          {/* Copyright always at bottom */}
+          <p className="text-xs text-gray-600 text-center">{t('copyright')}</p>
         </div>
       </div>
     </footer>

@@ -27,6 +27,14 @@ body {
   background-color: #ffffff;
 }
 
+/* Overscroll background (rubber-band effect on iOS) follows system preference */
+@media (prefers-color-scheme: dark) {
+  html, body { background-color: #000000; }
+}
+@media (prefers-color-scheme: light) {
+  html, body { background-color: #ffffff; }
+}
+
 /* Lock viewport for app shells (dashboard/admin) — prevents iOS Safari bounce.
    Applied via .app-shell class on the layout root element. */
 html:has(.app-shell) {

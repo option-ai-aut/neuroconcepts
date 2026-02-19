@@ -137,10 +137,10 @@ const S_ALT = 'bg-[#0d1117]';
 /* ═══════════════════════════════════════════════
    SECTION WRAPPER — each slide is 100vh
    ═══════════════════════════════════════════════ */
-function Slide({ children, className = '', active: _active, idx }: { children: React.ReactNode; className?: string; active: boolean; idx: number }) {
+function Slide({ children, className = '', active: _active, idx, fullOnMobile = false }: { children: React.ReactNode; className?: string; active: boolean; idx: number; fullOnMobile?: boolean }) {
   return (
     <section
-      className={`snap-slide h-screen w-full flex-shrink-0 relative overflow-hidden ${className}`}
+      className={`snap-slide w-full flex-shrink-0 relative overflow-hidden ${fullOnMobile ? 'snap-fullscreen' : ''} ${className}`}
       data-idx={idx}
     >
       <div className="h-full">
@@ -565,8 +565,15 @@ export default function LandingPage() {
         @media (max-width: 767px) {
           .snap-outer { height: auto !important; overflow: visible !important; }
           .snap-track { transform: none !important; transition: none !important; }
-          /* Keep each section fullscreen so layout looks clean */
-          .snap-slide { height: 100svh !important; }
+
+          /* Most sections: auto height, nav-aware padding */
+          .snap-slide { height: auto !important; }
+          .snap-slide > div { height: auto !important; min-height: 0 !important; padding-top: 80px; padding-bottom: 48px; }
+
+          /* Hero + Footer slide: keep full viewport height for absolute-positioned elements */
+          .snap-fullscreen { height: 100svh !important; }
+          .snap-fullscreen > div { height: 100% !important; min-height: 0 !important; padding: 0 !important; }
+
           /* Remove all entry animations on mobile */
           .hero-el {
             opacity: 1 !important;
@@ -580,6 +587,13 @@ export default function LandingPage() {
             transition: none !important;
           }
           .feat-card { aspect-ratio: auto; min-height: 0; padding: 20px; border-radius: 14px; }
+
+          /* Before/After slider: 4:3 landscape on mobile, no 4px offset */
+          .before-after-wrap { height: auto !important; aspect-ratio: 4 / 3 !important; }
+          .before-after-wrap img { object-position: center 60% !important; }
+
+          /* Hero: nudge content down so nav doesn't cover it */
+          .snap-fullscreen .hero-go { padding-top: 4rem !important; }
         }
 
         .glass-card-hover { transition: transform 0.3s, box-shadow 0.3s; }
@@ -599,7 +613,7 @@ export default function LandingPage() {
           {/* ══════════════════════════════════════════
               0. HERO
               ══════════════════════════════════════════ */}
-          <Slide idx={0} active={activeIdx === 0} className={S_DARK}>
+          <Slide idx={0} active={activeIdx === 0} className={S_DARK} fullOnMobile>
             <div className="h-full flex items-center justify-center relative">
               {/* Video background — poster visible initially, plays on scroll */}
               <div className="absolute inset-0 z-0 overflow-hidden">
@@ -941,7 +955,7 @@ export default function LandingPage() {
 
               {/* Image — edge to edge with 10px padding on each side */}
               <Stagger active={activeIdx === 5} delay={250} className="w-full px-[10px]">
-                <div className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden" style={{ height: 'clamp(200px, calc(100dvh - 200px), 560px)' }}>
+                <div className="before-after-wrap relative w-full rounded-2xl sm:rounded-3xl overflow-hidden" style={{ height: 'clamp(200px, calc(100dvh - 200px), 560px)' }}>
                   <BeforeAfterSlider active={activeIdx === 5} />
                   {/* Stat tag */}
                   <div
@@ -1089,7 +1103,7 @@ export default function LandingPage() {
           {/* ══════════════════════════════════════════
               9. FOOTER
               ══════════════════════════════════════════ */}
-          <Slide idx={9} active={activeIdx === 9} className="bg-white">
+          <Slide idx={9} active={activeIdx === 9} className="bg-white" fullOnMobile>
             <div className="h-full relative overflow-hidden">
               {/* Large text — overlaps with footer top edge */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ paddingBottom: '28vh' }}>

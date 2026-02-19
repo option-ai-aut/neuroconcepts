@@ -80,9 +80,13 @@ export class ImmivoStack extends cdk.Stack {
       allowAllOutbound: false,
     });
 
-    // Dev: restrict to known developer IPs instead of 0.0.0.0/0
-    // Set DEV_ALLOWED_IPS as comma-separated CIDRs in cdk.context.json or via -c flag
+    // Dev: Lambda lives outside the VPC → DB must be publicly accessible.
+    // Allow all IPs on port 5432 so Lambda (which has no fixed IP) can connect.
+    // The auto-generated RDS password is the only protection needed for a dev DB.
+    // Set devAllowedIps in cdk.context.json (comma-separated CIDRs) to additionally
+    // restrict developer direct access (psql, DataGrip, etc.).
     if (props.stageName === 'dev') {
+      dbSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(5432), 'Dev: allow Lambda (outside VPC) and developers from internet');
       const devIps = this.node.tryGetContext('devAllowedIps') as string || '';
       if (devIps) {
         for (const cidr of devIps.split(',').map((s: string) => s.trim()).filter(Boolean)) {
@@ -91,7 +95,7 @@ export class ImmivoStack extends cdk.Stack {
       }
     }
     
-    // Allow Lambda (same SG) to reach the database
+    // Allow Lambda (same SG) to reach the database (used on test/prod where Lambda is in VPC)
     dbSg.addIngressRule(dbSg, ec2.Port.tcp(5432), 'Allow Lambda to reach DB (self-referencing)');
 
     if (props.stageName === 'dev' || props.stageName === 'test') {
@@ -104,7 +108,10 @@ export class ImmivoStack extends cdk.Stack {
         maxAllocatedStorage: 50,
         credentials: rds.Credentials.fromSecret(this.dbSecret),
         securityGroups: [dbSg],
-        publiclyAccessible: false,
+        // Dev: publiclyAccessible=true gives the instance a public IP so the
+        // Lambda (which runs outside the VPC) can reach it over the internet.
+        // Test: private subnet → Lambda is in VPC → no public IP needed.
+        publiclyAccessible: props.stageName === 'dev',
         storageEncrypted: true,
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       });

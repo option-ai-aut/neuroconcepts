@@ -17,6 +17,29 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
   const defaultDark = currentPage === 'home' || currentPage === 'about';
   const [isDark, setIsDark] = useState(defaultDark);
 
+  // System dark mode detection (for mobile)
+  const [systemDark, setSystemDark] = useState(false);
+  const [isMobileWidth, setIsMobileWidth] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    setSystemDark(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  useEffect(() => {
+    const check = () => setIsMobileWidth(window.innerWidth < 1024);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  // On mobile: follow system dark/light preference
+  // On desktop: follow page-based theme (data-nav-theme or page type)
+  const effectiveDark = isMobileWidth ? systemDark : isDark;
+
   useEffect(() => {
     if (mobileMenuOpen) {
       document.body.style.overflow = 'hidden';
@@ -53,30 +76,31 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
     }
   };
 
-  const textClass = isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900';
-  const activeTextClass = isDark ? 'text-white font-semibold' : 'text-gray-900 font-semibold';
-  const iconClass = isDark ? 'text-gray-300' : 'text-gray-600';
-  const borderClass = isDark ? 'border-white/[0.04]' : 'border-black/[0.06]';
-  const ctaBg = isDark
+  // Desktop nav uses effectiveDark (= isDark on desktop, systemDark on mobile)
+  const textClass = effectiveDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900';
+  const activeTextClass = effectiveDark ? 'text-white font-semibold' : 'text-gray-900 font-semibold';
+  const iconClass = effectiveDark ? 'text-gray-300' : 'text-gray-600';
+  const borderClass = effectiveDark ? 'border-white/[0.04]' : 'border-black/[0.06]';
+  const ctaBg = effectiveDark
     ? 'bg-white text-gray-900 hover:bg-gray-100 hover:shadow-white/10'
     : 'bg-gray-900 text-white hover:bg-gray-800 hover:shadow-black/10';
-  const logoFilter = isDark ? 'none' : 'invert(1)';
+  const logoFilter = effectiveDark ? 'none' : 'invert(1)';
   const dropdownBg = 'backdrop-blur-xl border-white/10';
   const dropdownStyle = { background: 'rgba(15,15,15,0.95)' };
   const dropdownText = 'text-gray-300 hover:bg-white/10 hover:text-white';
 
-  const navBg = isDark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.75)';
+  const navBg = effectiveDark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.75)';
 
-  // Mobile menu — adapts to background
-  const menuBg = isDark ? 'rgba(10,10,10,0.88)' : 'rgba(248,248,248,0.88)';
-  const menuBorder = isDark ? 'border-white/[0.08]' : 'border-black/[0.06]';
-  const menuText = isDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900';
-  const menuActive = isDark ? 'text-white font-semibold' : 'text-gray-900 font-semibold';
-  const menuLabel = isDark ? 'text-gray-500' : 'text-gray-400';
-  const menuSignIn = isDark
+  // Mobile menu — follows system preference on mobile
+  const menuBg = effectiveDark ? 'rgba(10,10,10,0.88)' : 'rgba(248,248,248,0.88)';
+  const menuBorder = effectiveDark ? 'border-white/[0.08]' : 'border-black/[0.06]';
+  const menuText = effectiveDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900';
+  const menuActive = effectiveDark ? 'text-white font-semibold' : 'text-gray-900 font-semibold';
+  const menuLabel = effectiveDark ? 'text-gray-500' : 'text-gray-400';
+  const menuSignIn = effectiveDark
     ? 'text-gray-300 border-white/20 hover:bg-white/5'
     : 'text-gray-700 border-black/10 hover:bg-black/5';
-  const menuSignUp = isDark
+  const menuSignUp = effectiveDark
     ? 'bg-white text-gray-900 hover:bg-gray-100'
     : 'bg-gray-900 text-white hover:bg-gray-800';
 
@@ -167,7 +191,7 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
           </div>
 
           <button 
-            className={`lg:hidden p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+            className={`lg:hidden p-2 rounded-lg transition-colors ${effectiveDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             {mobileMenuOpen ? <X className={`w-6 h-6 ${iconClass}`} /> : <Menu className={`w-6 h-6 ${iconClass}`} />}
