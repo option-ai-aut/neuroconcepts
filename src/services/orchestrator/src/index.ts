@@ -10680,61 +10680,45 @@ async function handleStreamingChat(event: any, responseStream: any): Promise<voi
   (responseStream as any).end?.();
 }
 
-// Lambda handler: streamifyResponse must wrap the EXPORTED handler so Lambda provides responseStream.
-// Calling streamifyResponse(cb)(event, context) inside a regular handler does NOT work —
-// Lambda only provides responseStream when the exported handler itself is wrapped.
-const _awslambda = (globalThis as any).awslambda;
-
-const _streamingHandler = async (event: any, responseStream: any, context: any) => {
-  // Lambda ALWAYS calls streamifyResponse handlers with (event, responseStream, context) —
-  // both for Function URL (streaming) and API Gateway (buffered). Never return a value;
-  // always write to responseStream. Using context (3rd param) for serverless-http.
+// Lambda handler: routes /chat/stream to SSE streaming via Function URL, all else to serverless-http
+export const handler = async (event: any, context: any) => {
   const isFunctionUrl = !!event.requestContext?.http;
-  const rawPath = event.rawPath || event.path || '';
+  const path = event.rawPath || event.path || '';
   const method = (event.requestContext?.http?.method || event.httpMethod || '').toUpperCase();
 
   // Function URL: POST /chat/stream → real SSE streaming
-  if (isFunctionUrl && method === 'POST' && rawPath === '/chat/stream') {
-    await handleStreamingChat(event, responseStream);
-    return;
+  if (isFunctionUrl && method === 'POST' && path === '/chat/stream') {
+    const awslambda = (globalThis as any).awslambda;
+    if (awslambda?.streamifyResponse) {
+      return awslambda.streamifyResponse(async (_ev: any, responseStream: any, _ctx: any) => {
+        await handleStreamingChat(event, responseStream);
+      })(event, context);
+    }
   }
 
   // Function URL: OPTIONS → CORS preflight
   if (isFunctionUrl && method === 'OPTIONS') {
-    const corsStream = _awslambda.HttpResponseStream.from(responseStream, {
-      statusCode: 204,
-      headers: {
-        'Access-Control-Allow-Origin': event.headers?.origin || '*',
-        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,PATCH,OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Admin-Secret',
-        'Access-Control-Allow-Credentials': 'true',
-        'Access-Control-Max-Age': '86400',
-      },
-    });
-    (corsStream as any).end?.();
-    return;
+    const awslambda = (globalThis as any).awslambda;
+    if (awslambda?.streamifyResponse) {
+      return awslambda.streamifyResponse(async (_ev: any, responseStream: any) => {
+        const corsStream = awslambda.HttpResponseStream.from(responseStream, {
+          statusCode: 204,
+          headers: {
+            'Access-Control-Allow-Origin': event.headers?.origin || '*',
+            'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,PATCH,OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Admin-Secret',
+            'Access-Control-Allow-Credentials': 'true',
+            'Access-Control-Max-Age': '86400',
+          },
+        });
+        (corsStream as any).end?.();
+      })(event, context);
+    }
   }
 
-  // All other routes (API Gateway or non-streaming Function URL) → serverless-http,
-  // then write the result to responseStream so Lambda can deliver it.
-  const result: any = await serverlessHandler(event, context);
-  const outStream = _awslambda.HttpResponseStream.from(responseStream, {
-    statusCode: result.statusCode || 200,
-    headers: result.headers || {},
-  });
-  if (result.body) {
-    const body = result.isBase64Encoded
-      ? Buffer.from(result.body, 'base64').toString('utf8')
-      : result.body;
-    outStream.write(body);
-  }
-  (outStream as any).end?.();
+  // Everything else → serverless-http (API Gateway or Function URL non-streaming)
+  return serverlessHandler(event, context);
 };
-
-// Export: streaming-capable when awslambda is available (Lambda runtime), plain otherwise (local dev)
-export const handler = _awslambda?.streamifyResponse
-  ? _awslambda.streamifyResponse(_streamingHandler)
-  : async (event: any, context: any) => serverlessHandler(event, context);
 
 // Local dev support
 if (require.main === module) {
