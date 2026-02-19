@@ -70,6 +70,15 @@ function structuredLog(level: 'info' | 'warn' | 'error', message: string, meta?:
   }
 }
 
+// Disable ETag + HTTP caching for all API responses.
+// Without this, browsers cache empty responses from broken deploys and then
+// receive HTTP 304 (Not Modified) forever — causing "Unexpected end of JSON input".
+app.set('etag', false);
+app.use((_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
+
 // Request duration tracking middleware
 app.use((req, res, next) => {
   const start = Date.now();
