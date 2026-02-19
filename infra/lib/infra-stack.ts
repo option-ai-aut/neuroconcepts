@@ -280,7 +280,7 @@ export class ImmivoStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_22_X,
       entry: path.join(__dirname, '../../src/services/orchestrator/src/index.ts'),
       handler: 'handler',
-      timeout: cdk.Duration.seconds(120), // 2 min for AI tool calls (Function URL bypasses API GW 29s limit)
+      timeout: cdk.Duration.seconds(120), // 2 min for AI tool calls (chat/stream uses API GW SSE, not Function URL)
       memorySize: 1024, // More memory = faster cold starts + Prisma init
       vpc: lambdaVpc,
       vpcSubnets: props.stageName === 'dev' ? undefined : { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },

@@ -18,16 +18,6 @@ const getApiUrl = () => {
 
 // Get Lambda Function URL for streaming (bypasses API GW 29s timeout)
 // Falls back to regular API URL if Function URL not configured
-const getStreamUrl = () => {
-  const config = getRuntimeConfig();
-  const streamUrl = config.streamUrl || '';
-  if (streamUrl) {
-    console.log('[Chat] Using Lambda Function URL for streaming');
-    return streamUrl.replace(/\/+$/, '');
-  }
-  console.log('[Chat] No stream URL configured, falling back to API Gateway');
-  return getApiUrl(); // fallback to API Gateway
-};
 
 // Get auth headers for API calls
 const getAuthHeaders = async (): Promise<HeadersInit> => {
@@ -410,10 +400,6 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
             console.log('ℹ️ Keine Chat-Historie gefunden');
           }
         } else {
-          // #region agent log
-          const errBody = await res.text().catch(() => '');
-          console.error('[Jarvis-Debug] chat/history FAILED:', res.status, errBody.slice(0, 200));
-          // #endregion
           console.warn('⚠️ Chat-Historie konnte nicht geladen werden:', res.status);
         }
       } catch (error) {
@@ -606,9 +592,6 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         
         // Use FormData if we have files, otherwise JSON
         let res: Response;
-        // #region agent log
-        console.warn('[Jarvis-Debug] streamBaseUrl:', streamBaseUrl, '| apiBaseUrl:', apiBaseUrl);
-        // #endregion
         if (filesToUpload.length > 0) {
           const formData = new FormData();
           formData.append('message', userMsg.content);
@@ -639,26 +622,10 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           });
         }
 
-        // #region agent log
-        console.warn('[Jarvis-Debug] response status:', res.status, '| ok:', res.ok, '| content-type:', res.headers.get('content-type'));
-        // #endregion
-
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
-          // #region agent log
-          console.error('[Jarvis-Debug] non-ok response body:', errData);
-          // #endregion
           throw new Error(errData.error || `Server-Fehler (${res.status})`);
         }
-
-        // #region agent log
-        const ct = res.headers.get('content-type') || '';
-        if (!ct.includes('text/event-stream')) {
-          const rawBody = await res.clone().text().catch(() => '(unlesbar)');
-          console.error('[Jarvis-Debug] WRONG content-type! body:', rawBody.slice(0, 500));
-          fetch('http://127.0.0.1:7757/ingest/9b82a237-50c5-4c6a-aa16-234d3ee20ca3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3d1d39'},body:JSON.stringify({sessionId:'3d1d39',location:'AiChatSidebar.tsx:stream',message:'wrong-content-type',data:{ct,status:res.status,body:rawBody.slice(0,500)},timestamp:Date.now()})}).catch(()=>{});
-        }
-        // #endregion
 
         if (!res.body) throw new Error('No response body');
 
@@ -674,16 +641,9 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         let buffer = '';
         let hadFunctionCalls = false;
         let toolsUsed: string[] = [];
-        
 
-        // #region agent log
-        let _dbgChunkCount = 0;
-        // #endregion
         while (true) {
           const { done, value } = await reader.read();
-          // #region agent log
-          if (done) console.warn('[Jarvis-Debug] stream done, total chunks:', _dbgChunkCount);
-          // #endregion
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
@@ -692,10 +652,6 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
-              // #region agent log
-              _dbgChunkCount++;
-              if (_dbgChunkCount <= 3) console.warn('[Jarvis-Debug] SSE line #' + _dbgChunkCount + ':', line.slice(0, 120));
-              // #endregion
               const data = JSON.parse(line.slice(6));
 
               // Skip heartbeat keepalive signals
