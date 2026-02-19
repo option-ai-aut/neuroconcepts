@@ -74,11 +74,23 @@ export class ImmivoStack extends cdk.Stack {
       },
     });
 
+    // DB Security Group: locked-down, no outbound, only allows inbound Postgres
     const dbSg = new ec2.SecurityGroup(this, 'DBSecurityGroup', {
       vpc: this.vpc,
-      description: 'Allow access to DB',
+      description: 'RDS Postgres - inbound port 5432 only, no outbound',
       allowAllOutbound: false,
     });
+
+    // Lambda Security Group (test/prod only): allows all outbound so Lambda can reach
+    // Secrets Manager, OpenAI, Resend, Cognito, Stripe etc. via the NAT Gateway.
+    // Dev Lambda runs outside the VPC entirely, so no VPC security group is needed.
+    const lambdaInVpcSg = props.stageName !== 'dev'
+      ? new ec2.SecurityGroup(this, 'LambdaSecurityGroup', {
+          vpc: this.vpc,
+          description: 'Orchestrator Lambda - allows all outbound via NAT Gateway',
+          allowAllOutbound: true,
+        })
+      : null;
 
     // Dev: Lambda lives outside the VPC → DB must be publicly accessible.
     // Allow all IPs on port 5432 so Lambda (which has no fixed IP) can connect.
@@ -94,9 +106,11 @@ export class ImmivoStack extends cdk.Stack {
         }
       }
     }
-    
-    // Allow Lambda (same SG) to reach the database (used on test/prod where Lambda is in VPC)
-    dbSg.addIngressRule(dbSg, ec2.Port.tcp(5432), 'Allow Lambda to reach DB (self-referencing)');
+
+    // Test/Prod: Lambda is in VPC → allow inbound from the Lambda security group
+    if (lambdaInVpcSg) {
+      dbSg.addIngressRule(lambdaInVpcSg, ec2.Port.tcp(5432), 'Allow Lambda (VPC) to reach DB');
+    }
 
     if (props.stageName === 'dev' || props.stageName === 'test') {
       const instance = new rds.DatabaseInstance(this, 'PostgresInstance', {
@@ -248,7 +262,7 @@ export class ImmivoStack extends cdk.Stack {
     // --- 4. Orchestrator Service (Lambda + API Gateway) ---
     
     const lambdaVpc = props.stageName === 'dev' ? undefined : this.vpc;
-    const lambdaSg = props.stageName === 'dev' ? undefined : [dbSg]; 
+    const lambdaSg = lambdaInVpcSg ? [lambdaInVpcSg] : undefined;
 
     // App secrets (API keys, OAuth credentials, encryption keys)
     // These are stored securely in Secrets Manager and read at runtime
@@ -282,6 +296,10 @@ export class ImmivoStack extends cdk.Stack {
         APP_SECRET_ARN: appSecret.secretArn,
         // Flip to 'true' when ready to charge customers
         BILLING_ENABLED: 'false',
+        // Changes on every CDK deploy → forces a new Lambda version → guarantees
+        // all warm instances are replaced with a fresh cold start after each deploy.
+        // This prevents stale Prisma clients (broken DB connections) surviving redeploys.
+        DEPLOY_TS: new Date().toISOString(),
       },
       bundling: { 
         minify: true, 

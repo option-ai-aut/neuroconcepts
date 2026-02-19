@@ -195,8 +195,24 @@ function injectPrismaIntoServices(client: PrismaClient) {
 
 // Function to initialize Prisma with DATABASE_URL from AWS Secrets Manager
 async function initializePrisma() {
-  if (prisma) return prisma;
-  
+  // If prisma is already initialised, do a quick liveness ping.
+  // A broken client (stale DB connection from a previous cold start that failed
+  // mid-way) would cause every subsequent request to return 500. Resetting the
+  // client here lets the next request establish a fresh connection.
+  if (prisma) {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return prisma;
+    } catch {
+      // Connection is broken — reset so we re-initialise below
+      structuredLog('warn', 'Prisma liveness check failed — resetting client', {});
+      try { await prisma.$disconnect(); } catch {}
+      prisma = undefined as unknown as PrismaClient;
+      appSecretsLoaded = false;
+      _migrationsApplied = false;
+    }
+  }
+
   // Load app secrets first
   await loadAppSecrets();
   
