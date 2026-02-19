@@ -41,7 +41,7 @@ const STEPS = [
     icon: User,
     number: '02',
     title: 'Kurze Vorstellung',
-    desc: 'Teile uns in zwei Sätzen mit, wie dein Büro aktuell arbeitet. Das war's.',
+    desc: "Teile uns in zwei Sätzen mit, wie dein Büro aktuell arbeitet. Das war's.",
   },
   {
     icon: Sparkles,
