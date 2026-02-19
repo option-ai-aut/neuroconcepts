@@ -137,13 +137,13 @@ const S_ALT = 'bg-[#0d1117]';
 /* ═══════════════════════════════════════════════
    SECTION WRAPPER — each slide is 100vh
    ═══════════════════════════════════════════════ */
-function Slide({ children, className = '', active, idx }: { children: React.ReactNode; className?: string; active: boolean; idx: number }) {
+function Slide({ children, className = '', active: _active, idx }: { children: React.ReactNode; className?: string; active: boolean; idx: number }) {
   return (
     <section
       className={`snap-slide h-screen w-full flex-shrink-0 relative overflow-hidden ${className}`}
       data-idx={idx}
     >
-      <div className={`h-full transition-opacity duration-700 ease-out ${active ? 'opacity-100' : 'opacity-0'}`}>
+      <div className="h-full">
         {children}
       </div>
     </section>
@@ -156,11 +156,14 @@ function Slide({ children, className = '', active, idx }: { children: React.Reac
 function Stagger({ children, active, className = '', delay = 0 }: { children: React.ReactNode; active: boolean; className?: string; delay?: number }) {
   return (
     <div
-      className={`transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${className}`}
+      className={className}
       style={{
-        transitionDelay: active ? `${delay}ms` : '0ms',
         opacity: active ? 1 : 0,
-        transform: active ? 'translateY(0)' : 'translateY(40px)',
+        transform: active ? 'translateY(0)' : 'translateY(32px)',
+        // Enter: smooth stagger. Exit: instant reset so slide block slides away cleanly.
+        transition: active
+          ? `opacity 700ms cubic-bezier(0.16,1,0.3,1) ${delay}ms, transform 700ms cubic-bezier(0.16,1,0.3,1) ${delay}ms`
+          : 'none',
       }}
     >
       {children}
@@ -1033,14 +1036,14 @@ export default function LandingPage() {
                 <h2
                   className="text-[20vw] sm:text-[16vw] lg:text-[13vw] font-bold tracking-tighter leading-[0.85] text-center select-none"
                   style={{
-                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.04) 70%, transparent 100%)',
+                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.07) 60%, transparent 100%)',
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
                     backgroundClip: 'text',
                     opacity: activeIdx === 9 ? 1 : 0,
                     transform: activeIdx === 9 ? 'translateY(0)' : 'translateY(60px)',
                     transition: 'opacity 1.8s cubic-bezier(0.16, 1, 0.3, 1), transform 2s cubic-bezier(0.16, 1, 0.3, 1)',
-                    transitionDelay: '400ms',
+                    transitionDelay: activeIdx === 9 ? '400ms' : '0ms',
                   }}
                 >
                   Stress Less
