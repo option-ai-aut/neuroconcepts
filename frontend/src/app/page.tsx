@@ -950,32 +950,39 @@ export default function LandingPage() {
               7. DEMO
               ══════════════════════════════════════════ */}
           <Slide idx={7} active={activeIdx === 7} className="bg-white text-gray-900">
-            <div className="h-full flex flex-col items-center justify-center px-5 sm:px-10">
-              <div className="text-center max-w-2xl mx-auto">
-                <Stagger active={activeIdx === 7} delay={0}>
-                  <p className="text-blue-600 font-semibold text-[10px] sm:text-xs tracking-widest uppercase mb-2 sm:mb-3">{t('demo.badge')}</p>
-                </Stagger>
-                <Stagger active={activeIdx === 7} delay={80}>
-                  <h2 className="text-2xl sm:text-4xl lg:text-5xl font-bold tracking-tight leading-tight mb-3 sm:mb-4">
-                    {t.rich('demo.title', { bold: (chunks) => <strong>{chunks}</strong> })}
-                  </h2>
-                </Stagger>
-                <Stagger active={activeIdx === 7} delay={160}>
-                  <p className="text-xs sm:text-base text-gray-500 leading-relaxed mb-6 sm:mb-8 max-w-lg mx-auto">{t('demo.subtitle')}</p>
-                </Stagger>
-                <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-8 sm:mb-10">
-                  {[t('demo.feature1'), t('demo.feature2'), t('demo.feature3'), t('demo.feature4')].map((item, i) => (
-                    <Stagger key={i} active={activeIdx === 7} delay={240 + i * 60}>
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200/60">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                        <span className="text-gray-600 text-xs sm:text-sm">{item}</span>
-                      </div>
-                    </Stagger>
-                  ))}
+            <div className="h-full flex items-center justify-center px-5 sm:px-8 lg:px-12 py-6">
+              <div className="w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-14 items-center">
+
+                {/* Left: Text */}
+                <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
+                  <Stagger active={activeIdx === 7} delay={0}>
+                    <p className="text-blue-600 font-semibold text-[10px] sm:text-xs tracking-widest uppercase mb-2">{t('demo.badge')}</p>
+                  </Stagger>
+                  <Stagger active={activeIdx === 7} delay={80}>
+                    <h2 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold tracking-tight leading-tight mb-3">
+                      {t.rich('demo.title', { bold: (chunks) => <strong>{chunks}</strong> })}
+                    </h2>
+                  </Stagger>
+                  <Stagger active={activeIdx === 7} delay={160}>
+                    <p className="text-xs sm:text-sm lg:text-base text-gray-500 leading-relaxed mb-5 max-w-md">{t('demo.subtitle')}</p>
+                  </Stagger>
+                  <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2">
+                    {[t('demo.feature1'), t('demo.feature2'), t('demo.feature3'), t('demo.feature4')].map((item, i) => (
+                      <Stagger key={i} active={activeIdx === 7} delay={240 + i * 60}>
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200/60">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                          <span className="text-gray-600 text-xs sm:text-sm">{item}</span>
+                        </div>
+                      </Stagger>
+                    ))}
+                  </div>
                 </div>
-                <Stagger active={activeIdx === 7} delay={500} className="w-full max-w-lg mx-auto">
+
+                {/* Right: Booking widget */}
+                <Stagger active={activeIdx === 7} delay={300} className="w-full">
                   <DemoBooking />
                 </Stagger>
+
               </div>
             </div>
           </Slide>
