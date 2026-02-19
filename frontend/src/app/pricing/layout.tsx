@@ -6,10 +6,10 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Immivo AI Preise — Ab 99€/Monat',
     description: 'Flexible Tarife für Einzelmakler und Teams. KI-Assistent, CRM, Exposé-Editor, 24 Portale und mehr. 7 Tage kostenlos testen.',
-    url: 'https://immivo.ai/preise',
+    url: 'https://immivo.ai/pricing',
   },
   alternates: {
-    canonical: 'https://immivo.ai/preise',
+    canonical: 'https://immivo.ai/pricing',
   },
 };
 
@@ -19,7 +19,7 @@ const jsonLd = {
   name: 'Immivo AI',
   description: 'KI-gesteuertes Betriebssystem für Immobilienmakler mit Jarvis KI-Assistent, CRM, Exposé-Editor und 24 Portal-Integrationen.',
   brand: { '@type': 'Brand', name: 'Immivo AI' },
-  url: 'https://immivo.ai/preise',
+  url: 'https://immivo.ai/pricing',
   offers: [
     {
       '@type': 'Offer',
@@ -73,7 +73,7 @@ const jsonLd = {
         billingDuration: 'P1M',
       },
       availability: 'https://schema.org/InStock',
-      url: 'https://immivo.ai/kontakt',
+      url: 'https://immivo.ai/contact',
     },
   ],
 };

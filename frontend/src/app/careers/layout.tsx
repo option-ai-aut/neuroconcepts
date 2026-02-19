@@ -6,10 +6,10 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Karriere bei Immivo AI',
     description: 'Werde Teil unseres Teams und arbeite an der KI-Revolution in der Immobilienbranche.',
-    url: 'https://immivo.ai/karriere',
+    url: 'https://immivo.ai/careers',
   },
   alternates: {
-    canonical: 'https://immivo.ai/karriere',
+    canonical: 'https://immivo.ai/careers',
   },
 };
 

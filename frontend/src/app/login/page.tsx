@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { syncUser } from '@/lib/api';
+import { syncUser, getApiUrl, getAuthHeaders } from '@/lib/api';
 import { useAuthConfigured } from '@/components/AuthProvider';
 import { useTranslations } from 'next-intl';
 
@@ -78,6 +78,25 @@ export default function LoginPage() {
     }
     return '/dashboard';
   };
+
+  // After login: if ?plan= is set and not 'free', start Stripe checkout
+  const handlePostLoginRedirect = async () => {
+    const plan = searchParams.get('plan');
+    if (plan && plan !== 'free') {
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(`${getApiUrl()}/billing/checkout`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ plan, billingCycle: 'monthly' }),
+        });
+        const data = await res.json();
+        if (data.url) { window.location.href = data.url; return; }
+        // BILLING_ENABLED=false or no URL → fall through to dashboard
+      } catch { /* non-critical */ }
+    }
+    router.push(getRedirectTarget());
+  };
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -92,7 +111,7 @@ export default function LoginPage() {
         // password reset or global sign-out), and later API calls fail with 400.
         const session = await fetchAuthSession({ forceRefresh: true });
         if (session.tokens?.idToken) {
-          router.replace(getRedirectTarget());
+          await handlePostLoginRedirect();
           return;
         }
       } catch {
@@ -154,7 +173,7 @@ export default function LoginPage() {
       if (syncResult.needsOnboarding) {
         setView('onboarding');
       } else {
-        router.push(getRedirectTarget());
+        handlePostLoginRedirect();
       }
     } catch (err: any) {
       if (err.name === 'UserNotConfirmedException') {
@@ -222,7 +241,7 @@ export default function LoginPage() {
         })
       });
       
-      router.push(getRedirectTarget());
+      handlePostLoginRedirect();
     } catch (err: any) {
       setError(formatAuthError(err.message) || t('errors.setPasswordFailed'));
     } finally {
@@ -261,7 +280,7 @@ export default function LoginPage() {
         throw new Error(t('errors.profileUpdateFailed'));
       }
       
-      router.push(getRedirectTarget());
+      handlePostLoginRedirect();
     } catch (err: any) {
       setError(formatAuthError(err.message) || t('errors.saveFailed'));
     } finally {
@@ -324,7 +343,7 @@ export default function LoginPage() {
       // Auto sign in after confirmation
       await signIn({ username: email, password });
       await syncUser();
-      router.push(getRedirectTarget());
+      handlePostLoginRedirect();
     } catch (err: any) {
       setError(formatAuthError(err.message) || t('errors.confirmationFailed'));
     } finally {
@@ -676,8 +695,8 @@ export default function LoginPage() {
 
                 <p className="text-center text-xs text-gray-400">
                   {t('signUp.termsPrefix')}{' '}
-                <Link href="/agb" className="text-blue-600 hover:underline">{t('signUp.terms')}</Link> und{' '}
-                <Link href="/datenschutz" className="text-blue-600 hover:underline">{t('signUp.privacyPolicy')}</Link>.
+                <Link href="/terms" className="text-blue-600 hover:underline">{t('signUp.terms')}</Link> und{' '}
+                <Link href="/privacy" className="text-blue-600 hover:underline">{t('signUp.privacyPolicy')}</Link>.
                 </p>
 
                 <p className="text-center text-sm text-gray-500">

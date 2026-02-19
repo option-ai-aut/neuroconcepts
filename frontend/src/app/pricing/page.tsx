@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   CheckCircle2,
   XCircle,
@@ -14,10 +15,12 @@ import {
   Mail,
   ChevronDown,
   HelpCircle,
+  Loader2,
 } from 'lucide-react';
 import PublicNavigation from '@/components/PublicNavigation';
 import PublicFooter from '@/components/PublicFooter';
 import { useTranslations } from 'next-intl';
+import { getApiUrl, getAuthHeaders } from '@/lib/api';
 
 // Intersection Observer Hook for scroll animations
 function useInView(options = {}) {
@@ -44,11 +47,43 @@ function useInView(options = {}) {
 export default function PreisePage() {
   const t = useTranslations('pricing');
   const tCommon = useTranslations('common');
-  const [ yearly, setYearly ] = useState(false );
+  const router = useRouter();
+  const [yearly, setYearly] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const heroRef = useInView();
   const cardsRef = useInView();
   const faqRef = useInView();
   const contactRef = useInView();
+
+  // Detect if user is already logged in
+  useEffect(() => {
+    import('aws-amplify/auth').then(({ fetchAuthSession }) => {
+      fetchAuthSession().then(session => {
+        setIsLoggedIn(!!session.tokens?.idToken);
+      }).catch(() => {});
+    });
+  }, []);
+
+  // Direct checkout for logged-in users
+  const handlePlanClick = async (planId: string, e: React.MouseEvent) => {
+    if (!isLoggedIn || planId === 'free' || planId === 'enterprise') return;
+    e.preventDefault();
+    setCheckoutLoading(planId);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${getApiUrl()}/billing/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ plan: planId, billingCycle: yearly ? 'yearly' : 'monthly' }),
+      });
+      const data = await res.json();
+      if (data.url) { window.location.href = data.url; return; }
+      router.push('/dashboard');
+    } catch {
+      setCheckoutLoading(null);
+    }
+  };
 
   const plans = [
     {
@@ -134,7 +169,7 @@ export default function PreisePage() {
         { text: t('enterprise.features.5'), color: 'green' as const },
       ],
       cta: t('enterprise.cta'),
-      href: '/kontakt',
+      href: '/contact',
       popular: false,
       icon: Sparkles,
     },
@@ -148,7 +183,7 @@ export default function PreisePage() {
   return (
     <div className="min-h-screen bg-white">
 
-      <PublicNavigation currentPage="preise" />
+      <PublicNavigation currentPage="pricing" />
 
       {/* Hero */}
       <section className="pt-24 sm:pt-32 pb-8 sm:pb-12 bg-white">
@@ -378,14 +413,18 @@ export default function PreisePage() {
 
                 <Link
                   href={plan.href}
-                  className={`w-full flex items-center justify-center px-6 py-3 rounded-full font-semibold transition-all hover:-translate-y-0.5 ${
+                  onClick={(e) => handlePlanClick(plan.id, e)}
+                  className={`w-full flex items-center justify-center px-6 py-3 rounded-full font-semibold transition-all hover:-translate-y-0.5 disabled:opacity-60 ${
                     plan.popular
                       ? 'bg-white text-gray-900 hover:bg-gray-100'
                       : 'bg-gray-900 text-white hover:bg-gray-800'
                   }`}
                 >
-                  {plan.cta}
-                  <ArrowRight className="ml-2 w-4 h-4" />
+                  {checkoutLoading === plan.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>{plan.cta}<ArrowRight className="ml-2 w-4 h-4" /></>
+                  )}
                 </Link>
               </div>
             ))}

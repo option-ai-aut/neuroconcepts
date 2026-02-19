@@ -151,7 +151,7 @@ export default function KarrierePage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <PublicNavigation currentPage="karriere" />
+      <PublicNavigation currentPage="careers" />
 
       {/* Hero */}
       <section className="pt-24 sm:pt-32 pb-12 sm:pb-16 bg-white">
@@ -326,7 +326,7 @@ export default function KarrierePage() {
             </a>
           </p>
           <Link
-            href="/kontakt"
+            href="/contact"
             className="inline-flex items-center text-gray-900 font-medium hover:underline"
           >
             Kontakt aufnehmen

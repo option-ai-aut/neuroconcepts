@@ -543,6 +543,11 @@
       "email": "Email",
       "phone": "Phone",
       "referral": "Referral",
+      "portal": "Portal",
+      "social_media": "Social Media",
+      "cold_call": "Cold Call",
+      "event": "Event",
+      "other": "Other",
       "unknown": "Unknown"
     },
     "propertyTypes": {

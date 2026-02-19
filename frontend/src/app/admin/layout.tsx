@@ -34,7 +34,7 @@ const NAV_SECTIONS = [
     items: [
       { name: 'Blog', href: '/admin/blog', icon: Newspaper },
       { name: 'Newsletter', href: '/admin/newsletter', icon: Megaphone },
-      { name: 'Karriere', href: '/admin/karriere', icon: Briefcase },
+      { name: 'Karriere', href: '/admin/careers', icon: Briefcase },
     ],
   },
   {
@@ -69,7 +69,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/contacts': 'Kontaktanfragen',
   '/admin/blog': 'Blog',
   '/admin/newsletter': 'Newsletter',
-  '/admin/karriere': 'Karriere',
+  '/admin/careers': 'Karriere',
   '/admin/users': 'Mitarbeiter',
   '/admin/chat': 'Team Chat',
   '/admin/calendar': 'Kalender',

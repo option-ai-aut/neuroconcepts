@@ -6,10 +6,10 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Kontakt — Immivo AI',
     description: 'Kontaktiere das Immivo AI Team. Wir beantworten deine Fragen zu unserer KI-Plattform für Immobilienmakler.',
-    url: 'https://immivo.ai/kontakt',
+    url: 'https://immivo.ai/contact',
   },
   alternates: {
-    canonical: 'https://immivo.ai/kontakt',
+    canonical: 'https://immivo.ai/contact',
   },
 };
 

@@ -94,7 +94,7 @@ export default function KontaktPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <PublicNavigation currentPage="kontakt" />
+      <PublicNavigation currentPage="contact" />
 
       {/* Hero */}
       <section className="pt-24 sm:pt-32 pb-12 sm:pb-16 bg-white">

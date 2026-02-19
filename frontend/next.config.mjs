@@ -31,11 +31,17 @@ const nextConfig = {
 
   async redirects() {
     return [
-      {
-        source: '/integrationen',
-        destination: '/#features',
-        permanent: true,
-      },
+      // Legacy German URLs → new English URLs (permanent 308 for SEO)
+      { source: '/integrationen', destination: '/integrations', permanent: true },
+      { source: '/preise',        destination: '/pricing',      permanent: true },
+      { source: '/ueber-uns',     destination: '/about',        permanent: true },
+      { source: '/kontakt',       destination: '/contact',      permanent: true },
+      { source: '/karriere',      destination: '/careers',      permanent: true },
+      { source: '/impressum',     destination: '/imprint',      permanent: true },
+      { source: '/datenschutz',   destination: '/privacy',      permanent: true },
+      { source: '/agb',           destination: '/terms',        permanent: true },
+      // New English /integrations → features section
+      { source: '/integrations',  destination: '/#features',    permanent: true },
     ];
   },
 

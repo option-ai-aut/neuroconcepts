@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { FileText, Plus, Search, Edit2, Trash2, Sparkles, Calendar, Eye, ImageIcon, ChevronDown } from 'lucide-react';
+import DOMPurify from 'dompurify';
 import { getExposeTemplates, deleteExposeTemplate, createExposeTemplate, updateExposeTemplate, ExposeTemplate, API_ENDPOINTS, getProperties, Property, getImageUrl } from '@/lib/api';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { useTranslations } from 'next-intl';
@@ -376,7 +377,7 @@ export default function ExposesPage() {
           <div className={`p-6 ${block.style === 'highlight' ? 'bg-gray-50 border-l-4' : ''}`} style={block.style === 'highlight' ? { borderColor: themeColors.primary } : {}}>
             {block.title && <h3 className="text-lg font-semibold mb-3" style={{ color: themeColors.secondary }}>{rv(block.title)}</h3>}
             {textIsHtml ? (
-              <div className="text-gray-600 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: textVal }} />
+              <div className="text-gray-600 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(textVal) }} />
             ) : (
               <p className="text-gray-600 whitespace-pre-wrap">{rv(block.content, 'Text eingeben...')}</p>
             )}

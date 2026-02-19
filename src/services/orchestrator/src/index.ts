@@ -36,7 +36,7 @@ import { authMiddleware, adminAuthMiddleware } from './middleware/auth';
 import { AiSafetyMiddleware, wrapAiResponse } from './middleware/aiSafety';
 import { validate, schemas } from './middleware/validation';
 import { AiCostService } from './services/AiCostService';
-import { getStripe, BILLING_ENABLED, getPriceId, parsePlan, StripeConfig, PlanId, BillingCycle, checkoutIdempotencyKey } from './services/BillingService';
+import { getStripe, BILLING_ENABLED, getPriceId, parsePlan, StripeConfig, PlanId, BillingCycle, checkoutIdempotencyKey, TRIAL_DURATION_DAYS, getTrialDaysLeft } from './services/BillingService';
 import * as AWS from 'aws-sdk';
 import multer from 'multer';
 import path from 'path';
@@ -137,8 +137,9 @@ async function loadAppSecrets() {
       if (secret.SecretString) {
         const secrets = JSON.parse(secret.SecretString);
         // Set environment variables from secrets — all keys stored in Secrets Manager
+        // DATABASE_URL is intentionally excluded: it is always constructed from the
+        // stage-specific DB_SECRET_ARN + DB_ENDPOINT to guarantee per-environment isolation.
         const keysToLoad = [
-          'DATABASE_URL',
           'OPENAI_API_KEY',
           'ENCRYPTION_KEY',
           'ADMIN_SECRET',
@@ -199,14 +200,10 @@ async function initializePrisma() {
   // Load app secrets first
   await loadAppSecrets();
   
-  // If DATABASE_URL is already set (from app secrets or local dev), use it
-  if (process.env.DATABASE_URL) {
-    prisma = createOptimizedPrismaClient();
-    injectPrismaIntoServices(prisma);
-  }
-  
-  // In Lambda, get credentials from DB Secret in Secrets Manager
-  if (!prisma && process.env.DB_SECRET_ARN) {
+  // In Lambda always use the stage-specific DB_SECRET_ARN so each environment
+  // (dev / test / prod) is guaranteed to connect to its own database.
+  // For local dev (no AWS_LAMBDA_FUNCTION_NAME), DATABASE_URL from .env.local is used below.
+  if (process.env.DB_SECRET_ARN) {
     const secretsManager = new AWS.SecretsManager();
     try {
       const secret = await secretsManager.getSecretValue({ SecretId: process.env.DB_SECRET_ARN }).promise();
@@ -223,6 +220,7 @@ async function initializePrisma() {
     }
   }
   
+  // Local dev: DATABASE_URL set via .env.local
   if (!prisma) {
     prisma = createOptimizedPrismaClient();
     injectPrismaIntoServices(prisma);
@@ -722,7 +720,9 @@ app.post('/billing/webhook', express.raw({ type: 'application/json' }), async (r
         }
 
         const subscription = await getStripe().subscriptions.retrieve(session.subscription);
+        // Spread existing config to preserve trialEndsAt and other fields
         const stripeConfig: StripeConfig = {
+          ...existingCfg,
           customerId: session.customer,
           subscriptionId: subscription.id,
           plan,
@@ -999,17 +999,16 @@ function normalizeFileUrl(url: string, tenantId: string, propertyId: string, typ
   return url;
 }
 
-// Serve uploaded files
+// Serve uploaded files (auth required to prevent unauthorized file access)
 if (!isLambda) {
-  // Local dev: serve from disk
   const localUploadDir = path.join(__dirname, '../uploads');
   if (!fs.existsSync(localUploadDir)) {
     fs.mkdirSync(localUploadDir, { recursive: true });
   }
-  app.use('/uploads', express.static(localUploadDir));
+  app.use('/uploads', authMiddleware, express.static(localUploadDir));
 } else {
   // Lambda: redirect /uploads/* to CDN or S3 (handles legacy /uploads/ URLs still in DB)
-  app.get('/uploads/*', async (req, res) => {
+  app.get('/uploads/*', authMiddleware, async (req, res) => {
     const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'eu-central-1';
     const rawPath = req.path.replace(/^\/uploads\//, '');
     const baseUrl = MEDIA_CDN_URL || (MEDIA_BUCKET ? `https://${MEDIA_BUCKET}.s3.${region}.amazonaws.com` : '');
@@ -1097,9 +1096,14 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
         }
       });
       
-      // Create default settings
+      // Create default settings — start 7-day free trial immediately
       await prisma.tenantSettings.create({
-        data: { tenantId: newTenant.id }
+        data: {
+          tenantId: newTenant.id,
+          stripeConfig: {
+            trialEndsAt: Math.floor(Date.now() / 1000) + TRIAL_DURATION_DAYS * 24 * 3600,
+          },
+        },
       });
 
       // Create default team chat channel with company name
@@ -1195,6 +1199,11 @@ app.get('/billing/subscription', authMiddleware, billingRateLimitMiddleware, asy
     const settings = await db.tenantSettings.findUnique({ where: { tenantId: req.user.tenantId } });
     const cfg = (settings?.stripeConfig || {}) as StripeConfig;
 
+    const trialEndsAt = cfg.trialEndsAt ?? null;
+    const trialDaysLeft = getTrialDaysLeft(trialEndsAt ?? undefined);
+    const isTrialActive = trialDaysLeft > 0;
+    const trialFields = { trialEndsAt, trialDaysLeft, isTrialActive };
+
     // Test phase: billing not enabled → everyone is "free"
     if (!BILLING_ENABLED) {
       return res.json({
@@ -1207,11 +1216,12 @@ app.get('/billing/subscription', authMiddleware, billingRateLimitMiddleware, asy
         billingCycle: cfg.billingCycle || null,
         paymentMethod: null,
         invoices: [],
+        ...trialFields,
       });
     }
 
     if (!cfg.subscriptionId) {
-      return res.json({ plan: 'free', status: 'none', billingEnabled: true });
+      return res.json({ plan: 'free', status: 'none', billingEnabled: true, ...trialFields });
     }
 
     const stripe = getStripe();
@@ -1233,6 +1243,7 @@ app.get('/billing/subscription', authMiddleware, billingRateLimitMiddleware, asy
         last4: pm.card.last4,
         expiry: `${pm.card.exp_month}/${pm.card.exp_year}`,
       } : null,
+      ...trialFields,
     });
   } catch (error) {
     console.error('[Billing] GET /billing/subscription error:', error);
@@ -1268,20 +1279,13 @@ app.get('/billing/invoices', authMiddleware, billingRateLimitMiddleware, async (
 });
 
 // POST /billing/checkout — create Stripe Checkout Session
-app.post('/billing/checkout', authMiddleware, billingRateLimitMiddleware, async (req: any, res) => {
+app.post('/billing/checkout', authMiddleware, billingRateLimitMiddleware, validate(schemas.billingCheckout), async (req: any, res) => {
   try {
-    // Test phase: billing not enabled
     if (!BILLING_ENABLED) {
       return res.json({ billingEnabled: false, redirectUrl: '/dashboard' });
     }
 
-    const { plan, billingCycle = 'monthly' } = req.body as { plan: 'solo' | 'team'; billingCycle: BillingCycle };
-    if (!plan || !['solo', 'team'].includes(plan)) {
-      return res.status(400).json({ error: 'Bad Request' });
-    }
-    if (!['monthly', 'yearly'].includes(billingCycle)) {
-      return res.status(400).json({ error: 'Bad Request' });
-    }
+    const { plan, billingCycle } = req.body as { plan: 'solo' | 'team'; billingCycle: BillingCycle };
 
     const db = prisma || (await initializePrisma());
     const settings = await db.tenantSettings.findUnique({ where: { tenantId: req.user.tenantId } });
@@ -1295,7 +1299,7 @@ app.post('/billing/checkout', authMiddleware, billingRateLimitMiddleware, async 
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${frontendUrl}/dashboard/settings/billing?session_id={CHECKOUT_SESSION_ID}&success=1`,
-      cancel_url: `${frontendUrl}/preise`,
+      cancel_url: `${frontendUrl}/pricing`,
       metadata: { tenantId: req.user.tenantId, plan, billingCycle },
       allow_promotion_codes: true,
     };
@@ -2313,7 +2317,7 @@ app.get('/team', authMiddleware, async (req, res) => {
 });
 
 // PUT /leads/:id - Update lead details (tenant-isolated)
-app.put('/leads/:id', authMiddleware, async (req, res) => {
+app.put('/leads/:id', authMiddleware, validate(schemas.updateLead), async (req, res) => {
   try {
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
@@ -2455,7 +2459,7 @@ app.get('/leads/:id/activities', authMiddleware, async (req, res) => {
 });
 
 // PUT /properties/:id - Update property details (tenant-isolated)
-app.put('/properties/:id', authMiddleware, async (req, res) => {
+app.put('/properties/:id', authMiddleware, validate(schemas.updateProperty), async (req, res) => {
   try {
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
@@ -2591,8 +2595,9 @@ app.delete('/properties/:id/images', authMiddleware, async (req, res) => {
         console.error('S3 delete error:', e);
       }
     } else if (imageUrl.startsWith('/uploads/')) {
-      const filePath = path.join(__dirname, '..', imageUrl);
-      if (fs.existsSync(filePath)) {
+      const uploadRoot = path.resolve(__dirname, '..', 'uploads');
+      const filePath = path.resolve(__dirname, '..', imageUrl);
+      if (filePath.startsWith(uploadRoot + path.sep) && fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
     }
@@ -2799,7 +2804,7 @@ app.delete('/leads/:id/documents', authMiddleware, async (req, res) => {
 });
 
 // POST /leads/:id/email - Send manual email (tenant-isolated)
-app.post('/leads/:id/email', authMiddleware, async (req, res) => {
+app.post('/leads/:id/email', authMiddleware, validate(schemas.sendLeadEmail), async (req, res) => {
   try {
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
@@ -2884,7 +2889,7 @@ app.delete('/properties/:id', authMiddleware, async (req, res) => {
 });
 
 // POST /properties - Create new property
-app.post('/properties', authMiddleware, async (req, res) => {
+app.post('/properties', authMiddleware, validate(schemas.createProperty), async (req, res) => {
   try {
     const { 
       title, address, description, aiFacts, propertyType, status, marketingType,
@@ -2967,7 +2972,7 @@ app.post('/properties', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/leads', authMiddleware, async (req, res) => {
+app.post('/leads', authMiddleware, validate(schemas.createLead), async (req, res) => {
   try {
     const { email, firstName, lastName, propertyId, message, salutation, formalAddress, phone, source, notes, assignedToId } = req.body;
     
@@ -6236,13 +6241,9 @@ app.get('/email/status', authMiddleware, async (req, res) => {
 // --- AI Image Editing (Virtual Staging) ---
 
 // POST /ai/image-edit - Virtual Staging with Gemini 3 Pro Image Preview
-app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, async (req, res) => {
+app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, validate(schemas.aiImageEdit), async (req, res) => {
   try {
     const { image, prompt, style, roomType, aspectRatio } = req.body;
-    
-    if (!image) {
-      return res.status(400).json({ error: 'image required' });
-    }
 
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
@@ -6258,8 +6259,34 @@ app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, asyn
         imageData = matches[2];
       }
     } else if (image.startsWith('http://') || image.startsWith('https://')) {
-      // Image is a URL (e.g. S3 URL from property) — fetch and convert to base64
-      console.log(`🖼️ Fetching image from URL: ${image.substring(0, 100)}...`);
+      // SSRF protection: only allow fetching from own S3/CDN domains
+      try {
+        const parsed = new URL(image);
+        const allowedHosts = [
+          MEDIA_CDN_URL ? new URL(MEDIA_CDN_URL).hostname : null,
+          MEDIA_BUCKET ? `${MEDIA_BUCKET}.s3.${process.env.AWS_REGION || 'eu-central-1'}.amazonaws.com` : null,
+          MEDIA_BUCKET ? `s3.${process.env.AWS_REGION || 'eu-central-1'}.amazonaws.com` : null,
+        ].filter(Boolean) as string[];
+
+        const isAllowedHost = allowedHosts.some(h => parsed.hostname === h || parsed.hostname.endsWith(`.amazonaws.com`));
+        if (!isAllowedHost) {
+          return res.status(400).json({ error: 'Bad Request' });
+        }
+
+        // Block private/internal IPs even if hostname resolves to them
+        const blockedPatterns = /^(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|0\.|localhost|::1|\[::1\])/i;
+        if (blockedPatterns.test(parsed.hostname)) {
+          return res.status(400).json({ error: 'Bad Request' });
+        }
+
+        if (parsed.protocol !== 'https:') {
+          return res.status(400).json({ error: 'Bad Request' });
+        }
+      } catch {
+        return res.status(400).json({ error: 'Bad Request' });
+      }
+
+      console.log(`[AI] Fetching image from URL: ${image.substring(0, 100)}...`);
       try {
         const imgResponse = await fetch(image);
         if (!imgResponse.ok) throw new Error(`HTTP ${imgResponse.status}`);
@@ -6267,10 +6294,9 @@ app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, asyn
         if (contentType) mimeType = contentType.split(';')[0].trim();
         const arrayBuffer = await imgResponse.arrayBuffer();
         imageData = Buffer.from(arrayBuffer).toString('base64');
-        console.log(`✅ Fetched image: ${mimeType}, ${Math.round(imageData.length / 1024)}KB base64`);
       } catch (fetchErr: any) {
-        console.error('❌ Failed to fetch image from URL:', fetchErr.message);
-        return res.status(400).json({ error: `Bild konnte nicht von der URL geladen werden: ${fetchErr.message}` });
+        console.error('[AI] Failed to fetch image from URL:', fetchErr.message);
+        return res.status(400).json({ error: 'Bild konnte nicht geladen werden' });
       }
     }
 
@@ -9168,7 +9194,7 @@ app.post('/contact', async (req, res) => {
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background: #111827; color: white; padding: 24px 32px; border-radius: 12px 12px 0 0;">
               <h2 style="margin: 0; font-size: 20px;">Neue Kontaktanfrage</h2>
-              <p style="margin: 4px 0 0; opacity: 0.7; font-size: 14px;">via immivo.ai/kontakt</p>
+              <p style="margin: 4px 0 0; opacity: 0.7; font-size: 14px;">via immivo.ai/contact</p>
             </div>
             <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
               <table style="width: 100%; border-collapse: collapse;">

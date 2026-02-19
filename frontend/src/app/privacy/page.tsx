@@ -7,7 +7,7 @@ import Link from 'next/link';
 export default function DatenschutzPage() {
   return (
     <div className="min-h-screen bg-white">
-      <PublicNavigation currentPage="datenschutz" />
+      <PublicNavigation currentPage="privacy" />
 
       <section className="pt-24 sm:pt-32 pb-16 sm:pb-24">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 animate-fade-in">

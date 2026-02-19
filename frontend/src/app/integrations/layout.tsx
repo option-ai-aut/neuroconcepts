@@ -6,10 +6,10 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Immivo AI Integrationen — Alle Portale & Tools',
     description: 'Nahtlose Integration mit ImmoScout24, Willhaben, Immowelt, Google Workspace, Microsoft 365 und mehr.',
-    url: 'https://immivo.ai/integrationen',
+    url: 'https://immivo.ai/integrations',
   },
   alternates: {
-    canonical: 'https://immivo.ai/integrationen',
+    canonical: 'https://immivo.ai/integrations',
   },
 };
 

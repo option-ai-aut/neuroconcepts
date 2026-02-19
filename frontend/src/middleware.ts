@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Marketing pages - ONLY on immivo.ai
-const LANDING_PAGES = ['/', '/preise', '/ueber-uns', '/blog', '/karriere', '/kontakt', '/integrationen'];
+const LANDING_PAGES = ['/', '/pricing', '/about', '/blog', '/careers', '/contact', '/integrations'];
 
 // Legal pages - accessible on all domains
-const LEGAL_PAGES = ['/datenschutz', '/agb', '/impressum'];
+const LEGAL_PAGES = ['/privacy', '/terms', '/imprint'];
 
 const APP_DOMAIN = 'app.immivo.ai';
 const ADMIN_DOMAIN = 'admin.immivo.ai';
@@ -73,7 +73,7 @@ export function middleware(request: NextRequest) {
   if (isLocalhost || isDevTest) {
     if (detectedLocale) {
       const response = NextResponse.next();
-      response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365 });
+      response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, httpOnly: true });
       return response;
     }
     return NextResponse.next();
@@ -87,7 +87,7 @@ export function middleware(request: NextRequest) {
   if (isMarketingDomain) {
     if (LANDING_PAGES.includes(pathname) || LEGAL_PAGES.includes(pathname)) {
       const response = NextResponse.next();
-      if (detectedLocale) response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365 });
+      if (detectedLocale) response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, httpOnly: true });
       return response;
     }
     return NextResponse.redirect(new URL(`https://${APP_DOMAIN}${pathname}`));
@@ -108,7 +108,7 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL(`https://${MARKETING_DOMAIN}${pathname}`));
     }
     const response = NextResponse.next();
-    if (detectedLocale) response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365 });
+    if (detectedLocale) response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, httpOnly: true });
     return response;
   }
 
@@ -124,13 +124,13 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/admin/login', request.url));
     }
     const adminResponse = NextResponse.next();
-    if (detectedLocale) adminResponse.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365 });
+    if (detectedLocale) adminResponse.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, httpOnly: true });
     return adminResponse;
   }
 
   // Unknown domain (e.g. Lambda Function URL) - allow everything
   const response = NextResponse.next();
-  if (detectedLocale) response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365 });
+  if (detectedLocale) response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, httpOnly: true });
   return response;
 }
 

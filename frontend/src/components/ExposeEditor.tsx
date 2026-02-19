@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import DOMPurify from 'dompurify';
 import { 
   X, Minus, Maximize2, Save, Download, RefreshCw, 
   Plus, Trash2, GripVertical, ChevronUp, ChevronDown,
@@ -327,7 +328,7 @@ const RichEditorField: React.FC<RichEditorFieldProps> = ({
   // Set content on mount only
   useEffect(() => {
     if (editorRef.current) {
-      editorRef.current.innerHTML = toHtml(value || '');
+      editorRef.current.innerHTML = DOMPurify.sanitize(toHtml(value || ''));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -336,8 +337,7 @@ const RichEditorField: React.FC<RichEditorFieldProps> = ({
   useEffect(() => {
     if (!editorRef.current) return;
     if (value !== lastValueRef.current) {
-      // Value changed from outside (undo, mention insert, block switch, etc.)
-      editorRef.current.innerHTML = toHtml(value || '');
+      editorRef.current.innerHTML = DOMPurify.sanitize(toHtml(value || ''));
       lastValueRef.current = value;
     }
   }, [value, toHtml]);
@@ -1323,7 +1323,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
           <div className={`p-6 ${block.style === 'highlight' && !blockBg ? 'border-l-4' : ''}`} style={{ backgroundColor: blockBg || (block.style === 'highlight' ? '#F9FAFB' : undefined), borderColor: block.style === 'highlight' ? themeColors.primary : undefined }}>
             {block.title && <h3 className={`text-lg mb-3 ${hCls}`} style={{ color: blockTitleColor || themeColors.secondary }}>{renderPv(block.title)}</h3>}
             {isHtml ? (
-              <div className={`prose prose-sm max-w-none ${bCls}`} style={{ color: blockTextColor || '#4B5563' }} dangerouslySetInnerHTML={{ __html: textContent }} />
+              <div className={`prose prose-sm max-w-none ${bCls}`} style={{ color: blockTextColor || '#4B5563' }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(textContent) }} />
             ) : (
               <p className={`whitespace-pre-wrap ${bCls}`} style={{ color: blockTextColor || '#4B5563' }}>{textContent}</p>
             )}
@@ -1489,8 +1489,8 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
         return (
           <div className="p-6" style={{ backgroundColor: blockBg }}>
             <div className="grid grid-cols-2 gap-6">
-              <div className={`prose prose-sm max-w-none ${bCls}`} style={{ color: blockTextColor || '#4B5563' }} dangerouslySetInnerHTML={{ __html: leftHtml }} />
-              <div className={`prose prose-sm max-w-none ${bCls}`} style={{ color: blockTextColor || '#4B5563' }} dangerouslySetInnerHTML={{ __html: rightHtml }} />
+              <div className={`prose prose-sm max-w-none ${bCls}`} style={{ color: blockTextColor || '#4B5563' }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(leftHtml) }} />
+              <div className={`prose prose-sm max-w-none ${bCls}`} style={{ color: blockTextColor || '#4B5563' }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(rightHtml) }} />
             </div>
           </div>
         );

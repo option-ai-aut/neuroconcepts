@@ -168,4 +168,19 @@ export const schemas = {
   adminMigrate: z.object({
     version: z.string().min(1).max(50),
   }),
+
+  // AI image edit
+  aiImageEdit: z.object({
+    image: z.string().min(1).max(50_000_000),
+    prompt: z.string().max(2000).optional(),
+    style: z.string().max(100).optional(),
+    roomType: z.string().max(100).optional(),
+    aspectRatio: z.number().min(0.1).max(10).optional(),
+  }),
+
+  // Billing checkout
+  billingCheckout: z.object({
+    plan: z.enum(['solo', 'team']),
+    billingCycle: z.enum(['monthly', 'yearly']).optional().default('monthly'),
+  }),
 };

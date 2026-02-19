@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import DOMPurify from 'dompurify';
 import { fetchWithAuth } from '@/lib/api';
 import { useEnv } from '@/components/EnvProvider';
 import { Save, Eye, Code, Loader2, Sparkles, User, Mail, Phone, Building2, Globe, AlertCircle } from 'lucide-react';
@@ -223,7 +224,7 @@ export default function EmailSettingsPage() {
             {signature ? (
               <div 
                 className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: signature }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(signature) }}
               />
             ) : (
               <div className="flex flex-col items-center justify-center h-48 text-gray-400">

@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { CreditCard, FileText, Download, Calendar, CheckCircle, AlertCircle, ExternalLink, Loader2, Sparkles, ArrowRight } from 'lucide-react';
+import { CreditCard, FileText, Download, Calendar, CheckCircle, AlertCircle, ExternalLink, Loader2, Sparkles, ArrowRight, Clock } from 'lucide-react';
 import useSWR from 'swr';
-import { getMe, getApiUrl } from '@/lib/api';
+import { getMe, getApiUrl, getAuthHeaders } from '@/lib/api';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -24,6 +24,9 @@ interface Subscription {
   currentPeriodEnd: number | null;
   billingCycle: string | null;
   paymentMethod: { brand: string; last4: string; expiry: string } | null;
+  trialEndsAt: number | null;
+  trialDaysLeft: number;
+  isTrialActive: boolean;
 }
 
 const PLAN_LABELS: Record<string, string> = {
@@ -42,10 +45,10 @@ const PLAN_PRICES: Record<string, string> = {
 
 async function apiFetch(path: string, options?: RequestInit) {
   const base = getApiUrl();
-  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') || '' : '';
+  const authHeaders = await getAuthHeaders();
   const res = await fetch(`${base}${path}`, {
     ...options,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(options?.headers || {}) },
+    headers: { 'Content-Type': 'application/json', ...authHeaders, ...(options?.headers || {}) },
   });
   if (!res.ok) throw new Error(`${res.status}`);
   return res.json();
@@ -63,6 +66,8 @@ export default function BillingSettingsPage() {
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [checkoutCycle, setCheckoutCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
 
   // Redirect non-admins
   useEffect(() => {
@@ -106,6 +111,24 @@ export default function BillingSettingsPage() {
       alert('Stripe Portal konnte nicht geöffnet werden.');
     } finally {
       setPortalLoading(false);
+    }
+  };
+
+  const handleCheckout = async (planId: string) => {
+    setCheckoutLoading(planId);
+    try {
+      const data = await apiFetch('/billing/checkout', {
+        method: 'POST',
+        body: JSON.stringify({ plan: planId, billingCycle: checkoutCycle }),
+      });
+      if (data.url) { window.location.href = data.url; return; }
+      // BILLING_ENABLED=false → show success message
+      setSuccessMsg('Testphase verlängert — Kostenloser Vollzugang aktiviert.');
+      setTimeout(() => setSuccessMsg(''), 5000);
+    } catch {
+      alert('Checkout fehlgeschlagen.');
+    } finally {
+      setCheckoutLoading(null);
     }
   };
 
@@ -153,31 +176,102 @@ export default function BillingSettingsPage() {
             <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
           </div>
         ) : subscription && !subscription.billingEnabled ? (
-          /* ── Test-Phase Banner ── */
-          <div className="bg-white border border-gray-200 rounded-xl p-7">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-black flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-1">
-                  <h3 className="text-lg font-bold text-gray-900">Testphase — Kostenloser Vollzugang</h3>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    Aktiv
-                  </span>
+          /* ── Test-Phase Banner + Plan Selection ── */
+          <div className="space-y-6">
+            <div className="bg-white border border-gray-200 rounded-xl p-7">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-black flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-6 h-6 text-white" />
                 </div>
-                <p className="text-sm text-gray-500 leading-relaxed">
-                  Während der Testphase hast du kostenlosen Zugang zu allen Features. Keine Kreditkarte nötig.
-                  Sobald wir live gehen, wirst du rechtzeitig informiert.
-                </p>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-1">
+                    <h3 className="text-lg font-bold text-gray-900">Testphase — Kostenloser Vollzugang</h3>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      <CheckCircle className="w-3 h-3 mr-1" />Aktiv
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500 leading-relaxed">
+                    Während der Testphase hast du kostenlosen Zugang zu allen Features. Keine Kreditkarte nötig.
+                  </p>
+                  {subscription.isTrialActive && (
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs text-gray-500 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {subscription.trialDaysLeft === 1
+                            ? 'Noch 1 Tag'
+                            : `Noch ${subscription.trialDaysLeft} Tage`}
+                        </span>
+                        <span className="text-xs text-gray-400">von 7 Tagen</span>
+                      </div>
+                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gray-900 rounded-full transition-all"
+                          style={{ width: `${(subscription.trialDaysLeft / 7) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-            <div className="mt-6 pt-5 border-t border-gray-100 flex items-center justify-between">
-              <p className="text-sm text-gray-400">Aktiver Plan: <span className="font-medium text-gray-700">{PLAN_LABELS[subscription.plan] || 'Free'}</span></p>
-              <Link href="/preise" className="text-sm text-gray-500 hover:text-gray-900 flex items-center gap-1 transition-colors">
-                Pläne ansehen <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+
+            {/* Plan selection */}
+            <div className="bg-white border border-gray-200 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-sm font-semibold text-gray-900">Plan wählen</h3>
+                <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded-full">
+                  {(['monthly', 'yearly'] as const).map(c => (
+                    <button
+                      key={c}
+                      onClick={() => setCheckoutCycle(c)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                        checkoutCycle === c ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                      }`}
+                    >
+                      {c === 'monthly' ? 'Monatlich' : 'Jährlich'}
+                      {c === 'yearly' && <span className="ml-1 text-emerald-600">−10%</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  { id: 'solo', name: 'Solo', monthly: 149, yearly: 134, tagline: 'Für Einzelmakler' },
+                  { id: 'team', name: 'Team', monthly: 699, yearly: 629, tagline: 'Für kleine Teams', popular: true },
+                ].map(plan => (
+                  <div key={plan.id} className={`relative rounded-xl border p-4 ${plan.popular ? 'border-gray-900' : 'border-gray-200'}`}>
+                    {plan.popular && (
+                      <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 bg-gray-900 text-white text-[10px] font-semibold rounded-full whitespace-nowrap">
+                        Beliebteste Wahl
+                      </span>
+                    )}
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="text-xs text-gray-400 mb-0.5">{plan.tagline}</p>
+                        <h4 className="font-semibold text-gray-900">{plan.name}</h4>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-lg font-bold text-gray-900">
+                          €{checkoutCycle === 'monthly' ? plan.monthly : plan.yearly}
+                        </span>
+                        <span className="text-xs text-gray-400">/Mo</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleCheckout(plan.id)}
+                      disabled={!!checkoutLoading}
+                      className={`w-full py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60 ${
+                        plan.popular
+                          ? 'bg-gray-900 text-white hover:bg-gray-700'
+                          : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                      }`}
+                    >
+                      {checkoutLoading === plan.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>{plan.name} starten<ArrowRight className="w-3.5 h-3.5" /></>}
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         ) : subscription?.subscriptionId ? (
@@ -234,17 +328,49 @@ export default function BillingSettingsPage() {
             </div>
           </div>
         ) : (
-          /* ── No Subscription ── */
-          <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
-            <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Kein aktives Abonnement</h3>
-            <p className="text-sm text-gray-500 mb-6">Wähle einen Plan um loszulegen.</p>
-            <Link
-              href="/preise"
-              className="px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-gray-900 hover:bg-black inline-flex items-center gap-2 transition-colors"
-            >
-              Pläne ansehen <ArrowRight className="w-4 h-4" />
-            </Link>
+          /* ── No Subscription / Billing Enabled ── */
+          <div className="space-y-4">
+            <div className="bg-white border border-gray-200 rounded-xl p-6 text-center">
+              <CreditCard className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+              <h3 className="text-sm font-medium text-gray-900 mb-1">Kein aktives Abonnement</h3>
+              <p className="text-sm text-gray-500">Wähle einen Plan um loszulegen.</p>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-900">Plan wählen</h3>
+                <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded-full">
+                  {(['monthly', 'yearly'] as const).map(c => (
+                    <button key={c} onClick={() => setCheckoutCycle(c)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${checkoutCycle === c ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>
+                      {c === 'monthly' ? 'Monatlich' : <>Jährlich <span className="text-emerald-600">−10%</span></>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  { id: 'solo', name: 'Solo', monthly: 149, yearly: 134, tagline: 'Für Einzelmakler' },
+                  { id: 'team', name: 'Team', monthly: 699, yearly: 629, tagline: 'Für kleine Teams', popular: true },
+                ].map(plan => (
+                  <div key={plan.id} className={`relative rounded-xl border p-4 ${plan.popular ? 'border-gray-900' : 'border-gray-200'}`}>
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="text-xs text-gray-400">{plan.tagline}</p>
+                        <h4 className="font-semibold text-gray-900">{plan.name}</h4>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-lg font-bold text-gray-900">€{checkoutCycle === 'monthly' ? plan.monthly : plan.yearly}</span>
+                        <span className="text-xs text-gray-400">/Mo</span>
+                      </div>
+                    </div>
+                    <button onClick={() => handleCheckout(plan.id)} disabled={!!checkoutLoading}
+                      className={`w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 disabled:opacity-60 transition-colors ${plan.popular ? 'bg-gray-900 text-white hover:bg-gray-700' : 'bg-gray-100 text-gray-900 hover:bg-gray-200'}`}>
+                      {checkoutLoading === plan.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>{plan.name} starten<ArrowRight className="w-3.5 h-3.5" /></>}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>

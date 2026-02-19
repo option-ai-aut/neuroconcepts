@@ -6,7 +6,7 @@ import PublicFooter from '@/components/PublicFooter';
 export default function ImpressumPage() {
   return (
     <div className="min-h-screen bg-white">
-      <PublicNavigation currentPage="impressum" />
+      <PublicNavigation currentPage="imprint" />
 
       <section className="pt-24 sm:pt-32 pb-16 sm:pb-24">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 animate-fade-in">

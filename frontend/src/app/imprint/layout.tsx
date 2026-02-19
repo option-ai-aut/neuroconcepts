@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   description: 'Impressum von Immivo AI. Angaben gemäß § 5 TMG / ECG.',
   robots: { index: true, follow: true },
   alternates: {
-    canonical: 'https://immivo.ai/impressum',
+    canonical: 'https://immivo.ai/imprint',
   },
 };
 

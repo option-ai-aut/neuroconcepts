@@ -157,12 +157,14 @@ function Stagger({ children, active, className = '', delay = 0 }: { children: Re
   // Track whether this element has ever been made visible.
   // Before first activation → hidden (will animate in).
   // After first activation → stay fully visible on exit so the slide block slides away cleanly.
+  // On mobile, CSS overrides via [data-stagger] make everything always visible.
   const hasShown = useRef(false);
   if (active) hasShown.current = true;
 
   const shown = hasShown.current;
   return (
     <div
+      data-stagger=""
       className={className}
       style={{
         opacity: active || shown ? 1 : 0,
@@ -185,6 +187,15 @@ export default function LandingPage() {
   const [splashDone, setSplashDone] = useState(splashShownThisSession);
   const handleSplashComplete = useCallback(() => { splashShownThisSession = true; setSplashDone(true); }, []);
 
+  /* ── Mobile detection ── */
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   /* ── Scroll Controller ── */
   const [activeIdx, setActiveIdx] = useState(0);
   const activeIdxRef = useRef(0);
@@ -203,24 +214,35 @@ export default function LandingPage() {
   }, [splashDone]);
 
   // Jump to section based on URL hash (e.g. /#demo, /#features)
+  // Also handles hashchange events for in-page navigation (e.g. from nav menu while already on home page)
   useEffect(() => {
-    if (!splashDone) return;
-    const hash = window.location.hash;
     const hashMap: Record<string, number> = {
       '#demo': 7,
       '#features': 4,
       '#jarvis': 2,
       '#bildbearbeitung': 5,
     };
-    const target = hashMap[hash];
-    if (target !== undefined) {
-      // Clear hash without page reload
-      window.history.replaceState(null, '', window.location.pathname);
-      setTimeout(() => {
-        setActiveIdx(target);
-        if (target === 3) setOrbitalPhase('results');
-      }, 100);
+
+    const navigateToHash = (hash: string) => {
+      const target = hashMap[hash];
+      if (target !== undefined) {
+        window.history.replaceState(null, '', window.location.pathname);
+        setTimeout(() => {
+          setActiveIdx(target);
+          if (target === 3) setOrbitalPhase('results');
+        }, 100);
+      }
+    };
+
+    // Initial load: check hash once splash is done
+    if (splashDone) {
+      navigateToHash(window.location.hash);
     }
+
+    // In-page navigation: listen for hash changes while already on this page
+    const handleHashChange = () => navigateToHash(window.location.hash);
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, [splashDone]);
 
   const isLightSection = (activeIdx >= 1 && activeIdx <= 2) || (activeIdx === 3 && (orbitalPhase === 'orbital' || orbitalPhase === 'shrinking')) || activeIdx === 4 || activeIdx === 5 || activeIdx === 7 || activeIdx === 9;
@@ -322,6 +344,20 @@ export default function LandingPage() {
     return () => { if (heroRaf.current) cancelAnimationFrame(heroRaf.current); };
   }, []);
 
+  // Logo click → scroll to top (section 0)
+  useEffect(() => {
+    const handler = () => {
+      if (activeIdxRef.current === 0 && heroPhase === 'idle') return;
+      if (heroPhase !== 'idle') {
+        triggerHeroRewind();
+      } else {
+        setActiveIdx(0);
+      }
+    };
+    window.addEventListener('landing-go-top', handler);
+    return () => window.removeEventListener('landing-go-top', handler);
+  }, [heroPhase, triggerHeroRewind]);
+
   useEffect(() => {
     const vid = heroVideoRef.current;
     if (!vid) return;
@@ -373,14 +409,18 @@ export default function LandingPage() {
   }, [orbitalPhase]);
 
   useEffect(() => {
+    // On mobile, always show results (skip orbital animation)
+    if (isMobile) { setOrbitalPhase('results'); return; }
     if (activeIdx !== 3) {
       if (activeIdx > 3 && orbitalPhase !== 'results') setOrbitalPhase('results');
       else if (activeIdx < 3 && orbitalPhase !== 'orbital') setOrbitalPhase('orbital');
     }
-  }, [activeIdx, orbitalPhase]);
+  }, [activeIdx, orbitalPhase, isMobile]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    // On mobile, let the browser handle native scrolling
+    if (isMobile) return;
 
     const COOLDOWN = TRANSITION_MS + 500;
 
@@ -438,7 +478,7 @@ export default function LandingPage() {
       window.removeEventListener('touchstart', onTouchStart);
       window.removeEventListener('touchend', onTouchEnd);
     };
-  }, [SECTION_COUNT, TRANSITION_MS, triggerHeroReveal, triggerHeroRewind, expandOrbital, collapseOrbital]);
+  }, [SECTION_COUNT, TRANSITION_MS, triggerHeroReveal, triggerHeroRewind, expandOrbital, collapseOrbital, isMobile]);
 
   return (
     <div className={`${S_DARK} font-sans text-white`}>
@@ -521,9 +561,25 @@ export default function LandingPage() {
           height: 100dvh !important;
         }
 
-        /* Mobile tweaks */
-        @media (max-width: 768px) {
-          .feat-card { aspect-ratio: auto; min-height: 0; }
+        /* ── MOBILE: disable snap, enable normal scroll ── */
+        @media (max-width: 767px) {
+          .snap-outer { height: auto !important; overflow: visible !important; }
+          .snap-track { transform: none !important; transition: none !important; }
+          /* Keep each section fullscreen so layout looks clean */
+          .snap-slide { height: 100svh !important; }
+          /* Remove all entry animations on mobile */
+          .hero-el {
+            opacity: 1 !important;
+            animation: none !important;
+            transform: none !important;
+            filter: none !important;
+          }
+          [data-stagger] {
+            opacity: 1 !important;
+            transform: none !important;
+            transition: none !important;
+          }
+          .feat-card { aspect-ratio: auto; min-height: 0; padding: 20px; border-radius: 14px; }
         }
 
         .glass-card-hover { transition: transform 0.3s, box-shadow 0.3s; }
@@ -791,7 +847,7 @@ export default function LandingPage() {
           </Slide>
 
           {/* ══════════════════════════════════════════
-              4. FEATURES — horizontal slider
+              4. FEATURES — horizontal slider (desktop) / vertical grid (mobile)
               ══════════════════════════════════════════ */}
           <Slide idx={4} active={activeIdx === 4} className="bg-white text-gray-900">
             <div className="h-full flex flex-col justify-center relative">
@@ -809,55 +865,55 @@ export default function LandingPage() {
                 </Stagger>
               </div>
 
-              {/* Horizontal card track */}
-              <div className="overflow-hidden">
-                <div
-                  className="flex"
-                  style={{
-                    transition: 'transform 600ms cubic-bezier(0.4, 0, 0.2, 1)',
-                    transform: `translateX(-${featureStep * 100}%)`,
-                  }}
-                >
-                  {[0, 1, 2].map(groupIdx => {
-                    const groupItems = featureItems.slice(groupIdx * 4, groupIdx * 4 + 4);
-                    const isCentered = groupItems.length < 4;
-                    return (
-                      <div key={groupIdx} className="w-full flex-shrink-0 px-6 sm:px-12 lg:px-20">
-                        <div className={`grid gap-3 sm:gap-4 ${isCentered ? 'grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 max-w-6xl mx-auto'}`}>
-                          {groupItems.map((f, i) => (
-                            <Stagger key={i} active={activeIdx === 4} delay={300 + i * 80}>
-                            <div
-                              className="feat-card"
-                            >
-                              <f.icon className="w-7 h-7 sm:w-8 sm:h-8 text-gray-800" strokeWidth={1.5} />
-                              <div>
-                                <h3 className="text-[15px] sm:text-base font-semibold text-gray-900 mb-1.5">{f.title}</h3>
-                                <p className="text-xs sm:text-[13px] text-gray-500 leading-relaxed line-clamp-2">{f.desc}</p>
-                              </div>
-                            </div>
-                            </Stagger>
-                          ))}
-                        </div>
+              {/* Mobile: 2-col grid with all cards */}
+              {isMobile ? (
+                <div className="px-5 grid grid-cols-2 gap-3 max-w-lg mx-auto w-full">
+                  {featureItems.map((f, i) => (
+                    <div key={i} className="feat-card">
+                      <f.icon className="w-6 h-6 text-gray-800 mb-2" strokeWidth={1.5} />
+                      <div>
+                        <h3 className="text-[13px] font-semibold text-gray-900 mb-1">{f.title}</h3>
+                        <p className="text-[11px] text-gray-500 leading-relaxed line-clamp-2">{f.desc}</p>
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
-              </div>
-
-              {/* Mobile dots */}
-              <div className="sm:hidden flex items-center justify-center gap-2 mt-6">
-                {Array.from({ length: FEATURE_MAX_STEP + 1 }).map((_, i) => (
-                  <button
-                    key={i}
-                    className="h-1 rounded-full transition-all duration-500"
-                    style={{
-                      width: featureStep === i ? '20px' : '6px',
-                      background: featureStep === i ? '#111827' : 'rgba(0,0,0,0.1)',
-                    }}
-                    onClick={() => setFeatureStep(i)}
-                  />
-                ))}
-              </div>
+              ) : (
+                <>
+                  {/* Desktop: Horizontal card track */}
+                  <div className="overflow-hidden">
+                    <div
+                      className="flex"
+                      style={{
+                        transition: 'transform 600ms cubic-bezier(0.4, 0, 0.2, 1)',
+                        transform: `translateX(-${featureStep * 100}%)`,
+                      }}
+                    >
+                      {[0, 1, 2].map(groupIdx => {
+                        const groupItems = featureItems.slice(groupIdx * 4, groupIdx * 4 + 4);
+                        const isCentered = groupItems.length < 4;
+                        return (
+                          <div key={groupIdx} className="w-full flex-shrink-0 px-6 sm:px-12 lg:px-20">
+                            <div className={`grid gap-3 sm:gap-4 ${isCentered ? 'grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 max-w-6xl mx-auto'}`}>
+                              {groupItems.map((f, i) => (
+                                <Stagger key={i} active={activeIdx === 4} delay={300 + i * 80}>
+                                  <div className="feat-card">
+                                    <f.icon className="w-7 h-7 sm:w-8 sm:h-8 text-gray-800" strokeWidth={1.5} />
+                                    <div>
+                                      <h3 className="text-[15px] sm:text-base font-semibold text-gray-900 mb-1.5">{f.title}</h3>
+                                      <p className="text-xs sm:text-[13px] text-gray-500 leading-relaxed line-clamp-2">{f.desc}</p>
+                                    </div>
+                                  </div>
+                                </Stagger>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </Slide>
 
@@ -1044,10 +1100,10 @@ export default function LandingPage() {
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
                     backgroundClip: 'text',
-                    opacity: activeIdx === 9 ? 1 : 0,
-                    transform: activeIdx === 9 ? 'translateY(0)' : 'translateY(60px)',
-                    transition: 'opacity 1.8s cubic-bezier(0.16, 1, 0.3, 1), transform 2s cubic-bezier(0.16, 1, 0.3, 1)',
-                    transitionDelay: activeIdx === 9 ? '400ms' : '0ms',
+                    opacity: isMobile || activeIdx === 9 ? 1 : 0,
+                    transform: isMobile || activeIdx === 9 ? 'translateY(0)' : 'translateY(60px)',
+                    transition: isMobile ? 'none' : 'opacity 1.8s cubic-bezier(0.16, 1, 0.3, 1), transform 2s cubic-bezier(0.16, 1, 0.3, 1)',
+                    transitionDelay: activeIdx === 9 && !isMobile ? '400ms' : '0ms',
                   }}
                 >
                   Stress Less
@@ -1058,10 +1114,10 @@ export default function LandingPage() {
               <div
                 className="absolute inset-x-0 bottom-0"
                 style={{
-                  opacity: activeIdx === 9 ? 1 : 0,
-                  transform: activeIdx === 9 ? 'translateY(0)' : 'translateY(40px)',
-                  transition: 'opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1)',
-                  transitionDelay: '300ms',
+                  opacity: isMobile || activeIdx === 9 ? 1 : 0,
+                  transform: isMobile || activeIdx === 9 ? 'translateY(0)' : 'translateY(40px)',
+                  transition: isMobile ? 'none' : 'opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1)',
+                  transitionDelay: isMobile ? '0ms' : '300ms',
                 }}
               >
                 <div className="overflow-hidden mx-auto mb-[10px]" style={{ maxWidth: 'calc(100vw - 20px)' }}>

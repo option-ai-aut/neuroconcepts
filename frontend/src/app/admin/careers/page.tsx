@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchAuthSession } from 'aws-amplify/auth';
+import DOMPurify from 'dompurify';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 import {
   Plus,
@@ -110,7 +111,7 @@ function RichTextEditor({
 
   useEffect(() => {
     if (ref.current && ref.current.innerHTML !== value) {
-      ref.current.innerHTML = value || '';
+      ref.current.innerHTML = DOMPurify.sanitize(value || '');
     }
   }, [value]);
 

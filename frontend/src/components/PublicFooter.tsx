@@ -39,26 +39,26 @@ export default function PublicFooter({ bare = false }: { bare?: boolean }) {
               <li><Link href="/#jarvis" className="hover:text-white transition-colors">{nav('jarvisAi')}</Link></li>
               <li><Link href="/#features" className="hover:text-white transition-colors">{nav('features')}</Link></li>
               <li><Link href="/#bildbearbeitung" className="hover:text-white transition-colors">{nav('aiImageEditing')}</Link></li>
-              <li><Link href="/preise" className="hover:text-white transition-colors">{nav('pricing')}</Link></li>
+              <li><Link href="/pricing" className="hover:text-white transition-colors">{nav('pricing')}</Link></li>
             </ul>
           </div>
 
           <div>
             <h4 className="font-semibold mb-4">{t('company')}</h4>
             <ul className="space-y-3 text-gray-400 text-sm">
-              <li><Link href="/ueber-uns" className="hover:text-white transition-colors">{nav('aboutUs')}</Link></li>
+              <li><Link href="/about" className="hover:text-white transition-colors">{nav('aboutUs')}</Link></li>
               <li><Link href="/blog" className="hover:text-white transition-colors">{nav('blog')}</Link></li>
-              <li><Link href="/karriere" className="hover:text-white transition-colors">{nav('careers')}</Link></li>
-              <li><Link href="/kontakt" className="hover:text-white transition-colors">{nav('contact')}</Link></li>
+              <li><Link href="/careers" className="hover:text-white transition-colors">{nav('careers')}</Link></li>
+              <li><Link href="/contact" className="hover:text-white transition-colors">{nav('contact')}</Link></li>
             </ul>
           </div>
 
           <div>
             <h4 className="font-semibold mb-4">{t('legal')}</h4>
             <ul className="space-y-3 text-gray-400 text-sm">
-              <li><Link href="/datenschutz" className="hover:text-white transition-colors">{t('privacy')}</Link></li>
-              <li><Link href="/agb" className="hover:text-white transition-colors">{t('terms')}</Link></li>
-              <li><Link href="/impressum" className="hover:text-white transition-colors">{t('imprint')}</Link></li>
+              <li><Link href="/privacy" className="hover:text-white transition-colors">{t('privacy')}</Link></li>
+              <li><Link href="/terms" className="hover:text-white transition-colors">{t('terms')}</Link></li>
+              <li><Link href="/imprint" className="hover:text-white transition-colors">{t('imprint')}</Link></li>
             </ul>
           </div>
         </div>

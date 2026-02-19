@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchAuthSession } from 'aws-amplify/auth';
+import DOMPurify from 'dompurify';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 import {
   Plus,
@@ -154,7 +155,7 @@ export default function BlogEditorPage() {
       });
       slugManuallyEdited.current = false;
       setTimeout(() => {
-        if (editorRef.current) editorRef.current.innerHTML = selectedPost.content ?? '';
+        if (editorRef.current) editorRef.current.innerHTML = DOMPurify.sanitize(selectedPost.content ?? '');
       }, 0);
     } else if (isNew) {
       setForm({

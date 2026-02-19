@@ -15,14 +15,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     // Preise
     {
-      url: `${SITE_URL}/preise`,
+      url: `/pricing`,
       lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.9,
     },
     // Über uns
     {
-      url: `${SITE_URL}/ueber-uns`,
+      url: `/about`,
       lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.7,
@@ -36,33 +36,33 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     // Karriere
     {
-      url: `${SITE_URL}/karriere`,
+      url: `/careers`,
       lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.6,
     },
     // Kontakt
     {
-      url: `${SITE_URL}/kontakt`,
+      url: `/contact`,
       lastModified: now,
       changeFrequency: 'yearly',
       priority: 0.6,
     },
     // Legal Pages
     {
-      url: `${SITE_URL}/datenschutz`,
+      url: `/privacy`,
       lastModified: now,
       changeFrequency: 'yearly',
       priority: 0.3,
     },
     {
-      url: `${SITE_URL}/agb`,
+      url: `/terms`,
       lastModified: now,
       changeFrequency: 'yearly',
       priority: 0.3,
     },
     {
-      url: `${SITE_URL}/impressum`,
+      url: `/imprint`,
       lastModified: now,
       changeFrequency: 'yearly',
       priority: 0.3,

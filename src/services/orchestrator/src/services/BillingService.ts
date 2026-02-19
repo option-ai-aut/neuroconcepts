@@ -55,6 +55,16 @@ export interface StripeConfig {
   status?: string;
   currentPeriodEnd?: number;
   billingCycle?: BillingCycle;
+  /** Unix timestamp (seconds) when the 7-day free trial ends. Set on registration. */
+  trialEndsAt?: number;
+}
+
+export const TRIAL_DURATION_DAYS = 7;
+
+/** Returns remaining trial days (0 if expired or no trial). */
+export function getTrialDaysLeft(trialEndsAt?: number): number {
+  if (!trialEndsAt) return 0;
+  return Math.max(0, Math.ceil((trialEndsAt - Date.now() / 1000) / 86400));
 }
 
 export function parsePlan(priceId: string): PlanId {

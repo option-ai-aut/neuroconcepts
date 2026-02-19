@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchAuthSession } from 'aws-amplify/auth';
+import DOMPurify from 'dompurify';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 import {
   Users,
@@ -327,7 +328,7 @@ export default function NewsletterPage() {
 
   useEffect(() => {
     if (editorRef.current && editingCampaignId) {
-      editorRef.current.innerHTML = campaignForm.htmlContent || '';
+      editorRef.current.innerHTML = DOMPurify.sanitize(campaignForm.htmlContent || '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingCampaignId]);

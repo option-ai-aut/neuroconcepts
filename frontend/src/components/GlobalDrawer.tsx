@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import DOMPurify from 'dompurify';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { X, Minus, Maximize2, Send, Paperclip, ChevronDown, ChevronUp, Bold, Italic, Underline, List, ListOrdered, Link2, Image, Trash2, FileText, Plus, User, Camera, Terminal } from 'lucide-react';
 import { createLead, createProperty, sendManualEmail, API_ENDPOINTS, fetchWithAuth, getApiUrl } from '@/lib/api';
@@ -137,9 +138,9 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
     if (editorRef.current && !initializedRef.current) {
       initializedRef.current = true;
       if (emailFormData.bodyHtml) {
-        editorRef.current.innerHTML = emailFormData.bodyHtml;
+        editorRef.current.innerHTML = DOMPurify.sanitize(emailFormData.bodyHtml);
       } else if (emailFormData.body) {
-        editorRef.current.innerHTML = emailFormData.body.replace(/\n/g, '<br>');
+        editorRef.current.innerHTML = DOMPurify.sanitize(emailFormData.body.replace(/\n/g, '<br>'));
       }
     }
   }, [emailFormData.bodyHtml, emailFormData.body]);
@@ -154,7 +155,7 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
       !emailFormData.bodyHtml
     ) {
       const sigHtml = '<br><br>' + signature.replace(/\n/g, '<br>');
-      editorRef.current.innerHTML = sigHtml;
+      editorRef.current.innerHTML = DOMPurify.sanitize(sigHtml);
       // Place cursor at the very beginning (before signature)
       const range = document.createRange();
       const sel = window.getSelection();

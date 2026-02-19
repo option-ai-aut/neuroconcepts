@@ -6,10 +6,10 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Über uns — Das Team hinter Immivo AI',
     description: 'Immivo AI wurde 2026 in Wien gegründet, um Immobilienmakler mit künstlicher Intelligenz zu unterstützen.',
-    url: 'https://immivo.ai/ueber-uns',
+    url: 'https://immivo.ai/about',
   },
   alternates: {
-    canonical: 'https://immivo.ai/ueber-uns',
+    canonical: 'https://immivo.ai/about',
   },
 };
 
@@ -20,7 +20,7 @@ const jsonLd = {
       '@type': 'AboutPage',
       name: 'Über Immivo AI',
       description: 'Immivo AI wurde 2026 in Wien gegründet. Zwei Gründer, eine Mission: Makler von Büroarbeit befreien.',
-      url: 'https://immivo.ai/ueber-uns',
+      url: 'https://immivo.ai/about',
       mainEntity: { '@id': 'https://immivo.ai/#organization' },
     },
     {

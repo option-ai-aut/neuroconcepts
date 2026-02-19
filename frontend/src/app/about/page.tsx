@@ -34,7 +34,7 @@ export default function UeberUnsPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <PublicNavigation currentPage="ueber-uns" />
+      <PublicNavigation currentPage="about" />
 
       {/* Hero — Bold, full-width */}
       <section className="relative pt-24 sm:pt-32 pb-20 sm:pb-32 bg-black text-white overflow-hidden">

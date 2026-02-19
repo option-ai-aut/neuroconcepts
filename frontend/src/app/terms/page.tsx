@@ -7,7 +7,7 @@ import PublicFooter from '@/components/PublicFooter';
 export default function AGBPage() {
   return (
     <div className="min-h-screen bg-white">
-      <PublicNavigation currentPage="agb" />
+      <PublicNavigation currentPage="terms" />
 
       <section className="pt-24 sm:pt-32 pb-16 sm:pb-24">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 animate-fade-in">
@@ -248,10 +248,10 @@ export default function AGBPage() {
               <p className="text-gray-600 leading-relaxed">
                 Die Verarbeitung personenbezogener Daten erfolgt gemäß der geltenden
                 Datenschutz-Grundverordnung (DSGVO) und unserer{' '}
-                <Link href="/datenschutz" className="text-blue-600 hover:text-blue-700 hover:underline font-medium">
+                <Link href="/privacy" className="text-blue-600 hover:text-blue-700 hover:underline font-medium">
                   Datenschutzerklärung
                 </Link>
-                , die unter /datenschutz abrufbar ist. Durch die Nutzung der Plattform
+                , die unter /privacy abrufbar ist. Durch die Nutzung der Plattform
                 erkennt der Nutzer die Datenschutzerklärung an.
               </p>
             </section>

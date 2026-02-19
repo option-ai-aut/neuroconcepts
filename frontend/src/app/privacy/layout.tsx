@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   description: 'Datenschutzerklärung von Immivo AI. Informationen zur Verarbeitung personenbezogener Daten gemäß DSGVO.',
   robots: { index: true, follow: true },
   alternates: {
-    canonical: 'https://immivo.ai/datenschutz',
+    canonical: 'https://immivo.ai/privacy',
   },
 };
 

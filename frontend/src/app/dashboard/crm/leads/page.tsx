@@ -63,7 +63,16 @@ export default function LeadsPage() {
     EMAIL: tSrc('email'),
     PHONE: tSrc('phone'),
     REFERRAL: tSrc('referral'),
+    PORTAL: tSrc('portal'),
+    SOCIAL_MEDIA: tSrc('social_media'),
+    COLD_CALL: tSrc('cold_call'),
+    EVENT: tSrc('event'),
+    OTHER: tSrc('other'),
   };
+
+  const formatSource = (source: string) =>
+    sourceLabels[source] ??
+    source.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
   const statusLabels: Record<string, string> = {
     NEW: ts('new'),
@@ -167,7 +176,7 @@ export default function LeadsPage() {
                     </td>
                     <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
                       <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-                        {(lead.source && sourceLabels[lead.source]) || lead.source || tSrc('unknown')}
+                        {lead.source ? formatSource(lead.source) : tSrc('unknown')}
                       </span>
                     </td>
                     <td className="px-6 py-3 whitespace-nowrap text-sm">

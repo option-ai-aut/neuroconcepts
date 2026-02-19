@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   description: 'AGB von Immivo AI. Allgemeine Geschäftsbedingungen für die Nutzung unserer KI-Plattform für Immobilienmakler.',
   robots: { index: true, follow: true },
   alternates: {
-    canonical: 'https://immivo.ai/agb',
+    canonical: 'https://immivo.ai/terms',
   },
 };
 

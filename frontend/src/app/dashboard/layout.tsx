@@ -14,7 +14,9 @@ import { useGlobalState } from '@/context/GlobalStateContext';
 import { useAuthConfigured } from '@/components/AuthProvider';
 import { DarkModeProvider, useDarkMode } from '@/context/DarkModeContext';
 import { RealtimeEventProvider } from '@/components/RealtimeEventProvider';
-import { sendPresenceHeartbeat } from '@/lib/api';
+import { sendPresenceHeartbeat, getApiUrl, getAuthHeaders } from '@/lib/api';
+import TrialBanner from '@/components/TrialBanner';
+import TrialGate from '@/components/TrialGate';
 import { Loader2, Monitor } from 'lucide-react';
 import Image from 'next/image';
 
@@ -241,6 +243,39 @@ export default function DashboardLayout({
   const authConfigured = useAuthConfigured();
   const tCommon = useTranslations('common');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<{
+    isTrialActive: boolean;
+    trialDaysLeft: number;
+    subscriptionId: string | null;
+    billingEnabled: boolean;
+  } | null>(null);
+  // True once the billing fetch has settled (success or error), so the gate
+  // logic doesn't stay forever deferred when the API is unreachable.
+  const [billingResolved, setBillingResolved] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const fetchSub = async () => {
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(`${getApiUrl()}/billing/subscription`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setSubscriptionStatus({
+            isTrialActive: data.isTrialActive ?? false,
+            trialDaysLeft: data.trialDaysLeft ?? 0,
+            subscriptionId: data.subscriptionId ?? null,
+            billingEnabled: data.billingEnabled ?? false,
+          });
+        }
+      } catch {
+        // non-critical — don't block dashboard
+      } finally {
+        setBillingResolved(true);
+      }
+    };
+    fetchSub();
+  }, [isAuthenticated]);
 
   useEffect(() => {
     // Wait until Amplify is configured before checking auth
@@ -288,10 +323,30 @@ export default function DashboardLayout({
     );
   }
 
+  // Determine if trial gate should be shown:
+  // - trial expired (not active) AND no active subscription
+  // - skip gate on billing settings page so users can always reach it
+  // - if billing API failed (status still null after resolve), fall back to
+  //   open access — we never block users due to a backend error
+  const isOnBillingPage = pathname?.startsWith('/dashboard/settings/billing');
+  const showTrialGate =
+    billingResolved &&
+    subscriptionStatus !== null &&
+    !subscriptionStatus.isTrialActive &&
+    !subscriptionStatus.subscriptionId &&
+    subscriptionStatus.billingEnabled &&
+    !isOnBillingPage;
+
   // Authenticated - show dashboard
   return (
     <DarkModeProvider>
       <RealtimeEventProvider>
+        {subscriptionStatus?.isTrialActive && (
+          <TrialBanner daysLeft={subscriptionStatus.trialDaysLeft} />
+        )}
+        {showTrialGate && (
+          <TrialGate billingEnabled={subscriptionStatus.billingEnabled} />
+        )}
         <DashboardContent>{children}</DashboardContent>
       </RealtimeEventProvider>
     </DarkModeProvider>
