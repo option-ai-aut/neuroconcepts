@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, Users, Inbox, Calendar, FileText, 
   MessageSquare, Wand2, Activity, Settings, RefreshCw,
-  Sun, Moon, Bug, LogOut
+  Sun, Moon, Bug, LogOut, Zap
 } from 'lucide-react';
 import { signOut } from 'aws-amplify/auth';
 import NotificationBell from '@/components/NotificationBell';
@@ -14,8 +14,9 @@ import { useGlobalState } from '@/context/GlobalStateContext';
 import { useDarkMode } from '@/context/DarkModeContext';
 import { useSWRConfig } from 'swr';
 import useSWR from 'swr';
-import { getMe } from '@/lib/api';
+import { getMe, getApiUrl, getAuthHeaders } from '@/lib/api';
 import { useTranslations } from 'next-intl';
+import Link from 'next/link';
 
 const PAGE_ICONS: Record<string, any> = {
   '/dashboard': LayoutDashboard,
@@ -54,16 +55,27 @@ function getPageInfo(pathname: string): { titleKey: string; icon: any } {
   return { titleKey: 'dashboard', icon: LayoutDashboard };
 }
 
+async function fetchBilling() {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${getApiUrl()}/billing/subscription`, { headers });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export default function PageHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { mutate } = useSWRConfig();
   const { data: user } = useSWR('/me', getMe);
+  const { data: billing } = useSWR('/billing/subscription', fetchBilling, { revalidateOnFocus: false });
   const { headerActions, openDrawer } = useGlobalState();
   const { isDark, toggleDarkMode } = useDarkMode();
   const t = useTranslations('nav');
   const { titleKey, icon: Icon } = getPageInfo(pathname);
   const [refreshing, setRefreshing] = useState(false);
+
+  const trialDaysLeft: number = billing?.trialDaysLeft ?? 0;
+  const showTrialTag = billing?.isTrialActive && trialDaysLeft > 0;
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -88,6 +100,21 @@ export default function PageHeader() {
         <div className="hidden lg:flex items-center gap-2">
           {headerActions}
         </div>
+
+        {/* Trial Tag */}
+        {showTrialTag && (
+          <Link
+            href="/dashboard/settings/billing"
+            className={`hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+              trialDaysLeft <= 2
+                ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/10 dark:text-gray-300 dark:hover:bg-white/15'
+            }`}
+          >
+            <Zap className="w-3 h-3" />
+            {trialDaysLeft}d Trial
+          </Link>
+        )}
 
         {/* Bug Report */}
         <button

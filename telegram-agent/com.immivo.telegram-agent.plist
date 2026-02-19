@@ -2,43 +2,36 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>Label</key>
-    <string>com.immivo.telegram-agent</string>
-
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/bin/env</string>
-        <string>python3</string>
-        <string>/Users/dennis/NeuroConcepts.ai/telegram-agent/bot.py</string>
-    </array>
-
-    <!-- Env vars werden aus der .env Datei geladen (siehe EnvironmentVariables unten) -->
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>TELEGRAM_TOKEN</key>
-        <string>REPLACE_ME</string>
-        <key>ALLOWED_CHAT_ID</key>
-        <string>REPLACE_ME</string>
-        <key>CURSOR_API_KEY</key>
-        <string>REPLACE_ME</string>
-        <key>WORKSPACE_DIR</key>
-        <string>/Users/dennis/NeuroConcepts.ai</string>
-        <key>AGENT_PATH</key>
-        <string>/Users/dennis/.local/bin/agent</string>
-        <key>PATH</key>
-        <string>/Users/dennis/.local/bin:/usr/local/bin:/usr/bin:/bin</string>
-    </dict>
-
-    <key>RunAtLoad</key>
-    <true/>
-
-    <key>KeepAlive</key>
-    <true/>
-
-    <key>StandardOutPath</key>
-    <string>/Users/dennis/NeuroConcepts.ai/telegram-agent/bot.log</string>
-
-    <key>StandardErrorPath</key>
-    <string>/Users/dennis/NeuroConcepts.ai/telegram-agent/bot-error.log</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>AGENT_PATH</key>
+		<string>/Users/dennis/.local/bin/agent</string>
+		<key>ALLOWED_CHAT_ID</key>
+		<string>***CHAT_ID_REMOVED***</string>
+		<key>CURSOR_API_KEY</key>
+		<string>***CURSOR_KEY_REMOVED***</string>
+		<key>PATH</key>
+		<string>/Users/dennis/.local/bin:/usr/local/bin:/usr/bin:/bin</string>
+		<key>TELEGRAM_TOKEN</key>
+		<string>***TELEGRAM_TOKEN_REMOVED***</string>
+		<key>WORKSPACE_DIR</key>
+		<string>/Users/dennis/NeuroConcepts.ai</string>
+	</dict>
+	<key>KeepAlive</key>
+	<true/>
+	<key>Label</key>
+	<string>com.immivo.telegram-agent</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/bin/env</string>
+		<string>python3</string>
+		<string>/Users/dennis/NeuroConcepts.ai/telegram-agent/bot.py</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardErrorPath</key>
+	<string>/Users/dennis/NeuroConcepts.ai/telegram-agent/bot-error.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/dennis/NeuroConcepts.ai/telegram-agent/bot.log</string>
 </dict>
 </plist>

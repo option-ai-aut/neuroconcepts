@@ -341,9 +341,6 @@ export default function DashboardLayout({
   return (
     <DarkModeProvider>
       <RealtimeEventProvider>
-        {subscriptionStatus?.isTrialActive && (
-          <TrialBanner daysLeft={subscriptionStatus.trialDaysLeft} />
-        )}
         {showTrialGate && (
           <TrialGate billingEnabled={subscriptionStatus.billingEnabled} />
         )}
