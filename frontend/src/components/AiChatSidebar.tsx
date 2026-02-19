@@ -567,8 +567,8 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         // Show action indicator
         setMessages(prev => [...prev, { role: 'SYSTEM', content: 'Jarvis führt Aktion aus...', isAction: true }]);
         
-        // Determine endpoint — use Function URL for longer timeout
-        const baseUrl = getStreamUrl();
+        // Determine endpoint — use API Gateway
+        const baseUrl = getApiUrl();
         const endpoint = hasTemplateContext 
           ? `${baseUrl}/templates/${activeExposeContext.templateId}/chat`
           : `${baseUrl}/exposes/${activeExposeContext.exposeId}/chat`;
@@ -599,27 +599,10 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         setIsLoading(false);
         lastSentMessageRef.current = '';
       } else {
-        // Regular chat endpoint with STREAMING
-        // Use Lambda Function URL (no 29s timeout) if available, else API Gateway
-        const streamBaseUrl = getStreamUrl();
+        // Regular chat endpoint with STREAMING via API Gateway Express SSE route
+        const streamBaseUrl = getApiUrl();
         const apiBaseUrl = getApiUrl();
         const authHeaders = await getAuthHeaders();
-        
-        // Helper to try a fetch, with fallback to API Gateway if stream URL fails
-        const tryFetch = async (url: string, opts: RequestInit): Promise<Response> => {
-          try {
-            const response = await fetch(url, opts);
-            return response;
-          } catch (err) {
-            // If stream URL failed and it's different from API URL, try API Gateway as fallback
-            if (streamBaseUrl !== apiBaseUrl && url.startsWith(streamBaseUrl)) {
-              console.warn('Stream URL failed, falling back to API Gateway:', err);
-              const fallbackUrl = url.replace(streamBaseUrl, apiBaseUrl);
-              return fetch(fallbackUrl, opts);
-            }
-            throw err;
-          }
-        };
         
         // Use FormData if we have files, otherwise JSON
         let res: Response;
@@ -635,7 +618,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
             formData.append('files', f.file);
           });
           
-          res = await tryFetch(`${streamBaseUrl}/chat/stream`, {
+          res = await fetch(`${streamBaseUrl}/chat/stream`, {
             method: 'POST',
             headers: {
               'Authorization': (authHeaders as Record<string, string>)['Authorization'] || '',
@@ -645,7 +628,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           });
         } else {
           const pageContext = getPageContext(pathname, activeExposeContext);
-          res = await tryFetch(`${streamBaseUrl}/chat/stream`, {
+          res = await fetch(`${streamBaseUrl}/chat/stream`, {
             method: 'POST',
             headers: authHeaders,
             body: JSON.stringify({

@@ -10689,55 +10689,11 @@ async function handleStreamingChat(event: any, responseStream: any): Promise<voi
   responseStream.end();
 }
 
-// Lambda streaming runtime reference (available in Lambda, undefined locally)
-const _awslambda = (globalThis as any).awslambda;
-
-// Core request router — called with (event, responseStream, context) by streamifyResponse
-async function _routeRequest(event: any, responseStream: any, context: any): Promise<void> {
-  const isFunctionUrl = !!event.requestContext?.http;
-  const path = event.rawPath || event.path || '';
-  const method = (event.requestContext?.http?.method || event.httpMethod || '').toUpperCase();
-
-  // Function URL: POST /chat/stream → real SSE streaming
-  if (isFunctionUrl && method === 'POST' && path === '/chat/stream') {
-    await handleStreamingChat(event, responseStream);
-    return;
-  }
-
-  // Function URL: OPTIONS → CORS preflight
-  if (isFunctionUrl && method === 'OPTIONS') {
-    const corsStream = _awslambda.HttpResponseStream.from(responseStream, {
-      statusCode: 204,
-      headers: {
-        'Access-Control-Allow-Origin': event.headers?.origin || '*',
-        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,PATCH,OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Admin-Secret',
-        'Access-Control-Allow-Credentials': 'true',
-        'Access-Control-Max-Age': '86400',
-      },
-    });
-    corsStream.end();
-    return;
-  }
-
-  // All other requests → Express via serverless-http, then pipe through stream
-  const result = await serverlessHandler(event, context);
-  const outStream = _awslambda.HttpResponseStream.from(responseStream, {
-    statusCode: result.statusCode || 200,
-    headers: result.headers || {},
-  });
-  if (result.body) {
-    outStream.write(result.isBase64Encoded ? Buffer.from(result.body, 'base64') : result.body);
-  }
-  outStream.end();
-}
-
-// Wrap with streamifyResponse so Lambda runtime provides a real responseStream.
-// For Function URL: streams in real-time. For API Gateway: buffers automatically.
-// Falls back to standard async handler in local dev (no streaming runtime).
-export const handler = _awslambda?.streamifyResponse
-  ? _awslambda.streamifyResponse(_routeRequest)
-  : async (event: any, context: any) => serverlessHandler(event, context);
+// Lambda handler: all requests go through serverless-http (Express).
+// Note: Function URL streaming (chat/stream) is handled by the Express SSE route above.
+export const handler = async (event: any, context: any) => {
+  return serverlessHandler(event, context);
+};
 
 // Local dev support
 if (require.main === module) {
