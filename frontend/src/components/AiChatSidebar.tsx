@@ -410,6 +410,10 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
             console.log('ℹ️ Keine Chat-Historie gefunden');
           }
         } else {
+          // #region agent log
+          const errBody = await res.text().catch(() => '');
+          console.error('[Jarvis-Debug] chat/history FAILED:', res.status, errBody.slice(0, 200));
+          // #endregion
           console.warn('⚠️ Chat-Historie konnte nicht geladen werden:', res.status);
         }
       } catch (error) {
@@ -619,6 +623,9 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         
         // Use FormData if we have files, otherwise JSON
         let res: Response;
+        // #region agent log
+        console.log('[Jarvis-Debug] streamBaseUrl:', streamBaseUrl, '| apiBaseUrl:', apiBaseUrl);
+        // #endregion
         if (filesToUpload.length > 0) {
           const formData = new FormData();
           formData.append('message', userMsg.content);
@@ -649,8 +656,15 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           });
         }
 
+        // #region agent log
+        console.log('[Jarvis-Debug] response status:', res.status, '| ok:', res.ok, '| content-type:', res.headers.get('content-type'));
+        // #endregion
+
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
+          // #region agent log
+          console.error('[Jarvis-Debug] non-ok response body:', errData);
+          // #endregion
           throw new Error(errData.error || `Server-Fehler (${res.status})`);
         }
         if (!res.body) throw new Error('No response body');
@@ -669,8 +683,14 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         let toolsUsed: string[] = [];
         
 
+        // #region agent log
+        let _dbgChunkCount = 0;
+        // #endregion
         while (true) {
           const { done, value } = await reader.read();
+          // #region agent log
+          if (done) console.log('[Jarvis-Debug] stream done, total chunks:', _dbgChunkCount);
+          // #endregion
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
@@ -679,6 +699,10 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
+              // #region agent log
+              _dbgChunkCount++;
+              if (_dbgChunkCount <= 3) console.log('[Jarvis-Debug] SSE line #' + _dbgChunkCount + ':', line.slice(0, 120));
+              // #endregion
               const data = JSON.parse(line.slice(6));
 
               // Skip heartbeat keepalive signals
