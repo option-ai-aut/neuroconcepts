@@ -57,6 +57,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https://*.immivo.ai https://*.amazonaws.com",
+              "media-src 'self' https://*.immivo.ai",
               "connect-src 'self' https://*.immivo.ai https://*.amazonaws.com https://cognito-idp.eu-central-1.amazonaws.com",
               "frame-src 'self'",
               "base-uri 'self'",
