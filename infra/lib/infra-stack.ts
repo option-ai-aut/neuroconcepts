@@ -373,6 +373,11 @@ export class ImmivoStack extends cdk.Stack {
     const functionUrl = orchestratorLambda.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
       invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
+      cors: {
+        allowedOrigins: allowedStreamOrigins,
+        allowedHeaders: ['Content-Type', 'Authorization'],
+        allowedMethods: [lambda.HttpMethod.ALL],
+      },
     });
 
     // Export the Function URL for frontend to use for streaming
@@ -387,6 +392,10 @@ export class ImmivoStack extends cdk.Stack {
       'https://www.immivo.ai', 'https://admin.immivo.ai',
       ...(props.stageName === 'dev' ? ['http://localhost:3000', 'http://localhost:3001'] : []),
     ];
+
+    const primaryOrigin = props.stageName === 'prod'
+      ? 'https://app.immivo.ai'
+      : `https://${props.stageName}.immivo.ai`;
 
     const api = new apigateway.LambdaRestApi(this, 'OrchestratorApi', {
       handler: orchestratorLambda,
@@ -404,7 +413,7 @@ export class ImmivoStack extends cdk.Stack {
 
     // Gateway Responses: CORS headers on error responses so the browser doesn't block them
     const gatewayResponseHeaders = {
-      'Access-Control-Allow-Origin': `'${corsOrigins[0]}'`,
+      'Access-Control-Allow-Origin': `'${primaryOrigin}'`,
       'Access-Control-Allow-Headers': "'Content-Type,Authorization,X-Admin-Secret'",
       'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,PATCH,OPTIONS'",
     };
