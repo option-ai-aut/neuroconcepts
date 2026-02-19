@@ -12,16 +12,25 @@ import {
 } from 'lucide-react';
 import useSWR from 'swr';
 import { useGlobalState } from '@/context/GlobalStateContext';
+import DOMPurify from 'dompurify';
 
-// Sanitize HTML email content — keep <style> tags since they render inside a sandboxed iframe
 function sanitizeEmailHtml(html: string): string {
-  let clean = html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
-    .replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, '')
-    .replace(/on\w+="[^"]*"/gi, '')
-    .replace(/on\w+='[^']*'/gi, '');
-  return clean;
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      'div', 'span', 'p', 'br', 'a', 'b', 'i', 'u', 'strong', 'em',
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li',
+      'table', 'thead', 'tbody', 'tr', 'td', 'th',
+      'img', 'blockquote', 'pre', 'code', 'hr', 'style',
+      'font', 'center', 'small', 'big', 'sub', 'sup',
+    ],
+    ALLOWED_ATTR: [
+      'href', 'target', 'rel', 'src', 'alt', 'width', 'height',
+      'style', 'class', 'id', 'colspan', 'rowspan', 'align', 'valign',
+      'border', 'cellpadding', 'cellspacing', 'bgcolor', 'color', 'face', 'size',
+    ],
+    ALLOW_DATA_ATTR: false,
+    ADD_ATTR: ['target'],
+  });
 }
 
 interface Email {

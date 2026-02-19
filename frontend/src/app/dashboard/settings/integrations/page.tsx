@@ -61,38 +61,14 @@ export default function IntegrationsSettingsPage() {
     loadStatus();
   }, []);
 
-  // Handle OAuth callback
+  // Handle OAuth callback (tokens are saved server-side, only status + email come via URL)
   useEffect(() => {
     const provider = searchParams.get('provider');
     const success = searchParams.get('success');
     const error = searchParams.get('error');
     const email = searchParams.get('email');
-    const accessToken = searchParams.get('accessToken');
-    const refreshToken = searchParams.get('refreshToken');
-    const expiryDate = searchParams.get('expiryDate');
 
     if (success === 'true' && provider) {
-      // Handle email OAuth callbacks
-      if ((provider === 'gmail' || provider === 'outlook-mail') && accessToken && refreshToken) {
-        saveEmailConfig(provider, {
-          accessToken,
-          refreshToken,
-          expiryDate: expiryDate ? parseInt(expiryDate) : Date.now() + 3600000,
-          email: email ? decodeURIComponent(email) : ''
-        });
-      }
-      
-      // Handle calendar OAuth callbacks - save tokens to backend
-      if ((provider === 'google-calendar' || provider === 'outlook-calendar') && accessToken && refreshToken) {
-        saveCalendarConfig(provider, {
-          accessToken,
-          refreshToken,
-          expiryDate: expiryDate ? parseInt(expiryDate) : Date.now() + 3600000,
-          email: email ? decodeURIComponent(email) : ''
-        });
-      }
-      
-      // Update UI state
       if (provider === 'google-calendar') {
         setGoogleCalendarConnected(true);
         if (email) setGoogleCalendarEmail(decodeURIComponent(email));
@@ -105,24 +81,19 @@ export default function IntegrationsSettingsPage() {
         setGmailConnected(true);
         if (email) setGmailEmail(decodeURIComponent(email));
         setMessage({ type: 'success', text: 'Gmail erfolgreich verbunden! E-Mails werden synchronisiert...' });
-        // Trigger initial email sync after connecting
         triggerEmailSync();
       } else if (provider === 'outlook-mail') {
         setOutlookMailConnected(true);
         if (email) setOutlookMailEmail(decodeURIComponent(email));
         setMessage({ type: 'success', text: 'Outlook Mail erfolgreich verbunden! E-Mails werden synchronisiert...' });
-        // Trigger initial email sync after connecting
         triggerEmailSync();
       }
 
-      // Clear URL params
       window.history.replaceState({}, '', '/dashboard/settings/integrations');
-      
-      // Reload status
       setTimeout(() => loadStatus(), 1000);
     } else if (error === 'true' && provider) {
-      const providerName = provider === 'google' ? 'Google Calendar' : 
-                          provider === 'outlook' ? 'Outlook Calendar' :
+      const providerName = provider === 'google-calendar' ? 'Google Calendar' : 
+                          provider === 'outlook-calendar' ? 'Outlook Calendar' :
                           provider === 'gmail' ? 'Gmail' : 'Outlook Mail';
       setMessage({ type: 'error', text: `Fehler beim Verbinden mit ${providerName}` });
     }

@@ -19,76 +19,78 @@ on:
           - prod
 
 jobs:
-  deploy:
+  deploy-dev:
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/dev') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'dev')
     runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: read
-
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-
       - name: Install Dependencies
         run: |
           npm install
           cd infra && npm install
           cd ../src/services/email-parser && npm install
           cd ../orchestrator && npm install
-
-      - name: Configure AWS Credentials
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: eu-central-1
+      - name: Deploy to Dev
+        run: cd infra && npx cdk deploy Immivo-Dev --require-approval never
 
-      # ========================================
-      # AUTOMATIC: Branch-based deployment
-      # dev branch    -> Immivo-Dev
-      # test branch   -> Immivo-Test
-      # main branch   -> Immivo-Prod
-      # ========================================
-
-      - name: Deploy to Dev (dev branch)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+  deploy-test:
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/test') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'test')
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Dependencies
         run: |
-          cd infra
-          echo "Deploying to Immivo-Dev..."
-          npx cdk deploy Immivo-Dev --require-approval never
+          npm install
+          cd infra && npm install
+          cd ../src/services/email-parser && npm install
+          cd ../orchestrator && npm install
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-central-1
+      - name: Deploy to Test
+        run: cd infra && npx cdk deploy Immivo-Test --require-approval never
 
-      - name: Deploy to Test (test branch)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/test'
+  deploy-prod:
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod')
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Dependencies
         run: |
-          cd infra
-          echo "Deploying to Immivo-Test..."
-          npx cdk deploy Immivo-Test --require-approval never
-
-      - name: Deploy to Prod (main branch)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          cd infra
-          echo "Deploying to Immivo-Prod..."
-          npx cdk deploy Immivo-Prod --require-approval never
-
-      # ========================================
-      # MANUAL: Deploy to selected environment
-      # ========================================
-
-      - name: Deploy to Selected Environment (Manual)
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          cd infra
-          ENV_NAME="${{ inputs.environment }}"
-          
-          # Map input to stack name: dev -> Dev, test -> Test, prod -> Prod
-          STACK_SUFFIX="$(tr '[:lower:]' '[:upper:]' <<< ${ENV_NAME:0:1})${ENV_NAME:1}"
-          STACK_NAME="Immivo-$STACK_SUFFIX"
-          
-          echo "Manually deploying to $STACK_NAME..."
-          npx cdk deploy $STACK_NAME --require-approval never
+          npm install
+          cd infra && npm install
+          cd ../src/services/email-parser && npm install
+          cd ../orchestrator && npm install
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-central-1
+      - name: Deploy to Prod
+        run: cd infra && npx cdk deploy Immivo-Prod --require-approval never

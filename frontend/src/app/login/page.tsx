@@ -67,11 +67,14 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const [view, setView] = useState<AuthView>(searchParams.get('mode') === 'register' ? 'signUp' : 'signIn');
 
-  // Helper: get redirect target from URL params
+  // Helper: get redirect target from URL params (only allow safe relative paths)
   const getRedirectTarget = () => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      return params.get('redirect') || '/dashboard';
+      const redirect = params.get('redirect');
+      if (redirect && redirect.startsWith('/') && !redirect.startsWith('//') && !redirect.includes('://')) {
+        return redirect;
+      }
     }
     return '/dashboard';
   };

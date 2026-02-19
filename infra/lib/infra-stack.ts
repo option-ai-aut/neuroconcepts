@@ -18,6 +18,9 @@ import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
+import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
+import * as cloudtrail from 'aws-cdk-lib/aws-cloudtrail';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import * as path from 'path';
 
 export interface ImmivoStackProps extends cdk.StackProps {
@@ -74,16 +77,22 @@ export class ImmivoStack extends cdk.Stack {
     const dbSg = new ec2.SecurityGroup(this, 'DBSecurityGroup', {
       vpc: this.vpc,
       description: 'Allow access to DB',
-      allowAllOutbound: true,
+      allowAllOutbound: false,
     });
 
-    // Allow public access to DB in Dev (so Lambda outside VPC can reach it)
+    // Dev: restrict to known developer IPs instead of 0.0.0.0/0
+    // Set DEV_ALLOWED_IPS as comma-separated CIDRs in cdk.context.json or via -c flag
     if (props.stageName === 'dev') {
-      dbSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(5432), 'Allow public access to DB in Dev');
+      const devIps = this.node.tryGetContext('devAllowedIps') as string || '';
+      if (devIps) {
+        for (const cidr of devIps.split(',').map((s: string) => s.trim()).filter(Boolean)) {
+          dbSg.addIngressRule(ec2.Peer.ipv4(cidr), ec2.Port.tcp(5432), `Dev DB access from ${cidr}`);
+        }
+      }
     }
     
-    // Allow Lambda (same SG) to reach Aurora in non-dev stages
-    dbSg.addIngressRule(dbSg, ec2.Port.tcp(5432), 'Allow Lambda to reach Aurora (self-referencing)');
+    // Allow Lambda (same SG) to reach the database
+    dbSg.addIngressRule(dbSg, ec2.Port.tcp(5432), 'Allow Lambda to reach DB (self-referencing)');
 
     if (props.stageName === 'dev' || props.stageName === 'test') {
       const instance = new rds.DatabaseInstance(this, 'PostgresInstance', {
@@ -95,7 +104,8 @@ export class ImmivoStack extends cdk.Stack {
         maxAllocatedStorage: 50,
         credentials: rds.Credentials.fromSecret(this.dbSecret),
         securityGroups: [dbSg],
-        publiclyAccessible: props.stageName === 'dev',
+        publiclyAccessible: false,
+        storageEncrypted: true,
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       });
       this.dbEndpoint = instance.dbInstanceEndpointAddress;
@@ -110,6 +120,7 @@ export class ImmivoStack extends cdk.Stack {
         credentials: rds.Credentials.fromSecret(this.dbSecret),
         securityGroups: [dbSg],
         defaultDatabaseName: 'immivo',
+        storageEncrypted: true,
         removalPolicy: cdk.RemovalPolicy.RETAIN,
       });
       this.dbEndpoint = cluster.clusterEndpoint.hostname;
@@ -296,30 +307,28 @@ export class ImmivoStack extends cdk.Stack {
 
     // --- Media Upload Bucket (Property Images, Floorplans, Documents) ---
     const mediaBucket = new s3.Bucket(this, 'MediaBucket', {
-      versioned: false,
+      versioned: props.stageName === 'prod',
       removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
       autoDeleteObjects: props.stageName === 'dev',
-      blockPublicAccess: new s3.BlockPublicAccess({
-        blockPublicAcls: false,
-        ignorePublicAcls: false,
-        blockPublicPolicy: false,
-        restrictPublicBuckets: false,
-      }),
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
       cors: [{
         allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.HEAD],
-        allowedOrigins: ['*'],
+        allowedOrigins: [
+          'https://dev.immivo.ai',
+          'https://test.immivo.ai',
+          'https://app.immivo.ai',
+          'https://immivo.ai',
+          'https://www.immivo.ai',
+          'https://admin.immivo.ai',
+          'http://localhost:3000',
+        ],
         allowedHeaders: ['*'],
         exposedHeaders: ['Content-Length', 'Content-Type', 'ETag'],
         maxAge: 3600,
       }],
     });
-
-    // Allow public read access for media files
-    mediaBucket.addToResourcePolicy(new cdk.aws_iam.PolicyStatement({
-      actions: ['s3:GetObject'],
-      resources: [mediaBucket.arnForObjects('*')],
-      principals: [new cdk.aws_iam.StarPrincipal()],
-    }));
 
     // Grant orchestrator Lambda read/write access to the media bucket
     mediaBucket.grantReadWrite(orchestratorLambda);
@@ -354,8 +363,11 @@ export class ImmivoStack extends cdk.Stack {
     }));
 
     // Lambda Function URL for streaming endpoints (bypasses API Gateway 29s timeout)
-    // NOTE: CORS is handled by Express middleware — do NOT configure cors here
-    // to avoid duplicate Access-Control-Allow-Origin headers
+    const allowedStreamOrigins = [
+      'https://dev.immivo.ai', 'https://test.immivo.ai',
+      'https://app.immivo.ai', 'https://immivo.ai',
+      'https://admin.immivo.ai', 'http://localhost:3000',
+    ];
     const functionUrl = orchestratorLambda.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
       invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
@@ -367,39 +379,40 @@ export class ImmivoStack extends cdk.Stack {
       description: 'Lambda Function URL for streaming (bypasses API GW 29s limit)',
     });
 
+    const corsOrigins = [
+      'https://dev.immivo.ai', 'https://test.immivo.ai',
+      'https://app.immivo.ai', 'https://immivo.ai',
+      'https://www.immivo.ai', 'https://admin.immivo.ai',
+      ...(props.stageName === 'dev' ? ['http://localhost:3000', 'http://localhost:3001'] : []),
+    ];
+
     const api = new apigateway.LambdaRestApi(this, 'OrchestratorApi', {
       handler: orchestratorLambda,
       proxy: true,
       deployOptions: {
         stageName: props.stageName,
       },
-      // Enable binary media types for file uploads (multipart/form-data)
       binaryMediaTypes: ['multipart/form-data', 'image/*', 'application/octet-stream'],
       defaultCorsPreflightOptions: {
-        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowOrigins: corsOrigins,
         allowMethods: apigateway.Cors.ALL_METHODS,
         allowHeaders: ['Content-Type', 'Authorization', 'X-Admin-Secret'],
       }
     });
 
-    // Gateway Responses: Add CORS headers to ALL error responses (4XX, 5XX)
-    // Without this, API Gateway errors (502, 429, etc.) lack CORS headers
-    // and the browser blocks the response entirely.
+    // Gateway Responses: CORS headers on error responses so the browser doesn't block them
+    const gatewayResponseHeaders = {
+      'Access-Control-Allow-Origin': `'${corsOrigins[0]}'`,
+      'Access-Control-Allow-Headers': "'Content-Type,Authorization,X-Admin-Secret'",
+      'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,PATCH,OPTIONS'",
+    };
     api.addGatewayResponse('Default4XX', {
       type: apigateway.ResponseType.DEFAULT_4XX,
-      responseHeaders: {
-        'Access-Control-Allow-Origin': "'*'",
-        'Access-Control-Allow-Headers': "'Content-Type,Authorization,X-Admin-Secret'",
-        'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,PATCH,OPTIONS'",
-      },
+      responseHeaders: gatewayResponseHeaders,
     });
     api.addGatewayResponse('Default5XX', {
       type: apigateway.ResponseType.DEFAULT_5XX,
-      responseHeaders: {
-        'Access-Control-Allow-Origin': "'*'",
-        'Access-Control-Allow-Headers': "'Content-Type,Authorization,X-Admin-Secret'",
-        'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,PATCH,OPTIONS'",
-      },
+      responseHeaders: gatewayResponseHeaders,
     });
 
     // --- 5. E-Mail Intake (S3 + Lambda) ---
@@ -407,6 +420,9 @@ export class ImmivoStack extends cdk.Stack {
       versioned: false,
       removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
       autoDeleteObjects: props.stageName === 'dev',
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       lifecycleRules: [{ expiration: cdk.Duration.days(7) }]
     });
 
@@ -463,11 +479,6 @@ export class ImmivoStack extends cdk.Stack {
 
     const frontendUrl = frontendLambda.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
-      cors: {
-        allowedOrigins: ['*'],
-        allowedMethods: [lambda.HttpMethod.ALL],
-        allowedHeaders: ['*'],
-      },
     });
 
     // --- 7. DNS & CDN (Route53, ACM, CloudFront) ---
@@ -602,6 +613,100 @@ export class ImmivoStack extends cdk.Stack {
       new cdk.CfnOutput(this, 'ApiCustomUrl', { value: `https://${props.stageName}-api.immivo.ai` });
     }
 
+    // --- 8. WAF (Web Application Firewall) ---
+    // CloudFront WAF must be in us-east-1; for API Gateway WAF we use regional scope.
+    // Here we attach WAF to the API Gateway (regional).
+    const apiWaf = new wafv2.CfnWebACL(this, 'ApiWaf', {
+      name: `Immivo-API-WAF-${props.stageName}`,
+      scope: 'REGIONAL',
+      defaultAction: { allow: {} },
+      visibilityConfig: {
+        cloudWatchMetricsEnabled: true,
+        metricName: `ImmivoApiWaf-${props.stageName}`,
+        sampledRequestsEnabled: true,
+      },
+      rules: [
+        {
+          name: 'AWSManagedRulesCommonRuleSet',
+          priority: 1,
+          overrideAction: { none: {} },
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: 'AWS',
+              name: 'AWSManagedRulesCommonRuleSet',
+            },
+          },
+          visibilityConfig: { cloudWatchMetricsEnabled: true, metricName: 'CommonRules', sampledRequestsEnabled: true },
+        },
+        {
+          name: 'AWSManagedRulesSQLiRuleSet',
+          priority: 2,
+          overrideAction: { none: {} },
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: 'AWS',
+              name: 'AWSManagedRulesSQLiRuleSet',
+            },
+          },
+          visibilityConfig: { cloudWatchMetricsEnabled: true, metricName: 'SQLiRules', sampledRequestsEnabled: true },
+        },
+        {
+          name: 'AWSManagedRulesKnownBadInputsRuleSet',
+          priority: 3,
+          overrideAction: { none: {} },
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: 'AWS',
+              name: 'AWSManagedRulesKnownBadInputsRuleSet',
+            },
+          },
+          visibilityConfig: { cloudWatchMetricsEnabled: true, metricName: 'BadInputRules', sampledRequestsEnabled: true },
+        },
+        {
+          name: 'RateLimit',
+          priority: 4,
+          action: { block: {} },
+          statement: {
+            rateBasedStatement: {
+              limit: 2000,
+              aggregateKeyType: 'IP',
+            },
+          },
+          visibilityConfig: { cloudWatchMetricsEnabled: true, metricName: 'RateLimit', sampledRequestsEnabled: true },
+        },
+      ],
+    });
+
+    // Associate WAF with API Gateway stage
+    new wafv2.CfnWebACLAssociation(this, 'ApiWafAssociation', {
+      resourceArn: api.deploymentStage.stageArn,
+      webAclArn: apiWaf.attrArn,
+    });
+
+    // --- 9. CloudTrail (Audit Logging) ---
+    if (props.stageName === 'prod') {
+      const trailBucket = new s3.Bucket(this, 'CloudTrailBucket', {
+        encryption: s3.BucketEncryption.S3_MANAGED,
+        blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+        enforceSSL: true,
+        lifecycleRules: [{ expiration: cdk.Duration.days(90) }],
+        removalPolicy: cdk.RemovalPolicy.RETAIN,
+      });
+
+      new cloudtrail.Trail(this, 'ImmivoTrail', {
+        bucket: trailBucket,
+        trailName: `Immivo-Trail-${props.stageName}`,
+        isMultiRegionTrail: false,
+        includeGlobalServiceEvents: true,
+        sendToCloudWatchLogs: true,
+        cloudWatchLogGroup: new logs.LogGroup(this, 'TrailLogGroup', {
+          logGroupName: `/immivo/cloudtrail/${props.stageName}`,
+          retention: logs.RetentionDays.THREE_MONTHS,
+          removalPolicy: cdk.RemovalPolicy.DESTROY,
+        }),
+      });
+    }
+
     // --- Outputs ---
     new cdk.CfnOutput(this, 'VpcId', { value: this.vpc.vpcId });
     new cdk.CfnOutput(this, 'DBEndpoint', { value: this.dbEndpoint });
@@ -615,5 +720,6 @@ export class ImmivoStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'UserPoolClientId', { value: this.userPoolClient.userPoolClientId });
     new cdk.CfnOutput(this, 'AdminUserPoolId', { value: this.adminUserPool.userPoolId });
     new cdk.CfnOutput(this, 'AdminUserPoolClientId', { value: this.adminUserPoolClient.userPoolClientId });
+    new cdk.CfnOutput(this, 'WafAclArn', { value: apiWaf.attrArn });
   }
 }

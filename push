@@ -1,0 +1,43 @@
+#!/bin/bash
+# Usage: ./push dev | test | main
+
+TARGET=$1
+
+if [ -z "$TARGET" ]; then
+  echo "❌  Usage: ./push dev | test | main"
+  exit 1
+fi
+
+if [[ "$TARGET" != "dev" && "$TARGET" != "test" && "$TARGET" != "main" ]]; then
+  echo "❌  Unknown target: '$TARGET'. Use: dev | test | main"
+  exit 1
+fi
+
+CURRENT=$(git branch --show-current)
+STAGED=$(git status --porcelain)
+
+# Warn if uncommitted changes
+if [ -n "$STAGED" ]; then
+  echo "⚠️  Du hast uncommitted Änderungen. Erst committen!"
+  git status --short
+  exit 1
+fi
+
+echo "🚀  Pushe '$CURRENT' → '$TARGET'..."
+git push origin HEAD:$TARGET
+
+if [ $? -eq 0 ]; then
+  echo ""
+  echo "✅  Fertig! Deploy läuft auf GitHub Actions."
+  if [ "$TARGET" = "dev" ]; then
+    echo "🔗  https://dev.immivo.ai"
+  elif [ "$TARGET" = "test" ]; then
+    echo "🔗  https://test.immivo.ai"
+  elif [ "$TARGET" = "main" ]; then
+    echo "🔗  https://immivo.ai  (Prod)"
+  fi
+  echo ""
+  echo "📊  Status: https://github.com/option-ai-aut/neuroconcepts/actions"
+else
+  echo "❌  Push fehlgeschlagen."
+fi

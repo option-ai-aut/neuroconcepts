@@ -34,6 +34,7 @@ import { setPropertyMatchingPrisma } from './services/PropertyMatchingService';
 import { setNotificationPrisma } from './services/NotificationService';
 import { authMiddleware, adminAuthMiddleware } from './middleware/auth';
 import { AiSafetyMiddleware, wrapAiResponse } from './middleware/aiSafety';
+import { validate, schemas } from './middleware/validation';
 import { AiCostService } from './services/AiCostService';
 import * as AWS from 'aws-sdk';
 import multer from 'multer';
@@ -139,6 +140,7 @@ async function loadAppSecrets() {
           'DATABASE_URL',
           'OPENAI_API_KEY',
           'ENCRYPTION_KEY',
+          'ADMIN_SECRET',
           'FRONTEND_URL',
           'GOOGLE_CALENDAR_CLIENT_ID',
           'GOOGLE_CALENDAR_CLIENT_SECRET',
@@ -456,12 +458,24 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
-// Protected database migration endpoint - creates tables if they don't exist
-// This is the only way to run migrations on Aurora in a private VPC
+// Admin auth helper: uses dedicated ADMIN_SECRET (falls back to ENCRYPTION_KEY for migration)
+function verifyAdminSecret(req: express.Request): boolean {
+  const secret = req.headers['x-admin-secret'] as string | undefined;
+  const expectedSecret = process.env.ADMIN_SECRET;
+  if (!expectedSecret) {
+    console.error('[Security] ADMIN_SECRET is not configured - admin endpoints are disabled');
+    return false;
+  }
+  if (!secret || secret.length === 0) return false;
+  const a = Buffer.from(secret);
+  const b = Buffer.from(expectedSecret);
+  if (a.length !== b.length) return false;
+  return require('crypto').timingSafeEqual(a, b);
+}
+
 // Seed portals into the database (for production where seed.ts can't run)
 app.post('/admin/seed-portals', express.json({ limit: '1mb' }), async (req, res) => {
-  const secret = req.headers['x-admin-secret'];
-  if (!secret || secret !== process.env.ENCRYPTION_KEY) {
+  if (!verifyAdminSecret(req)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -522,20 +536,18 @@ app.post('/admin/seed-portals', express.json({ limit: '1mb' }), async (req, res)
     res.json({ success: true, created, updated, total: portals.length });
   } catch (error: any) {
     console.error('Error seeding portals:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
 app.post('/admin/db-migrate', express.json({ limit: '1mb' }), async (req, res) => {
-  const secret = req.headers['x-admin-secret'];
-  if (!secret || secret !== process.env.ENCRYPTION_KEY) {
+  if (!verifyAdminSecret(req)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   
   try {
     const db = prisma || (await initializePrisma());
     
-    // Check if tables already exist
     const tables = await db.$queryRaw<any[]>`SELECT tablename FROM pg_tables WHERE schemaname = 'public'`;
     const tableNames = tables.map((t: any) => t.tablename);
     
@@ -543,49 +555,50 @@ app.post('/admin/db-migrate', express.json({ limit: '1mb' }), async (req, res) =
       return res.json({ message: 'Database already migrated', tables: tableNames });
     }
     
-    // Run migration SQL statements one by one
-    const migrationStatements = (req.body.sql as string).split(';').filter((s: string) => s.trim().length > 0);
-    
-    let executed = 0;
-    const errors: string[] = [];
-    
-    for (const statement of migrationStatements) {
-      try {
-        await db.$executeRawUnsafe(statement.trim());
-        executed++;
-      } catch (err: any) {
-        // Skip "already exists" errors
-        if (err.message?.includes('already exists')) {
-          continue;
-        }
-        errors.push(`Statement ${executed}: ${err.message}`);
-      }
+    // Only accept a known migration version, not raw SQL
+    const { version } = req.body;
+    if (!version || typeof version !== 'string') {
+      return res.status(400).json({ error: 'Migration version is required' });
     }
+
+    // Delegate to the in-app migration system which uses versioned, pre-defined SQL
+    const { applyPendingMigrations } = await import('./services/MigrationService');
+    await applyPendingMigrations(db);
     
-    res.json({ success: true, executed, errors: errors.length > 0 ? errors : undefined });
+    const updatedTables = await db.$queryRaw<any[]>`SELECT tablename FROM pg_tables WHERE schemaname = 'public'`;
+    res.json({ success: true, tables: updatedTables.map((t: any) => t.tablename) });
   } catch (error: any) {
     console.error('Migration failed:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
-// CORS configuration - restrict to known origins in production
+// CORS configuration - restrict to known origins
 const allowedOrigins = [
-  'http://localhost:3000',  // Local frontend dev
-  'http://localhost:3001',  // Local backend dev
-  process.env.FRONTEND_URL, // Production frontend
+  'http://localhost:3000',
+  'http://localhost:3001',
+  process.env.FRONTEND_URL,
   'https://dev.immivo.ai',
-  'https://test.immivo.ai', // Test/staging environment
-  'https://app.immivo.ai',  // Production app subdomain
+  'https://test.immivo.ai',
+  'https://app.immivo.ai',
   'https://immivo.ai',
   'https://www.immivo.ai',
-  'https://admin.immivo.ai', // Admin subdomain
+  'https://admin.immivo.ai',
 ].filter(Boolean);
+
+const isProduction = process.env.STAGE === 'prod';
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, Postman, or server-to-server)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      // In production, block requests without Origin header (except health checks handled earlier)
+      // In dev/test, allow for Postman/cURL convenience
+      if (isProduction) {
+        console.warn('[CORS] Blocked request with no origin in production');
+        return callback(new Error('Origin header required'));
+      }
+      return callback(null, true);
+    }
     
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
@@ -605,30 +618,66 @@ app.use(morgan('combined'));
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  // Remove server header
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   res.removeHeader('X-Powered-By');
   next();
 });
 
-app.use(express.json({ limit: '20mb' }));
+// Global rate limiting (in-memory, per-IP) — protects all endpoints against abuse
+const globalRateLimit: Record<string, { count: number; resetTime: number }> = {};
+const GLOBAL_RATE_LIMIT = 200; // requests per window
+const GLOBAL_RATE_WINDOW = 60_000; // 1 minute
+
+app.use((req, res, next) => {
+  if (req.path === '/health') return next();
+  
+  const key = req.ip || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  
+  if (!globalRateLimit[key] || now > globalRateLimit[key].resetTime) {
+    globalRateLimit[key] = { count: 1, resetTime: now + GLOBAL_RATE_WINDOW };
+    return next();
+  }
+  
+  if (globalRateLimit[key].count >= GLOBAL_RATE_LIMIT) {
+    res.setHeader('Retry-After', String(Math.ceil((globalRateLimit[key].resetTime - now) / 1000)));
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
+  
+  globalRateLimit[key].count++;
+  next();
+});
+
+// Periodic cleanup of rate limit store (prevent memory leak in long-running processes)
+setInterval(() => {
+  const now = Date.now();
+  for (const key of Object.keys(globalRateLimit)) {
+    if (now > globalRateLimit[key].resetTime) delete globalRateLimit[key];
+  }
+}, 120_000);
+
+app.use(express.json({ limit: '5mb' }));
 
 // Multer setup for file uploads (memory storage for S3 upload)
 const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 const MEDIA_BUCKET = process.env.MEDIA_BUCKET_NAME || '';
-const MEDIA_CDN_URL = process.env.MEDIA_CDN_URL || ''; // CloudFront CDN URL for media (e.g. https://media.immivo.ai)
+const MEDIA_CDN_URL = process.env.MEDIA_CDN_URL || '';
 
-// Use memory storage — files go to S3, not disk
+const ALLOWED_MIMETYPES = new Set([
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml',
+  'application/pdf',
+]);
+
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf' || file.mimetype.startsWith('application/')) {
+    if (ALLOWED_MIMETYPES.has(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Dateityp nicht erlaubt'));
+      cb(new Error('Dateityp nicht erlaubt. Erlaubt: JPEG, PNG, WebP, GIF, SVG, PDF'));
     }
   }
 });
@@ -986,7 +1035,7 @@ app.get('/settings/tenant', authMiddleware, async (req, res) => {
 });
 
 // Update Tenant Settings
-app.put('/settings/tenant', authMiddleware, async (req, res) => {
+app.put('/settings/tenant', authMiddleware, validate(schemas.updateTenantSettings), async (req, res) => {
   try {
     const db = await initializePrisma();
     const currentUser = await db.user.findUnique({ where: { email: req.user!.email } });
@@ -1218,12 +1267,12 @@ app.get('/me/settings', authMiddleware, async (req: any, res) => {
     res.json(response);
   } catch (error: any) {
     console.error('Error fetching user settings:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
 // Update User Settings
-app.put('/me/settings', authMiddleware, async (req: any, res) => {
+app.put('/me/settings', authMiddleware, validate(schemas.updateUserSettings), async (req: any, res) => {
   try {
     const db = await initializePrisma();
     
@@ -1293,7 +1342,7 @@ app.put('/me/settings', authMiddleware, async (req: any, res) => {
     res.json(response);
   } catch (error: any) {
     console.error('Error updating user settings:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -1381,7 +1430,7 @@ app.get('/account/export', authMiddleware, async (req, res) => {
     res.json(exportData);
   } catch (error: any) {
     console.error('Error exporting user data:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -1456,7 +1505,7 @@ app.delete('/account', authMiddleware, async (req, res) => {
     res.json({ success: true, message: 'Konto und alle persönlichen Daten wurden gelöscht.' });
   } catch (error: any) {
     console.error('Error deleting account:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -1496,7 +1545,7 @@ app.get('/seats', authMiddleware, async (req, res) => {
 });
 
 // Invite Seat
-app.post('/seats/invite', authMiddleware, async (req, res) => {
+app.post('/seats/invite', authMiddleware, validate(schemas.inviteSeat), async (req, res) => {
   try {
     const { email, role } = req.body;
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
@@ -3276,13 +3325,14 @@ Antworte NUR mit dem HTML-Code, ohne Erklärungen.`;
     res.json({ signature });
   } catch (error: any) {
     console.error('Error generating signature:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
 app.post('/chat',
   authMiddleware,
-  AiSafetyMiddleware.rateLimit(50, 60000), // 50 requests per minute
+  validate(schemas.chatMessage),
+  AiSafetyMiddleware.rateLimit(50, 60000),
   AiSafetyMiddleware.contentModeration,
   AiSafetyMiddleware.auditLog,
   async (req, res) => {
@@ -3931,7 +3981,7 @@ app.post('/channels/upload', authMiddleware, upload.array('files', 5), async (re
     res.json({ files: urls });
   } catch (error: any) {
     console.error('Chat upload error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -4588,15 +4638,15 @@ app.get('/calendar/google/callback', async (req, res) => {
       }
     }
 
+    if (!saved) {
+      console.error('Google Calendar config could not be saved server-side');
+      return res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=google-calendar&error=true`);
+    }
+
     const params = new URLSearchParams({
       provider: 'google-calendar',
       success: 'true',
       email: tokens.email,
-      ...(saved ? {} : {
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        expiryDate: tokens.expiryDate.toString()
-      })
     });
     
     res.redirect(`${frontendUrl}/dashboard/settings/integrations?${params.toString()}`);
@@ -4810,15 +4860,15 @@ app.get('/calendar/outlook/callback', async (req, res) => {
       }
     }
 
+    if (!saved) {
+      console.error('Outlook Calendar config could not be saved server-side');
+      return res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=outlook-calendar&error=true`);
+    }
+
     const params = new URLSearchParams({
       provider: 'outlook-calendar',
       success: 'true',
       email: tokens.email,
-      ...(saved ? {} : {
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        expiryDate: tokens.expiryDate.toString()
-      })
     });
     
     res.redirect(`${frontendUrl}/dashboard/settings/integrations?${params.toString()}`);
@@ -5480,16 +5530,15 @@ app.get('/email/gmail/callback', async (req, res) => {
       }
     }
     
-    // Redirect to frontend with success/tokens (as fallback)
+    if (!saved) {
+      console.error('Gmail config could not be saved server-side');
+      return res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=gmail&error=true`);
+    }
+
     const params = new URLSearchParams({
       provider: 'gmail',
       success: 'true',
       email: tokens.email,
-      ...(saved ? {} : {
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        expiryDate: tokens.expiryDate.toString()
-      })
     });
     
     res.redirect(`${frontendUrl}/dashboard/settings/integrations?${params.toString()}`);
@@ -5644,15 +5693,15 @@ app.get('/email/outlook/callback', async (req, res) => {
       }
     }
 
+    if (!saved) {
+      console.error('Outlook Mail config could not be saved server-side');
+      return res.redirect(`${frontendUrl}/dashboard/settings/integrations?provider=outlook-mail&error=true`);
+    }
+
     const params = new URLSearchParams({
       provider: 'outlook-mail',
       success: 'true',
       email: tokens.email,
-      ...(saved ? {} : {
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        expiryDate: tokens.expiryDate.toString()
-      })
     });
     
     res.redirect(`${frontendUrl}/dashboard/settings/integrations?${params.toString()}`);
@@ -5988,10 +6037,8 @@ app.post('/calendar/share-team', authMiddleware, async (req, res) => {
 
 // --- Admin: Run Migrations (PROTECTED - requires admin secret) ---
 app.post('/admin/migrate', async (req, res) => {
-  // Require admin secret for admin operations
-  const adminSecret = req.headers['x-admin-secret'];
-  if (adminSecret !== process.env.ADMIN_SECRET && process.env.NODE_ENV !== 'development') {
-    return res.status(403).json({ error: 'Forbidden - Admin access required' });
+  if (!verifyAdminSecret(req)) {
+    return res.status(403).json({ error: 'Forbidden' });
   }
 
   try {
@@ -6003,16 +6050,14 @@ app.post('/admin/migrate', async (req, res) => {
     res.json({ success: true, tables: tables.map((t: any) => t.table_name) });
   } catch (error: any) {
     console.error('Migration error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
 // Full database setup - run init migration (PROTECTED)
 app.post('/admin/setup-db', async (req, res) => {
-  // Require admin secret for admin operations
-  const adminSecret = req.headers['x-admin-secret'];
-  if (adminSecret !== process.env.ADMIN_SECRET && process.env.NODE_ENV !== 'development') {
-    return res.status(403).json({ error: 'Forbidden - Admin access required' });
+  if (!verifyAdminSecret(req)) {
+    return res.status(403).json({ error: 'Forbidden' });
   }
   try {
     const db = await initializePrisma();
@@ -6117,7 +6162,7 @@ app.post('/admin/setup-db', async (req, res) => {
     });
   } catch (error: any) {
     console.error('Setup error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -6185,7 +6230,7 @@ app.get('/emails', authMiddleware, async (req: any, res) => {
     });
   } catch (error: any) {
     console.error('Error fetching emails:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -6216,7 +6261,7 @@ app.get('/emails/:id', authMiddleware, async (req: any, res) => {
     res.json({ email });
   } catch (error: any) {
     console.error('Error fetching email:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -6258,7 +6303,7 @@ app.patch('/emails/:id/read', authMiddleware, async (req: any, res) => {
     res.json({ success: true });
   } catch (error: any) {
     console.error('Error updating email:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -6283,7 +6328,7 @@ app.patch('/emails/:id/move', authMiddleware, async (req: any, res) => {
     res.json({ success: email.count > 0 });
   } catch (error: any) {
     console.error('Error moving email:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -6305,7 +6350,7 @@ app.patch('/emails/:id/star', authMiddleware, async (req: any, res) => {
     res.json({ success: email.count > 0 });
   } catch (error: any) {
     console.error('Error toggling star:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -6341,7 +6386,7 @@ app.delete('/emails/:id', authMiddleware, async (req: any, res) => {
     res.json({ success: true });
   } catch (error: any) {
     console.error('Error deleting email:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -6568,7 +6613,7 @@ app.post('/emails/send', authMiddleware, async (req: any, res) => {
     }
   } catch (error: any) {
     console.error('Error sending email:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -6586,7 +6631,7 @@ app.post('/emails/sync', authMiddleware, async (req: any, res) => {
     res.json(result);
   } catch (error: any) {
     console.error('Error syncing emails:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -6602,7 +6647,7 @@ app.get('/emails/sync/status', authMiddleware, async (req: any, res) => {
     res.json(status);
   } catch (error: any) {
     console.error('Error getting sync status:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -6626,7 +6671,7 @@ app.post('/emails/incoming', async (req, res) => {
     res.json(result);
   } catch (error: any) {
     console.error('Error processing incoming email:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -6656,7 +6701,7 @@ app.get('/notifications', authMiddleware, async (req: any, res) => {
     res.json({ notifications, unreadCount });
   } catch (error: any) {
     console.error('Error fetching notifications:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -6675,7 +6720,7 @@ app.patch('/notifications/:id/read', authMiddleware, async (req: any, res) => {
     res.json({ success: true });
   } catch (error: any) {
     console.error('Error marking notification as read:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -6687,7 +6732,7 @@ app.post('/notifications/mark-all-read', authMiddleware, async (req: any, res) =
     res.json({ success: true, count });
   } catch (error: any) {
     console.error('Error marking all notifications as read:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -6778,7 +6823,7 @@ app.get('/activities', authMiddleware, async (req: any, res) => {
     res.json({ activities: activitiesWithNames, currentUserId: user.id });
   } catch (error: any) {
     console.error('Error fetching activities:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -6831,7 +6876,7 @@ app.post('/admin/backfill-activities', adminAuthMiddleware, async (req: any, res
     res.json({ success: true, created, total: leads.length });
   } catch (error: any) {
     console.error('Error backfilling activities:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -6896,7 +6941,7 @@ app.get('/admin/platform/stats', adminAuthMiddleware, async (_req, res) => {
     });
   } catch (error: any) {
     console.error('Admin stats error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -6989,7 +7034,7 @@ app.get('/admin/platform/tenants', adminAuthMiddleware, async (_req, res) => {
     })));
   } catch (error: any) {
     console.error('Admin tenants error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7032,7 +7077,7 @@ app.get('/admin/platform/tenants/:id', adminAuthMiddleware, async (req, res) => 
     });
   } catch (error: any) {
     console.error('Admin tenant detail error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7049,7 +7094,7 @@ app.post('/admin/platform/tenants', adminAuthMiddleware, async (req, res) => {
     res.json(tenant);
   } catch (error: any) {
     console.error('Admin create tenant error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7061,7 +7106,7 @@ app.delete('/admin/platform/tenants/:id', adminAuthMiddleware, async (req, res) 
     res.json({ success: true });
   } catch (error: any) {
     console.error('Admin delete tenant error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7090,7 +7135,7 @@ app.get('/admin/platform/users', adminAuthMiddleware, async (_req, res) => {
     })));
   } catch (error: any) {
     console.error('Admin users error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7232,7 +7277,7 @@ app.get('/admin/team/members', adminAuthMiddleware, async (_req, res) => {
     })));
   } catch (error: any) {
     console.error('Admin team members error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7321,7 +7366,7 @@ app.post('/admin/team/members', adminAuthMiddleware, async (req: any, res) => {
     });
   } catch (error: any) {
     console.error('Create team member error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7341,7 +7386,7 @@ app.patch('/admin/team/members/:id', adminAuthMiddleware, async (req, res) => {
     });
     res.json(member);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7356,7 +7401,7 @@ app.delete('/admin/team/members/:id', adminAuthMiddleware, async (req, res) => {
     await db.adminStaff.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7386,7 +7431,7 @@ app.get('/admin/team/channels', adminAuthMiddleware, async (_req, res) => {
     });
     res.json({ channels });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7400,7 +7445,7 @@ app.post('/admin/team/channels', adminAuthMiddleware, async (req: any, res) => {
     const channel = await db.adminChannel.create({ data: { name } });
     res.json({ channel });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7415,7 +7460,7 @@ app.patch('/admin/team/channels/:id', adminAuthMiddleware, async (req, res) => {
     });
     res.json({ channel });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7426,7 +7471,7 @@ app.delete('/admin/team/channels/:id', adminAuthMiddleware, async (req, res) => 
     await db.adminChannel.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7443,7 +7488,7 @@ app.get('/admin/team/channels/:id/messages', adminAuthMiddleware, async (req, re
     // Map staff -> user for frontend compatibility
     res.json({ messages: messages.map((m: any) => ({ ...m, user: m.staff, staff: undefined })) });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7466,7 +7511,7 @@ app.post('/admin/team/channels/:id/messages', adminAuthMiddleware, async (req: a
     // Map staff -> user for frontend compatibility
     res.json({ message: { ...message, user: message.staff, staff: undefined } });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7512,7 +7557,7 @@ app.get('/admin/platform/audit-logs', adminAuthMiddleware, async (req, res) => {
     });
   } catch (error: any) {
     console.error('Admin audit error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7543,7 +7588,7 @@ app.get('/admin/platform/settings', adminAuthMiddleware, async (_req, res) => {
       region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'eu-central-1',
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7582,7 +7627,7 @@ app.get('/calendar/events', authMiddleware, async (req: any, res) => {
     res.json({ events });
   } catch (error: any) {
     console.error('Calendar events error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7612,7 +7657,7 @@ app.post('/calendar/events', authMiddleware, async (req: any, res) => {
     res.json(result);
   } catch (error: any) {
     console.error('Calendar create error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7627,7 +7672,7 @@ app.delete('/calendar/events/:id', authMiddleware, async (req: any, res) => {
     res.json({ success });
   } catch (error: any) {
     console.error('Calendar delete error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7756,7 +7801,7 @@ app.post('/calendar/book-demo', async (req, res) => {
     res.json({ success: true, eventId: eventId || 'booked' });
   } catch (error: any) {
     console.error('Demo booking error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7778,7 +7823,7 @@ app.get('/admin/platform/calendars', adminAuthMiddleware, async (req, res) => {
     res.json({ calendars });
   } catch (error: any) {
     console.error('Admin calendars error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7830,7 +7875,7 @@ app.post('/bug-reports', authMiddleware, async (req: any, res) => {
     res.json(report);
   } catch (error: any) {
     console.error('Bug report create error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7859,7 +7904,7 @@ app.get('/admin/platform/bug-reports', adminAuthMiddleware, async (req, res) => 
     });
   } catch (error: any) {
     console.error('Bug reports list error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7882,7 +7927,7 @@ app.patch('/admin/platform/bug-reports/:id', adminAuthMiddleware, async (req, re
     res.json(report);
   } catch (error: any) {
     console.error('Bug report update error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7898,7 +7943,7 @@ app.get('/jarvis/actions', authMiddleware, async (req: any, res) => {
     res.json({ actions });
   } catch (error: any) {
     console.error('Error fetching pending actions:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7917,7 +7962,7 @@ app.get('/jarvis/actions/all', authMiddleware, async (req: any, res) => {
     res.json({ actions });
   } catch (error: any) {
     console.error('Error fetching all pending actions:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -7951,7 +7996,7 @@ app.post('/jarvis/actions/:id/resolve', authMiddleware, async (req: any, res) =>
     res.json({ success: true, action: resolved });
   } catch (error: any) {
     console.error('Error resolving action:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -8034,7 +8079,7 @@ app.post('/jarvis/actions/:id/respond', authMiddleware, async (req: any, res) =>
     res.json({ success: true, action: resolved });
   } catch (error: any) {
     console.error('Error responding to action:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -8064,7 +8109,7 @@ app.post('/jarvis/actions/:id/cancel', authMiddleware, async (req: any, res) => 
     res.json({ success: true, action: cancelled });
   } catch (error: any) {
     console.error('Error cancelling action:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -8288,7 +8333,7 @@ app.post('/internal/scheduler/auto-reply', async (req, res) => {
     }
   } catch (error: any) {
     console.error('Auto-reply error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -8305,7 +8350,7 @@ app.post('/internal/scheduler/follow-up', async (req, res) => {
     res.json({ success: true, ...result });
   } catch (error: any) {
     console.error('Follow-up error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -8317,7 +8362,7 @@ app.post('/internal/scheduler/reminder', async (req, res) => {
     res.json({ success: true });
   } catch (error: any) {
     console.error('Reminder error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -8329,7 +8374,7 @@ app.post('/internal/scheduler/escalation', async (req, res) => {
     res.json({ success: true });
   } catch (error: any) {
     console.error('Escalation error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -8691,7 +8736,7 @@ app.post('/internal/ingest-lead', async (req, res) => {
 
   } catch (error: any) {
     console.error('❌ Error in email ingestion:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -8749,7 +8794,7 @@ app.post('/contact', async (req, res) => {
     res.json({ success: true, id: submission?.id || 'sent' });
   } catch (error: any) {
     console.error('Contact form error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -8816,7 +8861,7 @@ app.post('/newsletter/unsubscribe', async (req, res) => {
     await db.newsletterSubscriber.updateMany({ where: { email }, data: { unsubscribed: true } });
     res.json({ success: true, message: 'Erfolgreich abgemeldet' });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -8875,7 +8920,7 @@ app.post('/jobs/:id/apply', async (req, res) => {
     }
     res.json({ success: true, id: application.id });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -8886,7 +8931,7 @@ app.get('/admin/blog', adminAuthMiddleware, async (req, res) => {
     const posts = await db.blogPost.findMany({ orderBy: { createdAt: 'desc' } });
     res.json({ posts });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -8904,7 +8949,7 @@ app.post('/admin/blog', adminAuthMiddleware, async (req, res) => {
     });
     res.json({ post });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -8930,7 +8975,7 @@ app.put('/admin/blog/:id', adminAuthMiddleware, async (req, res) => {
     });
     res.json({ post });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -8940,7 +8985,7 @@ app.delete('/admin/blog/:id', adminAuthMiddleware, async (req, res) => {
     await db.blogPost.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -8956,7 +9001,7 @@ app.get('/admin/newsletter/subscribers', adminAuthMiddleware, async (req, res) =
     }));
     res.json({ subscribers });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -8983,7 +9028,7 @@ app.post('/admin/newsletter/subscribers', adminAuthMiddleware, async (req, res) 
     });
     res.json({ subscriber });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9019,7 +9064,7 @@ app.post('/admin/newsletter/subscribers/import', adminAuthMiddleware, async (req
     }
     res.json({ imported, skipped, total: rows.length });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9030,7 +9075,7 @@ app.delete('/admin/newsletter/subscribers/:id', adminAuthMiddleware, async (req,
     await db.newsletterSubscriber.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9040,7 +9085,7 @@ app.get('/admin/newsletter/campaigns', adminAuthMiddleware, async (req, res) => 
     const campaigns = await db.newsletterCampaign.findMany({ orderBy: { createdAt: 'desc' } });
     res.json({ campaigns });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9054,7 +9099,7 @@ app.post('/admin/newsletter/campaigns', adminAuthMiddleware, async (req, res) =>
     });
     res.json({ campaign });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9068,7 +9113,7 @@ app.put('/admin/newsletter/campaigns/:id', adminAuthMiddleware, async (req, res)
     });
     res.json({ campaign });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9098,7 +9143,7 @@ app.post('/admin/newsletter/campaigns/:id/send', adminAuthMiddleware, async (req
     });
     res.json({ success: true, sentCount });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9108,7 +9153,7 @@ app.delete('/admin/newsletter/campaigns/:id', adminAuthMiddleware, async (req, r
     await db.newsletterCampaign.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9119,7 +9164,7 @@ app.get('/admin/jobs', adminAuthMiddleware, async (req, res) => {
     const jobs = await db.jobPosting.findMany({ orderBy: { createdAt: 'desc' }, include: { applications: { select: { id: true } } } });
     res.json({ jobs: jobs.map(j => ({ ...j, applicationCount: j.applications.length, applications: undefined })) });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9133,7 +9178,7 @@ app.post('/admin/jobs', adminAuthMiddleware, async (req, res) => {
     });
     res.json({ job });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9160,7 +9205,7 @@ app.put('/admin/jobs/:id', adminAuthMiddleware, async (req, res) => {
     });
     res.json({ job });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9170,7 +9215,7 @@ app.delete('/admin/jobs/:id', adminAuthMiddleware, async (req, res) => {
     await db.jobPosting.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9180,7 +9225,7 @@ app.get('/admin/jobs/:id/applications', adminAuthMiddleware, async (req, res) =>
     const applications = await db.jobApplication.findMany({ where: { jobId: req.params.id }, orderBy: { createdAt: 'desc' } });
     res.json({ applications });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9194,7 +9239,7 @@ app.put('/admin/jobs/applications/:id', adminAuthMiddleware, async (req, res) =>
     });
     res.json({ application });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9205,7 +9250,7 @@ app.get('/admin/contacts', adminAuthMiddleware, async (req, res) => {
     const submissions = await db.contactSubmission.findMany({ orderBy: { createdAt: 'desc' } });
     res.json({ submissions });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9219,7 +9264,7 @@ app.put('/admin/contacts/:id', adminAuthMiddleware, async (req, res) => {
     });
     res.json({ submission });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9328,7 +9373,7 @@ app.patch('/admin/platform/users/:id', adminAuthMiddleware, async (req, res) => 
     });
   } catch (error: any) {
     console.error('Admin update user error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9347,7 +9392,7 @@ app.delete('/admin/platform/users/:id', adminAuthMiddleware, async (req, res) =>
     res.json({ success: true });
   } catch (error: any) {
     console.error('Admin delete user error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9383,7 +9428,7 @@ app.post('/calendar/events/sync-to-office', authMiddleware, async (req: any, res
     res.json({ success: true, eventId: result?.id });
   } catch (error: any) {
     console.error('Calendar sync to office error:', error);
-    res.json({ success: false, error: error.message });
+    res.json({ success: false, error: 'Internal Server Error' });
   }
 });
 
@@ -9471,7 +9516,7 @@ app.get('/events/stream', authMiddleware, async (req: any, res) => {
   } catch (error: any) {
     console.error('SSE stream error:', error);
     if (!res.headersSent) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: 'Internal Server Error' });
     }
   }
 });
@@ -9751,7 +9796,7 @@ app.get('/admin/finance/summary', adminAuthMiddleware, async (req, res) => {
     });
   } catch (error: any) {
     console.error('Finance summary error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9781,7 +9826,7 @@ app.get('/admin/finance/ai-costs', adminAuthMiddleware, async (req, res) => {
     res.json({ period: { from: from.toISOString(), to: to.toISOString() }, view, data });
   } catch (error: any) {
     console.error('AI costs error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9885,7 +9930,7 @@ app.get('/admin/finance/cost-per-lead', adminAuthMiddleware, async (req, res) =>
     });
   } catch (error: any) {
     console.error('Cost per lead error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9918,7 +9963,7 @@ app.get('/admin/finance/tenant-costs', adminAuthMiddleware, async (_req, res) =>
     res.json({ data: tenantCosts });
   } catch (error: any) {
     console.error('Tenant costs error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9933,7 +9978,7 @@ app.get('/leads/:id/prediction', authMiddleware, async (req: any, res) => {
     res.json(prediction);
   } catch (error: any) {
     console.error('Prediction error:', error.message);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9943,7 +9988,7 @@ app.get('/analytics/contact-time', authMiddleware, async (req: any, res) => {
     const prediction = await PredictiveService.predictContactTime(req.user.tenantId);
     res.json(prediction);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9956,7 +10001,7 @@ app.post('/analytics/price-estimate', authMiddleware, express.json(), async (req
     });
     res.json(estimation);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -9981,7 +10026,7 @@ app.post('/admin/ab-tests', adminAuthMiddleware, express.json(), async (req, res
     const experiment = ABTestService.createExperiment(req.body);
     res.json(experiment);
   } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: 'Bad Request' });
   }
 });
 
@@ -9990,7 +10035,7 @@ app.post('/admin/ab-tests/:id/start', adminAuthMiddleware, async (req, res) => {
     ABTestService.startExperiment(req.params.id);
     res.json({ success: true });
   } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: 'Bad Request' });
   }
 });
 
@@ -9999,7 +10044,7 @@ app.post('/admin/ab-tests/:id/end', adminAuthMiddleware, async (req, res) => {
     ABTestService.endExperiment(req.params.id);
     res.json({ success: true });
   } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: 'Bad Request' });
   }
 });
 

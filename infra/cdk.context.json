@@ -3,5 +3,6 @@
     "eu-central-1a",
     "eu-central-1b",
     "eu-central-1c"
-  ]
+  ],
+  "devAllowedIps": "41.66.119.230/32"
 }

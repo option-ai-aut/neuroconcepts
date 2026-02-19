@@ -2,27 +2,29 @@ import crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
-const SALT_LENGTH = 64;
-const TAG_LENGTH = 16;
 const KEY_LENGTH = 32;
+
+// Legacy salt kept for backwards-compatibility with existing encrypted data.
+// New encryptions also use this salt since changing it would break all stored ciphertext.
+const KEY_SALT = 'salt';
 
 export class EncryptionService {
   private key: Buffer;
 
   constructor() {
-    const secret = process.env.ENCRYPTION_KEY || 'default-dev-key-change-in-production-32chars!!';
+    const secret = process.env.ENCRYPTION_KEY;
+    
+    if (!secret) {
+      throw new Error('ENCRYPTION_KEY environment variable is required but not set');
+    }
     
     if (secret.length < 32) {
       throw new Error('ENCRYPTION_KEY must be at least 32 characters');
     }
     
-    // Derive key from secret
-    this.key = crypto.scryptSync(secret, 'salt', KEY_LENGTH);
+    this.key = crypto.scryptSync(secret, KEY_SALT, KEY_LENGTH);
   }
 
-  /**
-   * Encrypt a string (e.g., FTP password)
-   */
   encrypt(text: string): string {
     if (!text) return '';
     
@@ -34,13 +36,9 @@ export class EncryptionService {
     
     const authTag = cipher.getAuthTag();
     
-    // Format: iv:authTag:encrypted
     return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
   }
 
-  /**
-   * Decrypt a string
-   */
   decrypt(encryptedText: string): string {
     if (!encryptedText) return '';
     
@@ -67,9 +65,6 @@ export class EncryptionService {
     }
   }
 
-  /**
-   * Check if a string is encrypted (has our format)
-   */
   isEncrypted(text: string): boolean {
     if (!text) return false;
     const parts = text.split(':');
@@ -77,5 +72,11 @@ export class EncryptionService {
   }
 }
 
-// Singleton instance
-export const encryptionService = new EncryptionService();
+// Lazy singleton — only instantiated when first used (avoids crash during CDK builds)
+let _instance: EncryptionService | null = null;
+export const encryptionService = new Proxy({} as EncryptionService, {
+  get(_target, prop) {
+    if (!_instance) _instance = new EncryptionService();
+    return (_instance as any)[prop];
+  }
+});

@@ -39,7 +39,8 @@
     "qrcode": "^1.5.4",
     "resend": "^6.9.2",
     "serverless-http": "^3.2.0",
-    "sharp": "^0.34.5"
+    "sharp": "^0.34.5",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.133",

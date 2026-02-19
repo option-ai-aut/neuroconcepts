@@ -8,15 +8,25 @@ import {
   Eye, EyeOff, ArrowLeft, Menu, X, Shield
 } from 'lucide-react';
 import { getAdminEmails, markAdminEmailRead, getAdminUnreadCounts, AdminEmail } from '@/lib/adminApi';
+import DOMPurify from 'dompurify';
 
-// Sanitize HTML email content
 function sanitizeEmailHtml(html: string): string {
-  return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
-    .replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, '')
-    .replace(/on\w+="[^"]*"/gi, '')
-    .replace(/on\w+='[^']*'/gi, '');
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      'div', 'span', 'p', 'br', 'a', 'b', 'i', 'u', 'strong', 'em',
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li',
+      'table', 'thead', 'tbody', 'tr', 'td', 'th',
+      'img', 'blockquote', 'pre', 'code', 'hr', 'style',
+      'font', 'center', 'small', 'big', 'sub', 'sup',
+    ],
+    ALLOWED_ATTR: [
+      'href', 'target', 'rel', 'src', 'alt', 'width', 'height',
+      'style', 'class', 'id', 'colspan', 'rowspan', 'align', 'valign',
+      'border', 'cellpadding', 'cellspacing', 'bgcolor', 'color', 'face', 'size',
+    ],
+    ALLOW_DATA_ATTR: false,
+    ADD_ATTR: ['target'],
+  });
 }
 
 const MAILBOXES = [
