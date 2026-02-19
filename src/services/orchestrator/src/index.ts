@@ -880,19 +880,45 @@ const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 const MEDIA_BUCKET = process.env.MEDIA_BUCKET_NAME || '';
 const MEDIA_CDN_URL = process.env.MEDIA_CDN_URL || '';
 
-const ALLOWED_MIMETYPES = new Set([
+const IMAGE_MIMETYPES = new Set([
   'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml',
   'application/pdf',
 ]);
 
-const upload = multer({ 
+const CHAT_ALLOWED_MIMETYPES = new Set([
+  ...IMAGE_MIMETYPES,
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/csv',
+  'text/markdown',
+  'application/json',
+]);
+
+const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (ALLOWED_MIMETYPES.has(file.mimetype)) {
+    if (IMAGE_MIMETYPES.has(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new Error('Dateityp nicht erlaubt. Erlaubt: JPEG, PNG, WebP, GIF, SVG, PDF'));
+    }
+  }
+});
+
+const chatUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (CHAT_ALLOWED_MIMETYPES.has(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Dateityp nicht erlaubt. Erlaubt: Bilder, PDF, Word, Excel, PowerPoint, Text, CSV'));
     }
   }
 });
@@ -2665,7 +2691,7 @@ interface Document {
 }
 
 // POST /properties/:id/documents - Upload documents to property
-app.post('/properties/:id/documents', authMiddleware, upload.array('documents', 20), async (req, res) => {
+app.post('/properties/:id/documents', authMiddleware, chatUpload.array('documents', 20), async (req, res) => {
   try {
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
@@ -2756,7 +2782,7 @@ app.delete('/properties/:id/documents', authMiddleware, async (req, res) => {
 });
 
 // POST /leads/:id/documents - Upload documents to lead
-app.post('/leads/:id/documents', authMiddleware, upload.array('documents', 20), async (req, res) => {
+app.post('/leads/:id/documents', authMiddleware, chatUpload.array('documents', 20), async (req, res) => {
   try {
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
@@ -3841,7 +3867,7 @@ app.post('/chat',
 // Streaming Chat Endpoint with Optimized Memory (supports file uploads)
 app.post('/chat/stream',
   authMiddleware,
-  upload.array('files', 10), // Allow up to 10 files
+  chatUpload.array('files', 10),
   AiSafetyMiddleware.rateLimit(50, 60000),
   async (req, res) => {
     try {

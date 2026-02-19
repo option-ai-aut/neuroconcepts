@@ -45,7 +45,7 @@ export default function Sidebar() {
 
   return (
     <div 
-      className="hidden lg:flex flex-col bg-gray-950 dark:bg-[#0a0a0a] h-screen relative z-20 will-change-[width] transition-[width] duration-200 ease-out"
+      className="hidden lg:flex flex-col bg-[#0a0a0a] h-screen relative z-20 will-change-[width] transition-[width] duration-200 ease-out"
       style={{ width: isHovered ? '256px' : '80px' }}
       onMouseEnter={() => { setIsHovered(true); setSidebarExpanded(true); }}
       onMouseLeave={() => { setIsHovered(false); setSidebarExpanded(false); }}
