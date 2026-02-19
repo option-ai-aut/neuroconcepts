@@ -874,27 +874,27 @@ export default function LandingPage() {
               5. VIRTUAL STAGING — Fixa-style image + stat bars
               ══════════════════════════════════════════ */}
           <Slide idx={5} active={activeIdx === 5} className="bg-white text-gray-900">
-            <div className="h-full flex flex-col items-center justify-center">
+            <div className="h-full flex flex-col items-center justify-center py-4 sm:py-6">
               {/* Title */}
-              <div className="text-center mb-6 sm:mb-8 px-4">
+              <div className="text-center mb-3 sm:mb-5 lg:mb-7 px-4 flex-shrink-0">
                 <Stagger active={activeIdx === 5} delay={0}>
-                  <p className="text-blue-600 font-semibold text-[10px] sm:text-xs tracking-widest uppercase mb-2">{t('staging.badge')}</p>
+                  <p className="text-blue-600 font-semibold text-[10px] sm:text-xs tracking-widest uppercase mb-1 sm:mb-2">{t('staging.badge')}</p>
                 </Stagger>
                 <Stagger active={activeIdx === 5} delay={80}>
-                  <h2 className="text-2xl sm:text-4xl lg:text-5xl font-bold tracking-tight leading-tight max-w-3xl">
+                  <h2 className="text-xl sm:text-3xl lg:text-5xl font-bold tracking-tight leading-tight max-w-3xl">
                     {t.rich('staging.title', { bold: (chunks) => <strong>{chunks}</strong> })}
                   </h2>
                 </Stagger>
                 <Stagger active={activeIdx === 5} delay={160}>
-                  <p className="text-xs sm:text-base text-gray-500 mt-2 max-w-xl mx-auto">
+                  <p className="text-xs sm:text-sm lg:text-base text-gray-500 mt-1 sm:mt-2 max-w-xl mx-auto">
                     {t.rich('staging.subtitle', { bold: (chunks) => <span className="text-gray-900 font-medium">{chunks}</span> })}
                   </p>
                 </Stagger>
               </div>
 
-              {/* Image — edge to edge with 20px padding */}
-              <Stagger active={activeIdx === 5} delay={250} className="w-full">
-                <div className="relative w-full h-[260px] sm:h-[400px] lg:h-[600px] rounded-2xl sm:rounded-3xl overflow-hidden mx-auto" style={{ maxWidth: 'calc(100vw - 20px)' }}>
+              {/* Image — edge to edge with 20px padding, height adapts to remaining space */}
+              <Stagger active={activeIdx === 5} delay={250} className="w-full flex-1 min-h-0">
+                <div className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden mx-auto" style={{ maxWidth: 'calc(100vw - 20px)', height: 'min(calc(100dvh - 220px), 600px)', minHeight: '200px' }}>
                   <BeforeAfterSlider active={activeIdx === 5} />
                   {/* Stat tag */}
                   <div
