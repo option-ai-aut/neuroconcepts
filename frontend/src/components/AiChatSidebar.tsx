@@ -624,7 +624,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         // Use FormData if we have files, otherwise JSON
         let res: Response;
         // #region agent log
-        console.log('[Jarvis-Debug] streamBaseUrl:', streamBaseUrl, '| apiBaseUrl:', apiBaseUrl);
+        console.warn('[Jarvis-Debug] streamBaseUrl:', streamBaseUrl, '| apiBaseUrl:', apiBaseUrl);
         // #endregion
         if (filesToUpload.length > 0) {
           const formData = new FormData();
@@ -657,7 +657,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         }
 
         // #region agent log
-        console.log('[Jarvis-Debug] response status:', res.status, '| ok:', res.ok, '| content-type:', res.headers.get('content-type'));
+        console.warn('[Jarvis-Debug] response status:', res.status, '| ok:', res.ok, '| content-type:', res.headers.get('content-type'));
         // #endregion
 
         if (!res.ok) {
@@ -689,7 +689,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         while (true) {
           const { done, value } = await reader.read();
           // #region agent log
-          if (done) console.log('[Jarvis-Debug] stream done, total chunks:', _dbgChunkCount);
+          if (done) console.warn('[Jarvis-Debug] stream done, total chunks:', _dbgChunkCount);
           // #endregion
           if (done) break;
 
@@ -701,7 +701,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
             if (line.startsWith('data: ')) {
               // #region agent log
               _dbgChunkCount++;
-              if (_dbgChunkCount <= 3) console.log('[Jarvis-Debug] SSE line #' + _dbgChunkCount + ':', line.slice(0, 120));
+              if (_dbgChunkCount <= 3) console.warn('[Jarvis-Debug] SSE line #' + _dbgChunkCount + ':', line.slice(0, 120));
               // #endregion
               const data = JSON.parse(line.slice(6));
 
