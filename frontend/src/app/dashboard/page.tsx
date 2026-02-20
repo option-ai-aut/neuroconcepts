@@ -474,7 +474,11 @@ export default function DashboardPage() {
 
         const [statsRes, calRes] = await Promise.all([
           fetch(`${base}/dashboard/stats`, { headers }),
-          fetch(`${base}/calendar/events?limit=20`, { headers }).catch(() => null),
+          (() => {
+            const now = new Date();
+            const end = new Date(now); end.setDate(end.getDate() + 14);
+            return fetch(`${base}/calendar/events?start=${now.toISOString()}&end=${end.toISOString()}`, { headers }).catch(() => null);
+          })(),
         ]);
 
         if (!statsRes.ok) throw new Error('stats failed');

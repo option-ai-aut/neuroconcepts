@@ -42,6 +42,11 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import sharp from 'sharp';
+import mammoth from 'mammoth';
+import * as XLSX from 'xlsx';
+import JSZip from 'jszip';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require('pdf-parse') as (buffer: Buffer) => Promise<{ text: string }>;
 
 const app = express();
 
@@ -3914,11 +3919,76 @@ app.post('/chat/stream',
         const fileInfos = await Promise.all(files.map(async (f) => {
           const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(f.originalname)}`;
           const url = await uploadToS3(f.buffer, uniqueName, f.mimetype, folder);
+
+          // Extract text content for readable documents
+          let extractedText: string | null = null;
+          let isStructuredData = false;
+          try {
+            const ext = path.extname(f.originalname).toLowerCase();
+            if (ext === '.docx' || f.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+              const result = await mammoth.extractRawText({ buffer: f.buffer });
+              extractedText = result.value?.trim() || null;
+            } else if (ext === '.pdf' || f.mimetype === 'application/pdf') {
+              const result = await pdfParse(f.buffer);
+              extractedText = result.text?.trim() || null;
+            } else if (ext === '.txt' || f.mimetype === 'text/plain') {
+              extractedText = f.buffer.toString('utf-8').trim();
+            } else if (ext === '.json' || f.mimetype === 'application/json') {
+              try {
+                const parsed = JSON.parse(f.buffer.toString('utf-8'));
+                extractedText = JSON.stringify(parsed, null, 2);
+              } catch {
+                extractedText = f.buffer.toString('utf-8').trim();
+              }
+            } else if (ext === '.pptx' || f.mimetype === 'application/vnd.openxmlformats-officedocument.presentationml.presentation') {
+              const zip = await JSZip.loadAsync(f.buffer);
+              const slideFiles = Object.keys(zip.files)
+                .filter(name => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+                .sort((a, b) => {
+                  const na = parseInt(a.match(/\d+/)?.[0] || '0');
+                  const nb = parseInt(b.match(/\d+/)?.[0] || '0');
+                  return na - nb;
+                });
+              const slideTexts: string[] = [];
+              for (let i = 0; i < slideFiles.length; i++) {
+                const xml = await zip.files[slideFiles[i]].async('text');
+                const texts = [...xml.matchAll(/<a:t[^>]*>([^<]*)<\/a:t>/g)].map(m => m[1]).filter(Boolean);
+                if (texts.length > 0) slideTexts.push(`### Folie ${i + 1}\n${texts.join(' ')}`);
+              }
+              extractedText = slideTexts.join('\n\n') || null;
+            } else if (['.xlsx', '.xls', '.csv'].includes(ext) || f.mimetype.includes('spreadsheet') || f.mimetype === 'text/csv') {
+              isStructuredData = true;
+              const workbook = XLSX.read(f.buffer, { type: 'buffer' });
+              const lines: string[] = [];
+              for (const sheetName of workbook.SheetNames) {
+                const sheet = workbook.Sheets[sheetName];
+                const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                if (rows.length === 0) continue;
+                if (workbook.SheetNames.length > 1) lines.push(`## Tabellenblatt: ${sheetName}`);
+                // Header row
+                const headers = (rows[0] as any[]).map(String);
+                lines.push(headers.join(' | '));
+                lines.push(headers.map(() => '---').join(' | '));
+                // Data rows (cap at 500 rows to avoid token overflow)
+                const dataRows = rows.slice(1, 501);
+                for (const row of dataRows) {
+                  lines.push((row as any[]).map(v => String(v ?? '')).join(' | '));
+                }
+                if (rows.length > 501) lines.push(`[... ${rows.length - 501} weitere Zeilen nicht angezeigt]`);
+              }
+              extractedText = lines.join('\n');
+            }
+          } catch (err) {
+            console.warn(`⚠️ Text extraction failed for ${f.originalname}:`, err);
+          }
+
           return {
             name: f.originalname,
             type: f.mimetype,
             size: f.size,
-            url
+            url,
+            extractedText,
+            isStructuredData,
           };
         }));
         uploadedFileUrls.push(...fileInfos.map(f => f.url));
@@ -3930,8 +4000,18 @@ app.post('/chat/stream',
         if (imageFiles.length > 0) {
           fileContext += `\n[HOCHGELADENE BILDER: ${imageFiles.map(f => `"${f.name}" (${f.url})`).join(', ')}]`;
         }
-        if (otherFiles.length > 0) {
-          fileContext += `\n[HOCHGELADENE DATEIEN: ${otherFiles.map(f => `"${f.name}"`).join(', ')}]`;
+        for (const f of otherFiles) {
+          if (f.extractedText) {
+            // Structured data (Excel/CSV) gets more space; docs are capped at 8000 chars
+            const limit = f.isStructuredData ? 40000 : 8000;
+            const preview = f.extractedText.length > limit
+              ? f.extractedText.slice(0, limit) + '\n[... Inhalt gekürzt — nur erste Datensätze angezeigt ...]'
+              : f.extractedText;
+            const label = f.isStructuredData ? 'TABELLE' : 'DOKUMENT';
+            fileContext += `\n[${label} "${f.name}" — INHALT:\n${preview}\n]`;
+          } else {
+            fileContext += `\n[HOCHGELADENE DATEI: "${f.name}" — Inhalt konnte nicht gelesen werden (kein unterstütztes Format)]`;
+          }
         }
         
         // Store file URLs in session for AI tools to access

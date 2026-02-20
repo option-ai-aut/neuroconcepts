@@ -102,6 +102,15 @@ export class AgentRouter {
    */
   private static keywordClassify(msg: string): AgentCategory | null {
     const m = msg.toLowerCase().trim();
+
+    // If file content is embedded: route based on intent
+    if ((msg.includes('[DATEI "') || msg.includes('[TABELLE "') || msg.includes('[DOKUMENT "')) && msg.includes('— INHALT:')) {
+      // CRM import intent → needs crm tools
+      const importIntent = /\b(import|importier|anlegen|erstell|einfüg|hinzufüg|create|add|insert|leg.*an|füg.*ein|speicher|übertrag|alle.*lead|alle.*objekt|alle.*immobilie)\b/i;
+      if (importIntent.test(msg)) return 'crm';
+      // Otherwise just read/summarize from context — no tools needed
+      return 'smalltalk';
+    }
     
     // Smalltalk patterns (allow optional name/word after greeting, e.g. "hallo jarvis")
     const smalltalkPatterns = [
