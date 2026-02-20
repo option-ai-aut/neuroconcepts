@@ -303,7 +303,7 @@ export class ImmivoStack extends cdk.Stack {
       },
       bundling: { 
         minify: true, 
-        sourceMap: true,
+        sourceMap: false, // Source maps are 110MB+ unzipped — Lambda limit is 262MB
         // ews-javascript-api uses deasync (native module) which can't be bundled by esbuild
         // xlsx/mammoth/pdf-parse/jszip must NOT be bundled — xlsx crashes Lambda on startup (DOMMatrix)
         externalModules: ['@aws-sdk/*', '@smithy/*', 'ews-javascript-api', 'deasync', 'http-cookie-agent', 'sharp', 'xlsx', 'mammoth', 'pdf-parse', 'jszip'],
