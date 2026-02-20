@@ -1,6 +1,6 @@
-# Deploy-Checkliste: Dev → Test → Main
+# Deploy-Checkliste: Lokal → Test → Main
 
-Dieses Dokument beschreibt alle Schritte die beim Pushen von `dev` nach `test` (und `test` nach `main`) zu beachten sind.
+Dieses Dokument beschreibt alle Schritte die beim Deployen von lokal nach `test` (und `test` nach `main`) zu beachten sind.
 
 ---
 
@@ -8,20 +8,19 @@ Dieses Dokument beschreibt alle Schritte die beim Pushen von `dev` nach `test` (
 
 | Stage | API Gateway URL | Secret Name | CloudFormation Stack |
 |-------|----------------|-------------|----------------------|
-| dev   | `https://7mb9n425ui.execute-api.eu-central-1.amazonaws.com/dev` | `Immivo-App-Secret-dev` | `Immivo-Dev` |
 | test  | `https://8fiutkddgi.execute-api.eu-central-1.amazonaws.com/test` | `Immivo-App-Secret-test` | `Immivo-Test` |
 | main  | *(prod URL)* | `Immivo-App-Secret-prod` | `Immivo-Prod` |
 
 ---
 
-## Dev → Test pushen
+## Lokal → Test pushen
 
 ### 1. Vor dem Push: Code prüfen
 
 ```bash
-# Lokale Tests laufen lassen
+# Lokale TypeScript-Kompilierung prüfen
 cd src/services/orchestrator
-npm run build   # TypeScript-Fehler prüfen
+npm run build
 
 cd ../../..
 cd frontend
@@ -32,7 +31,7 @@ npm run build   # Next.js Build prüfen
 
 Hat sich `schema.prisma` geändert? Wenn ja:
 
-- [ ] Ist jede neue Tabelle in `migration.sql` ODER in `applyPendingMigrations` ODER in `ensureAdminTables` abgedeckt?
+- [ ] Ist jede neue Tabelle in `ensureAdminTables` abgedeckt?
 - [ ] Ist jede neue Spalte in `applyPendingMigrations` als `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` enthalten?
 - [ ] Wurde `MIGRATION_VERSION` erhöht (z.B. von 13 auf 14)?
 
@@ -43,17 +42,13 @@ Hat sich `schema.prisma` geändert? Wenn ja:
 ```bash
 cd /Users/dennis/NeuroConcepts.ai
 
-# Option A: Nur den aktuellen dev-Stand nach test pushen
-git push origin dev:test
-
-# Option B: Erst committen, dann pushen
+# Aktuellen Branch-Stand nach test pushen
 git add .
 git commit -m "feat: ..."
-git push origin dev
-git push origin dev:test
+git push origin HEAD:test
 ```
 
-GitHub Actions deployt automatisch sobald `test` Branch aktualisiert wird. Dauer: **~10–15 Minuten**.
+GitHub Actions deployt automatisch sobald der `test`-Branch aktualisiert wird. Dauer: **~10–15 Minuten**.
 
 ### 4. Nach dem Deploy: Datenbank migrieren
 
@@ -112,6 +107,8 @@ Test muss **vollständig funktionieren** (Login, Dashboard, CRM, alle Seiten).
 git push origin test:main
 ```
 
+GitHub Actions benötigt für `main` eine **manuelle Bestätigung** (Environment Protection). Im GitHub Actions UI auf "Review deployments" → "Approve" klicken.
+
 ### 2. Datenbank migrieren (Main/Prod)
 
 ```bash
@@ -165,6 +162,24 @@ Das Projekt hat **3 Migrations-Schichten**:
 
 ---
 
+## Lokale Entwicklung
+
+Für lokale Entwicklung wird kein separates Stage-Backend benötigt:
+
+```bash
+# Backend starten
+cd src/services/orchestrator
+npm run dev   # startet auf localhost:3001
+
+# Frontend starten
+cd frontend
+npm run dev   # startet auf localhost:3000
+```
+
+Das lokale Frontend verbindet sich automatisch mit `localhost:3001` (via `NODE_ENV === 'development'` Logik in `next.config.mjs`).
+
+---
+
 ## Häufige Fehler & Lösungen
 
 ### `500` beim Login (`/auth/sync`)
@@ -185,21 +200,8 @@ Das Projekt hat **3 Migrations-Schichten**:
 
 ### `Forbidden` beim Aufrufen von `/admin/migrate`
 **Ursache**: Falscher Secret-Name im `aws secretsmanager` Befehl.  
-**Korrekte Namen**: `Immivo-App-Secret-dev`, `Immivo-App-Secret-test`, `Immivo-App-Secret-prod`.
+**Korrekte Namen**: `Immivo-App-Secret-test`, `Immivo-App-Secret-prod`.
 
----
-
-## Dev-Stage: Force-Migrate (Referenz)
-
-```bash
-ADMIN_SECRET=$(aws secretsmanager get-secret-value \
-  --secret-id Immivo-App-Secret-dev \
-  --query SecretString \
-  --output text \
-  --region eu-central-1 | python3 -c "import sys,json; print(json.load(sys.stdin)['ADMIN_SECRET'])")
-
-curl -s -X POST https://7mb9n425ui.execute-api.eu-central-1.amazonaws.com/dev/admin/migrate \
-  -H "Content-Type: application/json" \
-  -H "x-admin-secret: $ADMIN_SECRET" \
-  -d '{"force":true}' | python3 -m json.tool
-```
+### Deploy auf `main` hängt auf "Warten"
+**Ursache**: GitHub Actions `environment: production` erfordert manuelle Genehmigung.  
+**Fix**: Im GitHub Actions UI → "Review deployments" → "Approve" klicken.

@@ -24,7 +24,7 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as path from 'path';
 
 export interface ImmivoStackProps extends cdk.StackProps {
-  stageName: 'dev' | 'test' | 'prod';
+  stageName: 'test' | 'prod';
 }
 
 export class ImmivoStack extends cdk.Stack {
@@ -44,22 +44,20 @@ export class ImmivoStack extends cdk.Stack {
     cdk.Tags.of(this).add('Project', 'Immivo');
 
     // --- 1. Network Stack (VPC) ---
-    const natGateways = props.stageName === 'dev' ? 0 : 1;
-
     this.vpc = new ec2.Vpc(this, 'ImmivoVPC', {
       maxAzs: 2,
-      natGateways: natGateways,
+      natGateways: 1,
       subnetConfiguration: [
         {
           cidrMask: 24,
           name: 'Public',
           subnetType: ec2.SubnetType.PUBLIC,
         },
-        ...(props.stageName !== 'dev' ? [{
+        {
           cidrMask: 24,
           name: 'Private',
           subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-        }] : []),
+        },
       ],
     });
 
@@ -82,53 +80,30 @@ export class ImmivoStack extends cdk.Stack {
       allowAllOutbound: false,
     });
 
-    // Lambda Security Group (test/prod only): allows all outbound so Lambda can reach
+    // Lambda Security Group: allows all outbound so Lambda can reach
     // Secrets Manager, OpenAI, Resend, Cognito, Stripe etc. via the NAT Gateway.
-    // Dev Lambda runs outside the VPC entirely, so no VPC security group is needed.
-    const lambdaInVpcSg = props.stageName !== 'dev'
-      ? new ec2.SecurityGroup(this, 'LambdaSecurityGroup', {
-          vpc: this.vpc,
-          description: 'Orchestrator Lambda - allows all outbound via NAT Gateway',
-          allowAllOutbound: true,
-        })
-      : null;
+    const lambdaInVpcSg = new ec2.SecurityGroup(this, 'LambdaSecurityGroup', {
+      vpc: this.vpc,
+      description: 'Orchestrator Lambda - allows all outbound via NAT Gateway',
+      allowAllOutbound: true,
+    });
 
-    // Dev: Lambda lives outside the VPC → DB must be publicly accessible.
-    // Allow all IPs on port 5432 so Lambda (which has no fixed IP) can connect.
-    // The auto-generated RDS password is the only protection needed for a dev DB.
-    // Set devAllowedIps in cdk.context.json (comma-separated CIDRs) to additionally
-    // restrict developer direct access (psql, DataGrip, etc.).
-    if (props.stageName === 'dev') {
-      dbSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(5432), 'Dev: allow Lambda (outside VPC) and developers from internet');
-      const devIps = this.node.tryGetContext('devAllowedIps') as string || '';
-      if (devIps) {
-        for (const cidr of devIps.split(',').map((s: string) => s.trim()).filter(Boolean)) {
-          dbSg.addIngressRule(ec2.Peer.ipv4(cidr), ec2.Port.tcp(5432), `Dev DB access from ${cidr}`);
-        }
-      }
-    }
+    // Lambda is in VPC → allow inbound from the Lambda security group
+    dbSg.addIngressRule(lambdaInVpcSg, ec2.Port.tcp(5432), 'Allow Lambda (VPC) to reach DB');
 
-    // Test/Prod: Lambda is in VPC → allow inbound from the Lambda security group
-    if (lambdaInVpcSg) {
-      dbSg.addIngressRule(lambdaInVpcSg, ec2.Port.tcp(5432), 'Allow Lambda (VPC) to reach DB');
-    }
-
-    if (props.stageName === 'dev' || props.stageName === 'test') {
+    if (props.stageName === 'test') {
       const instance = new rds.DatabaseInstance(this, 'PostgresInstance', {
         engine: rds.DatabaseInstanceEngine.postgres({ version: rds.PostgresEngineVersion.VER_16 }),
         vpc: this.vpc,
-        vpcSubnets: { subnetType: props.stageName === 'dev' ? ec2.SubnetType.PUBLIC : ec2.SubnetType.PRIVATE_WITH_EGRESS },
+        vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
         instanceType: ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.MICRO),
         allocatedStorage: 20,
         maxAllocatedStorage: 50,
         credentials: rds.Credentials.fromSecret(this.dbSecret),
         securityGroups: [dbSg],
-        // Dev: publiclyAccessible=true gives the instance a public IP so the
-        // Lambda (which runs outside the VPC) can reach it over the internet.
-        // Test: private subnet → Lambda is in VPC → no public IP needed.
-        publiclyAccessible: props.stageName === 'dev',
+        publiclyAccessible: false,
         storageEncrypted: true,
-        removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
+        removalPolicy: cdk.RemovalPolicy.RETAIN,
       });
       this.dbEndpoint = instance.dbInstanceEndpointAddress;
     } else {
@@ -214,7 +189,7 @@ export class ImmivoStack extends cdk.Stack {
       lambdaTriggers: {
         customEmailSender: customEmailSenderLambda,
       },
-      removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
     this.userPoolClient = this.userPool.addClient('ImmivoClient', {
@@ -248,7 +223,7 @@ export class ImmivoStack extends cdk.Stack {
       lambdaTriggers: {
         customEmailSender: customEmailSenderLambda,
       },
-      removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
     this.adminUserPoolClient = this.adminUserPool.addClient('ImmivoAdminClient', {
@@ -262,8 +237,8 @@ export class ImmivoStack extends cdk.Stack {
 
     // --- 4. Orchestrator Service (Lambda + API Gateway) ---
     
-    const lambdaVpc = props.stageName === 'dev' ? undefined : this.vpc;
-    const lambdaSg = lambdaInVpcSg ? [lambdaInVpcSg] : undefined;
+    const lambdaVpc = this.vpc;
+    const lambdaSg = [lambdaInVpcSg];
 
     // App secrets (API keys, OAuth credentials, encryption keys)
     // These are stored securely in Secrets Manager and read at runtime
@@ -284,7 +259,7 @@ export class ImmivoStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(120), // 2 min for AI tool calls (chat/stream uses API GW SSE, not Function URL)
       memorySize: 1024, // More memory = faster cold starts + Prisma init
       vpc: lambdaVpc,
-      vpcSubnets: props.stageName === 'dev' ? undefined : { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: lambdaSg,
       environment: {
         STAGE: props.stageName,
@@ -354,15 +329,14 @@ export class ImmivoStack extends cdk.Stack {
     // --- Media Upload Bucket (Property Images, Floorplans, Documents) ---
     const mediaBucket = new s3.Bucket(this, 'MediaBucket', {
       versioned: props.stageName === 'prod',
-      removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
-      autoDeleteObjects: props.stageName === 'dev',
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      autoDeleteObjects: false,
       encryption: s3.BucketEncryption.S3_MANAGED,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       enforceSSL: true,
       cors: [{
         allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.HEAD],
         allowedOrigins: [
-          'https://dev.immivo.ai',
           'https://test.immivo.ai',
           'https://app.immivo.ai',
           'https://immivo.ai',
@@ -410,10 +384,9 @@ export class ImmivoStack extends cdk.Stack {
 
     // Lambda Function URL for streaming endpoints (bypasses API Gateway 29s timeout)
     const allowedStreamOrigins = [
-      'https://dev.immivo.ai', 'https://test.immivo.ai',
+      'https://test.immivo.ai',
       'https://app.immivo.ai', 'https://immivo.ai',
       'https://admin.immivo.ai',
-      ...(props.stageName === 'dev' ? ['http://localhost:3000'] : []),
     ];
     const functionUrl = orchestratorLambda.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
@@ -432,10 +405,9 @@ export class ImmivoStack extends cdk.Stack {
     });
 
     const corsOrigins = [
-      'https://dev.immivo.ai', 'https://test.immivo.ai',
+      'https://test.immivo.ai',
       'https://app.immivo.ai', 'https://immivo.ai',
       'https://www.immivo.ai', 'https://admin.immivo.ai',
-      ...(props.stageName === 'dev' ? ['http://localhost:3000', 'http://localhost:3001'] : []),
     ];
 
     const primaryOrigin = props.stageName === 'prod'
@@ -474,8 +446,8 @@ export class ImmivoStack extends cdk.Stack {
     // --- 5. E-Mail Intake (S3 + Lambda) ---
     const emailBucket = new s3.Bucket(this, 'EmailIngestBucket', {
       versioned: false,
-      removalPolicy: props.stageName === 'dev' ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN,
-      autoDeleteObjects: props.stageName === 'dev',
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      autoDeleteObjects: false,
       encryption: s3.BucketEncryption.S3_MANAGED,
       enforceSSL: true,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,

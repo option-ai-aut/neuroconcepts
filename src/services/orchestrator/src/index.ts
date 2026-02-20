@@ -674,7 +674,6 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   process.env.FRONTEND_URL,
-  'https://dev.immivo.ai',
   'https://test.immivo.ai',
   'https://app.immivo.ai',
   'https://immivo.ai',
@@ -1420,7 +1419,7 @@ app.post('/billing/checkout', authMiddleware, billingRateLimitMiddleware, valida
     const cfg = (settings?.stripeConfig || {}) as StripeConfig;
 
     const stripe = getStripe();
-    const frontendUrl = process.env.FRONTEND_URL || 'https://dev.immivo.ai';
+    const frontendUrl = process.env.FRONTEND_URL || '';
     const priceId = getPriceId(plan, billingCycle);
 
     const sessionParams: any = {
@@ -1467,7 +1466,7 @@ app.post('/billing/portal', authMiddleware, billingRateLimitMiddleware, async (r
     }
 
     const stripe = getStripe();
-    const frontendUrl = process.env.FRONTEND_URL || 'https://dev.immivo.ai';
+    const frontendUrl = process.env.FRONTEND_URL || '';
     const session = await stripe.billingPortal.sessions.create({
       customer: cfg.customerId,
       return_url: `${frontendUrl}/dashboard/settings/billing`,

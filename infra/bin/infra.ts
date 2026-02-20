@@ -10,21 +10,14 @@ const defaultEnv = {
   region: 'eu-central-1' 
 };
 
-// 1. Dev Environment (For developers)
-new ImmivoStack(app, 'Immivo-Dev', {
-  env: defaultEnv,
-  stageName: 'dev',
-  description: 'Development environment for Immivo AI',
-});
-
-// 2. Test Environment (Pre-production testing)
+// 1. Test Environment (Pre-production testing)
 new ImmivoStack(app, 'Immivo-Test', {
   env: defaultEnv,
   stageName: 'test',
   description: 'Testing environment for QA',
 });
 
-// 3. Prod Environment (Live)
+// 2. Prod Environment (Live)
 new ImmivoStack(app, 'Immivo-Prod', {
   env: defaultEnv,
   stageName: 'prod',

@@ -16,7 +16,7 @@ async function getAdminHeaders(): Promise<Record<string, string>> {
 
 function getApiUrl(): string {
   const config = getRuntimeConfig();
-  return (config.apiUrl || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/+$/, '');
+  return (config.apiUrl || process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
 }
 
 async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {

@@ -277,7 +277,7 @@ export default function ImageStudioPage() {
       const token = session.tokens?.idToken?.toString();
       
       const config = getRuntimeConfig();
-      const apiUrl = (config.apiUrl || 'http://localhost:3001').replace(/\/+$/, '');
+      const apiUrl = (config.apiUrl || '').replace(/\/+$/, '');
       
       const aspectRatio = imageDimensions 
         ? imageDimensions.width / imageDimensions.height 
@@ -355,7 +355,7 @@ export default function ImageStudioPage() {
       formData.append('images', blob, `staged-${selectedRoom?.id || 'room'}-${Date.now()}.png`);
       
       const config = getRuntimeConfig();
-      const apiUrl = (config.apiUrl || 'http://localhost:3001').replace(/\/+$/, '');
+      const apiUrl = (config.apiUrl || '').replace(/\/+$/, '');
       
       await fetch(`${apiUrl}/properties/${property.id}/images`, {
         method: 'POST',

@@ -3,7 +3,6 @@ name: Deploy to AWS
 on:
   push:
     branches:
-      - dev
       - test
       - main
   workflow_dispatch:
@@ -11,39 +10,13 @@ on:
       environment:
         description: 'Environment to deploy'
         required: true
-        default: 'dev'
+        default: 'test'
         type: choice
         options:
-          - dev
           - test
           - prod
 
 jobs:
-  deploy-dev:
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/dev') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'dev')
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Install Dependencies
-        run: |
-          npm install
-          cd infra && npm install
-          cd ../src/services/email-parser && npm install
-          cd ../orchestrator && npm install
-      - name: Configure AWS Credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: eu-central-1
-      - name: Deploy to Dev
-        run: cd infra && npx cdk deploy Immivo-Dev --require-approval never
-
   deploy-test:
     if: (github.event_name == 'push' && github.ref == 'refs/heads/test') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'test')
     runs-on: ubuntu-latest
