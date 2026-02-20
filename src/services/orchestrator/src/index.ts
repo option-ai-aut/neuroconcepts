@@ -6630,10 +6630,18 @@ app.post('/admin/migrate', async (req, res) => {
 
   try {
     const db = await initializePrisma();
-    
-    // Check what tables exist
+
+    // force=true resets _MigrationMeta so applyPendingMigrations re-runs all ALTER TABLE statements
+    if (req.body?.force === true) {
+      await db.$executeRawUnsafe(`DROP TABLE IF EXISTS "_MigrationMeta"`);
+      appSecretsLoaded = false;
+      _migrationsApplied = false;
+      structuredLog('info', 'Migration meta reset — re-running full migration', {});
+    }
+
+    await applyPendingMigrations(db);
+
     const tables = await db.$queryRaw`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'` as any[];
-    
     res.json({ success: true, tables: tables.map((t: any) => t.table_name) });
   } catch (error: any) {
     console.error('Migration error:', error);
