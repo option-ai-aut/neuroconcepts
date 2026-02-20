@@ -73,7 +73,7 @@ export function middleware(request: NextRequest) {
   if (isLocalhost || isTest) {
     if (detectedLocale) {
       const response = NextResponse.next();
-      response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, httpOnly: true });
+      response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, httpOnly: true, sameSite: 'lax' });
       return response;
     }
     return NextResponse.next();
@@ -87,7 +87,7 @@ export function middleware(request: NextRequest) {
   if (isMarketingDomain) {
     if (LANDING_PAGES.includes(pathname) || LEGAL_PAGES.includes(pathname)) {
       const response = NextResponse.next();
-      if (detectedLocale) response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, httpOnly: true });
+      if (detectedLocale) response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, httpOnly: true, sameSite: 'lax' });
       return response;
     }
     return NextResponse.redirect(new URL(`https://${APP_DOMAIN}${pathname}`));
@@ -108,7 +108,7 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL(`https://${MARKETING_DOMAIN}${pathname}`));
     }
     const response = NextResponse.next();
-    if (detectedLocale) response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, httpOnly: true });
+    if (detectedLocale) response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, httpOnly: true, sameSite: 'lax' });
     return response;
   }
 
@@ -124,13 +124,13 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/admin/login', request.url));
     }
     const adminResponse = NextResponse.next();
-    if (detectedLocale) adminResponse.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, httpOnly: true });
+    if (detectedLocale) adminResponse.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, httpOnly: true, sameSite: 'lax' });
     return adminResponse;
   }
 
   // Unknown domain (e.g. Lambda Function URL) - allow everything
   const response = NextResponse.next();
-  if (detectedLocale) response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, httpOnly: true });
+  if (detectedLocale) response.cookies.set('locale', detectedLocale, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, httpOnly: true, sameSite: 'lax' });
   return response;
 }
 

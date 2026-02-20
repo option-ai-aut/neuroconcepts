@@ -15,11 +15,31 @@ import axios from 'axios';
 
 const s3 = new AWS.S3();
 
+let secretsLoaded = false;
+async function loadSecrets() {
+  if (secretsLoaded) return;
+  secretsLoaded = true;
+  const arn = process.env.APP_SECRET_ARN;
+  if (!arn || !process.env.AWS_LAMBDA_FUNCTION_NAME) return;
+  try {
+    const sm = new AWS.SecretsManager();
+    const secret = await sm.getSecretValue({ SecretId: arn }).promise();
+    if (secret.SecretString) {
+      const parsed = JSON.parse(secret.SecretString);
+      if (parsed.INTERNAL_API_SECRET) process.env.INTERNAL_API_SECRET = parsed.INTERNAL_API_SECRET;
+    }
+  } catch (e) {
+    console.error('Failed to load secrets:', e);
+  }
+}
+
 export const handler = async (event: any, context: Context) => {
   console.log('📧 Email Parser Lambda triggered');
   console.log('Event:', JSON.stringify(event, null, 2));
 
+  await loadSecrets();
   const ORCHESTRATOR_URL = process.env.ORCHESTRATOR_API_URL || 'http://localhost:3001';
+  const INTERNAL_API_SECRET = process.env.INTERNAL_API_SECRET;
 
   // LOCAL TEST MODE
   if (event.isLocal) {
@@ -134,11 +154,12 @@ async function processEmail(params: ProcessEmailParams) {
       subject,
       text,
       html,
-      rawEmailKey, // For reference/debugging
+      rawEmailKey,
     }, {
-      timeout: 30000, // 30 second timeout
+      timeout: 30000,
       headers: {
         'Content-Type': 'application/json',
+        ...(process.env.INTERNAL_API_SECRET ? { 'X-Internal-Secret': process.env.INTERNAL_API_SECRET } : {}),
       }
     });
 

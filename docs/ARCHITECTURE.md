@@ -86,14 +86,13 @@ graph TD
 ### 3. Data Layer
 
 #### Datenbank-Infrastruktur
-*   **Dev:** RDS PostgreSQL 16 Single Instance (`t4g.micro`), **oeffentlich erreichbar** (Security Group erlaubt 0.0.0.0/0:5432). Lambda laeuft **ausserhalb** des VPC fuer schnellere Cold Starts.
-*   **Test:** RDS PostgreSQL 16 Single Instance (`t4g.micro`), **privates Subnetz**. Lambda laeuft **innerhalb** des VPC (wie Prod).
-*   **Prod:** Aurora Serverless v2 (PostgreSQL 16.6), **privates Subnetz** (nicht oeffentlich erreichbar). Lambda laeuft **innerhalb** des VPC mit Security Group die nur DB-Zugriff erlaubt. Datenbankname: `immivo`.
+*   **Test:** RDS PostgreSQL 16 Single Instance (`t4g.micro`), **privates Subnetz**, Lambda **innerhalb** des VPC. `removalPolicy: RETAIN`.
+*   **Prod:** Aurora Serverless v2 (PostgreSQL 16.6), **privates Subnetz** (nicht oeffentlich erreichbar). Lambda laeuft **innerhalb** des VPC mit Security Group die nur DB-Zugriff erlaubt. Datenbankname: `immivo`. `removalPolicy: RETAIN`.
 *   **Lokal:** Neon.tech (serverless Postgres) fuer lokale Entwicklung.
 *   **Connection Pooling:** Wird dynamisch an die `DATABASE_URL` angehaengt:
     *   Lambda: `connection_limit=3&pool_timeout=10&connect_timeout=5`
     *   Lokal: `connection_limit=10&pool_timeout=30&connect_timeout=5`
-*   **Credentials:** Alle Stages nutzen AWS Secrets Manager (`Immivo-DB-Secret-{stage}` fuer DB, `Immivo-App-Secret-{stage}` fuer App-Keys). Lokal: `.env`/`.env.local`.
+*   **Credentials:** Alle Stages nutzen AWS Secrets Manager (`Immivo-DB-Secret-{stage}` fuer DB, `Immivo-App-Secret-{stage}` fuer App-Keys). Secret-Namen: `Immivo-App-Secret-test`, `Immivo-App-Secret-prod`. Lokal: `.env`/`.env.local`.
 
 #### Prisma Schema & Models
 Die Datenschicht nutzt **Prisma ORM** (`schema.prisma`). Aktuelle Models:
@@ -163,7 +162,7 @@ When a new lead is created from email: (1) LeadEnrichmentService runs async (dup
     *   **Extraction:** Strukturierte Daten aus Freitext ziehen (z.B. Terminwunsch "nächsten Dienstag").
     *   **Exposé-Erstellung:** Live-Bearbeitung von Exposés im Editor via Tool-Calls.
     *   **Virtual Staging:** KI-basierte Bildbearbeitung (Möblierung) im Bildstudio und direkt im Jarvis-Chat. Bilder können von Properties oder Chat-Uploads stammen. Ergebnisse werden inline im Chat angezeigt und optional einer Property zugewiesen.
-    *   **Datei-Verarbeitung:** CSV/Excel-Import, PDF-Analyse, Bild-Erkennung.
+    *   **Datei-Verarbeitung:** Server-seitiges Parsing für docx, xlsx, pdf, pptx, txt, json. OpenAI Vision für Bilder. CRM-Massenimport aus Tabellen.
 *   **Chat UX:**
     *   **Live Tool-Tags:** Pulsierende blaue Tags während der Tool-Ausführung, statisch nach Abschluss.
     *   **Inline-Bilder:** Ergebnis-Bilder (z.B. Virtual Staging) direkt im Chat als klickbare Bilder.
@@ -213,7 +212,7 @@ Wir nutzen **AWS CDK (Cloud Development Kit)**, um die gesamte Infrastruktur im 
 *   **Fine-Tuning Data Export:** Endpoint available for exporting fine-tuning-ready data.
 
 ### CDN & DNS (CloudFront + Route53)
-*   **Route53 Hosted Zone:** `immivo.ai` — verwaltet DNS fuer alle Subdomains (app, api, admin, media, dev, test) sowie Resend-Verifizierung.
+*   **Route53 Hosted Zone:** `immivo.ai` — verwaltet DNS fuer alle Subdomains (app, api, admin, media, test) sowie Resend-Verifizierung.
 *   **ACM Wildcard-Zertifikat:** `*.immivo.ai` + `immivo.ai` (us-east-1, fuer CloudFront).
 *   **CloudFront Distributions (Prod — manuell verwaltet):**
     *   `app.immivo.ai` → Frontend Lambda URL (E1E8VMUP3UA4TJ)
@@ -221,36 +220,32 @@ Wir nutzen **AWS CDK (Cloud Development Kit)**, um die gesamte Infrastruktur im 
     *   `admin.immivo.ai` → Frontend Lambda URL (E1XYO1OK2QOZQA)
     *   `immivo.ai` → Frontend Lambda URL (E24ZLYKGX22SZJ)
     *   `media.immivo.ai` → S3 Media Bucket via OAC (**CDK-verwaltet**)
-*   **CloudFront Distributions (Dev/Test — CDK-verwaltet):**
-    *   `dev.immivo.ai` / `test.immivo.ai` → Frontend Lambda URL
-    *   `dev-api.immivo.ai` / `test-api.immivo.ai` → API Gateway
-    *   `dev-media.immivo.ai` / `test-media.immivo.ai` → S3 Media Bucket via OAC
-    *   Frontend-CDN fuer Dev/Test nutzt `CACHING_DISABLED` als Default + `CACHING_OPTIMIZED` fuer `/_next/static/*` (verhindert 429-Fehler).
+*   **CloudFront Distributions (Test — CDK-verwaltet):**
+    *   `test.immivo.ai` → Frontend Lambda URL
+    *   `test-api.immivo.ai` → API Gateway
+    *   `test-media.immivo.ai` → S3 Media Bucket via OAC
+    *   Frontend-CDN fuer Test nutzt `CACHING_DISABLED` als Default + `CACHING_OPTIMIZED` fuer `/_next/static/*` (verhindert 429-Fehler).
 *   **Caching:** Media-CDN nutzt `CachePolicy.CACHING_OPTIMIZED` (TTL max 1 Jahr, gzip/brotli Kompression).
 *   **Protokoll:** HTTP/2+3, TLS 1.2+, Price Class 100 (EU + Nordamerika).
 
 ### Environment-Strategie
-1.  **Dev** (`Immivo-Dev`):
-    *   Für die tägliche Entwicklung und schnelle Iteration.
-    *   **Branch:** `dev` → automatisches Deployment via GitHub Actions.
-    *   **Domain:** `dev.immivo.ai`, `dev-api.immivo.ai`, `dev-media.immivo.ai`
-    *   Ressourcen: RDS Micro (oeffentlich), Lambda ausserhalb VPC, eigener Cognito Pool.
-2.  **Test** (`Immivo-Test`):
-    *   Spiegelbild der Produktion (VPC, private Subnets).
+1.  **Test** (`Immivo-Test`):
+    *   Spiegelbild der Produktion — gleiche VPC/Security-Group-Architektur.
     *   **Branch:** `test` → automatisches Deployment via GitHub Actions.
     *   **Domain:** `test.immivo.ai`, `test-api.immivo.ai`, `test-media.immivo.ai`
-    *   Ressourcen: RDS Micro (privat, wie Prod), Lambda innerhalb VPC, eigener Cognito Pool.
-3.  **Prod** (`Immivo-Prod`):
+    *   Ressourcen: RDS Micro (privat), Lambda innerhalb VPC, eigener Cognito Pool, eigene DB.
+2.  **Prod** (`Immivo-Prod`):
     *   Das Live-System.
-    *   **Branch:** `main` → automatisches Deployment via GitHub Actions.
+    *   **Branch:** `main` → automatisches Deployment via GitHub Actions *(manuelle Genehmigung erforderlich)*.
     *   **Domain:** `app.immivo.ai`, `api.immivo.ai`, `admin.immivo.ai`, `immivo.ai`, `media.immivo.ai`
     *   Ressourcen: Aurora Serverless v2, Lambda innerhalb VPC, Backups und High-Availability.
     *   **Middleware:** Domainbasiertes Routing (app → Dashboard, admin → Admin-Panel, immivo.ai → Marketing).
 
-**Workflow:** Entwicklung auf `dev` → Testen auf `test` → Release auf `main` (Prod). Jede Stage hat isolierte Datenbank, Cognito Pool und Secrets.
+**Workflow:** Lokal entwickeln → `push test` → Testen auf `test.immivo.ai` → `push main` (Prod). Jede Stage hat isolierte Datenbank, Cognito Pool und Secrets.
 
 ### Lokale Entwicklung
 *   **Frontend:** `npm run dev` auf Port 3000
 *   **Backend:** `npm run dev` auf Port 3001 (mit nodemon)
-*   **Datenbank:** Neon.tech (kostenlose serverless Postgres)
-*   **Uploads:** AWS S3 (Production) via CloudFront CDN, lokal in `./uploads` als Fallback (Development)
+*   **Datenbank:** Neon.tech (kostenlose serverless Postgres) — Connection String in `src/services/orchestrator/.env`
+*   **Uploads:** AWS S3 (Test/Prod) via CloudFront CDN, lokal in `./uploads` als Fallback
+*   **Shell-Shortcuts:** `push test [message]` → deployt auf Test-Stage | `push main` → deployt auf Prod

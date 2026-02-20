@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { signIn, signUp, signOut, confirmSignUp, resetPassword, confirmResetPassword, fetchAuthSession, confirmSignIn } from 'aws-amplify/auth';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { safeRedirect } from '@/lib/safeRedirect';
 import { ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -91,7 +92,7 @@ export default function LoginPage() {
           body: JSON.stringify({ plan, billingCycle: 'monthly' }),
         });
         const data = await res.json();
-        if (data.url) { window.location.href = data.url; return; }
+        if (data.url) { safeRedirect(data.url); return; }
         // BILLING_ENABLED=false or no URL → fall through to dashboard
       } catch { /* non-critical */ }
     }

@@ -59,6 +59,23 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
  * Admin auth middleware - validates tokens against the Admin User Pool.
  * Used for /admin/* API routes that should only be accessible by platform admins.
  */
+/**
+ * Middleware for internal service-to-service calls (e.g. email-parser -> orchestrator).
+ * Validates a shared secret passed via X-Internal-Secret header.
+ */
+export const verifyInternalSecret = (req: Request, res: Response, next: NextFunction) => {
+  const secret = req.headers['x-internal-secret'];
+  const expected = process.env.INTERNAL_API_SECRET;
+  if (!expected) {
+    console.error('INTERNAL_API_SECRET not configured');
+    return res.status(500).json({ error: 'Internal auth not configured' });
+  }
+  if (!secret || secret !== expected) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+};
+
 export const adminAuthMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;

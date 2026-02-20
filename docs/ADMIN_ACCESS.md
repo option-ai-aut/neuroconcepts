@@ -7,8 +7,7 @@ Der Admin-Bereich ist das Herzstück der Plattform für dich als Founder und dei
 ### Wie komme ich hin?
 
 **Production:** `https://admin.immivo.ai` (oder `https://app.immivo.ai/admin`)  
-**Test:** `https://test.immivo.ai/admin`  
-**Dev:** `https://dev.immivo.ai/admin`
+**Test:** `https://test.immivo.ai/admin`
 
 Der Admin-Bereich ist über `/admin` erreichbar und durch einen separaten **Admin Cognito User Pool** geschützt.
 
@@ -24,23 +23,28 @@ Der Admin-Bereich ist über `/admin` erreichbar und durch einen separaten **Admi
 | **Operations** | System-Health-Checks (DB, Cognito, S3, OpenAI, Gemini, Resend, Lambda) |
 | **Settings** | Plattform-Konfiguration (AI Keys, Auth, E-Mail, Storage) |
 
-### Admin-User erstellen (Manuell)
+### Admin-User erstellen
 
-Da wir noch keine Admin-Registrierungsseite haben, musst du den ersten Super-Admin direkt in der Datenbank anlegen.
+Admin-User werden direkt im **AWS Cognito Admin User Pool** angelegt:
 
-1.  **Verbinde dich mit der Datenbank:**
-    *   Hole dir das Passwort aus dem AWS Secrets Manager (`Immivo-DB-Secret-dev`).
-    *   Nutze ein Tool wie **TablePlus** oder **DBeaver**.
-    *   Host: Siehe CloudFormation Output `DBEndpoint` (in der AWS Konsole).
+```bash
+# User anlegen
+aws cognito-idp admin-create-user \
+  --user-pool-id <ADMIN_POOL_ID> \
+  --username email@immivo.ai \
+  --temporary-password "Temp123!" \
+  --region eu-central-1
 
-2.  **SQL-Befehl ausführen:**
-    ```sql
-    INSERT INTO "Tenant" (id, name, "updatedAt") 
-    VALUES ('default-tenant', 'Immivo HQ', NOW());
+# Permanentes Passwort setzen
+aws cognito-idp admin-set-user-password \
+  --user-pool-id <ADMIN_POOL_ID> \
+  --username email@immivo.ai \
+  --password "PermanentPass123!" \
+  --permanent \
+  --region eu-central-1
+```
 
-    INSERT INTO "User" (id, email, name, "tenantId", role) 
-    VALUES (gen_random_uuid(), 'deine.email@immivo.ai', 'Dennis (Founder)', 'default-tenant', 'SUPER_ADMIN');
-    ```
+Pool-IDs: AWS Console → Cognito → `Immivo-Admins-test` / `Immivo-Admins-prod`
 
 ### Sicherheits-Konzept
 
@@ -69,13 +73,6 @@ Da das Frontend auf Lambda läuft, kann der erste Aufruf nach einer Pause 3-5 Se
 Falls GitHub Actions Deployments in "queued" hängen bleiben:
 - Prüfen ob GitHub-Limits erreicht sind
 - Alternativ: Manuelles Deployment via CDK (siehe DEV_ENVIRONMENT_SETUP.md)
-
-### CORS Fehler auf Dev Stage
-
-Falls 502 Fehler mit CORS auftreten:
-- Lambda Logs prüfen (`aws logs tail /aws/lambda/Immivo-Dev-OrchestratorLambda...`)
-- Häufige Ursache: Dateisystem-Zugriff außerhalb von `/tmp` in Lambda
-- Lösung: Uploads müssen in `/tmp/uploads` statt `./uploads` gespeichert werden
 
 ### Doppelte Slashes in API URLs
 

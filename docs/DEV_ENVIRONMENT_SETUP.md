@@ -1,57 +1,66 @@
-# Dev Environment Setup & Stack Updates
+# Lokale Entwicklung & Stack Updates
 
 Wenn du einen neuen CloudFormation Stack deployst (z.B. weil du den alten gelöscht hast oder eine neue Stage wie `Immivo-Test` aufsetzt), ändern sich die **IDs und URLs** der AWS-Ressourcen (Datenbank, Cognito User Pool, API Gateway).
 
 Damit deine lokale Entwicklungsumgebung (`localhost`) weiterhin funktioniert, musst du diese neuen Werte in die lokalen Konfigurationsdateien übertragen.
 
-## 1. Stack Deployen & Outputs abrufen
+## Workflow
 
-Führe den Deploy-Befehl aus:
-
-```bash
-cd infra
-cdk deploy Immivo-Dev --outputs-file outputs.json
+```
+Lokal entwickeln → push test → (manuell approve) → push main (Prod)
 ```
 
-Nach dem Deployment werden die "Outputs" im Terminal angezeigt. Du findest sie auch in der Datei `infra/outputs.json`.
+Shell-Shortcuts (in `~/.zshrc` konfiguriert):
+```bash
+push test "mein feature"   # commit + push auf test branch → test.immivo.ai
+push main                  # test → main mergen + pushen → app.immivo.ai
+```
 
-Die wichtigsten Werte sind:
-*   `UserPoolId` (z.B. `eu-central-1_xxxxxx`)
-*   `UserPoolClientId` (z.B. `73cigqbtjg...`)
-*   `OrchestratorApiUrl` (z.B. `https://...amazonaws.com/dev/`)
-*   `DBEndpoint` (z.B. `...rds.amazonaws.com`)
+---
 
-## 2. Frontend Konfiguration aktualisieren
+## 1. Lokale Umgebung starten
 
-Datei: `frontend/.env.local`
+```bash
+# Backend (Orchestrator)
+cd src/services/orchestrator
+npm run dev   # startet auf localhost:3001
 
-Aktualisiere diese Datei mit den neuen Cognito-Werten, damit der Login funktioniert.
+# Frontend (in neuem Terminal)
+cd frontend
+npm run dev   # startet auf localhost:3000
+```
+
+Das Frontend verbindet sich im `development`-Modus automatisch mit `localhost:3001` (via CSP in `next.config.mjs`).
+
+---
+
+## 2. Frontend Konfiguration (`frontend/.env.local`)
 
 ```env
-# API URL für lokale Entwicklung meist localhost, für Prod die AWS URL
+# Lokale Entwicklung: Backend auf localhost
 NEXT_PUBLIC_API_URL=http://localhost:3001
 
-# Diese Werte kommen aus dem neuen Stack:
-NEXT_PUBLIC_USER_POOL_ID=eu-central-1_NEUE_ID_HIER
-NEXT_PUBLIC_USER_POOL_CLIENT_ID=NEUE_CLIENT_ID_HIER
+# Cognito-Werte aus dem test/prod Stack (für Login via AWS Cognito):
+NEXT_PUBLIC_USER_POOL_ID=eu-central-1_XXXXXXXX
+NEXT_PUBLIC_USER_POOL_CLIENT_ID=XXXXXXXXXXXXXXXX
 NEXT_PUBLIC_AWS_REGION=eu-central-1
 ```
 
-## 3. Backend (Orchestrator) Konfiguration aktualisieren
+Werte findest du in: AWS Console → CloudFormation → `Immivo-Test` → Outputs.
 
-### Datei: `src/services/orchestrator/.env`
+---
 
-Enthält die Basis-Konfiguration für AWS-Deployment.
+## 3. Backend Konfiguration (`src/services/orchestrator/.env`)
 
 ```env
-# DB Endpoint aus dem Stack Output
-DATABASE_URL="postgresql://postgres:DEIN_PASSWORT@AWS_DB_ENDPOINT:5432/postgres"
-
 PORT=3001
 
-# Diese Werte müssen mit dem Frontend übereinstimmen:
-USER_POOL_ID=eu-central-1_NEUE_ID_HIER
-CLIENT_ID=NEUE_CLIENT_ID_HIER
+# Lokale DB (Neon.tech empfohlen, siehe unten)
+DATABASE_URL="postgresql://neondb_owner:PASSWORD@ep-xxx.eu-central-1.aws.neon.tech/neondb?sslmode=require"
+
+# Cognito (muss mit Frontend übereinstimmen)
+USER_POOL_ID=eu-central-1_XXXXXXXX
+CLIENT_ID=XXXXXXXXXXXXXXXX
 
 # AI
 OPENAI_API_KEY=sk-...
@@ -60,55 +69,27 @@ GEMINI_API_KEY=AIza...
 # E-Mail (System-Mails via Resend)
 RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=noreply@immivo.ai
-# Zum Deaktivieren in Dev: RESEND_ENABLED=false
+
+# Interner Service-zu-Service-Auth (Email-Parser → Orchestrator)
+# Für lokale Dev: beliebiger Wert (z.B. local-dev-internal-secret)
+# AWS: In Immivo-App-Secret-{stage} als INTERNAL_API_SECRET hinterlegt
+INTERNAL_API_SECRET=local-dev-internal-secret
 ```
 
-### Datei: `src/services/orchestrator/.env.local` (Optional)
+**Hinweis:** `.env.local` wird von `.gitignore` ignoriert und nicht committed.
 
-Für lokale Entwicklung mit Neon.tech (überschreibt `.env`):
+---
 
-```env
-# Neon.tech Connection String für lokale Entwicklung
-DATABASE_URL="postgresql://neondb_owner:PASSWORD@ep-xxx.eu-central-1.aws.neon.tech/neondb?sslmode=require"
-```
-
-**Wichtig:** `.env.local` wird von `.gitignore` ignoriert und nicht committed.
-
-## 4. Google/Microsoft OAuth (Falls benötigt)
-
-Wenn sich die Frontend-URL geändert hat, musst du die **Authorized Redirect URI** anpassen:
-
-### Google Cloud Console
-*   Lokal: `http://localhost:3000/dashboard/settings/integrations`
-*   Dev: `https://dev.immivo.ai/dashboard/settings/integrations`
-*   Test: `https://test.immivo.ai/dashboard/settings/integrations`
-*   Prod: `https://app.immivo.ai/dashboard/settings/integrations`
-
-### Microsoft Azure Portal
-*   Lokal: `http://localhost:3000/dashboard/settings/integrations`
-*   Dev: `https://dev.immivo.ai/dashboard/settings/integrations`
-*   Test: `https://test.immivo.ai/dashboard/settings/integrations`
-*   Prod: `https://app.immivo.ai/dashboard/settings/integrations`
-
-## 5. Neustart
-
-Nach dem Ändern von `.env` Dateien musst du die lokalen Server neu starten:
-
-*   Frontend: `Ctrl+C` -> `npm run dev`
-*   Backend: `Ctrl+C` -> `npm run dev`
-
-## 6. Lokale Datenbank (Neon.tech)
+## 4. Lokale Datenbank (Neon.tech)
 
 Für lokale Entwicklung empfehlen wir **Neon.tech** (kostenlose serverless Postgres):
 
 1. Account erstellen auf https://neon.tech
 2. Neues Projekt anlegen (Region: eu-central-1)
 3. Connection String kopieren
-4. In `.env.local` einfügen
+4. In `src/services/orchestrator/.env` als `DATABASE_URL` einfügen
 
-### Prisma Schema lokal synchronisieren
-
-**Wichtig:** Wir nutzen `prisma db push` (nicht `prisma migrate dev`) fuer die lokale Entwicklung. In Production laufen Migrationen automatisch ueber das In-App-System (`applyPendingMigrations()` in `index.ts`). Siehe `docs/ARCHITECTURE.md` → "Datenbank-Migrationen".
+### Schema synchronisieren
 
 ```bash
 cd src/services/orchestrator
@@ -116,27 +97,44 @@ cd src/services/orchestrator
 # Schema zur lokalen DB pushen (erstellt/aktualisiert Tabellen):
 npx prisma db push
 
-# Prisma Client neu generieren (nach Schema-Aenderungen):
+# Prisma Client neu generieren (nach Schema-Änderungen):
 npx prisma generate
 
-# Optional: Prisma Studio oeffnen (DB-GUI):
+# Optional: Prisma Studio öffnen (DB-GUI):
 npx prisma studio
 ```
 
-### Neue Spalte/Tabelle hinzufuegen
+### Neue Spalte/Tabelle hinzufügen
 
-1. Zum Prisma-Schema (`prisma/schema.prisma`) hinzufuegen
-2. `npx prisma db push` lokal ausfuehren
-3. SQL-Statement zum `migrations`-Array in `applyPendingMigrations()` (index.ts) hinzufuegen
-4. `MIGRATION_VERSION` in `index.ts` erhoehen
-5. `npx prisma generate` ausfuehren
+1. Zum Prisma-Schema (`prisma/schema.prisma`) hinzufügen
+2. `npx prisma db push` lokal ausführen
+3. SQL-Statement zum `migrations`-Array in `applyPendingMigrations()` (`index.ts`) hinzufügen
+4. `MIGRATION_VERSION` in `index.ts` erhöhen
+5. `npx prisma generate` ausführen
 
-**Hinweis:** Manche DB-Objekte (pgvector Embeddings, tsvector Spalten, Trigger) sind **nicht** im Prisma-Schema, da Prisma die Typen nicht nativ unterstuetzt. Diese werden nur per Raw SQL in den Migrationen verwaltet. Siehe Kommentar oben in `schema.prisma`.
+**Hinweis:** Manche DB-Objekte (pgvector Embeddings, tsvector Spalten, Trigger) sind **nicht** im Prisma-Schema, da Prisma die Typen nicht nativ unterstützt. Diese werden nur per Raw SQL in den Migrationen verwaltet.
 
-## 7. AWS Secrets Manager (Alle Stages)
+---
 
-In allen AWS-Stages (Dev, Test, Prod) werden Secrets aus dem **AWS Secrets Manager** geladen:
-- `Immivo-App-Secret-dev` — Dev-Stage
+## 5. Google/Microsoft OAuth (Falls benötigt)
+
+Wenn sich die Frontend-URL geändert hat, musst du die **Authorized Redirect URI** anpassen:
+
+### Google Cloud Console
+- Lokal: `http://localhost:3000/dashboard/settings/integrations`
+- Test: `https://test.immivo.ai/dashboard/settings/integrations`
+- Prod: `https://app.immivo.ai/dashboard/settings/integrations`
+
+### Microsoft Azure Portal
+- Lokal: `http://localhost:3000/dashboard/settings/integrations`
+- Test: `https://test.immivo.ai/dashboard/settings/integrations`
+- Prod: `https://app.immivo.ai/dashboard/settings/integrations`
+
+---
+
+## 6. AWS Secrets Manager (Test & Prod)
+
+In allen AWS-Stages werden Secrets aus dem **AWS Secrets Manager** geladen:
 - `Immivo-App-Secret-test` — Test-Stage
 - `Immivo-App-Secret-prod` — Production
 
@@ -148,33 +146,39 @@ Folgende Keys müssen im Secret hinterlegt sein:
 - `GEMINI_API_KEY`
 - `RESEND_API_KEY`
 - `ENCRYPTION_KEY`
-- `FRONTEND_URL` (Dev: `https://dev.immivo.ai`, Test: `https://test.immivo.ai`, Prod: `https://app.immivo.ai`)
-- Google/Microsoft OAuth Keys (wenn benötigt)
+- `FRONTEND_URL` (Test: `https://test.immivo.ai`, Prod: `https://app.immivo.ai`)
+- `ADMIN_SECRET` (für `/admin/migrate` Endpoint)
+- `INTERNAL_API_SECRET` (für interne Endpoints: `/internal/ingest-lead`, `/emails/incoming`)
+- Google/Microsoft OAuth Keys
 
 **Hinzufügen:** AWS Console → Secrets Manager → `Immivo-App-Secret-{stage}` → Retrieve secret value → Edit → Add row.
 
-## 8. Medien-Uploads
+**INTERNAL_API_SECRET:** Bereits per AWS CLI in test und prod gesetzt (siehe `docs/SECURITY_AUDIT_V4.md`).
 
-- **Production:** AWS S3 Bucket (automatisch via CDK erstellt)
-- **Lokal:** Fallback auf `./uploads` Ordner (wird automatisch erstellt)
-- Bilder werden über den `/uploads/...` Endpunkt oder direkte S3-URLs ausgeliefert
+---
 
-## 9. Manuelles Lambda-Deployment
+## 7. Nach dem Deploy: Datenbank migrieren
 
-Falls GitHub Actions nicht funktioniert, kannst du direkt deployen:
+Nach jedem Deploy auf test oder prod — besonders wenn Schema-Änderungen dabei sind:
 
 ```bash
-# CDK Stack synthetisieren
-cd infra
-rm -rf cdk.out
-npx cdk synth Immivo-Dev
+ADMIN_SECRET=$(aws secretsmanager get-secret-value \
+  --secret-id Immivo-App-Secret-test \
+  --query SecretString \
+  --output text \
+  --region eu-central-1 | python3 -c "import sys,json; print(json.load(sys.stdin)['ADMIN_SECRET'])")
 
-# Orchestrator Lambda manuell updaten
-cd cdk.out
-ASSET_DIR=$(ls -d asset.* | while read d; do if [ -f "$d/index.js" ] && [ $(stat -f%z "$d/index.js") -gt 1000000 ]; then echo "$d"; fi; done | head -1)
-cd "$ASSET_DIR"
-zip -r /tmp/orchestrator.zip index.js
-aws lambda update-function-code \
-  --function-name Immivo-Dev-OrchestratorLambdaXXXXX \
-  --zip-file fileb:///tmp/orchestrator.zip
+curl -s -X POST https://8fiutkddgi.execute-api.eu-central-1.amazonaws.com/test/admin/migrate \
+  -H "Content-Type: application/json" \
+  -H "x-admin-secret: $ADMIN_SECRET" \
+  -d '{"force":true}' | python3 -m json.tool
 ```
+
+Vollständige Checkliste: siehe `docs/DEPLOY_CHECKLIST.md`.
+
+---
+
+## 8. Medien-Uploads
+
+- **Production/Test:** AWS S3 Bucket (automatisch via CDK erstellt), ausgeliefert via CloudFront CDN
+- **Lokal:** Fallback auf `./uploads` Ordner (wird automatisch erstellt)

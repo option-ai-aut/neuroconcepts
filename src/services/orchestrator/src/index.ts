@@ -32,7 +32,7 @@ import { setEmailResponsePrisma } from './services/EmailResponseHandler';
 import { setEmailSyncPrisma } from './services/EmailSyncService';
 import { setPropertyMatchingPrisma } from './services/PropertyMatchingService';
 import { setNotificationPrisma } from './services/NotificationService';
-import { authMiddleware, adminAuthMiddleware } from './middleware/auth';
+import { authMiddleware, adminAuthMiddleware, verifyInternalSecret } from './middleware/auth';
 import { AiSafetyMiddleware, wrapAiResponse } from './middleware/aiSafety';
 import { validate, schemas } from './middleware/validation';
 import { AiCostService } from './services/AiCostService';
@@ -181,6 +181,7 @@ async function loadAppSecrets() {
           'WORKMAIL_EWS_URL',
           'STRIPE_SECRET_KEY',
           'STRIPE_WEBHOOK_SECRET',
+          'INTERNAL_API_SECRET',
         ];
         for (const key of keysToLoad) {
           if (secrets[key]) process.env[key] = secrets[key];
@@ -984,6 +985,11 @@ const chatUpload = multer({
   }
 });
 
+function escapeHtml(str: string): string {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 // S3 helpers
 const s3Client = new AWS.S3();
 
@@ -1312,6 +1318,43 @@ setInterval(() => {
     if (now > billingRateLimit[key].resetTime) delete billingRateLimit[key];
   }
 }, 120_000);
+
+// Generic rate-limit factory: IP-based or user-based
+const _rateLimitStores: Record<string, Record<string, { count: number; resetTime: number }>> = {};
+function createRateLimit(name: string, maxRequests: number, windowMs: number, keyFn: 'ip' | 'user' = 'ip') {
+  _rateLimitStores[name] = {};
+  const store = _rateLimitStores[name];
+  setInterval(() => {
+    const now = Date.now();
+    for (const k of Object.keys(store)) {
+      if (now > store[k].resetTime) delete store[k];
+    }
+  }, windowMs * 2);
+  return (req: any, res: any, next: any) => {
+    const key = keyFn === 'user'
+      ? (req.user?.sub || req.user?.email || req.ip)
+      : (req.ip || req.headers['x-forwarded-for'] || 'unknown');
+    const now = Date.now();
+    if (!store[key] || now > store[key].resetTime) {
+      store[key] = { count: 1, resetTime: now + windowMs };
+      return next();
+    }
+    if (store[key].count >= maxRequests) {
+      res.setHeader('Retry-After', String(Math.ceil((store[key].resetTime - now) / 1000)));
+      return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+    }
+    store[key].count++;
+    next();
+  };
+}
+
+const publicContactLimit = createRateLimit('contact', 5, 60_000, 'ip');
+const publicNewsletterLimit = createRateLimit('newsletter', 5, 60_000, 'ip');
+const publicJobApplyLimit = createRateLimit('jobApply', 5, 60_000, 'ip');
+const publicCalendarBusyLimit = createRateLimit('calBusy', 20, 60_000, 'ip');
+const publicBookDemoLimit = createRateLimit('bookDemo', 3, 60_000, 'ip');
+const uploadLimit = createRateLimit('upload', 20, 60_000, 'user');
+const searchLimit = createRateLimit('search', 30, 60_000, 'user');
 
 // GET /billing/subscription — current plan info
 app.get('/billing/subscription', authMiddleware, billingRateLimitMiddleware, async (req: any, res) => {
@@ -2630,7 +2673,7 @@ app.put('/properties/:id', authMiddleware, validate(schemas.updateProperty), asy
 });
 
 // POST /properties/:id/images - Upload images (tenant-isolated)
-app.post('/properties/:id/images', authMiddleware, upload.array('images', 10), async (req, res) => {
+app.post('/properties/:id/images', authMiddleware, uploadLimit, upload.array('images', 10), async (req, res) => {
   try {
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
@@ -2753,7 +2796,7 @@ interface Document {
 }
 
 // POST /properties/:id/documents - Upload documents to property
-app.post('/properties/:id/documents', authMiddleware, chatUpload.array('documents', 20), async (req, res) => {
+app.post('/properties/:id/documents', authMiddleware, uploadLimit, chatUpload.array('documents', 20), async (req, res) => {
   try {
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
@@ -2832,8 +2875,11 @@ app.delete('/properties/:id/documents', authMiddleware, async (req, res) => {
         if (key) await s3Client.deleteObject({ Bucket: MEDIA_BUCKET, Key: key }).promise();
       } catch (e) { console.error('S3 delete error:', e); }
     } else if (docToDelete.url.startsWith('/uploads/')) {
-      const filePath = path.join(__dirname, '..', docToDelete.url);
-      if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
+      const uploadRoot = path.resolve(__dirname, '..', 'uploads');
+      const filePath = path.resolve(__dirname, '..', docToDelete.url);
+      if (filePath.startsWith(uploadRoot + path.sep) && fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
     }
 
     res.json({ success: true });
@@ -2844,7 +2890,7 @@ app.delete('/properties/:id/documents', authMiddleware, async (req, res) => {
 });
 
 // POST /leads/:id/documents - Upload documents to lead
-app.post('/leads/:id/documents', authMiddleware, chatUpload.array('documents', 20), async (req, res) => {
+app.post('/leads/:id/documents', authMiddleware, uploadLimit, chatUpload.array('documents', 20), async (req, res) => {
   try {
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
@@ -2923,8 +2969,11 @@ app.delete('/leads/:id/documents', authMiddleware, async (req, res) => {
         if (key) await s3Client.deleteObject({ Bucket: MEDIA_BUCKET, Key: key }).promise();
       } catch (e) { console.error('S3 delete error:', e); }
     } else if (docToDelete.url.startsWith('/uploads/')) {
-      const filePath = path.join(__dirname, '..', docToDelete.url);
-      if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
+      const uploadRoot = path.resolve(__dirname, '..', 'uploads');
+      const filePath = path.resolve(__dirname, '..', docToDelete.url);
+      if (filePath.startsWith(uploadRoot + path.sep) && fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
     }
 
     res.json({ success: true });
@@ -3360,7 +3409,10 @@ app.get('/expose-templates', authMiddleware, async (req, res) => {
 app.get('/expose-templates/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const template = await prisma.exposeTemplate.findUnique({ where: { id } });
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const template = await prisma.exposeTemplate.findFirst({ where: { id, tenantId: currentUser.tenantId } });
     if (!template) return res.status(404).json({ error: 'Template not found' });
     res.json(template);
   } catch (error) {
@@ -3397,6 +3449,11 @@ app.put('/expose-templates/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, blocks, theme, customColors, isDefault } = req.body;
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const existing = await prisma.exposeTemplate.findFirst({ where: { id, tenantId: currentUser.tenantId } });
+    if (!existing) return res.status(404).json({ error: 'Template not found' });
 
     const template = await prisma.exposeTemplate.update({
       where: { id },
@@ -3413,6 +3470,12 @@ app.put('/expose-templates/:id', authMiddleware, async (req, res) => {
 app.delete('/expose-templates/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const existing = await prisma.exposeTemplate.findFirst({ where: { id, tenantId: currentUser.tenantId } });
+    if (!existing) return res.status(404).json({ error: 'Template not found' });
+
     await prisma.exposeTemplate.delete({ where: { id } });
     res.json({ success: true });
   } catch (error) {
@@ -3477,16 +3540,16 @@ app.post('/exposes', authMiddleware, async (req, res) => {
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
 
-    // Get property data
-    const property = await prisma.property.findUnique({ where: { id: propertyId } });
+    // Get property data with tenantId check
+    const property = await prisma.property.findFirst({ where: { id: propertyId, tenantId: currentUser.tenantId } });
     if (!property) return res.status(404).json({ error: 'Property not found' });
 
-    // Get template if provided
+    // Get template if provided with tenantId check
     let blocks: any[] = [];
     let theme = 'default';
     
     if (templateId) {
-      const template = await prisma.exposeTemplate.findUnique({ where: { id: templateId } });
+      const template = await prisma.exposeTemplate.findFirst({ where: { id: templateId, tenantId: currentUser.tenantId } });
       if (template) {
         // Replace placeholders with actual property data
         blocks = replacePlaceholders(template.blocks as any[], property, currentUser);
@@ -3521,6 +3584,11 @@ app.put('/exposes/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { blocks, theme, customColors, status } = req.body;
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const existing = await prisma.expose.findFirst({ where: { id, tenantId: currentUser.tenantId } });
+    if (!existing) return res.status(404).json({ error: 'Expose not found' });
 
     const expose = await prisma.expose.update({
       where: { id },
@@ -3540,8 +3608,8 @@ app.post('/exposes/:id/regenerate', authMiddleware, async (req, res) => {
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
 
-    const expose = await prisma.expose.findUnique({
-      where: { id },
+    const expose = await prisma.expose.findFirst({
+      where: { id, tenantId: currentUser.tenantId },
       include: { property: true, template: true }
     });
     if (!expose) return res.status(404).json({ error: 'Expose not found' });
@@ -3569,6 +3637,12 @@ app.post('/exposes/:id/regenerate', authMiddleware, async (req, res) => {
 app.delete('/exposes/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const existing = await prisma.expose.findFirst({ where: { id, tenantId: currentUser.tenantId } });
+    if (!existing) return res.status(404).json({ error: 'Expose not found' });
+
     await prisma.expose.delete({ where: { id } });
     res.json({ success: true });
   } catch (error) {
@@ -3808,7 +3882,7 @@ app.post('/chat/new', authMiddleware, async (req, res) => {
 });
 
 // Generate email signature with AI
-app.post('/jarvis/generate-signature', authMiddleware, async (req, res) => {
+app.post('/jarvis/generate-signature', authMiddleware, AiSafetyMiddleware.rateLimit(20, 60000), async (req, res) => {
   try {
     const { name, email, phone, company, website } = req.body;
     
@@ -4245,7 +4319,7 @@ app.post('/templates/:id/chat',
 );
 
 // Generate text for a property
-app.post('/properties/:id/generate-text', authMiddleware, async (req, res) => {
+app.post('/properties/:id/generate-text', authMiddleware, AiSafetyMiddleware.rateLimit(20, 60000), async (req, res) => {
   try {
     const { id: propertyId } = req.params;
     const { textType, tone, maxLength } = req.body;
@@ -6481,7 +6555,7 @@ app.post('/ai/image-edit', express.json({ limit: '20mb' }), authMiddleware, vali
           MEDIA_BUCKET ? `s3.${process.env.AWS_REGION || 'eu-central-1'}.amazonaws.com` : null,
         ].filter(Boolean) as string[];
 
-        const isAllowedHost = allowedHosts.some(h => parsed.hostname === h || parsed.hostname.endsWith(`.amazonaws.com`));
+        const isAllowedHost = allowedHosts.some(h => parsed.hostname === h);
         if (!isAllowedHost) {
           return res.status(400).json({ error: 'Bad Request' });
         }
@@ -6719,21 +6793,7 @@ app.post('/admin/setup-db', async (req, res) => {
     }
     
     if (!fs.existsSync(migrationPath)) {
-      // List what's in /var/task
-      let taskFiles: string[] = [];
-      try { taskFiles = fs.readdirSync('/var/task'); } catch (e) {}
-      
-      return res.status(404).json({ 
-        error: 'Migration file not found', 
-        tried: [
-          path.join(process.cwd(), 'prisma/migrations/20260202171831_init/migration.sql'),
-          '/var/task/prisma/migrations/20260202171831_init/migration.sql',
-          path.join(__dirname, '../prisma/migrations/20260202171831_init/migration.sql')
-        ],
-        cwd: process.cwd(),
-        dirname: __dirname,
-        taskFiles
-      });
+      return res.status(404).json({ error: 'Migration file not found' });
     }
     
     const migrationSql = fs.readFileSync(migrationPath, 'utf-8');
@@ -7158,15 +7218,17 @@ app.post('/emails/send', authMiddleware, async (req: any, res) => {
     } else if (settings?.smtpConfig) {
       // Send via SMTP (fallback)
       const smtpConfig = settings.smtpConfig as any;
+      let smtpPass = smtpConfig.pass;
+      try { smtpPass = encryptionService.decrypt(smtpPass); } catch {}
       const nodemailer = require('nodemailer');
-      
+
       const transporter = nodemailer.createTransport({
         host: smtpConfig.host,
         port: smtpConfig.port,
         secure: smtpConfig.port === 465,
         auth: {
           user: smtpConfig.user,
-          pass: smtpConfig.pass,
+          pass: smtpPass,
         },
       });
 
@@ -7296,7 +7358,7 @@ app.get('/emails/sync/status', authMiddleware, async (req: any, res) => {
 });
 
 // Process incoming email (webhook endpoint)
-app.post('/emails/incoming', async (req, res) => {
+app.post('/emails/incoming', verifyInternalSecret, async (req, res) => {
   try {
     const { tenantId, from, fromName, subject, body, receivedAt } = req.body;
 
@@ -8393,7 +8455,7 @@ app.delete('/calendar/events/:id', authMiddleware, async (req: any, res) => {
 });
 
 // Get busy slots (for public booking page) — always checks office@ calendar
-app.get('/calendar/busy', async (req, res) => {
+app.get('/calendar/busy', publicCalendarBusyLimit, async (req, res) => {
   try {
     const creds = getWorkMailCreds();
     if (!creds.email || !creds.password) {
@@ -8413,7 +8475,7 @@ app.get('/calendar/busy', async (req, res) => {
 });
 
 // Public: Book a demo (no auth required)
-app.post('/calendar/book-demo', async (req, res) => {
+app.post('/calendar/book-demo', publicBookDemoLimit, async (req, res) => {
   try {
     const { name, email, company, message, start, end } = req.body;
     if (!name || !email || !start || !end) {
@@ -9051,7 +9113,10 @@ app.post('/internal/scheduler/auto-reply', async (req, res) => {
       };
     }
     if (tenantSettings.smtpConfig) {
-      emailConfig.smtpConfig = tenantSettings.smtpConfig;
+      const rawSmtp = tenantSettings.smtpConfig as any;
+      let decryptedPass = rawSmtp.pass;
+      try { decryptedPass = encryptionService.decrypt(decryptedPass); } catch {}
+      emailConfig.smtpConfig = { ...rawSmtp, pass: decryptedPass };
     }
     
     // 5. Check if we have an email provider
@@ -9206,7 +9271,7 @@ app.post('/internal/scheduler/escalation', async (req, res) => {
 import { classifyAndParseEmail, type EmailClassification } from './services/EmailParserService';
 import { matchProperty, getPropertiesForSelection } from './services/PropertyMatchingService';
 
-app.post('/internal/ingest-lead', async (req, res) => {
+app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
   try {
     const db = await initializePrisma();
     const { recipientEmail, from, subject, text, html, rawEmail } = req.body;
@@ -9566,7 +9631,7 @@ app.post('/internal/ingest-lead', async (req, res) => {
 // ============================================
 
 // --- Contact Form ---
-app.post('/contact', async (req, res) => {
+app.post('/contact', publicContactLimit, async (req, res) => {
   try {
     const { firstName, lastName, email, subject, message } = req.body;
     if (!firstName || !lastName || !email || !subject || !message) {
@@ -9581,7 +9646,7 @@ app.post('/contact', async (req, res) => {
       const { sendSystemEmail } = await import('./services/SystemEmailService');
       await sendSystemEmail({
         to: 'office@immivo.ai',
-        subject: `Neue Kontaktanfrage: ${subject}`,
+        subject: `Neue Kontaktanfrage: ${escapeHtml(subject)}`,
         html: `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background: #111827; color: white; padding: 24px 32px; border-radius: 12px 12px 0 0;">
@@ -9590,15 +9655,15 @@ app.post('/contact', async (req, res) => {
             </div>
             <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
               <table style="width: 100%; border-collapse: collapse;">
-                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px; width: 100px;">Name</td><td style="padding: 8px 0; font-weight: 600;">${firstName} ${lastName}</td></tr>
-                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;">E-Mail</td><td style="padding: 8px 0;"><a href="mailto:${email}" style="color: #2563eb;">${email}</a></td></tr>
-                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Betreff</td><td style="padding: 8px 0; font-weight: 500;">${subject}</td></tr>
+                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px; width: 100px;">Name</td><td style="padding: 8px 0; font-weight: 600;">${escapeHtml(firstName)} ${escapeHtml(lastName)}</td></tr>
+                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;">E-Mail</td><td style="padding: 8px 0;"><a href="mailto:${escapeHtml(email)}" style="color: #2563eb;">${escapeHtml(email)}</a></td></tr>
+                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Betreff</td><td style="padding: 8px 0; font-weight: 500;">${escapeHtml(subject)}</td></tr>
               </table>
               <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
                 <p style="color: #6b7280; font-size: 14px; margin: 0 0 8px;">Nachricht:</p>
-                <div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb; white-space: pre-wrap;">${message}</div>
+                <div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb; white-space: pre-wrap;">${escapeHtml(message)}</div>
               </div>
-              <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">Du kannst direkt auf diese E-Mail antworten, um ${firstName} zu kontaktieren.</p>
+              <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">Du kannst direkt auf diese E-Mail antworten, um ${escapeHtml(firstName)} zu kontaktieren.</p>
             </div>
           </div>`,
         replyTo: email,
@@ -9645,7 +9710,7 @@ app.get('/blog/posts/:slug', async (req, res) => {
 });
 
 // --- Newsletter (Public Subscribe) ---
-app.post('/newsletter/subscribe', async (req, res) => {
+app.post('/newsletter/subscribe', publicNewsletterLimit, async (req, res) => {
   try {
     const db = await initializePrisma();
     const { email, name, source } = req.body;
@@ -9668,7 +9733,7 @@ app.post('/newsletter/subscribe', async (req, res) => {
   }
 });
 
-app.post('/newsletter/unsubscribe', async (req, res) => {
+app.post('/newsletter/unsubscribe', publicNewsletterLimit, async (req, res) => {
   try {
     const db = await initializePrisma();
     const { email } = req.body;
@@ -9709,7 +9774,7 @@ app.get('/jobs/:id', async (req, res) => {
   }
 });
 
-app.post('/jobs/:id/apply', async (req, res) => {
+app.post('/jobs/:id/apply', publicJobApplyLimit, async (req, res) => {
   try {
     const db = await initializePrisma();
     const { firstName, lastName, email, phone, coverLetter } = req.body;
@@ -9726,8 +9791,8 @@ app.post('/jobs/:id/apply', async (req, res) => {
       const { sendSystemEmail } = await import('./services/SystemEmailService');
       await sendSystemEmail({
         to: 'office@immivo.ai',
-        subject: `Neue Bewerbung: ${job.title} — ${firstName} ${lastName}`,
-        html: `<h3>Neue Bewerbung</h3><p><strong>Stelle:</strong> ${job.title}</p><p><strong>Name:</strong> ${firstName} ${lastName}</p><p><strong>E-Mail:</strong> ${email}</p>${phone ? `<p><strong>Telefon:</strong> ${phone}</p>` : ''}${coverLetter ? `<p><strong>Anschreiben:</strong></p><p>${coverLetter}</p>` : ''}`,
+        subject: `Neue Bewerbung: ${escapeHtml(job.title)} — ${escapeHtml(firstName)} ${escapeHtml(lastName)}`,
+        html: `<h3>Neue Bewerbung</h3><p><strong>Stelle:</strong> ${escapeHtml(job.title)}</p><p><strong>Name:</strong> ${escapeHtml(firstName)} ${escapeHtml(lastName)}</p><p><strong>E-Mail:</strong> ${escapeHtml(email)}</p>${phone ? `<p><strong>Telefon:</strong> ${escapeHtml(phone)}</p>` : ''}${coverLetter ? `<p><strong>Anschreiben:</strong></p><p>${escapeHtml(coverLetter)}</p>` : ''}`,
         replyTo: email,
       });
     } catch (emailErr) {
@@ -10340,7 +10405,7 @@ app.get('/events/stream', authMiddleware, async (req: any, res) => {
 // ═══════════════════════════════════════════════════════════
 // Full-Text Search (PostgreSQL tsvector/tsquery)
 // ═══════════════════════════════════════════════════════════
-app.get('/search', authMiddleware, async (req, res) => {
+app.get('/search', authMiddleware, searchLimit, async (req, res) => {
   try {
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });

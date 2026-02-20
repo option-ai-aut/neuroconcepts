@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, ArrowRight, Loader2, Zap } from 'lucide-react';
+import { safeRedirect } from '@/lib/safeRedirect';
 import { getApiUrl, getAuthHeaders } from '@/lib/api';
 
 interface TrialGateProps {
@@ -49,7 +50,7 @@ export default function TrialGate({ billingEnabled }: TrialGateProps) {
       const data = await res.json();
 
       if (data.url) {
-        window.location.href = data.url;
+        safeRedirect(data.url);
       } else {
         // BILLING_ENABLED=false → kostenloser Zugang
         setFreeActivated(true);

@@ -83,13 +83,17 @@ const expose = await prisma.expose.findFirst({
 **Problem:** User könnte die KI spammen oder Kosten in die Höhe treiben.
 
 **Lösung:**
-- ✅ Max. 50 Requests pro Minute pro User
+- ✅ Chat/Stream: 50 Requests pro Minute pro User
+- ✅ Jarvis generate-signature, generate-text: 20 req/min
+- ✅ Search: 30 req/min, Uploads (Images/Documents): 20 req/min
+- ✅ Öffentliche Endpoints (contact, newsletter, jobs/apply, calendar): 3–20 req/min pro IP
 - ✅ 429 Status Code bei Überschreitung
-- ✅ In-Memory Store (für Production: Redis empfohlen)
 
 **Implementierung:**
 ```typescript
-AiSafetyMiddleware.rateLimit(50, 60000) // 50 req/min
+AiSafetyMiddleware.rateLimit(50, 60000) // Chat 50 req/min
+uploadLimit // 20 req/min für properties/images, properties/documents, leads/documents
+searchLimit // 30 req/min für /search
 ```
 
 **Response bei Limit:**
@@ -313,6 +317,37 @@ Bei Sicherheitsvorfällen:
 3. **Mitigation:** Keyword-Liste erweitern
 4. **Kommunikation:** Betroffene Tenants informieren
 5. **Post-Mortem:** Dokumentation und Verbesserungen
+
+## Secret Management
+
+### Regeln für Credentials
+
+- ✅ Alle Secrets in `.env`-Dateien — niemals hardcoded in Code
+- ✅ `INTERNAL_API_SECRET` — für interne Service-Calls (Email-Parser → Orchestrator); in AWS Secrets Manager + Orchestrator `.env`/`.env.local`
+- ✅ `.env`, `*.env`, `*.log` sind in `.gitignore` eingetragen
+- ✅ `telegram-agent/.env` enthält Telegram-Token und Cursor API Key (nur lokal)
+- ✅ `telegram-agent/com.immivo.telegram-agent.plist` lädt Secrets via `source .env` — keine hardcoded Werte
+- ✅ AWS-Secrets liegen in AWS Secrets Manager (nie in `.env` für Prod)
+
+### Vorgefallener Incident (Feb 2026)
+
+**Was passiert:** Telegram Bot Token + Cursor API Key wurden versehentlich in `telegram-agent/com.immivo.telegram-agent.plist` hardcoded committed und auf GitHub gepusht. GitHub Secret Scanning hat den Cursor Key erkannt und alarmiert.
+
+**Maßnahmen:**
+1. Beide Tokens sofort rotiert (Telegram via BotFather, Cursor via cursor.com)
+2. `git-filter-repo` hat alle 320+ Commits bereinigt — Tokens sind aus der History entfernt
+3. Force-Push auf alle Branches
+4. Plist umgeschrieben: Secrets werden jetzt per `source .env` geladen
+5. `.gitignore` erweitert: `telegram-agent/*.log`, `telegram-agent/.env`
+
+**Lektion:** launchd-Plist-Dateien nie mit hardcoded Secrets committen. Immer Wrapper-Script mit `source .env` nutzen.
+
+### Email-Normalisierung
+
+Emails werden auf drei Ebenen lowercase normalisiert um Case-Sensitivity-Probleme zu verhindern:
+1. **Frontend** (`login/page.tsx`): `setEmail(e.target.value.toLowerCase())` — beim Tippen
+2. **Auth-Middleware** (`auth.ts`): `payload.email = payload.email.toLowerCase().trim()` — aus JWT
+3. **Auth-Sync Endpoint** (`/auth/sync`): `email = req.user!.email?.toLowerCase().trim()`
 
 ## Kontakt
 

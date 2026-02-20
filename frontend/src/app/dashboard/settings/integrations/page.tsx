@@ -5,6 +5,7 @@ import { Mail, Calendar, Check, Eye, EyeOff, Loader2, Copy, CheckCircle } from '
 import { useSearchParams } from 'next/navigation';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 import { fetchAuthSession } from 'aws-amplify/auth';
+import { safeRedirect } from '@/lib/safeRedirect';
 
 // Helper to get API URL without trailing slash
 const getApiUrl = () => {
@@ -207,7 +208,7 @@ export default function IntegrationsSettingsPage() {
 
       if (response.ok) {
         const data = await response.json();
-        window.location.href = data.authUrl;
+        safeRedirect(data.authUrl);
       } else if (response.status === 409) {
         const data = await response.json();
         setMessage({ type: 'error', text: data.error || 'Es ist bereits ein anderer Kalender-Anbieter verbunden.' });
@@ -259,7 +260,7 @@ export default function IntegrationsSettingsPage() {
 
       if (response.ok) {
         const data = await response.json();
-        window.location.href = data.authUrl;
+        safeRedirect(data.authUrl);
       } else if (response.status === 409) {
         const data = await response.json();
         setMessage({ type: 'error', text: data.error || 'Es ist bereits ein anderer E-Mail-Anbieter verbunden.' });

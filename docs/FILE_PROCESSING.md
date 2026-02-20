@@ -1,320 +1,174 @@
-# Datei-Import für Leads & Properties
+# Datei-Verarbeitung in Jarvis
 
 ## Übersicht
 
-Jarvis kann **alle gängigen Dateiformate** nativ verarbeiten - keine speziellen Import-Tools nötig! Perfekt für Onboarding neuer Kunden, die von anderen Systemen migrieren.
+Jarvis kann **alle gängigen Dateiformate** direkt im Chat verarbeiten. Die Verarbeitung erfolgt **server-seitig** im Orchestrator — der Text/Inhalt wird extrahiert und als Kontext an das LLM übergeben. So kann Jarvis Dokumente lesen, analysieren, Daten importieren und auf Bilder reagieren.
+
+---
 
 ## Unterstützte Formate
 
-- 📄 **CSV** - Komma-getrennte Werte
-- 📊 **Excel (.xlsx)** - Microsoft Excel
-- 📄 **PDF** - Extrahiert Text und Tabellen
-- 📄 **Word (.docx)** - Microsoft Word
-- 🖼️ **Bilder** (JPG, PNG) - Analysiert Immobilienfotos
-- 📄 **Text, JSON, XML** - Strukturierte Daten
+| Format | Erweiterung | Parser | Verwendung |
+|--------|-------------|--------|------------|
+| Word | `.docx` | `mammoth` | Verträge, Exposés, Berichte lesen |
+| Excel | `.xlsx`, `.xls` | `SheetJS (xlsx)` | Leads/Objekte massenimportieren |
+| CSV | `.csv` | `SheetJS (xlsx)` | Tabellen importieren |
+| PDF | `.pdf` | `pdf-parse` | Verträge, Dokumente lesen |
+| PowerPoint | `.pptx` | `jszip` + XML | Präsentationen lesen |
+| Text | `.txt` | native UTF-8 | Plain-text lesen |
+| JSON | `.json` | native JSON.parse | Strukturierte Daten lesen |
+| Bilder | `.jpg`, `.png`, `.gif`, `.webp` | OpenAI Vision | Fotos analysieren, Virtual Staging |
+
+> **`.xls` (altes Excel-Format)** wird ebenfalls unterstützt — SheetJS wandelt es automatisch um.
+
+---
 
 ## Wie es funktioniert
 
-### 1. User kopiert CSV-Inhalt in den Chat
+### 1. Upload → Server-seitiges Parsing
 
 ```
-User: Ich habe hier eine CSV mit meinen Leads:
-
-email,firstName,lastName,phone,notes,status
-max@test.de,Max,Mustermann,+49123456,Interessiert an Wohnung,NEW
-anna@test.de,Anna,Schmidt,+49234567,Sucht Haus in München,CONTACTED
+User lädt Datei hoch
+       ↓
+Orchestrator empfängt Datei als Buffer
+       ↓
+Parser extrahiert Text/Struktur (mammoth / xlsx / pdf-parse / jszip)
+       ↓
+Inhalt wird als [DOKUMENT "..." — INHALT: ...] in den Message-Kontext eingebettet
+       ↓
+Jarvis (GPT-5) liest den Inhalt und antwortet
 ```
 
-### 2. Jarvis erkennt Format automatisch
+### 2. Intelligentes Routing (AgentRouter)
 
-Jarvis analysiert den Inhalt und erkennt:
-- ✅ Dateiformat (CSV, Excel, PDF, etc.)
-- ✅ Spalten-Header und Struktur
-- ✅ Datentyp (Leads oder Properties)
+Der AgentRouter erkennt automatisch die Intention:
 
-### 3. Jarvis importiert intelligent
+| Datei + Nachricht | Routing | Verhalten |
+|---|---|---|
+| `.xlsx` + "importiere alle Leads" | `crm` | CRM-Tools aktiv, Jarvis legt Zeile für Zeile an |
+| `.docx` + "fass das zusammen" | `smalltalk` | Kein Tool-Call, Jarvis antwortet direkt aus Kontext |
+| `.pdf` + "erstelle einen Lead daraus" | `crm` | CRM-Tools aktiv |
+| Bild + "möbliere das" | `expose/crm` | Virtual Staging Tool |
 
-```
-Jarvis: Ich sehe eine CSV mit 2 Leads. Importiere...
-        [create_lead: max@test.de, Max, Mustermann]
-        Lead 1/2 angelegt ✓
-        [create_lead: anna@test.de, Anna, Schmidt]
-        Lead 2/2 angelegt ✓
-        
-        ✅ Alle 2 Leads erfolgreich importiert!
-```
+### 3. Bilder: Vision-Input
 
-## CSV-Formate
+Hochgeladene Bilder werden als echte **OpenAI Vision-Inputs** (image_url content blocks) an GPT-5 gesendet — Jarvis kann das Bild wirklich *sehen*, nicht nur die URL kennen.
 
-### Leads CSV
+### 4. Persistenz über mehrere Nachrichten
 
-**Pflichtfelder:**
-- `email` - E-Mail-Adresse (muss @ enthalten)
-
-**Optionale Felder:**
-- `firstName` - Vorname
-- `lastName` - Nachname
-- `phone` - Telefonnummer
-- `notes` - Notizen
-- `status` - Status (NEW, CONTACTED, CONVERSATION, BOOKED, LOST)
-
-**Beispiel:**
-
-```csv
-email,firstName,lastName,phone,notes,status
-max@test.de,Max,Mustermann,+49123456,Interessiert an Wohnung,NEW
-anna@test.de,Anna,Schmidt,+49234567,Sucht Haus in München,CONTACTED
-peter@test.de,Peter,Müller,,Callback morgen,NEW
-```
-
-### Properties CSV
-
-**Pflichtfelder:**
-- `title` - Titel der Immobilie
-
-**Optionale Felder:**
-- `address` - Adresse
-- `price` - Preis (Zahl)
-- `rooms` - Anzahl Zimmer (Zahl)
-- `area` - Fläche in m² (Zahl)
-- `description` - Beschreibung
-- `notes` - Notizen (werden zu aiFacts)
-
-**Beispiel:**
-
-```csv
-title,address,price,rooms,area,description
-Moderne Wohnung in Berlin-Mitte,Friedrichstraße 123,450000,3,85.5,Neubau mit Balkon
-Einfamilienhaus München,Maximilianstraße 45,890000,5,150,Altbau saniert
-Penthouse Hamburg,Elbchaussee 78,1200000,4,180,Luxus mit Elbblick
-```
-
-## Features
-
-### ✅ Native Datei-Verarbeitung
-
-Jarvis nutzt Gemini's native Fähigkeiten:
-- **Keine Parser nötig** - Gemini versteht Dateien direkt
-- **Intelligente Erkennung** - Spalten werden automatisch gemappt
-- **Flexibel** - Funktioniert mit verschiedenen Formaten
-
-### ✅ Intelligente Verarbeitung
-
-- **Zeile für Zeile** - Jeder Eintrag wird einzeln verarbeitet
-- **Fortschritts-Updates** - "Lead 5/50 angelegt..."
-- **Fehlertoleranz** - Bei Fehler wird weitergemacht
-- **Duplikat-Erkennung** - Existierende Einträge werden erkannt
-
-### ✅ Transparente Fehlerbehandlung
-
-Jarvis meldet jeden Schritt:
+Bild-URLs und Dateiinhalte werden in der Chat-History gespeichert. Jarvis kann also 2 Nachrichten später noch auf ein zuvor hochgeladenes Bild oder Dokument referenzieren:
 
 ```
-Lead 1/50: max@test.de ✓
-Lead 2/50: anna@test.de ✓
-Lead 3/50: invalid-email ✗ (Ungültige E-Mail)
-Lead 4/50: peter@test.de ✗ (Existiert bereits)
-Lead 5/50: lisa@test.de ✓
-...
-✅ 46 Leads importiert, 4 übersprungen
+User: [lädt Foto hoch] Hier ein Foto der Wohnung
+Jarvis: Ich sehe ein modernes Wohnzimmer mit Parkettboden...
+
+User: (2 Nachrichten später) Mach daraus ein Virtual Staging
+Jarvis: [virtual_staging mit URL aus History] → zeigt Ergebnis
 ```
 
-## Verwendung
+---
 
-### Methode 1: Direkt in den Chat kopieren
+## Limits & Performance
+
+| Parameter | Wert |
+|-----------|------|
+| Max. Dateien pro Upload | 10 |
+| Dokument-Inhalt Cap | 8.000 Zeichen |
+| Tabellen-Inhalt Cap | 40.000 Zeichen (≈500 Zeilen) |
+| Max. Excel-Zeilen pro Batch | 500 (danach wird gekürzt + Hinweis) |
+
+> Bei sehr großen Excel-Dateien fragt Jarvis vor dem Import nach Bestätigung (>50 Einträge).
+
+---
+
+## Massen-Import (Excel/CSV)
+
+### Workflow
 
 ```
-User: Hier sind meine Leads:
+User: [lädt Objektliste.xlsx hoch]
+      Importiere alle Objekte
 
-email,firstName,lastName
-max@test.de,Max,Mustermann
-anna@test.de,Anna,Schmidt
-
-Jarvis: Ich sehe 2 Leads. Soll ich diese importieren?
-```
-
-### Methode 2: Datei-Upload
-
-```
-User: [Lädt leads.xlsx hoch]
-
-Jarvis: Excel-Datei erkannt mit 150 Leads. Importiere...
-        Lead 1/150: max@test.de ✓
-        Lead 2/150: anna@test.de ✓
+Jarvis: Tabelle "Objektliste.xlsx" gelesen: 45 Zeilen
+        Lege Objekt 1/45 an: Friedrichstraße 1, Wien, 450.000€ ✓
+        Lege Objekt 2/45 an: Maximilianstraße 8, München, 890.000€ ✓
         ...
-        ✅ 148 Leads importiert, 2 übersprungen
+        ✅ 43 Objekte angelegt, 2 übersprungen (fehlende Pflichtfelder)
 ```
 
-### Methode 3: PDF-Extraktion
+### Empfohlene Spaltenbezeichnungen
+
+**Leads:**
+| Spalte | Feld |
+|--------|------|
+| email / E-Mail | email (Pflicht) |
+| vorname / firstName | firstName |
+| nachname / lastName | lastName |
+| telefon / phone | phone |
+| status | status (NEW/CONTACTED/etc.) |
+
+**Objekte/Properties:**
+| Spalte | Feld |
+|--------|------|
+| titel / title | title (Pflicht) |
+| adresse / address | address |
+| preis / price | price |
+| zimmer / rooms | rooms |
+| fläche / area | livingArea |
+| stadt / city | city |
+
+> Jarvis erkennt auch abweichende Spaltenbezeichnungen (z.B. "Wohnfläche" → livingArea) durch das LLM-Mapping.
+
+---
+
+## Dokument-Analyse
+
+### Verträge, Berichte, Exposés
 
 ```
-User: [Lädt Vertrag.pdf hoch]
-      Erstelle einen Lead aus diesem Vertrag
-
-Jarvis: PDF analysiert. Ich habe folgende Daten gefunden:
-        - Name: Max Mustermann
-        - E-Mail: max@mustermann.de
-        - Telefon: +49 123 456789
-        
-        Soll ich einen Lead anlegen?
-
-User: Ja
-
-Jarvis: [create_lead]
-        ✅ Lead Max Mustermann angelegt
-```
-
-### Methode 4: Bild-Analyse
-
-```
-User: [Lädt Immobilienfoto hoch]
-      Was siehst du auf diesem Bild?
-
-Jarvis: Ich sehe ein modernes Wohnzimmer mit:
-        - Großem Fenster mit Stadtblick
-        - Parkettboden
-        - Offener Küche
-        - Ca. 30-35m² Fläche
-        
-        Soll ich diese Infos zu einem Property hinzufügen?
-```
-
-## Was Jarvis alles kann
-
-### 📄 Dokument-Analyse
-
-**Verträge, Exposés, Angebote:**
-```
-User: [Lädt Mietvertrag.pdf hoch]
+User: [lädt Mietvertrag.pdf hoch]
       Extrahiere alle relevanten Daten
 
 Jarvis: Vertrag analysiert:
         - Mieter: Max Mustermann (max@test.de)
-        - Objekt: Friedrichstraße 123, Berlin
-        - Miete: 1.200€/Monat
-        - Laufzeit: 01.01.2026 - 31.12.2027
-        
-        Soll ich einen Lead und Property anlegen?
+        - Objekt: Friedrichstraße 123, 1010 Wien
+        - Miete: 1.200€ kalt
+        - Laufzeit: 01.03.2026 – 28.02.2028
+
+        Soll ich Lead und Property anlegen?
 ```
 
-### 🖼️ Bild-Analyse
-
-**Immobilienfotos:**
-```
-User: [Lädt 5 Fotos hoch]
-      Beschreibe diese Wohnung
-
-Jarvis: Basierend auf den Fotos:
-        - Moderne 3-Zimmer-Wohnung
-        - Offene Küche mit Kochinsel
-        - Parkettboden durchgehend
-        - Balkon mit Südausrichtung
-        - Hochwertige Ausstattung
-        - Geschätzte Fläche: 80-90m²
-```
-
-### 📊 Excel-Verarbeitung
-
-**Komplexe Tabellen:**
-```
-User: [Lädt Objektliste.xlsx hoch]
-      Importiere alle Objekte aus Tabelle "Verkauf"
-
-Jarvis: Excel analysiert:
-        - Tabelle "Verkauf" hat 45 Objekte
-        - Spalten: Adresse, Preis, Zimmer, Fläche
-        
-        Importiere Objekt 1/45...
-        [create_property: Friedrichstr. 1, 450.000€, 3 Zi, 85m²]
-        ...
-```
-
-## Roadmap
-
-### Q1 2026
-- ✅ CSV-Import für Leads
-- ✅ CSV-Import für Properties
-- 🚧 Datei-Upload (Drag & Drop)
-
-### Q2 2026
-- 🔮 Excel-Import (.xlsx)
-- 🔮 Bilder-Import (ZIP mit Bildern)
-- 🔮 Lead-Property-Verknüpfung beim Import
-
-### Q3 2026
-- 🔮 Import aus anderen CRMs (Salesforce, HubSpot)
-- 🔮 Automatisches Mapping (KI erkennt Spalten)
-- 🔮 Preview vor Import
-
-## Beispiel-Konversation
+### PowerPoint-Präsentationen
 
 ```
-User: Wir steigen von unserem alten System um. Ich habe hier 200 Leads als CSV.
+User: [lädt Objektpräsentation.pptx hoch]
+      Was steht auf den Folien?
 
-Jarvis: Super! Kopiere einfach den CSV-Inhalt hier rein, ich importiere sie dann.
-
-User: [Kopiert CSV]
-
-email,firstName,lastName,phone,status
-max@test.de,Max,Mustermann,+49123,NEW
-anna@test.de,Anna,Schmidt,+49234,CONTACTED
-...
-
-Jarvis: Ich sehe eine CSV mit 200 Leads. Soll ich diese importieren?
-
-User: Ja
-
-Jarvis: [import_leads_from_csv]
-        ✅ 198 Leads importiert, 2 fehlgeschlagen
-        
-        Fehler:
-        - Lead max@test.de existiert bereits
-        - Zeile 45: Ungültige E-Mail
-        
-        Möchtest du auch deine Properties importieren?
+Jarvis: Folie 1: Luxuswohnung Wien-Innere Stadt
+        Folie 2: 3 Zimmer, 95m², Baujahr 1910 saniert...
+        Folie 3: Preis: 1.200.000 €
 ```
+
+---
 
 ## Technische Details
 
-### Wie es funktioniert
+### Parser-Bibliotheken
 
-Jarvis nutzt **Gemini's native Multimodal-Fähigkeiten**:
+| Bibliothek | Version | Einsatz |
+|---|---|---|
+| `mammoth` | latest | `.docx` Text-Extraktion |
+| `xlsx` (SheetJS) | latest | `.xlsx/.xls/.csv` |
+| `pdf-parse` | latest | `.pdf` Text-Extraktion |
+| `jszip` | (bereits im Projekt) | `.pptx` ZIP-Parsing + XML |
 
-1. **Datei-Upload** → User lädt Datei hoch
-2. **Gemini analysiert** → Erkennt Format und Inhalt automatisch
-3. **Intelligentes Mapping** → Spalten werden zu Feldern gemappt
-4. **Tool-Calls** → Für jeden Eintrag wird `create_lead`/`create_property` aufgerufen
-5. **Fehlerbehandlung** → Bei Fehler wird weitergemacht
+> **Lambda-Hinweis:** `xlsx` wird **lazy geladen** (erst beim ersten Excel-Upload) um den `DOMMatrix is not defined`-Crash auf Lambda-Startup zu vermeiden. `xlsx`, `mammoth`, `pdf-parse` und `jszip` sind in `externalModules` der CDK-Bundling-Config eingetragen und werden separat in `afterBundling` installiert.
 
-### Vorteile gegenüber klassischem Parsing
+### Speicherung
 
-✅ **Flexibler**: Funktioniert mit verschiedenen Formaten
-✅ **Intelligenter**: KI versteht Kontext (z.B. "Vorname" = "firstName")
-✅ **Robuster**: Kommas in Werten sind kein Problem
-✅ **Transparenter**: User sieht jeden einzelnen Schritt
-✅ **Fehlertoleranz**: Bei Fehler wird nicht abgebrochen
-
-### Performance
-
-- **Sequenziell**: Einträge werden nacheinander verarbeitet
-- **Transparent**: Fortschritts-Updates nach jedem Eintrag
-- **Empfohlen**: Max. 200 Einträge pro Batch
-
-Für größere Imports:
+Hochgeladene Dateien werden in S3 gespeichert:
 ```
-User: Ich habe 5000 Leads
-
-Jarvis: Das ist viel! Lass uns das in Batches machen:
-        - Batch 1: Zeilen 1-200
-        - Batch 2: Zeilen 201-400
-        - etc.
-        
-        Soll ich mit Batch 1 starten?
+s3://[media-bucket]/chat-uploads/{tenantId}/{userId}/{timestamp}-{random}.{ext}
 ```
 
-## Support
-
-Bei Problemen:
-1. Prüfe CSV-Format (Header, Kommas)
-2. Teste mit kleiner CSV (3-5 Zeilen)
-3. Schaue in die Fehlermeldungen von Jarvis
+Der extrahierte Text wird **nicht** persistent gespeichert — er existiert nur im Message-Kontext der aktuellen Anfrage + in der Chat-History (als Teil der gespeicherten User-Nachricht).

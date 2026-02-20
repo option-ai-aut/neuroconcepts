@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { safeRedirect } from '@/lib/safeRedirect';
 import {
   CheckCircle2,
   XCircle,
@@ -78,7 +79,7 @@ export default function PreisePage() {
         body: JSON.stringify({ plan: planId, billingCycle: yearly ? 'yearly' : 'monthly' }),
       });
       const data = await res.json();
-      if (data.url) { window.location.href = data.url; return; }
+      if (data.url) { safeRedirect(data.url); return; }
       router.push('/dashboard');
     } catch {
       setCheckoutLoading(null);

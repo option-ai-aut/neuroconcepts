@@ -1,6 +1,6 @@
 # Immivo AI - B2B Real Estate Automation Platform
 
-**Status:** Phase 1 (MVP) - Live on AWS (Dev/Test/Prod)  
+**Status:** Phase 1 (MVP) - Live on AWS (Test/Prod)  
 **Target Launch:** Q2 2026  
 **Focus:** DACH Region (Germany, Austria, Switzerland)
 
@@ -12,7 +12,7 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 
 ### Hauptfunktionen (Ticket 1 - MVP)
 - **Lead Intake:** Automatische Erfassung aus E-Mail-Weiterleitungen (ImmoScout, Willhaben) und Web-Formularen. Smart Email Processing: AutoClick (Portal-Link-Extraktion via Puppeteer), LeadEnrichment (Duplikat-Check, Telefon-Normalisierung DACH, Vollständigkeit), Sentiment-Analyse (Buying/Risk-Signale).
-- **Jarvis-Kommunikation:** OpenAI GPT-5.2 (flagship, Dec 2025) via Chat Completions API mit 64+ Tools, Multi-Agent Router (gpt-5-mini Intent-Klassifikation), pgvector RAG Suche, persistente Konversationen, Multi-Round Tool Calls (bis zu 4 Runden), Live Tool-Tags, Inline-Bilder im Chat, Virtual Staging direkt im Chat.
+- **Jarvis-Kommunikation:** OpenAI GPT-5.2 via Chat Completions API mit 64+ Tools, Multi-Agent Router (gpt-5-mini Intent-Klassifikation), pgvector RAG, persistente Konversationen, Multi-Round Tool Calls, Live Tool-Tags, Inline-Bilder, Virtual Staging. Server-seitige Datei-Verarbeitung (docx, xlsx, pdf, pptx, txt, json), OpenAI Vision für Bilder, automatische Spracherkennung.
 - **KI-Bildstudio:** Virtual Staging mit Google Gemini (Möblierung). Settings-Sidebar links, Bildvorschau rechts. Auch direkt via Jarvis-Chat nutzbar.
 - **E-Mail Thread Intelligence:** Ordnet Antworten korrekt zu und führt den Dialog kontextbezogen fort.
 - **Kalender:** AWS WorkMail Kalender via CalDAV mit Google Meet Integration (geplant).
@@ -26,7 +26,7 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 ### Infrastructure & Backend
 - **Cloud:** AWS (Region: `eu-central-1` Frankfurt)
 - **Compute:** AWS Lambda (Serverless) + API Gateway
-- **Database:** PostgreSQL 16 (RDS t4g.micro for Dev/Test, Aurora Serverless v2 for Prod, Neon.tech lokal)
+- **Database:** PostgreSQL 16 (RDS t4g.micro for Test, Aurora Serverless v2 for Prod, Neon.tech lokal)
 - **Language:** Node.js / TypeScript
 - **IaC:** AWS CDK
 
@@ -51,7 +51,7 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 - **Email Postfächer:** AWS WorkMail (4 Seats)
 - **Calendar:** AWS WorkMail CalDAV (geplant: Google Meet)
 - **Media Storage:** AWS S3 via CloudFront CDN (`media.immivo.ai`, `{stage}-media.immivo.ai`)
-- **CDN:** AWS CloudFront — Prod: `app/api/admin/media.immivo.ai` | Dev: `dev.immivo.ai`, `dev-api.immivo.ai` | Test: `test.immivo.ai`, `test-api.immivo.ai`
+- **CDN:** AWS CloudFront — Prod: `app/api/admin/media.immivo.ai` | Test: `test.immivo.ai`, `test-api.immivo.ai`
 - **DNS:** AWS Route53 (`immivo.ai` Hosted Zone, Wildcard-Zertifikat `*.immivo.ai`)
 
 ### Frontend
@@ -70,7 +70,7 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 │   ├── JARVIS_CAPABILITIES.md # Alle Jarvis-Tools & Fähigkeiten (64+ Tools)
 │   ├── ONBOARDING.md     # Checklisten für neue Kunden
 │   ├── PROPERTY_FIELDS_RESEARCH.md # Property-Felder Spezifikation
-│   ├── FILE_PROCESSING.md # Datei-Import (CSV, Excel, PDF)
+│   ├── FILE_PROCESSING.md # Datei-Verarbeitung (docx, xlsx, pdf, pptx, txt, json, Bilder)
 │   ├── CONVERSATION_MEMORY.md # Jarvis Gedächtnis-System
 │   └── DEV_ENVIRONMENT_SETUP.md # Anleitung für Dev-Environment & Stack Updates
 ├── frontend/             # Next.js Frontend App (Dockerized)
@@ -146,6 +146,7 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 - **Datenhaltung:** Konform mit österreichischen und EU-Rechtsvorgaben (DSGVO).
 - **Isolation:** Logische Mandantentrennung (Multi-Tenancy).
 - **Transparenz:** Jarvis-Nachrichten sind im Dashboard klar gekennzeichnet.
+- **Audit (Feb 2026):** Sicherheitsaudit v4 umgesetzt — IDOR-Schutz, interne Endpoint-Auth, Rate-Limits, XSS-Escaping, CSP, SHA-Pinning. Details: `docs/SECURITY_AUDIT_V4.md`.
 
 ## 📞 Support
 

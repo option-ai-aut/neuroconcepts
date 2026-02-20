@@ -15,7 +15,9 @@ export class TemplateService {
   static render(templateBody: string, context: any): string {
     return templateBody.replace(/\{\{([\w\.]+)\}\}/g, (match, path) => {
       const value = path.split('.').reduce((obj: any, key: string) => obj?.[key], context);
-      return value !== undefined ? value : match;
+      if (value === undefined) return match;
+      const str = String(value);
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     });
   }
 

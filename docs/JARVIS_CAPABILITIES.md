@@ -211,32 +211,35 @@ Datum:    {{date.today}}, {{date.year}}
 |------|--------------|----------|
 | `get_team_members` | Team-Mitglieder abrufen | "Wer ist im Team?" |
 
-### 📂 DATEI-VERARBEITUNG (Native Fähigkeit)
+### 📂 DATEI-VERARBEITUNG
 
-**Keine Tools nötig** - Jarvis kann Dateien direkt verarbeiten:
+**Keine Tools nötig** — Jarvis verarbeitet Dateien server-seitig: Text wird extrahiert und direkt in den Kontext eingebettet.
 
-| Format | Fähigkeit | Beispiel |
-|--------|-----------|----------|
-| 📄 CSV, Excel | Bulk-Import | "Hier sind 200 Leads als CSV" → Jarvis liest und importiert |
-| 📄 PDF, Word | Text-Extraktion | "Extrahiere Daten aus diesem Vertrag" |
-| 🖼️ Bilder | Bild-Analyse & Virtual Staging | "Möbliere dieses Bild" / "Was siehst du auf diesem Foto?" |
-| 📄 JSON, XML | Struktur-Parsing | "Parse diese API-Response" |
+| Format | Parser | Fähigkeit |
+|--------|--------|-----------|
+| 📄 `.docx` (Word) | mammoth | Verträge, Berichte lesen |
+| 📊 `.xlsx` / `.xls` / `.csv` | SheetJS | Massen-Import Leads/Objekte |
+| 📄 `.pdf` | pdf-parse | Text aus PDFs extrahieren |
+| 📊 `.pptx` (PowerPoint) | jszip+XML | Folieninhalte lesen |
+| 📄 `.txt` / `.json` | native | Text/Struktur lesen |
+| 🖼️ Bilder (jpg/png/webp) | OpenAI Vision | Foto wirklich sehen, Virtual Staging |
 
-**Intelligente Verarbeitung:**
-- ✅ Automatisches Format-Erkennung
-- ✅ Spalten-Mapping (z.B. "Vorname" → firstName)
-- ✅ Zeile-für-Zeile mit Fortschritts-Updates
-- ✅ Fehlertoleranz und Duplikat-Erkennung
+**Intelligentes Routing:**
+- ✅ Datei + Lese-Intent → kein Tool-Call, Jarvis antwortet direkt
+- ✅ Datei + Import-Intent → CRM-Tools aktiv, Zeile-für-Zeile anlegen
+- ✅ Bild → Vision-Input (GPT sieht das Foto wirklich)
+- ✅ Datei-URLs persistent in Chat-History → 2 Nachrichten später noch nutzbar
 
 ## Gesamt: 64+ Tools
 
 - ✅ **53 Tools aktiv**
 - 🚧 **9 Tools in Entwicklung** (E-Mail & Kalender-Integration)
 - 🎨 **1 Virtual Staging Tool** (Google Gemini)
-- ✨ **Native Datei-Verarbeitung** (CSV, Excel, PDF, Bilder, etc.)
+- ✨ **Server-seitige Datei-Verarbeitung** (docx, xlsx, pdf, pptx, txt, json, Bilder)
 - 🧠 **4 Gedächtnis-Tools** (Chatverlauf, Kontext, Memory)
 - 🔄 **Multi-Round Tool Calls** (bis zu 8 Runden pro Antwort)
 - 🖼️ **Inline-Bilder im Chat** (Virtual Staging Ergebnisse etc.)
+- 🌍 **Automatische Spracherkennung** (Jarvis antwortet in der Sprache des Users)
 
 ## Chat UX
 
@@ -362,6 +365,11 @@ Bei kritischen Operationen (Löschen, E-Mail-Versand) fragt Jarvis nach Bestäti
 - ✅ Multi-Round Tool Calls
 - ✅ Inline-Bilder im Chat
 - ✅ Live Tool-Tags mit Animation
+- ✅ Server-seitige Datei-Verarbeitung (docx, xlsx, csv, pdf, pptx, txt, json)
+- ✅ Massen-Import aus Excel/CSV (Leads & Objekte)
+- ✅ OpenAI Vision für hochgeladene Bilder
+- ✅ Datei-Persistenz in Chat-History (Referenz nach mehreren Nachrichten)
+- ✅ Automatische Spracherkennung (antwortet in Sprache des Users)
 - 🚧 E-Mail-Integration (SMTP)
 - 🚧 Kalender-Integration (Google/Outlook)
 
@@ -372,7 +380,6 @@ Bei kritischen Operationen (Löschen, E-Mail-Versand) fragt Jarvis nach Bestäti
 - ✅ Cache & Queue Infrastructure
 - 🔮 Automatische Lead-Qualifizierung
 - 🔮 Automatische Termin-Vorschläge
-- 🔮 Multi-Language Support
 
 ### Q3 2026
 - 🔮 Voice Interface (Spracheingabe)

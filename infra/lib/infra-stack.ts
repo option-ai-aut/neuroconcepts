@@ -342,7 +342,6 @@ export class ImmivoStack extends cdk.Stack {
           'https://immivo.ai',
           'https://www.immivo.ai',
           'https://admin.immivo.ai',
-          'http://localhost:3000',
         ],
         allowedHeaders: ['*'],
         exposedHeaders: ['Content-Length', 'Content-Type', 'ETag'],
@@ -465,12 +464,14 @@ export class ImmivoStack extends cdk.Stack {
         DB_SECRET_ARN: this.dbSecret.secretArn,
         DB_ENDPOINT: this.dbEndpoint,
         ORCHESTRATOR_API_URL: api.url,
+        APP_SECRET_ARN: appSecret.secretArn,
       },
       bundling: { minify: true, sourceMap: true },
     });
 
     emailBucket.grantRead(emailProcessor);
     this.dbSecret.grantRead(emailProcessor);
+    appSecret.grantRead(emailProcessor);
     emailBucket.addEventNotification(s3.EventType.OBJECT_CREATED, new s3n.LambdaDestination(emailProcessor));
 
     // --- 6. Frontend (Lambda + Web Adapter) ---

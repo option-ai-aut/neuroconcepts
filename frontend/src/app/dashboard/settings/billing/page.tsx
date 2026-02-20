@@ -6,6 +6,7 @@ import useSWR from 'swr';
 import { getMe, getApiUrl, getAuthHeaders } from '@/lib/api';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { safeRedirect } from '@/lib/safeRedirect';
 
 interface Invoice {
   id: string;
@@ -106,7 +107,7 @@ export default function BillingSettingsPage() {
     try {
       setPortalLoading(true);
       const { url } = await apiFetch('/billing/portal', { method: 'POST' });
-      window.location.href = url;
+      safeRedirect(url);
     } catch {
       alert('Stripe Portal konnte nicht geöffnet werden.');
     } finally {
@@ -121,7 +122,7 @@ export default function BillingSettingsPage() {
         method: 'POST',
         body: JSON.stringify({ plan: planId, billingCycle: checkoutCycle }),
       });
-      if (data.url) { window.location.href = data.url; return; }
+      if (data.url) { safeRedirect(data.url); return; }
       // BILLING_ENABLED=false → show success message
       setSuccessMsg('Testphase verlängert — Kostenloser Vollzugang aktiviert.');
       setTimeout(() => setSuccessMsg(''), 5000);

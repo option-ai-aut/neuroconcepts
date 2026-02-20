@@ -39,6 +39,20 @@ Hat sich `schema.prisma` geändert? Wenn ja:
 
 ### 3. Push ausführen
 
+**Option A: Push-Script (empfohlen)**
+
+```bash
+# Auf test deployen
+push test
+
+# Auf main (Prod) deployen
+push main
+```
+
+> Die `push`-Funktion in `~/.zshrc` stasht automatisch ungetrackte/geänderte Dateien (z.B. `telegram-agent/bot-error.log`) vor dem Branch-Wechsel und poppt sie danach wieder. So blockieren lokale Log-Änderungen nicht mehr.
+
+**Option B: Manuell**
+
 ```bash
 cd /Users/dennis/NeuroConcepts.ai
 
@@ -48,7 +62,7 @@ git commit -m "feat: ..."
 git push origin HEAD:test
 ```
 
-GitHub Actions deployt automatisch sobald der `test`-Branch aktualisiert wird. Dauer: **~10–15 Minuten**.
+GitHub Actions deployt automatisch sobald der `test`/`main`-Branch aktualisiert wird. Dauer: **~10–15 Minuten**.
 
 ### 4. Nach dem Deploy: Datenbank migrieren
 
@@ -162,6 +176,19 @@ Das Projekt hat **3 Migrations-Schichten**:
 
 ---
 
+## Push-Workflow (zshrc)
+
+Das Projekt nutzt eine `push`-Funktion in `~/.zshrc` für vereinfachtes Deployen:
+
+```bash
+push test             # commit + push auf test → deployt auf test.immivo.ai
+push main             # merged test → main, pushed (braucht GitHub-Approval) → app.immivo.ai
+```
+
+**Hinweis:** Die dev-Stage wurde entfernt. Es gibt nur noch test und main.
+
+Die Funktion stasht automatisch ungetrackte/geänderte Dateien (z.B. `bot-error.log`) vor Branch-Wechseln und stellt sie danach wieder her.
+
 ## Lokale Entwicklung
 
 Für lokale Entwicklung wird kein separates Stage-Backend benötigt:
@@ -202,6 +229,22 @@ Das lokale Frontend verbindet sich automatisch mit `localhost:3001` (via `NODE_E
 **Ursache**: Falscher Secret-Name im `aws secretsmanager` Befehl.  
 **Korrekte Namen**: `Immivo-App-Secret-test`, `Immivo-App-Secret-prod`.
 
+### Eingehende E-Mails landen nicht (401 Unauthorized)
+**Ursache**: `INTERNAL_API_SECRET` fehlt in AWS Secrets Manager oder Email-Parser hat keinen Zugriff auf AppSecret.  
+**Fix**: In `Immivo-App-Secret-{stage}` muss der Key `INTERNAL_API_SECRET` existieren. CDK gibt dem Email-Parser `APP_SECRET_ARN` + `grantRead` — nach Deploy sollte es automatisch funktionieren.
+
 ### Deploy auf `main` hängt auf "Warten"
 **Ursache**: GitHub Actions `environment: production` erfordert manuelle Genehmigung.  
 **Fix**: Im GitHub Actions UI → "Review deployments" → "Approve" klicken.
+
+### Lambda crasht mit `DOMMatrix is not defined` (502/500)
+**Ursache**: `xlsx` (SheetJS) nutzt Browser-APIs (`DOMMatrix`), die auf AWS Lambda nicht existieren. Wenn der Bundler `xlsx` einbündelt, crasht der Orchestrator beim Startup.  
+**Fix**: `xlsx`, `mammoth`, `pdf-parse`, `jszip` müssen in `infra/lib/infra-stack.ts` unter `externalModules` stehen und in `afterBundling` separat installiert werden. Außerdem: `xlsx` nur lazy laden (z.B. per `require('xlsx')` erst bei Excel-Upload).
+
+### Lambda startet nicht: `DOMMatrix is not defined`
+**Ursache**: Eine npm-Library (z.B. `xlsx`/SheetJS) wird von esbuild eingebündelt und ihr statischer Initializer braucht Browser-APIs (DOMMatrix), die in Lambda nicht existieren.  
+**Fix**: Library zu `externalModules` in `infra/lib/infra-stack.ts` (OrchestratorLambda) hinzufügen UND in `afterBundling` via `npm install` installieren. Aktuell extern: `xlsx`, `mammoth`, `pdf-parse`, `jszip`.
+
+### `push test` schlägt fehl: "local changes would be overwritten by checkout"
+**Ursache**: Lokale Datei (z.B. `telegram-agent/bot-error.log`) ist auf dem Ziel-Branch getrackt, aber lokal verändert.  
+**Fix**: Die `push`-Funktion in `~/.zshrc` stasht automatisch — falls das Problem erneut auftritt, manuell `git stash` vor `push test` ausführen. Oder: `git rm --cached <datei>` auf dem Ziel-Branch ausführen und pushen.

@@ -406,7 +406,7 @@ const RichEditorField: React.FC<RichEditorFieldProps> = ({
         sel?.removeAllRanges();
         sel?.addRange(range);
         const temp = document.createElement('span');
-        temp.innerHTML = tagHtml + '\u00A0';
+        temp.innerHTML = DOMPurify.sanitize(tagHtml + '\u00A0');
         const frag = document.createDocumentFragment();
         while (temp.firstChild) frag.appendChild(temp.firstChild);
         range.insertNode(frag);
@@ -1780,7 +1780,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
       // Create and insert the tag span
       const tagHtml = valueToTagHtml(field.variable);
       const temp = document.createElement('span');
-      temp.innerHTML = tagHtml;
+      temp.innerHTML = DOMPurify.sanitize(tagHtml);
       const tagSpan = temp.firstChild;
 
       if (tagSpan) {
