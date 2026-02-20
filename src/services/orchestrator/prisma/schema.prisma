@@ -1039,6 +1039,35 @@ enum BugReportPriority {
   CRITICAL
 }
 
+// --- Demo Bookings ---
+
+model DemoBooking {
+  id        String   @id @default(uuid())
+  name      String
+  email     String
+  company   String?
+  message   String?  @db.Text
+  start     DateTime
+  end       DateTime
+  eventId   String?
+  status    DemoBookingStatus @default(PENDING)
+  adminNotes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([email])
+}
+
+enum DemoBookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
 // --- Blog ---
 
 model BlogPost {

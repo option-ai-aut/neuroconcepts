@@ -8296,6 +8296,8 @@ app.post('/calendar/book-demo', async (req, res) => {
     const timeStr = startDate.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' });
     const subject = `Demo Call – ${name}${company ? ` (${company})` : ''}`;
 
+    console.log(`📅 Demo booking: ${name} (${email}), ${dateStr} ${timeStr}`);
+
     // 1) Try to create calendar event via WorkMail
     let eventId: string | undefined;
     try {
@@ -8320,9 +8322,27 @@ app.post('/calendar/book-demo', async (req, res) => {
           meetLink,
         });
         eventId = result?.id;
+        console.log(`✅ WorkMail calendar event created: ${eventId}`);
+      } else {
+        console.warn('⚠️ WorkMail credentials not configured — calendar event skipped');
       }
     } catch (calErr) {
-      console.error('WorkMail calendar event failed (continuing):', calErr);
+      console.error('❌ WorkMail calendar event failed (continuing):', calErr);
+    }
+
+    // 1b) Persist booking to DB
+    try {
+      const db = await initializePrisma();
+      await db.demoBooking.create({
+        data: {
+          name, email, company: company || null, message: message || null,
+          start: startDate, end: endDate, eventId: eventId || null,
+          status: eventId ? 'CONFIRMED' : 'PENDING',
+        },
+      });
+      console.log(`💾 Demo booking persisted for ${email}`);
+    } catch (dbErr) {
+      console.error('Demo booking DB persist failed (continuing):', dbErr);
     }
 
     // 2) Send confirmation email to office@ via SystemEmailService
@@ -8414,6 +8434,57 @@ app.get('/admin/platform/calendars', adminAuthMiddleware, async (req, res) => {
 });
 
 // ============================================
+// Demo Bookings Admin API
+// ============================================
+
+app.get('/admin/platform/demo-bookings', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const status = req.query.status as string | undefined;
+    const where = status && status !== 'ALL' ? { status: status as any } : {};
+
+    const bookings = await db.demoBooking.findMany({
+      where,
+      orderBy: { start: 'desc' },
+      take: 200,
+    });
+
+    const counts = await db.demoBooking.groupBy({
+      by: ['status'],
+      _count: true,
+    });
+
+    res.json({
+      bookings,
+      counts: counts.reduce((acc: any, c: any) => ({ ...acc, [c.status]: c._count }), {}),
+      total: bookings.length,
+    });
+  } catch (error: any) {
+    console.error('Demo bookings list error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+app.patch('/admin/platform/demo-bookings/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { status, adminNotes } = req.body;
+    const data: any = {};
+    if (status) data.status = status;
+    if (adminNotes !== undefined) data.adminNotes = adminNotes;
+
+    const booking = await db.demoBooking.update({
+      where: { id: req.params.id },
+      data,
+    });
+    res.json(booking);
+  } catch (error: any) {
+    console.error('Demo booking update error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// ============================================
 // Bug Reports API
 // ============================================
 
@@ -8457,6 +8528,40 @@ app.post('/bug-reports', authMiddleware, async (req: any, res) => {
         consoleLogs: consoleLogs || null,
       }
     });
+
+    // Notify admins via email
+    try {
+      const { sendSystemEmail } = await import('./services/SystemEmailService');
+      const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+      await sendSystemEmail({
+        to: 'office@immivo.ai',
+        subject: `Bug Report: ${title} — ${userName} (${user.tenant.name})`,
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #dc2626; color: white; padding: 24px 32px; border-radius: 12px 12px 0 0;">
+              <h2 style="margin: 0; font-size: 20px;">Neuer Bug Report</h2>
+              <p style="margin: 4px 0 0; opacity: 0.8; font-size: 14px;">via Dashboard</p>
+            </div>
+            <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px; width: 120px;">Titel</td><td style="padding: 8px 0; font-weight: 600;">${title}</td></tr>
+                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Gemeldet von</td><td style="padding: 8px 0;">${userName}</td></tr>
+                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Unternehmen</td><td style="padding: 8px 0;">${user.tenant.name}</td></tr>
+                ${page ? `<tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Seite</td><td style="padding: 8px 0;"><code>${page}</code></td></tr>` : ''}
+              </table>
+              <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                <p style="color: #6b7280; font-size: 14px; margin: 0 0 8px;">Beschreibung:</p>
+                <div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb; white-space: pre-wrap;">${description}</div>
+              </div>
+              ${screenshotUrl ? `<p style="margin-top: 16px; font-size: 13px;"><a href="${screenshotUrl}" style="color: #2563eb;">Screenshot ansehen</a></p>` : ''}
+              <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">Zum Bearbeiten: Admin → Support → Bug Reports</p>
+            </div>
+          </div>`,
+        replyTo: user.email,
+      });
+    } catch (emailErr) {
+      console.error('Bug report admin notification email failed:', emailErr);
+    }
 
     res.json(report);
   } catch (error: any) {
