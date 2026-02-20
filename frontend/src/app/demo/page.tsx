@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Check, Calendar, Clock, User, Mail, Building2, ArrowRight, Sparkles, Zap, Shield } from 'lucide-react';
 import PublicNavigation from '@/components/PublicNavigation';
 import PublicFooter from '@/components/PublicFooter';
+import { getRuntimeConfig } from '@/components/EnvProvider';
 
 function useInView() {
   const ref = useRef<HTMLDivElement>(null);
@@ -116,10 +117,40 @@ export default function DemoPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedDate || !selectedTime || !form.name || !form.email) return;
     setSubmitting(true);
-    await new Promise(r => setTimeout(r, 1200));
-    setSubmitting(false);
-    setStep('success');
+    try {
+      const [hours, minutes] = selectedTime.split(':').map(Number);
+      const startDate = new Date(selectedDate);
+      startDate.setHours(hours, minutes, 0, 0);
+      const endDate = new Date(startDate);
+      endDate.setMinutes(endDate.getMinutes() + 30);
+
+      const config = getRuntimeConfig();
+      const apiUrl = (config.apiUrl || '').replace(/\/+$/, '');
+
+      const res = await fetch(`${apiUrl}/calendar/book-demo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          company: form.company || undefined,
+          start: startDate.toISOString(),
+          end: endDate.toISOString(),
+        }),
+      });
+
+      if (res.ok) {
+        setStep('success');
+      } else {
+        console.error('Demo booking failed:', res.status);
+      }
+    } catch (err) {
+      console.error('Demo booking error:', err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const formatDate = (d: Date) =>

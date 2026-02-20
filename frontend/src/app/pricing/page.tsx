@@ -408,6 +408,7 @@ export default function PreisePage() {
 
                 <Link
                   href={plan.href}
+                  prefetch={false}
                   onClick={(e) => handlePlanClick(plan.id, e)}
                   className={`w-full flex items-center justify-center px-6 py-3 rounded-full font-semibold transition-all hover:-translate-y-0.5 disabled:opacity-60 ${
                     plan.popular

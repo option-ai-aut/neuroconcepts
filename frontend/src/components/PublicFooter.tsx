@@ -15,7 +15,7 @@ export default function PublicFooter({ bare = false }: { bare?: boolean }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 md:gap-12 mb-8 md:mb-12">
           <div className="col-span-2">
-            <Link href="/" className="inline-block mb-4 md:mb-6">
+            <Link href="/" prefetch={false} className="inline-block mb-4 md:mb-6">
               <Image src="/logo-white.png" alt="Immivo" width={160} height={160} className="w-28 sm:w-36 h-auto" />
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed mb-4">
@@ -36,29 +36,29 @@ export default function PublicFooter({ bare = false }: { bare?: boolean }) {
           <div>
             <h4 className="font-semibold mb-4">{t('product')}</h4>
             <ul className="space-y-3 text-gray-400 text-sm">
-              <li><Link href="/#jarvis" className="hover:text-white transition-colors">{nav('jarvisAi')}</Link></li>
-              <li><Link href="/#features" className="hover:text-white transition-colors">{nav('features')}</Link></li>
-              <li><Link href="/#bildbearbeitung" className="hover:text-white transition-colors">{nav('aiImageEditing')}</Link></li>
-              <li><Link href="/pricing" className="hover:text-white transition-colors">{nav('pricing')}</Link></li>
+              <li><Link href="/#jarvis" prefetch={false} className="hover:text-white transition-colors">{nav('jarvisAi')}</Link></li>
+              <li><Link href="/#features" prefetch={false} className="hover:text-white transition-colors">{nav('features')}</Link></li>
+              <li><Link href="/#bildbearbeitung" prefetch={false} className="hover:text-white transition-colors">{nav('aiImageEditing')}</Link></li>
+              <li><Link href="/pricing" prefetch={false} className="hover:text-white transition-colors">{nav('pricing')}</Link></li>
             </ul>
           </div>
 
           <div>
             <h4 className="font-semibold mb-4">{t('company')}</h4>
             <ul className="space-y-3 text-gray-400 text-sm">
-              <li><Link href="/about" className="hover:text-white transition-colors">{nav('aboutUs')}</Link></li>
-              <li><Link href="/blog" className="hover:text-white transition-colors">{nav('blog')}</Link></li>
-              <li><Link href="/careers" className="hover:text-white transition-colors">{nav('careers')}</Link></li>
-              <li><Link href="/contact" className="hover:text-white transition-colors">{nav('contact')}</Link></li>
+              <li><Link href="/about" prefetch={false} className="hover:text-white transition-colors">{nav('aboutUs')}</Link></li>
+              <li><Link href="/blog" prefetch={false} className="hover:text-white transition-colors">{nav('blog')}</Link></li>
+              <li><Link href="/careers" prefetch={false} className="hover:text-white transition-colors">{nav('careers')}</Link></li>
+              <li><Link href="/contact" prefetch={false} className="hover:text-white transition-colors">{nav('contact')}</Link></li>
             </ul>
           </div>
 
           <div>
             <h4 className="font-semibold mb-4">{t('legal')}</h4>
             <ul className="space-y-3 text-gray-400 text-sm">
-              <li><Link href="/privacy" className="hover:text-white transition-colors">{t('privacy')}</Link></li>
-              <li><Link href="/terms" className="hover:text-white transition-colors">{t('terms')}</Link></li>
-              <li><Link href="/imprint" className="hover:text-white transition-colors">{t('imprint')}</Link></li>
+              <li><Link href="/privacy" prefetch={false} className="hover:text-white transition-colors">{t('privacy')}</Link></li>
+              <li><Link href="/terms" prefetch={false} className="hover:text-white transition-colors">{t('terms')}</Link></li>
+              <li><Link href="/imprint" prefetch={false} className="hover:text-white transition-colors">{t('imprint')}</Link></li>
             </ul>
           </div>
         </div>

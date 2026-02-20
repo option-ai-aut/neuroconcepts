@@ -681,7 +681,7 @@ export default function LandingPage() {
             </p>
           </div>
                 <div className="hero-el opacity-0 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mt-8 sm:mt-12" style={{ animationDelay: '0.65s' }}>
-                  <Link href="/login?mode=register" className="group w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-semibold text-white backdrop-blur-xl bg-white/[0.12] border border-white/[0.2] rounded-full hover:bg-white/[0.2] transition-all duration-300 hover:-translate-y-0.5 shadow-[0_0_30px_rgba(255,255,255,0.06),inset_0_1px_0_rgba(255,255,255,0.1)]">
+                  <Link href="/login?mode=register" prefetch={false} className="group w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-semibold text-white backdrop-blur-xl bg-white/[0.12] border border-white/[0.2] rounded-full hover:bg-white/[0.2] transition-all duration-300 hover:-translate-y-0.5 shadow-[0_0_30px_rgba(255,255,255,0.06),inset_0_1px_0_rgba(255,255,255,0.1)]">
                     {t('hero.ctaPrimary')}<ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform duration-300" />
             </Link>
                   <a href="#demo" onClick={(e) => handleAnchorClick(e, 7)} className="group w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-semibold text-gray-300 backdrop-blur-xl bg-white/[0.06] border border-white/[0.12] rounded-full hover:bg-white/[0.1] hover:text-white transition-all duration-300">
@@ -1066,7 +1066,7 @@ export default function LandingPage() {
                   <p className="text-sm text-gray-500 leading-relaxed max-w-sm">{t('demo.subtitle')}</p>
                 </Stagger>
                 <Stagger active={activeIdx === 7} delay={240}>
-                  <Link href="/demo" className="inline-flex items-center gap-2 px-7 py-3.5 bg-gray-900 text-white text-sm font-semibold rounded-full hover:bg-gray-700 transition-colors">
+                  <Link href="/demo" prefetch={false} className="inline-flex items-center gap-2 px-7 py-3.5 bg-gray-900 text-white text-sm font-semibold rounded-full hover:bg-gray-700 transition-colors">
                     {t('demo.cta')}<ArrowRight className="w-4 h-4" />
                   </Link>
                 </Stagger>
@@ -1121,7 +1121,7 @@ export default function LandingPage() {
                 </Stagger>
                 <Stagger active={activeIdx === 8} delay={300}>
                   <div className="flex flex-col sm:flex-row justify-center gap-3 mb-8 sm:mb-10">
-                    <Link href="/login?mode=register" className="group w-full sm:w-auto inline-flex items-center justify-center px-8 py-3.5 text-sm font-bold text-gray-900 bg-white rounded-full hover:bg-gray-100 transition-all duration-300 hover:-translate-y-0.5 shadow-[0_0_40px_rgba(255,255,255,0.08)]">
+                    <Link href="/login?mode=register" prefetch={false} className="group w-full sm:w-auto inline-flex items-center justify-center px-8 py-3.5 text-sm font-bold text-gray-900 bg-white rounded-full hover:bg-gray-100 transition-all duration-300 hover:-translate-y-0.5 shadow-[0_0_40px_rgba(255,255,255,0.08)]">
                       {t('cta.primary')}<ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
                     </Link>
                     <a href="mailto:office@immivo.ai" className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3.5 text-sm font-semibold text-gray-300 border border-white/15 rounded-full hover:bg-white/5 transition-all duration-300">

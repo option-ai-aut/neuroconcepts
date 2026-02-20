@@ -305,7 +305,8 @@ export class ImmivoStack extends cdk.Stack {
         minify: true, 
         sourceMap: true,
         // ews-javascript-api uses deasync (native module) which can't be bundled by esbuild
-        externalModules: ['@aws-sdk/*', '@smithy/*', 'ews-javascript-api', 'deasync', 'http-cookie-agent', 'sharp'],
+        // xlsx/mammoth/pdf-parse/jszip must NOT be bundled — xlsx crashes Lambda on startup (DOMMatrix)
+        externalModules: ['@aws-sdk/*', '@smithy/*', 'ews-javascript-api', 'deasync', 'http-cookie-agent', 'sharp', 'xlsx', 'mammoth', 'pdf-parse', 'jszip'],
         // Prisma + EWS need special handling for Lambda - do everything in afterBundling
         commandHooks: {
           beforeBundling(inputDir: string, outputDir: string): string[] {
@@ -322,6 +323,7 @@ export class ImmivoStack extends cdk.Stack {
               `npm init -y`,
               `npm install @prisma/client@5.10.2 prisma@5.10.2 ews-javascript-api`,
               `npm install --os=linux --cpu=x64 sharp`,
+              `npm install xlsx mammoth pdf-parse jszip`,
               `npx prisma generate`,
               `rm -rf node_modules/@prisma/engines`,
               `rm -rf node_modules/.bin`,
