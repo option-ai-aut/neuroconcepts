@@ -45,6 +45,8 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     }
 
     const payload = await verifier.verify(token);
+    // Normalize email to lowercase to ensure case-insensitive auth
+    if (payload.email) (payload as any).email = (payload.email as string).toLowerCase().trim();
     req.user = payload as any;
     next();
   } catch (err) {

@@ -89,10 +89,16 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
   const dropdownStyle = { background: 'rgba(15,15,15,0.95)' };
   const dropdownText = 'text-gray-300 hover:bg-white/10 hover:text-white';
 
-  const navBg = effectiveDark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.75)';
+  // Mobile: fully opaque black/white — no gray shimmer from transparency
+  // Desktop: glassmorphism with backdrop-blur
+  const navBg = isMobileWidth
+    ? (effectiveDark ? '#000000' : '#ffffff')
+    : (effectiveDark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.75)');
 
-  // Mobile menu — follows system preference on mobile
-  const menuBg = effectiveDark ? 'rgba(10,10,10,0.88)' : 'rgba(248,248,248,0.88)';
+  // Mobile menu — fully opaque to match header
+  const menuBg = isMobileWidth
+    ? (effectiveDark ? '#0a0a0a' : '#ffffff')
+    : (effectiveDark ? 'rgba(10,10,10,0.88)' : 'rgba(248,248,248,0.88)');
   const menuBorder = effectiveDark ? 'border-white/[0.08]' : 'border-black/[0.06]';
   const menuText = effectiveDark ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900';
   const menuActive = effectiveDark ? 'text-white font-semibold' : 'text-gray-900 font-semibold';
@@ -107,7 +113,7 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
   return (
     <nav
       ref={navRef}
-      className="fixed w-full z-50 backdrop-blur-2xl"
+      className={`fixed w-full z-50 ${isMobileWidth ? '' : 'backdrop-blur-2xl'}`}
       style={{ background: navBg, transition: 'background 0.4s ease' }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -201,7 +207,7 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
 
       {mobileMenuOpen && (
         <div
-          className={`lg:hidden backdrop-blur-2xl border-t ${menuBorder} max-h-[calc(100vh-4rem)] overflow-y-auto`}
+          className={`lg:hidden border-t ${menuBorder} max-h-[calc(100vh-4rem)] overflow-y-auto`}
           style={{ background: menuBg, transition: 'background 0.3s ease' }}
         >
           <div className="px-5 py-5 space-y-5">

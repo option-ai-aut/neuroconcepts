@@ -1167,7 +1167,8 @@ if (!isLambda) {
 // Sync User from Token (Create/Update in DB)
 app.post('/auth/sync', authMiddleware, async (req, res) => {
   try {
-    const { sub, email, given_name, family_name, address, phone_number } = req.user!;
+    const { sub, given_name, family_name, address, phone_number } = req.user!;
+    const email = req.user!.email?.toLowerCase().trim();
     const companyName = req.user!['custom:company_name'];
     const postalCode = req.user!['custom:postal_code'];
     const city = req.user!['custom:city'];
