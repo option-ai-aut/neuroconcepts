@@ -316,7 +316,6 @@ export class ImmivoStack extends cdk.Stack {
             return [];
           },
           afterBundling(inputDir: string, outputDir: string): string[] {
-            // Copy prisma schema, install prisma with specific version + EWS deps, generate client
             return [
               `cp -R ${prismaDir} ${outputDir}/`,
               `cd ${outputDir}`,
@@ -325,9 +324,26 @@ export class ImmivoStack extends cdk.Stack {
               `npm install --os=linux --cpu=x64 sharp`,
               `npm install xlsx mammoth pdf-parse jszip`,
               `npx prisma generate`,
+              // Prisma: remove engines, CLI, unused engine files
               `rm -rf node_modules/@prisma/engines`,
               `rm -rf node_modules/.bin`,
               `rm -rf node_modules/prisma`,
+              `rm -rf node_modules/@prisma/client/node_modules`,
+              // pdf-parse: remove browser build + workers (only Node CJS needed)
+              `rm -rf node_modules/pdf-parse/dist/pdf-parse/web`,
+              `rm -rf node_modules/pdf-parse/dist/pdf-parse/esm`,
+              `rm -rf node_modules/pdf-parse/dist/worker`,
+              // sharp: remove docs, build artifacts not needed at runtime
+              `rm -rf node_modules/sharp/docs node_modules/sharp/src`,
+              // General: remove TypeScript types, docs, tests, maps from all deps
+              `find node_modules -name '*.d.ts' -not -path '*/.prisma/*' -delete 2>/dev/null || true`,
+              `find node_modules -name '*.map' -delete 2>/dev/null || true`,
+              `find node_modules -name '*.md' -not -name 'LICENSE*' -delete 2>/dev/null || true`,
+              `find node_modules -type d -name '__tests__' -exec rm -rf {} + 2>/dev/null || true`,
+              `find node_modules -type d -name 'test' -not -path '*/pdf-parse/*' -exec rm -rf {} + 2>/dev/null || true`,
+              `find node_modules -type d -name 'docs' -exec rm -rf {} + 2>/dev/null || true`,
+              `find node_modules -type d -name 'example' -exec rm -rf {} + 2>/dev/null || true`,
+              `find node_modules -type d -name 'examples' -exec rm -rf {} + 2>/dev/null || true`,
             ];
           },
         },
