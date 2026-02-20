@@ -285,7 +285,7 @@ async function initializePrisma() {
 // Auto-migration: Apply missing columns/tables that exist in Prisma schema but not in DB
 // Each statement uses IF NOT EXISTS / IF EXISTS so it's safe to run multiple times
 // Version-gated: Only runs full migration set when version changes
-const MIGRATION_VERSION = 12; // Increment when adding new migrations
+const MIGRATION_VERSION = 13; // Increment when adding new migrations
 let _migrationsApplied = false;
 
 async function applyPendingMigrations(db: PrismaClient) {
@@ -438,6 +438,47 @@ async function applyPendingMigrations(db: PrismaClient) {
     'ALTER TABLE "TenantSettings" ADD COLUMN IF NOT EXISTS "aiCostCapCentsUsd" DOUBLE PRECISION NOT NULL DEFAULT 2000',
     // 2026-02-16: Per-seat language preference
     'ALTER TABLE "UserSettings" ADD COLUMN IF NOT EXISTS "locale" TEXT NOT NULL DEFAULT \'de\'',
+    // 2026-02-19: v13 - Missing schema columns consolidated from ad-hoc migrations
+    // TenantSettings email integrations + auto-reply
+    'ALTER TABLE "TenantSettings" ADD COLUMN IF NOT EXISTS "gmailConfig" JSONB',
+    'ALTER TABLE "TenantSettings" ADD COLUMN IF NOT EXISTS "outlookMailConfig" JSONB',
+    'ALTER TABLE "TenantSettings" ADD COLUMN IF NOT EXISTS "autoReplyDelay" INTEGER NOT NULL DEFAULT 5',
+    'ALTER TABLE "TenantSettings" ADD COLUMN IF NOT EXISTS "inboundLeadEmail" TEXT',
+    // Lead documents + alternate emails
+    'ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "documents" JSONB',
+    'ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "alternateEmails" JSONB',
+    // LeadActivity property + jarvis links
+    'ALTER TABLE "LeadActivity" ADD COLUMN IF NOT EXISTS "propertyId" TEXT',
+    'ALTER TABLE "LeadActivity" ADD COLUMN IF NOT EXISTS "jarvisActionId" TEXT',
+    // Property address fields
+    'ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "street" TEXT',
+    'ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "houseNumber" TEXT',
+    'ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "apartmentNumber" TEXT',
+    'ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "staircase" TEXT',
+    'ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "block" TEXT',
+    'ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "state" TEXT',
+    'ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "documents" JSONB',
+    'ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "defaultExposeTemplateId" TEXT',
+    // Expose + ExposeTemplate color customization
+    'ALTER TABLE "ExposeTemplate" ADD COLUMN IF NOT EXISTS "customColors" JSONB',
+    'ALTER TABLE "Expose" ADD COLUMN IF NOT EXISTS "customColors" JSONB',
+    // PropertyAssignment table (user ↔ property many-to-many)
+    `CREATE TABLE IF NOT EXISTS "PropertyAssignment" (
+      "id" TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+      "propertyId" TEXT NOT NULL,
+      "userId" TEXT NOT NULL,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "PropertyAssignment_pkey" PRIMARY KEY ("id")
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "PropertyAssignment_propertyId_userId_key" ON "PropertyAssignment"("propertyId","userId")`,
+    `CREATE INDEX IF NOT EXISTS "PropertyAssignment_propertyId_idx" ON "PropertyAssignment"("propertyId")`,
+    `CREATE INDEX IF NOT EXISTS "PropertyAssignment_userId_idx" ON "PropertyAssignment"("userId")`,
+    `ALTER TABLE "PropertyAssignment" ADD CONSTRAINT "PropertyAssignment_propertyId_fkey" FOREIGN KEY ("propertyId") REFERENCES "Property"("id") ON DELETE CASCADE ON UPDATE CASCADE`,
+    `ALTER TABLE "PropertyAssignment" ADD CONSTRAINT "PropertyAssignment_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE`,
+    // Unique index for inboundLeadEmail
+    `CREATE UNIQUE INDEX IF NOT EXISTS "TenantSettings_inboundLeadEmail_key" ON "TenantSettings"("inboundLeadEmail")`,
+    // Unique index for LeadActivity.jarvisActionId
+    `CREATE UNIQUE INDEX IF NOT EXISTS "LeadActivity_jarvisActionId_key" ON "LeadActivity"("jarvisActionId")`,
   ];
   
   for (const sql of migrations) {
