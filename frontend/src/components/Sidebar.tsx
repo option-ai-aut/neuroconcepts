@@ -67,6 +67,7 @@ export default function Sidebar() {
           <Link
             key={item.name}
             href={item.href}
+            prefetch={false}
             className={`flex items-center pl-[17px] pr-3 py-2.5 text-sm font-medium rounded-md transition-all duration-200 ${
               isActive(item.href)
                 ? 'bg-white text-gray-950'

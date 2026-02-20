@@ -5632,6 +5632,7 @@ app.get('/calendar/status', authMiddleware, async (req, res) => {
 // Get Calendar Events
 app.get('/calendar/events', authMiddleware, async (req, res) => {
   try {
+    const db = await initializePrisma();
     const userEmail = req.user!.email;
     const { start, end } = req.query;
 
@@ -5640,7 +5641,7 @@ app.get('/calendar/events', authMiddleware, async (req, res) => {
     }
 
     // Get user's tenantId from database
-    const user = await prisma.user.findUnique({
+    const user = await db.user.findUnique({
       where: { email: userEmail },
       select: { tenantId: true }
     });
@@ -5649,7 +5650,7 @@ app.get('/calendar/events', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const settings = await prisma.tenantSettings.findUnique({
+    const settings = await db.tenantSettings.findUnique({
       where: { tenantId: user.tenantId },
       select: {
         googleCalendarConfig: true,
@@ -5685,7 +5686,7 @@ app.get('/calendar/events', authMiddleware, async (req, res) => {
               expiryDate: expiryDate
             };
             
-            await prisma.tenantSettings.update({
+            await db.tenantSettings.update({
               where: { tenantId: user.tenantId },
               data: { googleCalendarConfig: updatedConfig }
             });
@@ -5739,7 +5740,7 @@ app.get('/calendar/events', authMiddleware, async (req, res) => {
               expiryDate: expiryDate
             };
             
-            await prisma.tenantSettings.update({
+            await db.tenantSettings.update({
               where: { tenantId: user.tenantId },
               data: { outlookCalendarConfig: updatedConfig }
             });
@@ -8198,24 +8199,8 @@ function getWorkMailCreds(): WorkMailCredentials {
   };
 }
 
-// Get calendar events for current user or a specific email
-app.get('/calendar/events', authMiddleware, async (req: any, res) => {
-  try {
-    const creds = getWorkMailCreds();
-    if (!creds.email || !creds.password) {
-      return res.status(500).json({ error: 'WorkMail not configured' });
-    }
-    const start = new Date(req.query.start as string || new Date().toISOString());
-    const end = new Date(req.query.end as string || new Date(Date.now() + 30 * 86400000).toISOString());
-    const targetEmail = req.query.email as string | undefined;
-
-    const events = await getCalendarEvents(creds, start, end, targetEmail);
-    res.json({ events });
-  } catch (error: any) {
-    console.error('Calendar events error:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
+// NOTE: GET /calendar/events is defined earlier (line ~5633) with Google/Outlook integration.
+// WorkMail calendar events are accessed via /admin/platform/calendars.
 
 // Create a calendar event
 app.post('/calendar/events', authMiddleware, async (req: any, res) => {

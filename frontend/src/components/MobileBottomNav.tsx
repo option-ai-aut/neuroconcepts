@@ -31,6 +31,7 @@ export default function MobileBottomNav() {
           <Link
             key={item.name}
             href={item.href}
+            prefetch={false}
             className={`flex flex-col items-center justify-center flex-1 h-full gap-0.5 transition-colors ${
               isActive(item.href) ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-600 active:text-gray-600'
             }`}
