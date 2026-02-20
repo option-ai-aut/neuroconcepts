@@ -43,10 +43,18 @@ import path from 'path';
 import fs from 'fs';
 import sharp from 'sharp';
 import mammoth from 'mammoth';
-import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require('pdf-parse') as (buffer: Buffer) => Promise<{ text: string }>;
+// xlsx / XLSX is loaded lazily (only when Excel files are processed) — avoids DOMMatrix crash on Lambda startup
+let _XLSX: typeof import('xlsx') | null = null;
+function getXLSX(): typeof import('xlsx') {
+  if (!_XLSX) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    _XLSX = require('xlsx');
+  }
+  return _XLSX!;
+}
 
 const app = express();
 
@@ -3958,6 +3966,7 @@ app.post('/chat/stream',
               extractedText = slideTexts.join('\n\n') || null;
             } else if (['.xlsx', '.xls', '.csv'].includes(ext) || f.mimetype.includes('spreadsheet') || f.mimetype === 'text/csv') {
               isStructuredData = true;
+              const XLSX = getXLSX();
               const workbook = XLSX.read(f.buffer, { type: 'buffer' });
               const lines: string[] = [];
               for (const sheetName of workbook.SheetNames) {
@@ -4059,9 +4068,9 @@ app.post('/chat/stream',
         } : undefined,
       };
 
-      // Save user message to DB BEFORE streaming (so follow-ups see it immediately)
+      // Save user message to DB BEFORE streaming — include file context so follow-up messages can reference uploaded files/images
       await prisma.userChat.create({
-        data: { userId, role: 'USER', content: message + (uploadedFileUrls.length > 0 ? ` [${uploadedFileUrls.length} Datei(en)]` : '') }
+        data: { userId, role: 'USER', content: fullMessage || message }
       });
 
       // Keepalive: Send heartbeat every 5s during tool execution to prevent API GW timeout

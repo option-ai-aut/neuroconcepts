@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, useCallback } from 'react';
-import {
+import { 
   Bot, TrendingUp, Clock, ArrowRight, CheckCircle2,
   Users, Building2, Mail, Calendar, FileText, Zap, Shield,
   BarChart3, MessageSquare, Brain, Rocket, Target, Award, Globe,
@@ -116,8 +116,8 @@ function BeforeAfterSlider({ active }: { active: boolean }) {
         </div>
         <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold px-3 py-1.5 rounded-full z-20 pointer-events-none">{t('beforeAfter.before')}</div>
         <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-gray-900 text-xs font-semibold px-3 py-1.5 rounded-full z-20 pointer-events-none">{t('beforeAfter.after')}</div>
-      </div>
-    </div>
+          </div>
+        </div>
   );
 }
 
@@ -142,7 +142,7 @@ function SplashScreen({ onComplete }: { onComplete: () => void }) {
           <span key={i} className="splash-char" style={{ opacity: 0, animationDelay: `${300 + i * 55}ms` } as React.CSSProperties}>{char === ' ' ? '\u00A0' : char}</span>
         ))}
       </p>
-    </div>
+      </div>
   );
 }
 
@@ -163,7 +163,7 @@ function Slide({ children, className = '', active: _active, idx, fullOnMobile = 
     >
       <div className="h-full">
         {children}
-      </div>
+    </div>
     </section>
   );
 }
@@ -645,7 +645,7 @@ export default function LandingPage() {
                   className="absolute inset-0 w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-b from-[#07070f]/40 via-[#07070f]/15 to-[#07070f]/50" />
-              </div>
+          </div>
 
               {/* Blur overlay — visible in idle, fades during reveal/rewind */}
               <div
@@ -668,33 +668,33 @@ export default function LandingPage() {
                 <div className="hero-el opacity-0" style={{ animationDelay: '0.2s' }}>
                   <h1 className="font-extrabold tracking-tight leading-[1.05]">
                     <span className="block text-sm sm:text-xl lg:text-2xl text-gray-400 uppercase tracking-[0.2em] mb-3 sm:mb-4">
-                      {t('hero.title1')}
-                    </span>
+                {t('hero.title1')}
+              </span>
                     <span className="block text-[2.5rem] sm:text-7xl lg:text-[6.5rem] bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
-                      {t('hero.title2')}
-                    </span>
-                  </h1>
-                </div>
+                {t('hero.title2')}
+              </span>
+            </h1>
+          </div>
                 <div className="hero-el opacity-0" style={{ animationDelay: '0.45s' }}>
                   <p className="mt-5 sm:mt-8 text-sm sm:text-lg lg:text-xl text-gray-400 max-w-xl mx-auto leading-relaxed">
                     {t.rich('hero.subtitle', { bold: (chunks) => <span className="text-white font-medium">{chunks}</span> })}
-                  </p>
-                </div>
+            </p>
+          </div>
                 <div className="hero-el opacity-0 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mt-8 sm:mt-12" style={{ animationDelay: '0.65s' }}>
                   <Link href="/login?mode=register" className="group w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-semibold text-white backdrop-blur-xl bg-white/[0.12] border border-white/[0.2] rounded-full hover:bg-white/[0.2] transition-all duration-300 hover:-translate-y-0.5 shadow-[0_0_30px_rgba(255,255,255,0.06),inset_0_1px_0_rgba(255,255,255,0.1)]">
                     {t('hero.ctaPrimary')}<ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform duration-300" />
-                  </Link>
+            </Link>
                   <a href="#demo" onClick={(e) => handleAnchorClick(e, 7)} className="group w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-semibold text-gray-300 backdrop-blur-xl bg-white/[0.06] border border-white/[0.12] rounded-full hover:bg-white/[0.1] hover:text-white transition-all duration-300">
                     <Calendar className="mr-2 w-4 h-4 sm:w-5 sm:h-5 opacity-60" />{t('hero.ctaSecondary')}
-                  </a>
-                </div>
+            </a>
+          </div>
                 <div className="hero-el opacity-0 flex flex-wrap items-center justify-center gap-x-4 sm:gap-x-6 gap-y-2 mt-8 sm:mt-14 text-[11px] sm:text-sm text-gray-500" style={{ animationDelay: '0.85s' }}>
                   <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500/60" />{t('hero.trustNoCard')}</span>
                   <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500/60" />{t('hero.trust7Days')}</span>
                   <span className="flex items-center gap-1"><Shield className="w-3 h-3 sm:w-3.5 sm:h-3.5" />{t('hero.trustGdpr')}</span>
                   <span className="flex items-center gap-1"><Server className="w-3 h-3 sm:w-3.5 sm:h-3.5" />{t('hero.awsHosting')}</span>
-                </div>
-              </div>
+          </div>
+        </div>
 
               {/* Logo — visible during reveal & rewind, hidden in idle */}
               <div
@@ -707,14 +707,14 @@ export default function LandingPage() {
                 }}
               >
                 <NextImage src="/logo-white.png" alt="Immivo" width={480} height={480} className="w-64 sm:w-80 lg:w-[28rem] h-auto" priority />
-              </div>
+          </div>
 
               {/* Scroll hint */}
               <div className={`absolute bottom-8 left-1/2 -translate-x-1/2 z-20 hidden sm:flex flex-col items-center gap-2 transition-opacity duration-500 ${heroPhase === 'idle' ? 'opacity-100' : 'opacity-0'}`}>
                 <span className="text-xs text-gray-500 tracking-widest uppercase">Scroll</span>
                 <ChevronDown className="w-4 h-4 text-gray-500" style={{ animation: 'scroll-bounce 2.5s ease-in-out infinite' }} />
-              </div>
-            </div>
+                </div>
+                  </div>
           </Slide>
 
           {/* ══════════════════════════════════════════
@@ -739,11 +739,11 @@ export default function LandingPage() {
                       <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-2">{card.title}</h3>
                       <p className="text-xs sm:text-sm text-gray-400 leading-relaxed line-through decoration-gray-300 mb-2">{card.problem}</p>
                       <p className="text-xs sm:text-sm text-gray-900 font-medium leading-relaxed">{card.solution}</p>
-                    </div>
+                  </div>
                   </Stagger>
-                ))}
-              </div>
-            </div>
+            ))}
+          </div>
+        </div>
           </Slide>
 
           {/* ══════════════════════════════════════════
@@ -754,7 +754,7 @@ export default function LandingPage() {
               <Stagger active={activeIdx === 2} delay={0}>
                 <h2 className="font-extrabold tracking-tight text-gray-900 text-center px-2" style={{ fontSize: 'clamp(1.3rem, 5vw, 4.5rem)', lineHeight: 1.1 }}>
                   {jarvisTitleText}
-                </h2>
+              </h2>
               </Stagger>
               <Stagger active={activeIdx === 2} delay={120}>
                 <p className="text-xs sm:text-lg text-gray-500 max-w-xl text-center leading-relaxed mt-4 sm:mt-8 px-2">
@@ -767,9 +767,9 @@ export default function LandingPage() {
                     <div className="flex items-center gap-2.5 sm:gap-3">
                       <div className="w-5 h-5 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
                         <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />
-                      </div>
-                      <span className="text-gray-600 text-xs sm:text-base">{item}</span>
                     </div>
+                      <span className="text-gray-600 text-xs sm:text-base">{item}</span>
+                  </div>
                   </Stagger>
                 ))}
               </div>
@@ -800,13 +800,13 @@ export default function LandingPage() {
                       <p className="text-[11px] text-gray-500 leading-tight">{stat.label}</p>
                     </Stagger>
                   ))}
-                </div>
+                  </div>
                 <Stagger active delay={500}>
                   <div className="flex flex-wrap items-center justify-center gap-2">
                     {['ImmoScout24', 'Willhaben', 'Immowelt', 'Homegate', 'Kleinanzeigen', t('results.morePortals')].map((portal, i) => (
                       <span key={i} className="px-3 py-1.5 rounded-full text-xs font-medium bg-white/[0.06] text-gray-400 border border-white/[0.08]">{portal}</span>
-                    ))}
-                  </div>
+                ))}
+              </div>
                 </Stagger>
               </div>
             ) : (
@@ -819,7 +819,7 @@ export default function LandingPage() {
                 {/* Orbital icons */}
                 <div
                   className="z-10 flex items-center justify-center pointer-events-none"
-                  style={{
+                      style={{
                     opacity: orbitalPhase === 'orbital' ? 1 : 0,
                     transform: orbitalPhase === 'orbital' ? 'scale(1)' : 'scale(0)',
                     transition: 'opacity 400ms cubic-bezier(0.65,0,0.35,1), transform 400ms cubic-bezier(0.65,0,0.35,1)',
@@ -841,11 +841,11 @@ export default function LandingPage() {
                               <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
 
                 {/* Black expanding rectangle */}
                 <div
@@ -885,18 +885,18 @@ export default function LandingPage() {
                           <div className="text-2xl sm:text-4xl font-bold mb-1"><AnimatedCounter end={stat.value} suffix={stat.suffix} /></div>
                           <p className="text-[11px] sm:text-sm text-gray-500">{stat.label}</p>
                         </Stagger>
-                      ))}
-                    </div>
+            ))}
+          </div>
                     <Stagger active={orbitalPhase === 'expanding' || orbitalPhase === 'results'} delay={650}>
                       <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
-                        {['ImmoScout24', 'Willhaben', 'Immowelt', 'Homegate', 'Kleinanzeigen', t('results.morePortals')].map((portal, i) => (
+                  {['ImmoScout24', 'Willhaben', 'Immowelt', 'Homegate', 'Kleinanzeigen', t('results.morePortals')].map((portal, i) => (
                           <span key={i} className="px-3 sm:px-4 py-1.5 rounded-full text-xs font-medium bg-white/[0.06] text-gray-400 border border-white/[0.08]">{portal}</span>
-                        ))}
-                      </div>
-                    </Stagger>
-                  </div>
+                  ))}
                 </div>
+                    </Stagger>
               </div>
+            </div>
+          </div>
             )}
           </Slide>
 
@@ -917,7 +917,7 @@ export default function LandingPage() {
                 <Stagger active={activeIdx === 4} delay={160}>
                   <p className="text-xs sm:text-base text-gray-500 mt-2 sm:mt-3 max-w-xl mx-auto">{t('features.subtitle')}</p>
                 </Stagger>
-              </div>
+          </div>
 
               {/* Mobile: 2-col grid with all cards */}
               {isMobile ? (
@@ -928,10 +928,10 @@ export default function LandingPage() {
                       <div>
                         <h3 className="text-[13px] font-semibold text-gray-900 mb-1">{f.title}</h3>
                         <p className="text-[11px] text-gray-500 leading-relaxed line-clamp-2">{f.desc}</p>
-                      </div>
-                    </div>
-                  ))}
                 </div>
+              </div>
+            ))}
+          </div>
               ) : (
                 <>
                   {/* Desktop: Horizontal card track */}
@@ -956,19 +956,19 @@ export default function LandingPage() {
                                     <div>
                                       <h3 className="text-[15px] sm:text-base font-semibold text-gray-900 mb-1.5">{f.title}</h3>
                                       <p className="text-xs sm:text-[13px] text-gray-500 leading-relaxed line-clamp-2">{f.desc}</p>
-                                    </div>
-                                  </div>
+        </div>
+                  </div>
                                 </Stagger>
                               ))}
-                            </div>
-                          </div>
+                  </div>
+                </div>
                         );
                       })}
-                    </div>
-                  </div>
+              </div>
+            </div>
                 </>
               )}
-            </div>
+              </div>
           </Slide>
 
           {/* ══════════════════════════════════════════
@@ -983,8 +983,8 @@ export default function LandingPage() {
                 </Stagger>
                 <Stagger active={activeIdx === 5} delay={80}>
                   <h2 className="text-xl sm:text-3xl lg:text-5xl font-bold tracking-tight leading-tight max-w-3xl">
-                    {t.rich('staging.title', { bold: (chunks) => <strong>{chunks}</strong> })}
-                  </h2>
+                {t.rich('staging.title', { bold: (chunks) => <strong>{chunks}</strong> })}
+              </h2>
                 </Stagger>
                 <Stagger active={activeIdx === 5} delay={160}>
                   <p className="text-xs sm:text-sm lg:text-base text-gray-500 mt-1 sm:mt-2 max-w-xl mx-auto">
@@ -1009,10 +1009,10 @@ export default function LandingPage() {
                   >
                     <span className="text-white/70 text-[11px] sm:text-xs font-medium">Attention</span>
                     <span className="text-white text-xs sm:text-sm font-semibold tabular-nums">+73%</span>
-                  </div>
-                </div>
-              </Stagger>
             </div>
+          </div>
+              </Stagger>
+        </div>
           </Slide>
 
           {/* ══════════════════════════════════════════
@@ -1032,19 +1032,19 @@ export default function LandingPage() {
                     { step: '01', title: t('howItWorks.step1Title'), desc: t('howItWorks.step1Desc'), icon: Rocket },
                     { step: '02', title: t('howItWorks.step2Title'), desc: t('howItWorks.step2Desc'), icon: Brain },
                     { step: '03', title: t('howItWorks.step3Title'), desc: t('howItWorks.step3Desc'), icon: Award },
-                  ].map((item, i) => (
+            ].map((item, i) => (
                     <Stagger key={i} active={activeIdx === 6} delay={250 + i * 100} className="p-4 sm:p-6 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-center">
                       <div className="relative inline-flex mb-3 sm:mb-4">
                         <item.icon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
                         <span className="absolute -top-2 -right-4 text-[10px] font-bold text-gray-500">{item.step}</span>
-                      </div>
+                    </div>
                       <h3 className="text-sm sm:text-lg font-bold mb-1.5 sm:mb-2">{item.title}</h3>
                       <p className="text-gray-500 text-xs sm:text-sm leading-relaxed">{item.desc}</p>
                     </Stagger>
-                  ))}
-                </div>
+            ))}
+          </div>
+        </div>
               </div>
-            </div>
           </Slide>
 
           {/* ══════════════════════════════════════════
@@ -1059,8 +1059,8 @@ export default function LandingPage() {
                 </Stagger>
                 <Stagger active={activeIdx === 7} delay={80}>
                   <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight">
-                    {t.rich('demo.title', { bold: (chunks) => <strong>{chunks}</strong> })}
-                  </h2>
+                {t.rich('demo.title', { bold: (chunks) => <strong>{chunks}</strong> })}
+              </h2>
                 </Stagger>
                 <Stagger active={activeIdx === 7} delay={160}>
                   <p className="text-sm text-gray-500 leading-relaxed max-w-sm">{t('demo.subtitle')}</p>
@@ -1092,16 +1092,16 @@ export default function LandingPage() {
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200/60">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                           <span className="text-gray-600 text-sm">{item}</span>
-                        </div>
+                    </div>
                       </Stagger>
-                    ))}
-                  </div>
-                </div>
-                <Stagger active={activeIdx === 7} delay={300} className="w-full">
-                  <DemoBooking />
-                </Stagger>
+                ))}
               </div>
             </div>
+                <Stagger active={activeIdx === 7} delay={300} className="w-full">
+            <DemoBooking />
+                </Stagger>
+          </div>
+        </div>
           </Slide>
 
           {/* ══════════════════════════════════════════
@@ -1127,7 +1127,7 @@ export default function LandingPage() {
                     <a href="mailto:office@immivo.ai" className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3.5 text-sm font-semibold text-gray-300 border border-white/15 rounded-full hover:bg-white/5 transition-all duration-300">
                       {t('cta.secondary')}
                     </a>
-                  </div>
+        </div>
                 </Stagger>
                 <Stagger active={activeIdx === 8} delay={400}>
                   <div className="flex justify-center items-center gap-2 flex-wrap">
@@ -1155,7 +1155,7 @@ export default function LandingPage() {
                   >
                     Stress Less
                   </h2>
-                </div>
+          </div>
                 {/* Footer */}
                 <div className="mx-auto w-full" style={{ maxWidth: 'calc(100vw - 20px)' }}>
                   <PublicFooter bare />
@@ -1179,7 +1179,7 @@ export default function LandingPage() {
                     }}
                   >
                     Stress Less
-                  </h2>
+          </h2>
                 </div>
                 <div
                   className="absolute inset-x-0 bottom-0"
@@ -1192,14 +1192,14 @@ export default function LandingPage() {
                 >
                   <div className="overflow-hidden mx-auto mb-[10px]" style={{ maxWidth: 'calc(100vw - 20px)' }}>
                     <PublicFooter bare />
-                  </div>
+          </div>
                 </div>
-              </div>
+            </div>
             )}
           </Slide>
 
+          </div>
         </div>
-      </div>
     </div>
   );
 }

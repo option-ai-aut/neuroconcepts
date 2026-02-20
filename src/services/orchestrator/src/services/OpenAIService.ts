@@ -259,13 +259,22 @@ export class OpenAIService {
     }
     const streamContextStr = contextParts.length > 0 ? contextParts.join('\n') : '';
 
+    // Build user message — if images were uploaded, send them as vision content blocks
+    const imageUrls = uploadedFiles.filter(u => /\.(jpe?g|png|gif|webp)(\?|$)/i.test(u));
+    const userMessageContent: OpenAI.Chat.ChatCompletionContentPart[] = imageUrls.length > 0
+      ? [
+          { type: 'text', text: message },
+          ...imageUrls.map(url => ({ type: 'image_url' as const, image_url: { url, detail: 'auto' as const } })),
+        ]
+      : [{ type: 'text', text: message }];
+
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: 'system', content: getSystemPrompt() + streamContextStr + (categoryHint || '') },
       ...validHistory.map(h => ({
         role: (h.role === 'assistant' || h.role === 'ASSISTANT' ? 'assistant' : 'user') as 'assistant' | 'user',
         content: h.content || '',
       })),
-      { role: 'user', content: message },
+      { role: 'user', content: userMessageContent },
     ];
 
     // Use filtered tools (from router) or all CRM tools
