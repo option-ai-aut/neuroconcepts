@@ -27,24 +27,29 @@ export default function AdminContactsPage() {
   const config = useRuntimeConfig();
   const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ContactSubmission | null>(null);
   const [filter, setFilter] = useState<string>('ALL');
 
   const apiUrl = (config.apiUrl || process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
 
   const fetchContacts = async () => {
+    setLoadError(null);
     try {
       const session = await fetchAuthSession();
       const token = session.tokens?.idToken?.toString();
       const res = await fetch(`${apiUrl}/admin/contacts`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
-        const data = await res.json();
-        setSubmissions(data.submissions || []);
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status}: ${body}`);
       }
-    } catch (err) {
+      const data = await res.json();
+      setSubmissions(data.submissions || []);
+    } catch (err: any) {
       console.error('Failed to fetch contacts:', err);
+      setLoadError(err.message || 'Fehler beim Laden');
       setSubmissions([]);
     } finally {
       setLoading(false);
@@ -88,8 +93,16 @@ export default function AdminContactsPage() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-gray-900">Kontaktanfragen</h1>
-        <p className="text-sm text-gray-500 mt-1">Anfragen über das Kontaktformular auf immivo.ai</p>
+        <p className="text-sm text-gray-500 mt-1">Anfragen ueber das Kontaktformular auf immivo.ai</p>
       </div>
+
+      {loadError && (
+        <div className="mb-6 bg-red-50 rounded-xl border border-red-200 p-6 text-center">
+          <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+          <p className="text-sm text-red-600 mb-3">{loadError}</p>
+          <button onClick={fetchContacts} className="text-sm text-blue-600 hover:underline">Erneut versuchen</button>
+        </div>
+      )}
 
       {/* Filter Tabs */}
       <div className="flex gap-2 mb-6">

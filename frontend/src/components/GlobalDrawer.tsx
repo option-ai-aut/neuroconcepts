@@ -527,6 +527,7 @@ export default function GlobalDrawer() {
   const [bugDescription, setBugDescription] = useState('');
   const [bugSubmitting, setBugSubmitting] = useState(false);
   const [bugSuccess, setBugSuccess] = useState(false);
+  const [bugError, setBugError] = useState(false);
   const [bugScreenshot, setBugScreenshot] = useState<string | null>(null);
   const [bugConsoleLogs, setBugConsoleLogs] = useState<any[]>([]);
   const [bugIncludeScreenshot, setBugIncludeScreenshot] = useState(true);
@@ -732,6 +733,7 @@ export default function GlobalDrawer() {
   const handleSubmitBug = async () => {
     if (!bugTitle.trim() || !bugDescription.trim()) return;
     setBugSubmitting(true);
+    setBugError(false);
     try {
       const { fetchWithAuth, getApiUrl } = await import('@/lib/api');
       await fetchWithAuth(`${getApiUrl()}/bug-reports`, {
@@ -756,6 +758,7 @@ export default function GlobalDrawer() {
       }, 2000);
     } catch (err) {
       console.error('Bug report error:', err);
+      setBugError(true);
     } finally {
       setBugSubmitting(false);
     }
@@ -1525,6 +1528,12 @@ export default function GlobalDrawer() {
                       </div>
                     )}
                   </div>
+
+                  {bugError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                      Bug-Report konnte nicht gesendet werden. Bitte versuche es erneut.
+                    </div>
+                  )}
 
                   <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
                     <button

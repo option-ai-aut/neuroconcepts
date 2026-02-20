@@ -62,7 +62,7 @@ export default function KontaktPage() {
     betreff: 'general',
     nachricht: '',
   });
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -85,11 +85,11 @@ export default function KontaktPage() {
       if (!res.ok) {
         throw new Error(res.statusText || 'Fehler beim Senden');
       }
+      setStatus('success');
     } catch (err) {
       console.error('Contact form error:', err);
-      // Backend might not have the endpoint yet - show success anyway
+      setStatus('error');
     }
-    setStatus('success');
   };
 
   return (
@@ -303,6 +303,21 @@ export default function KontaktPage() {
                   <p className="text-gray-600 text-sm sm:text-base">
                     {t('messageSentDesc')}
                   </p>
+                </div>
+              ) : status === 'error' ? (
+                <div className="bg-red-50 rounded-xl p-6 sm:p-8 text-center border border-red-100">
+                  <div className="w-14 sm:w-16 h-14 sm:h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle2 className="w-7 sm:w-8 h-7 sm:h-8 text-red-600" />
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">
+                    Fehler beim Senden
+                  </h3>
+                  <p className="text-gray-600 text-sm sm:text-base mb-4">
+                    Die Nachricht konnte nicht gesendet werden. Bitte versuche es erneut.
+                  </p>
+                  <button onClick={() => setStatus('idle')} className="text-blue-600 hover:underline text-sm font-medium">
+                    Erneut versuchen
+                  </button>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">

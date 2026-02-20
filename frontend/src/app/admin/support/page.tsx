@@ -37,15 +37,18 @@ export default function SupportPage() {
   const [saving, setSaving] = useState(false);
   const [screenshotFullscreen, setScreenshotFullscreen] = useState(false);
   const [logsExpanded, setLogsExpanded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchReports = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const data = await getAdminBugReports(filterStatus);
       setReports(data.reports);
       setCounts(data.counts);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load bug reports:', err);
+      setLoadError(err.message || 'Fehler beim Laden der Bug Reports');
     } finally {
       setLoading(false);
     }
@@ -161,7 +164,16 @@ export default function SupportPage() {
         </button>
       </div>
 
-      {loading && reports.length === 0 ? (
+      {loadError ? (
+        <div className="bg-red-50 rounded-xl border border-red-200 p-16 text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-8 h-8 text-red-400" />
+          </div>
+          <h3 className="text-base font-semibold text-gray-900 mb-1">Fehler beim Laden</h3>
+          <p className="text-sm text-red-600 max-w-sm mx-auto mb-4">{loadError}</p>
+          <button onClick={fetchReports} className="text-sm text-blue-600 hover:underline">Erneut versuchen</button>
+        </div>
+      ) : loading && reports.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
           <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-4" />
           <p className="text-sm text-gray-500">Lade Bug Reports...</p>

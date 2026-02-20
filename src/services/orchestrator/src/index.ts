@@ -224,6 +224,13 @@ async function initializePrisma() {
   if (prisma) {
     try {
       await prisma.$queryRaw`SELECT 1`;
+      // Ensure tables/migrations even on cached client
+      if (!_migrationsApplied) {
+        try { await applyPendingMigrations(prisma); } catch {}
+      }
+      if (!_tablesEnsured) {
+        try { await ensureAdminTables(prisma); } catch {}
+      }
       return prisma;
     } catch {
       // Connection is broken — reset so we re-initialise below
@@ -232,6 +239,7 @@ async function initializePrisma() {
       prisma = undefined as unknown as PrismaClient;
       appSecretsLoaded = false;
       _migrationsApplied = false;
+      _tablesEnsured = false;
     }
   }
 
@@ -7310,10 +7318,10 @@ app.post('/emails/incoming', async (req, res) => {
         subject,
         bodyText: body,
         bodyHtml: body.includes('<') ? body : null,
-        folder: 'FORWARDING',
+        folder: 'FORWARDING' as any,
         isRead: false,
         receivedAt: receivedAt ? new Date(receivedAt) : new Date(),
-        provider: 'OTHER',
+        provider: 'OTHER' as any,
         providerData: { source: 'forwarding' },
       }
     });
@@ -9564,16 +9572,10 @@ app.post('/contact', async (req, res) => {
     if (!firstName || !lastName || !email || !subject || !message) {
       return res.status(400).json({ error: 'Alle Pflichtfelder müssen ausgefüllt sein' });
     }
-    // Try to save to DB — may fail if table doesn't exist yet
-    let submission: any = null;
-    try {
-      const db = await initializePrisma();
-      submission = await db.contactSubmission.create({
-        data: { firstName, lastName, email, subject, message }
-      });
-    } catch (dbErr) {
-      console.error('Contact DB save failed (table may not exist):', dbErr);
-    }
+    const db = await initializePrisma();
+    const submission = await db.contactSubmission.create({
+      data: { firstName, lastName, email, subject, message }
+    });
     // Send notification email
     try {
       const { sendSystemEmail } = await import('./services/SystemEmailService');
