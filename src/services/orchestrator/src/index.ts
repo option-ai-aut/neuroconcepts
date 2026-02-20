@@ -7866,6 +7866,72 @@ async function ensureAdminTables(db: any) {
       created++;
     }
     
+    // --- UserSettings ---
+    if (!existing.has('UserSettings')) {
+      console.log('🔧 Creating UserSettings table...');
+      await db.$executeRawUnsafe(`CREATE TABLE "UserSettings" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "userId" TEXT NOT NULL, "viewingHoursEnabled" BOOLEAN NOT NULL DEFAULT false, "viewingHoursStart" TEXT, "viewingHoursEnd" TEXT, "viewingDays" JSONB, "viewingDuration" INTEGER NOT NULL DEFAULT 30, "viewingBuffer" INTEGER NOT NULL DEFAULT 15, "emailNotifications" BOOLEAN NOT NULL DEFAULT true, "emailSignature" TEXT, "emailSignatureName" TEXT, "locale" TEXT NOT NULL DEFAULT 'de', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "UserSettings_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "UserSettings_userId_key" ON "UserSettings"("userId")`);
+      await db.$executeRawUnsafe(`ALTER TABLE "UserSettings" ADD CONSTRAINT "UserSettings_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE`).catch(() => {});
+      created++;
+    }
+
+    // --- JarvisPendingAction ---
+    if (!existing.has('JarvisPendingAction')) {
+      console.log('🔧 Creating JarvisPendingAction table...');
+      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "PendingActionType" AS ENUM ('SEND_EXPOSE','SCHEDULE_VIEWING','ANSWER_QUESTION','ESCALATION','ASSIGN_PROPERTY','LINK_CLICK_REQUIRED','CLARIFICATION'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "PendingActionStatus" AS ENUM ('PENDING','REMINDED','ESCALATED','RESOLVED','CANCELLED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`CREATE TABLE "JarvisPendingAction" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "tenantId" TEXT NOT NULL, "userId" TEXT NOT NULL, "leadId" TEXT, "propertyId" TEXT, "type" "PendingActionType" NOT NULL, "question" TEXT NOT NULL, "context" JSONB, "options" JSONB, "allowCustom" BOOLEAN NOT NULL DEFAULT true, "status" "PendingActionStatus" NOT NULL DEFAULT 'PENDING', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "reminderSentAt" TIMESTAMP(3), "escalatedAt" TIMESTAMP(3), "resolvedAt" TIMESTAMP(3), "resolution" TEXT, "scheduledReminderId" TEXT, "scheduledEscalationId" TEXT, CONSTRAINT "JarvisPendingAction_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "JarvisPendingAction_tenantId_status_idx" ON "JarvisPendingAction"("tenantId","status")`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "JarvisPendingAction_userId_status_idx" ON "JarvisPendingAction"("userId","status")`);
+      await db.$executeRawUnsafe(`ALTER TABLE "JarvisPendingAction" ADD CONSTRAINT "JarvisPendingAction_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE`).catch(() => {});
+      created++;
+    }
+
+    // --- Notification ---
+    if (!existing.has('Notification')) {
+      console.log('🔧 Creating Notification table...');
+      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "NotificationType" AS ENUM ('JARVIS_QUESTION','NEW_LEAD','LEAD_RESPONSE','REMINDER','ESCALATION','SYSTEM'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`CREATE TABLE "Notification" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "tenantId" TEXT NOT NULL, "userId" TEXT NOT NULL, "type" "NotificationType" NOT NULL, "title" TEXT NOT NULL, "message" TEXT NOT NULL, "metadata" JSONB, "read" BOOLEAN NOT NULL DEFAULT false, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "Notification_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Notification_tenantId_userId_read_idx" ON "Notification"("tenantId","userId","read")`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Notification_userId_createdAt_idx" ON "Notification"("userId","createdAt")`);
+      await db.$executeRawUnsafe(`ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE`).catch(() => {});
+      created++;
+    }
+
+    // --- Email ---
+    if (!existing.has('Email')) {
+      console.log('🔧 Creating Email table...');
+      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "EmailFolder" AS ENUM ('INBOX','SENT','DRAFTS','TRASH','SPAM'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "EmailProvider" AS ENUM ('GMAIL','OUTLOOK','SMTP'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`CREATE TABLE "Email" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "tenantId" TEXT NOT NULL, "messageId" TEXT, "threadId" TEXT, "inReplyTo" TEXT, "from" TEXT NOT NULL, "fromName" TEXT, "to" TEXT[] NOT NULL DEFAULT '{}', "cc" TEXT[] NOT NULL DEFAULT '{}', "bcc" TEXT[] NOT NULL DEFAULT '{}', "subject" TEXT NOT NULL, "bodyHtml" TEXT, "bodyText" TEXT, "folder" "EmailFolder" NOT NULL DEFAULT 'INBOX', "isRead" BOOLEAN NOT NULL DEFAULT false, "isStarred" BOOLEAN NOT NULL DEFAULT false, "hasAttachments" BOOLEAN NOT NULL DEFAULT false, "attachments" JSONB, "leadId" TEXT, "provider" "EmailProvider", "providerData" JSONB, "sentAt" TIMESTAMP(3), "receivedAt" TIMESTAMP(3), "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "Email_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Email_tenantId_folder_receivedAt_idx" ON "Email"("tenantId","folder","receivedAt")`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Email_tenantId_leadId_idx" ON "Email"("tenantId","leadId")`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Email_tenantId_from_idx" ON "Email"("tenantId","from")`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Email_threadId_idx" ON "Email"("threadId")`);
+      created++;
+    }
+
+    // --- BugReport ---
+    if (!existing.has('BugReport')) {
+      console.log('🔧 Creating BugReport table...');
+      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "BugReportStatus" AS ENUM ('OPEN','IN_PROGRESS','RESOLVED','CLOSED','WONT_FIX'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "BugReportPriority" AS ENUM ('LOW','MEDIUM','HIGH','CRITICAL'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`CREATE TABLE "BugReport" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "tenantId" TEXT NOT NULL, "userId" TEXT NOT NULL, "userEmail" TEXT NOT NULL, "userName" TEXT, "tenantName" TEXT, "title" TEXT NOT NULL, "description" TEXT NOT NULL, "page" TEXT, "screenshotUrl" TEXT, "consoleLogs" TEXT, "status" "BugReportStatus" NOT NULL DEFAULT 'OPEN', "priority" "BugReportPriority" NOT NULL DEFAULT 'MEDIUM', "adminNotes" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "BugReport_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BugReport_status_createdAt_idx" ON "BugReport"("status","createdAt")`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BugReport_tenantId_idx" ON "BugReport"("tenantId")`);
+      created++;
+    }
+
+    // --- DemoBooking ---
+    if (!existing.has('DemoBooking')) {
+      console.log('🔧 Creating DemoBooking table...');
+      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "DemoBookingStatus" AS ENUM ('PENDING','CONFIRMED','COMPLETED','CANCELLED','NO_SHOW'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`CREATE TABLE "DemoBooking" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "name" TEXT NOT NULL, "email" TEXT NOT NULL, "company" TEXT, "message" TEXT, "start" TIMESTAMP(3) NOT NULL, "end" TIMESTAMP(3) NOT NULL, "eventId" TEXT, "status" "DemoBookingStatus" NOT NULL DEFAULT 'PENDING', "adminNotes" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "DemoBooking_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DemoBooking_status_createdAt_idx" ON "DemoBooking"("status","createdAt")`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "DemoBooking_email_idx" ON "DemoBooking"("email")`);
+      created++;
+    }
+
     // --- Fix Message cascade FK ---
     try {
       await db.$executeRawUnsafe(`ALTER TABLE "Message" DROP CONSTRAINT IF EXISTS "Message_leadId_fkey"`);
