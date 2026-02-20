@@ -7296,6 +7296,28 @@ app.post('/emails/incoming', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    const db = await initializePrisma();
+
+    // Store in Email table under FORWARDING folder
+    await db.email.create({
+      data: {
+        tenantId,
+        from,
+        fromName: fromName || null,
+        to: [],
+        cc: [],
+        bcc: [],
+        subject,
+        bodyText: body,
+        bodyHtml: body.includes('<') ? body : null,
+        folder: 'FORWARDING',
+        isRead: false,
+        receivedAt: receivedAt ? new Date(receivedAt) : new Date(),
+        provider: 'OTHER',
+        providerData: { source: 'forwarding' },
+      }
+    });
+
     const result = await EmailResponseHandler.processEmailResponse(tenantId, {
       from,
       fromName,

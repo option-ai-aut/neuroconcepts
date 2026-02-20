@@ -754,7 +754,18 @@
     "timeSuffix": ""
   },
   "inbox": {
-    "folders": { "inbox": "Inbox", "sent": "Sent", "drafts": "Drafts", "trash": "Trash" },
+    "folders": { "inbox": "Inbox", "sent": "Sent", "drafts": "Drafts", "trash": "Trash", "forwarding": "Forwarding" },
+    "emptyState": {
+      "title": "No mailbox connected",
+      "description": "Connect your Gmail or Outlook account to receive and send emails directly in Immivo.",
+      "connectButton": "Connect email",
+      "centralInbox": "Central inbox",
+      "centralInboxDesc": "Manage all emails in one place",
+      "aiResponses": "AI responses",
+      "aiResponsesDesc": "Jarvis automatically answers inquiries",
+      "leadSync": "Lead assignment",
+      "leadSyncDesc": "Emails are automatically assigned to leads"
+    },
     "newEmail": "New email",
     "searchPlaceholder": "Search emails...",
     "noEmails": "No emails",

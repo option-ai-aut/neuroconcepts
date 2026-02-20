@@ -60,11 +60,28 @@ export default function CalendarPage() {
   }, []);
 
   useEffect(() => {
-    // WorkMail calendar is always connected via backend EWS
-    setIsConnected(true);
-    setConnectedEmail('WorkMail');
-    loadEvents();
-    setLoading(false);
+    const checkStatus = async () => {
+      try {
+        const apiUrl = getApiUrl();
+        const headers = await getAuthHeaders();
+        const res = await fetch(`${apiUrl}/calendar/status`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const googleOk = data.google?.connected;
+          const outlookOk = data.outlook?.connected;
+          if (googleOk || outlookOk) {
+            setIsConnected(true);
+            setConnectedEmail(googleOk ? data.google.email : data.outlook.email);
+            loadEvents();
+          }
+        }
+      } catch (err) {
+        console.error('Calendar status check failed:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkStatus();
   }, []);
 
   const loadEvents = async () => {

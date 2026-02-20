@@ -989,12 +989,14 @@ enum EmailFolder {
   DRAFTS
   TRASH
   SPAM
+  FORWARDING
 }
 
 enum EmailProvider {
   GMAIL
   OUTLOOK
   SMTP
+  OTHER
 }
 
 // --- Bug Reports ---

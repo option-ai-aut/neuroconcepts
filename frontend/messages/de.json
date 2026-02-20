@@ -754,7 +754,18 @@
     "timeSuffix": "Uhr"
   },
   "inbox": {
-    "folders": { "inbox": "Posteingang", "sent": "Gesendet", "drafts": "Entwürfe", "trash": "Papierkorb" },
+    "folders": { "inbox": "Posteingang", "sent": "Gesendet", "drafts": "Entwürfe", "trash": "Papierkorb", "forwarding": "Weiterleitung" },
+    "emptyState": {
+      "title": "Kein Postfach verbunden",
+      "description": "Verbinde dein Gmail- oder Outlook-Konto, um E-Mails direkt in Immivo zu empfangen und zu versenden.",
+      "connectButton": "E-Mail verbinden",
+      "centralInbox": "Zentraler Posteingang",
+      "centralInboxDesc": "Alle E-Mails an einem Ort verwalten",
+      "aiResponses": "KI-Antworten",
+      "aiResponsesDesc": "Jarvis beantwortet Anfragen automatisch",
+      "leadSync": "Lead-Zuordnung",
+      "leadSyncDesc": "E-Mails werden automatisch Leads zugeordnet"
+    },
     "newEmail": "Neue E-Mail",
     "searchPlaceholder": "E-Mails durchsuchen...",
     "noEmails": "Keine E-Mails",

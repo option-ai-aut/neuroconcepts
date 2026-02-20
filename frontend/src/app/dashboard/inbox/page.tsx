@@ -8,8 +8,10 @@ import {
   RefreshCw, Search, Mail, Inbox, Send, FileText, Trash2, 
   Star, StarOff, MoreHorizontal, Reply, Forward,
   Paperclip, ChevronDown, Plus, AlertCircle, Check, X, Loader2,
-  Eye, EyeOff, Copy, Pencil, ArrowLeft, Menu, SquarePen
+  Eye, EyeOff, Copy, Pencil, ArrowLeft, Menu, SquarePen,
+  MailOpen, Users, Zap, LinkIcon
 } from 'lucide-react';
+import Link from 'next/link';
 import useSWR from 'swr';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import DOMPurify from 'dompurify';
@@ -63,6 +65,7 @@ interface EmailsResponse {
 
 const FOLDERS = [
   { id: 'INBOX', key: 'inbox', icon: Inbox },
+  { id: 'FORWARDING', key: 'forwarding', icon: MailOpen },
   { id: 'SENT', key: 'sent', icon: Send },
   { id: 'DRAFTS', key: 'drafts', icon: FileText },
   { id: 'TRASH', key: 'trash', icon: Trash2 },
@@ -184,6 +187,8 @@ export default function InboxPage() {
   const [syncing, setSyncing] = useState(false);
   const [showMobileFolders, setShowMobileFolders] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
+  const [emailConnected, setEmailConnected] = useState<boolean | null>(null);
+  const [forwardingEmail, setForwardingEmail] = useState<string | null>(null);
   
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -191,9 +196,31 @@ export default function InboxPage() {
   } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
+  // Check email integration status
+  useEffect(() => {
+    if (!apiUrl) return;
+    const check = async () => {
+      try {
+        const [statusRes, tenantRes] = await Promise.all([
+          fetchWithAuth(`${apiUrl}/email/status`).catch(() => null),
+          fetchWithAuth(`${apiUrl}/settings/tenant`).catch(() => null),
+        ]);
+        const hasGmail = statusRes?.gmail?.connected;
+        const hasOutlook = statusRes?.outlook?.connected;
+        setEmailConnected(hasGmail || hasOutlook || false);
+        if (tenantRes?.inboundLeadEmail) {
+          setForwardingEmail(`${tenantRes.inboundLeadEmail}@leads.immivo.ai`);
+        }
+      } catch {
+        setEmailConnected(false);
+      }
+    };
+    check();
+  }, [apiUrl]);
+
   // Fetch emails
   const { data: emailsData, mutate, isValidating } = useSWR<EmailsResponse>(
-    `${apiUrl}/emails?folder=${selectedFolder}&search=${searchQuery}`,
+    emailConnected !== false ? `${apiUrl}/emails?folder=${selectedFolder}&search=${searchQuery}` : null,
     (url: string) => fetchWithAuth(url),
     { revalidateOnFocus: false }
   );
@@ -203,7 +230,7 @@ export default function InboxPage() {
   const syncingRef = useRef(false); // avoid overlapping syncs
 
   useEffect(() => {
-    if (!apiUrl) return;
+    if (!apiUrl || emailConnected === false) return;
 
     const doSync = async () => {
       if (syncingRef.current || document.visibilityState !== 'visible') return;
@@ -578,6 +605,15 @@ export default function InboxPage() {
               );
             })}
           </nav>
+          {forwardingEmail && (
+            <div className="mx-3 mb-3 p-2.5 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center gap-1.5 mb-1">
+                <LinkIcon className="w-3 h-3 text-gray-400" />
+                <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Weiterleitung</span>
+              </div>
+              <code className="text-[11px] text-gray-600 break-all leading-tight">{forwardingEmail}</code>
+            </div>
+          )}
           <div className="p-4 border-t border-gray-200">
             <button onClick={handleSync} disabled={syncing}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg transition-colors">
@@ -688,6 +724,76 @@ export default function InboxPage() {
           )}
         </div>
       </>
+    );
+  }
+
+  // ──────────── LOADING STATE ────────────
+  if (emailConnected === null) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
+  // ──────────── EMPTY STATE ────────────
+  if (emailConnected === false) {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="pt-2" />
+        <div className="flex-1 flex flex-col items-center justify-center p-8">
+          <div className="max-w-md text-center space-y-6">
+            <div className="w-20 h-20 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto">
+              <Mail className="w-10 h-10 text-blue-600" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold text-gray-900">{t('emptyState.title')}</h2>
+              <p className="text-sm text-gray-500 leading-relaxed">{t('emptyState.description')}</p>
+            </div>
+            <div className="space-y-3 pt-4">
+              <div className="flex items-start gap-3 text-left">
+                <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Inbox className="w-3 h-3 text-blue-600" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-900">{t('emptyState.centralInbox')}</div>
+                  <div className="text-xs text-gray-500">{t('emptyState.centralInboxDesc')}</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 text-left">
+                <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Zap className="w-3 h-3 text-blue-600" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-900">{t('emptyState.aiResponses')}</div>
+                  <div className="text-xs text-gray-500">{t('emptyState.aiResponsesDesc')}</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 text-left">
+                <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Users className="w-3 h-3 text-blue-600" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-900">{t('emptyState.leadSync')}</div>
+                  <div className="text-xs text-gray-500">{t('emptyState.leadSyncDesc')}</div>
+                </div>
+              </div>
+            </div>
+            {forwardingEmail && (
+              <div className="pt-2 text-left bg-gray-50 rounded-lg p-4">
+                <div className="text-xs text-gray-500 mb-1">Weiterleitungs-Adresse:</div>
+                <code className="text-sm font-mono text-gray-800">{forwardingEmail}</code>
+              </div>
+            )}
+            <div className="pt-4">
+              <Link href="/dashboard/settings/integrations"
+                className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium rounded-lg text-white bg-gray-900 hover:bg-gray-800 transition-colors w-full">
+                {t('emptyState.connectButton')}
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 
