@@ -75,9 +75,10 @@ export class ImmivoStack extends cdk.Stack {
     });
 
     // DB Security Group: locked-down, no outbound, only allows inbound Postgres
+    // IMPORTANT: description is immutable in AWS — changing it forces SG replacement
     const dbSg = new ec2.SecurityGroup(this, 'DBSecurityGroup', {
       vpc: this.vpc,
-      description: 'RDS Postgres - inbound port 5432 only, no outbound',
+      description: 'Allow access to DB',
       allowAllOutbound: false,
     });
 
