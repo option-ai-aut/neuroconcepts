@@ -569,7 +569,7 @@ export class ImmivoStack extends cdk.Stack {
     // Deploy landing page video to Media bucket (Lambda struggles with large static files)
     const landingAssetsPath = path.join(__dirname, '../../frontend/public');
     new s3deploy.BucketDeployment(this, 'LandingVideoDeploy', {
-      sources: [s3deploy.Source.asset(landingAssetsPath, { exclude: ['*'], include: ['Hyperlapse-scroll.mp4', 'Hyperlapse-poster.jpg'] })],
+      sources: [s3deploy.Source.asset(landingAssetsPath)],
       destinationBucket: mediaBucket,
       destinationKeyPrefix: 'public/',
     });
