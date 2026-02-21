@@ -310,24 +310,47 @@ export default function LandingPage() {
   const triggerHeroReveal = useCallback(() => {
     if (heroPhase !== 'idle') return;
     const vid = heroVideoRef.current;
-    if (!vid || !Number.isFinite(vid.duration) || vid.duration <= 0) return;
+    if (!vid || !Number.isFinite(vid.duration) || vid.duration <= 0) {
+      setActiveIdx(1);
+      return;
+    }
     isAnimating.current = true;
     setHeroPhase('revealing');
     vid.pause();
     const safe = Number.isFinite(vid.currentTime) ? vid.currentTime : 0;
-    if (safe > 0.1) vid.currentTime = 0;
+    if (safe > 0.1) {
+      try { vid.currentTime = 0; } catch { /* ignore */ }
+    }
 
+    const duration = vid.duration;
     let lastTs = 0;
+    const safetyTimeout = setTimeout(() => {
+      heroRaf.current = 0;
+      isAnimating.current = false;
+      setActiveIdx(1);
+    }, 15000);
+
     const step = (ts: number) => {
-      if (!Number.isFinite(vid.duration) || vid.duration <= 0) return;
+      if (!Number.isFinite(vid.duration) || vid.duration <= 0) {
+        clearTimeout(safetyTimeout);
+        heroRaf.current = 0;
+        isAnimating.current = false;
+        setActiveIdx(1);
+        return;
+      }
       if (!lastTs) lastTs = ts;
       const dt = (ts - lastTs) / 1000;
       lastTs = ts;
-      const next = (Number.isFinite(vid.currentTime) ? vid.currentTime : 0) + dt * PLAYBACK_SPEED;
-      const target = Math.min(vid.duration, Math.max(0, next));
-      if (Number.isFinite(target)) vid.currentTime = target;
-      if (vid.currentTime >= vid.duration - 0.05) {
-        vid.currentTime = vid.duration;
+      const curr = Number.isFinite(vid.currentTime) ? vid.currentTime : 0;
+      const next = curr + dt * PLAYBACK_SPEED;
+      const target = Math.min(duration, Math.max(0, next));
+      if (Number.isFinite(target)) {
+        try { vid.currentTime = target; } catch { /* ignore */ }
+      }
+      const now = Number.isFinite(vid.currentTime) ? vid.currentTime : next;
+      if (now >= duration - 0.05) {
+        clearTimeout(safetyTimeout);
+        try { vid.currentTime = duration; } catch { /* ignore */ }
         setTimeout(() => { isAnimating.current = false; }, TRANSITION_MS + 100);
         setActiveIdx(1);
         return;
@@ -346,15 +369,26 @@ export default function LandingPage() {
     vid.pause();
 
     let lastTs = 0;
+    const safetyTimeout = setTimeout(() => {
+      heroRaf.current = 0;
+      isAnimating.current = false;
+      setHeroPhase('idle');
+      try { if (vid) vid.currentTime = 0; } catch { /* ignore */ }
+    }, 8000);
+
     const step = (ts: number) => {
       if (!lastTs) lastTs = ts;
       const dt = (ts - lastTs) / 1000;
       lastTs = ts;
       const curr = Number.isFinite(vid.currentTime) ? vid.currentTime : 0;
       const target = Math.max(0, curr - dt * PLAYBACK_SPEED);
-      if (Number.isFinite(target)) vid.currentTime = target;
-      if (vid.currentTime <= 0.05) {
-        vid.currentTime = 0;
+      if (Number.isFinite(target)) {
+        try { vid.currentTime = target; } catch { /* ignore */ }
+      }
+      const now = Number.isFinite(vid.currentTime) ? vid.currentTime : target;
+      if (now <= 0.05) {
+        clearTimeout(safetyTimeout);
+        try { vid.currentTime = 0; } catch { /* ignore */ }
         setHeroPhase('idle');
         setTimeout(() => { isAnimating.current = false; }, 300);
         return;
@@ -387,11 +421,14 @@ export default function LandingPage() {
     if (!vid) return;
     const warmUp = () => {
       try {
-        if (vid.readyState >= 2) vid.currentTime = 0;
+        if (vid.readyState >= 1 && Number.isFinite(vid.duration)) vid.currentTime = 0;
       } catch { /* ignore non-finite currentTime before metadata */ }
     };
-    if (vid.readyState >= 2) warmUp();
-    else vid.addEventListener('loadeddata', warmUp, { once: true });
+    if (vid.readyState >= 1 && Number.isFinite(vid.duration)) warmUp();
+    else {
+      vid.addEventListener('loadedmetadata', warmUp, { once: true });
+      vid.addEventListener('loadeddata', warmUp, { once: true });
+    }
   }, []);
 
   const [featureStep, setFeatureStep] = useState(0);
