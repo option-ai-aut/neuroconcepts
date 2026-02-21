@@ -21,6 +21,7 @@ import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 import * as cloudtrail from 'aws-cdk-lib/aws-cloudtrail';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as path from 'path';
 
 export interface ImmivoStackProps extends cdk.StackProps {
@@ -496,6 +497,7 @@ export class ImmivoStack extends cdk.Stack {
         RUNTIME_ADMIN_USER_POOL_ID: this.adminUserPool.userPoolId,
         RUNTIME_ADMIN_USER_POOL_CLIENT_ID: this.adminUserPoolClient.userPoolClientId,
         RUNTIME_AWS_REGION: this.region,
+        RUNTIME_MEDIA_CDN_URL: `https://${props.stageName === 'prod' ? 'media' : `${props.stageName}-media`}.immivo.ai`,
         // Keep NEXT_PUBLIC_ for backwards compatibility (baked in at build time)
         NEXT_PUBLIC_API_URL: api.url,
         NEXT_PUBLIC_USER_POOL_ID: this.userPool.userPoolId,
@@ -563,6 +565,14 @@ export class ImmivoStack extends cdk.Stack {
     });
 
     orchestratorLambda.addEnvironment('MEDIA_CDN_URL', `https://${mediaDomain}`);
+
+    // Deploy landing page video to Media bucket (Lambda struggles with large static files)
+    const landingAssetsPath = path.join(__dirname, '../../frontend/public');
+    new s3deploy.BucketDeployment(this, 'LandingVideoDeploy', {
+      sources: [s3deploy.Source.asset(landingAssetsPath, { exclude: ['*'], include: ['Hyperlapse-scroll.mp4', 'Hyperlapse-poster.jpg'] })],
+      destinationBucket: mediaBucket,
+      destinationKeyPrefix: 'public/',
+    });
 
     // --- Frontend & API CDN (dev/test only — prod uses manually created distributions) ---
     if (props.stageName !== 'prod') {

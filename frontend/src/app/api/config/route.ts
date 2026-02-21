@@ -14,5 +14,6 @@ export async function GET() {
     adminUserPoolId: process.env.RUNTIME_ADMIN_USER_POOL_ID || '',
     adminUserPoolClientId: process.env.RUNTIME_ADMIN_USER_POOL_CLIENT_ID || '',
     awsRegion: process.env.RUNTIME_AWS_REGION || process.env.NEXT_PUBLIC_AWS_REGION || 'eu-central-1',
+    mediaCdnUrl: (process.env.RUNTIME_MEDIA_CDN_URL || process.env.NEXT_PUBLIC_MEDIA_CDN_URL || '').replace(/\/+$/, ''),
   });
 }

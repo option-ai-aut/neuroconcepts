@@ -10,6 +10,7 @@ interface RuntimeConfig {
   adminUserPoolId: string;
   adminUserPoolClientId: string;
   awsRegion: string;
+  mediaCdnUrl: string; // Media CDN base URL (e.g. https://test-media.immivo.ai) — used for landing video
 }
 
 const defaultConfig: RuntimeConfig = {
@@ -20,6 +21,7 @@ const defaultConfig: RuntimeConfig = {
   adminUserPoolId: '',
   adminUserPoolClientId: '',
   awsRegion: 'eu-central-1',
+  mediaCdnUrl: '',
 };
 
 const RuntimeConfigContext = createContext<RuntimeConfig>(defaultConfig);
@@ -48,6 +50,7 @@ export function RuntimeConfigProvider({ children }: { children: ReactNode }) {
             adminUserPoolId: data.adminUserPoolId || '',
             adminUserPoolClientId: data.adminUserPoolClientId || '',
             awsRegion: data.awsRegion || 'eu-central-1',
+            mediaCdnUrl: (data.mediaCdnUrl || '').replace(/\/+$/, ''),
           };
           setConfig(loaded);
           // Also set on window for non-React code

@@ -13,6 +13,7 @@ import PublicNavigation from '@/components/PublicNavigation';
 import PublicFooter from '@/components/PublicFooter';
 import DemoBooking from '@/components/DemoBooking';
 import { useTranslations } from 'next-intl';
+import { useRuntimeConfig } from '@/components/RuntimeConfigProvider';
 
 /* ═══════════════════════════════════════════════
    ANIMATED COUNTER
@@ -302,28 +303,44 @@ export default function LandingPage() {
   ];
 
   const jarvisTitleText = String(t.raw('jarvis.title')).replace(/<[^>]*>/g, '');
+  const config = useRuntimeConfig();
   const heroVideoRef = useRef<HTMLVideoElement>(null);
   const [heroPhase, setHeroPhase] = useState<'idle' | 'revealing' | 'rewinding'>('idle');
+  const mediaBase = config.mediaCdnUrl || process.env.NEXT_PUBLIC_MEDIA_CDN_URL || '';
+  const isLocalhost = typeof window !== 'undefined' && window.location?.hostname === 'localhost';
+  const heroVideoSrc = mediaBase ? `${mediaBase}/public/Hyperlapse-scroll.mp4` : (isLocalhost ? '/Hyperlapse-scroll.mp4' : '');
+  const heroPosterSrc = mediaBase ? `${mediaBase}/public/Hyperlapse-poster.jpg` : (isLocalhost ? '/Hyperlapse-poster.jpg' : '');
   const heroRaf = useRef<number>(0);
   const PLAYBACK_SPEED = 3;
 
   const triggerHeroReveal = useCallback(() => {
     if (heroPhase !== 'idle') return;
     const vid = heroVideoRef.current;
-    if (!vid) return;
+    if (!vid || !Number.isFinite(vid.duration) || vid.duration <= 0) {
+      setActiveIdx(1);
+      return;
+    }
     isAnimating.current = true;
     setHeroPhase('revealing');
     vid.pause();
     if (vid.currentTime > 0.1) vid.currentTime = 0;
 
+    const duration = vid.duration;
     let lastTs = 0;
     const step = (ts: number) => {
+      if (!Number.isFinite(vid.duration) || vid.duration <= 0) {
+        isAnimating.current = false;
+        setActiveIdx(1);
+        return;
+      }
       if (!lastTs) lastTs = ts;
       const dt = (ts - lastTs) / 1000;
       lastTs = ts;
-      vid.currentTime = Math.min(vid.duration, vid.currentTime + dt * PLAYBACK_SPEED);
-      if (vid.currentTime >= vid.duration - 0.05) {
-        vid.currentTime = vid.duration;
+      const next = vid.currentTime + dt * PLAYBACK_SPEED;
+      const target = Math.min(duration, Math.max(0, next));
+      if (Number.isFinite(target)) vid.currentTime = target;
+      if (vid.currentTime >= duration - 0.05) {
+        vid.currentTime = duration;
         setTimeout(() => { isAnimating.current = false; }, TRANSITION_MS + 100);
         setActiveIdx(1);
         return;
@@ -346,8 +363,10 @@ export default function LandingPage() {
       if (!lastTs) lastTs = ts;
       const dt = (ts - lastTs) / 1000;
       lastTs = ts;
-      vid.currentTime = Math.max(0, vid.currentTime - dt * PLAYBACK_SPEED);
-      if (vid.currentTime <= 0.05) {
+      const curr = Number.isFinite(vid.currentTime) ? vid.currentTime : 0;
+      const target = Math.max(0, curr - dt * PLAYBACK_SPEED);
+      if (Number.isFinite(target)) vid.currentTime = target;
+      if ((Number.isFinite(vid.currentTime) ? vid.currentTime : 0) <= 0.05) {
         vid.currentTime = 0;
         setHeroPhase('idle');
         setTimeout(() => { isAnimating.current = false; }, 300);
@@ -634,8 +653,8 @@ export default function LandingPage() {
               <div className="absolute inset-0 z-0 overflow-hidden">
                 <video
                   ref={heroVideoRef}
-                  src="/Hyperlapse-scroll.mp4"
-                  poster="/Hyperlapse-poster.jpg"
+                  src={heroVideoSrc || undefined}
+                  poster={heroPosterSrc || undefined}
                   muted
                   playsInline
                   preload="auto"
