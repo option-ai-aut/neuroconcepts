@@ -687,15 +687,11 @@ const isProduction = process.env.STAGE === 'prod';
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) {
-      // In production, block requests without Origin header (except health checks handled earlier)
-      // In dev/test, allow for Postman/cURL convenience
       if (isProduction) {
-        console.warn('[CORS] Blocked request with no origin in production');
         return callback(new Error('Origin header required'));
       }
       return callback(null, true);
     }
-    
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -1172,6 +1168,7 @@ if (!isLambda) {
 // Sync User from Token (Create/Update in DB)
 app.post('/auth/sync', authMiddleware, async (req, res) => {
   try {
+    const db = prisma || (await initializePrisma());
     const { sub, given_name, family_name, address, phone_number } = req.user!;
     const email = req.user!.email?.toLowerCase().trim();
     const companyName = req.user!['custom:company_name'];
@@ -1179,7 +1176,11 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
     const city = req.user!['custom:city'];
     const country = req.user!['custom:country'];
     
-    console.log('Auth sync for:', email, 'sub:', sub);
+    if (!email) {
+      return res.status(400).json({ error: 'Email required' });
+    }
+    
+    structuredLog('info', 'Auth sync', { email, sub });
     
     // Handle address - Cognito may return it as object { formatted: "..." } or string
     let streetAddress: string | undefined;
@@ -1192,22 +1193,22 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
     }
 
     // Check if user exists in DB (by email)
-    let user = await prisma.user.findUnique({ where: { email } });
+    let user = await db.user.findUnique({ where: { email } });
     let tenantId = user?.tenantId;
     let needsOnboarding = false;
 
     if (!user) {
       // New User (self-signup) - create new tenant
-      console.log('Creating new user and tenant for:', email);
+      structuredLog('info', 'Creating new user and tenant', { email });
       
-      const newTenant = await prisma.tenant.create({
+      const newTenant = await db.tenant.create({
         data: {
           name: companyName || 'My Company',
         }
       });
       tenantId = newTenant.id;
 
-      user = await prisma.user.create({
+      user = await db.user.create({
         data: {
           id: sub, // Use Cognito Sub as ID
           email,
@@ -1224,7 +1225,7 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
       });
       
       // Create default settings — start 7-day free trial immediately
-      await prisma.tenantSettings.create({
+      await db.tenantSettings.create({
         data: {
           tenantId: newTenant.id,
           stripeConfig: {
@@ -1234,7 +1235,7 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
       });
 
       // Create default team chat channel with company name
-      await prisma.channel.create({
+      await db.channel.create({
         data: {
           name: companyName || 'Team',
           description: 'Standard-Channel für das gesamte Team',
@@ -1251,24 +1252,21 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
       const isPendingInvite = user.firstName === 'Pending' && user.lastName === 'Invite';
       
       if (isPendingInvite) {
-        console.log('Invited user first login:', email);
-        // Update the user ID to match Cognito sub (important!)
-        // and mark for onboarding
-        user = await prisma.user.update({
+        structuredLog('info', 'Invited user first login', { email });
+        user = await db.user.update({
           where: { email },
           data: {
-            id: sub, // Update to Cognito sub
-            // Keep firstName/lastName as Pending until they complete onboarding
+            id: sub,
+            lastSeenAt: new Date(),
           }
         });
         needsOnboarding = true;
       } else {
-        // Regular existing user - update with Cognito data if provided
-        console.log('Existing user login:', email);
-        user = await prisma.user.update({
+        structuredLog('info', 'Existing user login', { email });
+        user = await db.user.update({
           where: { email },
           data: {
-            id: sub, // Ensure ID matches Cognito sub
+            id: sub,
             firstName: given_name || user.firstName,
             lastName: family_name || user.lastName,
             phone: phone_number || user.phone,
@@ -1276,6 +1274,7 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
             postalCode: postalCode || user.postalCode,
             city: city || user.city,
             country: country || user.country,
+            lastSeenAt: new Date(),
           }
         });
       }

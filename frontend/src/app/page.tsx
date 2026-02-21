@@ -700,9 +700,9 @@ export default function LandingPage() {
                   <Link href="/login?mode=register" prefetch={false} className="group w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-semibold text-white backdrop-blur-xl bg-white/[0.12] border border-white/[0.2] rounded-full hover:bg-white/[0.2] transition-all duration-300 hover:-translate-y-0.5 shadow-[0_0_30px_rgba(255,255,255,0.06),inset_0_1px_0_rgba(255,255,255,0.1)]">
                     {t('hero.ctaPrimary')}<ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform duration-300" />
             </Link>
-                  <a href="#demo" onClick={(e) => handleAnchorClick(e, 7)} className="group w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-semibold text-gray-300 backdrop-blur-xl bg-white/[0.06] border border-white/[0.12] rounded-full hover:bg-white/[0.1] hover:text-white transition-all duration-300">
+                  <Link href="/demo" prefetch={false} className="group w-full sm:w-auto inline-flex items-center justify-center px-7 sm:px-8 py-3 sm:py-3.5 text-sm sm:text-base font-semibold text-gray-300 backdrop-blur-xl bg-white/[0.06] border border-white/[0.12] rounded-full hover:bg-white/[0.1] hover:text-white transition-all duration-300">
                     <Calendar className="mr-2 w-4 h-4 sm:w-5 sm:h-5 opacity-60" />{t('hero.ctaSecondary')}
-            </a>
+            </Link>
           </div>
                 <div className="hero-el opacity-0 flex flex-wrap items-center justify-center gap-x-4 sm:gap-x-6 gap-y-2 mt-8 sm:mt-14 text-[11px] sm:text-sm text-gray-500" style={{ animationDelay: '0.85s' }}>
                   <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-500/60" />{t('hero.trustNoCard')}</span>
@@ -1140,9 +1140,9 @@ export default function LandingPage() {
                     <Link href="/login?mode=register" prefetch={false} className="group w-full sm:w-auto inline-flex items-center justify-center px-8 py-3.5 text-sm font-bold text-gray-900 bg-white rounded-full hover:bg-gray-100 transition-all duration-300 hover:-translate-y-0.5 shadow-[0_0_40px_rgba(255,255,255,0.08)]">
                       {t('cta.primary')}<ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
                     </Link>
-                    <a href="mailto:office@immivo.ai" className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3.5 text-sm font-semibold text-gray-300 border border-white/15 rounded-full hover:bg-white/5 transition-all duration-300">
+                    <Link href="/demo" prefetch={false} className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3.5 text-sm font-semibold text-gray-300 border border-white/15 rounded-full hover:bg-white/5 transition-all duration-300">
                       {t('cta.secondary')}
-                    </a>
+                    </Link>
         </div>
                 </Stagger>
                 <Stagger active={activeIdx === 8} delay={400}>

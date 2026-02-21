@@ -252,7 +252,7 @@ export default function UeberUnsPage() {
             {t('ctaSubtitle')}
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-            <Link href="/#demo" className="inline-flex items-center px-8 py-4 bg-gray-900 text-white rounded-full font-semibold hover:bg-gray-800 transition-colors">
+            <Link href="/demo" prefetch={false} className="inline-flex items-center px-8 py-4 bg-gray-900 text-white rounded-full font-semibold hover:bg-gray-800 transition-colors">
               {t('ctaDemo')}
               <ArrowRight className="ml-2 w-5 h-5" />
             </Link>

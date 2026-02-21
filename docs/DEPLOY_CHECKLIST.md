@@ -132,11 +132,14 @@ ADMIN_SECRET=$(aws secretsmanager get-secret-value \
   --output text \
   --region eu-central-1 | python3 -c "import sys,json; print(json.load(sys.stdin)['ADMIN_SECRET'])")
 
-curl -s -X POST <PROD_API_URL>/admin/migrate \
+curl -s -X POST https://api.immivo.ai/admin/migrate \
   -H "Content-Type: application/json" \
   -H "x-admin-secret: $ADMIN_SECRET" \
+  -H "Origin: https://app.immivo.ai" \
   -d '{"force":true}' | python3 -m json.tool
 ```
+
+> **Hinweis:** Prod blockiert Requests ohne `Origin`-Header. Bei curl `-H "Origin: https://app.immivo.ai"` setzen.
 
 > **Achtung bei Main/Prod**: `force:true` ist sicher (idempotent), aber auf Prod nur ausführen wenn neue Schema-Änderungen da sind. Bei reinen Code-Changes ohne Schema-Änderungen reicht ein normaler Aufruf ohne `force`.
 

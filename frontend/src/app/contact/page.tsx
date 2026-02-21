@@ -222,7 +222,8 @@ export default function KontaktPage() {
                   {t('personalDemoDesc')}
                 </p>
                 <Link
-                  href="/#demo"
+                  href="/demo"
+                  prefetch={false}
                   className="inline-flex items-center text-blue-600 font-medium hover:underline text-sm sm:text-base group"
                 >
                   {t('bookDemo')}
