@@ -572,6 +572,8 @@ export class ImmivoStack extends cdk.Stack {
       sources: [s3deploy.Source.asset(landingAssetsPath)],
       destinationBucket: mediaBucket,
       destinationKeyPrefix: 'public/',
+      memoryLimit: 2048, // Default 128MB is too low for ~15MB videos — speeds up upload ~10x
+      ephemeralStorageSize: cdk.Size.mebibytes(2048), // More /tmp for unzip + upload
     });
 
     // --- Frontend & API CDN (dev/test only — prod uses manually created distributions) ---
