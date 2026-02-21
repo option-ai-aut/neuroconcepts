@@ -309,19 +309,23 @@ export default function LandingPage() {
 
   const triggerHeroReveal = useCallback(() => {
     if (heroPhase !== 'idle') return;
+    const vid = heroVideoRef.current;
+    if (!vid || !Number.isFinite(vid.duration) || vid.duration <= 0) return;
     isAnimating.current = true;
     setHeroPhase('revealing');
-    const vid = heroVideoRef.current;
-    if (!vid) return;
     vid.pause();
-    if (vid.currentTime > 0.1) vid.currentTime = 0;
+    const safe = Number.isFinite(vid.currentTime) ? vid.currentTime : 0;
+    if (safe > 0.1) vid.currentTime = 0;
 
     let lastTs = 0;
     const step = (ts: number) => {
+      if (!Number.isFinite(vid.duration) || vid.duration <= 0) return;
       if (!lastTs) lastTs = ts;
       const dt = (ts - lastTs) / 1000;
       lastTs = ts;
-      vid.currentTime = Math.min(vid.duration, vid.currentTime + dt * PLAYBACK_SPEED);
+      const next = (Number.isFinite(vid.currentTime) ? vid.currentTime : 0) + dt * PLAYBACK_SPEED;
+      const target = Math.min(vid.duration, Math.max(0, next));
+      if (Number.isFinite(target)) vid.currentTime = target;
       if (vid.currentTime >= vid.duration - 0.05) {
         vid.currentTime = vid.duration;
         setTimeout(() => { isAnimating.current = false; }, TRANSITION_MS + 100);
@@ -346,7 +350,9 @@ export default function LandingPage() {
       if (!lastTs) lastTs = ts;
       const dt = (ts - lastTs) / 1000;
       lastTs = ts;
-      vid.currentTime = Math.max(0, vid.currentTime - dt * PLAYBACK_SPEED);
+      const curr = Number.isFinite(vid.currentTime) ? vid.currentTime : 0;
+      const target = Math.max(0, curr - dt * PLAYBACK_SPEED);
+      if (Number.isFinite(target)) vid.currentTime = target;
       if (vid.currentTime <= 0.05) {
         vid.currentTime = 0;
         setHeroPhase('idle');
@@ -379,12 +385,13 @@ export default function LandingPage() {
   useEffect(() => {
     const vid = heroVideoRef.current;
     if (!vid) return;
-    const warmUp = () => { vid.currentTime = 0.001; };
-    if (vid.readyState >= 2) {
-      warmUp();
-    } else {
-      vid.addEventListener('loadeddata', warmUp, { once: true });
-    }
+    const warmUp = () => {
+      try {
+        if (vid.readyState >= 2) vid.currentTime = 0;
+      } catch { /* ignore non-finite currentTime before metadata */ }
+    };
+    if (vid.readyState >= 2) warmUp();
+    else vid.addEventListener('loadeddata', warmUp, { once: true });
   }, []);
 
   const [featureStep, setFeatureStep] = useState(0);
