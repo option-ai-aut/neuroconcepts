@@ -684,7 +684,16 @@ const allowedOrigins = [
 
 const isProduction = process.env.STAGE === 'prod';
 
-app.use(cors({
+// OAuth callbacks are browser-navigated GET redirects (from Google/Microsoft)
+// and therefore never carry an Origin header — they must bypass the CORS check.
+const OAUTH_CALLBACK_PATHS = [
+  '/email/gmail/callback',
+  '/email/outlook/callback',
+  '/calendar/google/callback',
+  '/calendar/outlook/callback',
+];
+
+const corsMiddleware = cors({
   origin: (origin, callback) => {
     if (!origin) {
       if (isProduction) {
@@ -702,7 +711,14 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Secret'],
-}));
+});
+
+app.use((req, res, next) => {
+  if (OAUTH_CALLBACK_PATHS.includes(req.path)) {
+    return next();
+  }
+  corsMiddleware(req, res, next);
+});
 
 app.use(morgan('combined'));
 
