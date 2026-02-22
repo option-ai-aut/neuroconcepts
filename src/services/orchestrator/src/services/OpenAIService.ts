@@ -403,7 +403,7 @@ export class OpenAIService {
     const recentHistory = history.slice(-10).filter(h => h.content && h.content.trim());
 
     const stream = await this.client.chat.completions.create({
-      model: 'gpt-5-mini',
+      model: MINI_MODEL,
       messages: [
         { role: 'system', content: getSystemPrompt() + contextStr },
         ...recentHistory.map((h: any) => ({
@@ -414,7 +414,7 @@ export class OpenAIService {
       ],
       stream: true,
       stream_options: { include_usage: true },
-      max_completion_tokens: 512,
+      max_completion_tokens: 4096,
     });
 
     let totalIn = 0, totalOut = 0;
@@ -776,7 +776,7 @@ Makler: ${params.agentName}`;
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        max_completion_tokens: 512,
+        max_completion_tokens: 4096,
         temperature: 0.7,
       });
 
@@ -789,7 +789,7 @@ Makler: ${params.agentName}`;
           { role: 'system', content: 'Generiere einen kurzen, professionellen E-Mail-Betreff auf Deutsch für die folgende Makler-Antwort. Nur den Betreff, nichts anderes. Maximal 8 Wörter.' },
           { role: 'user', content: body },
         ],
-        max_completion_tokens: 64,
+        max_completion_tokens: 512,
         temperature: 0.5,
       });
 
