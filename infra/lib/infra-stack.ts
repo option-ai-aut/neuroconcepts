@@ -388,7 +388,7 @@ export class ImmivoStack extends cdk.Stack {
     // causes duplicate headers that browsers reject.
     const functionUrl = orchestratorLambda.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
-      invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
+      invokeMode: lambda.InvokeMode.BUFFERED, // streamifyResponse breaks API GW proxy format — uses BUFFERED with 15min timeout instead
     });
 
     // Export the Function URL for frontend to use for streaming
@@ -484,7 +484,7 @@ export class ImmivoStack extends cdk.Stack {
         // RUNTIME_ vars are read at runtime by the /api/config endpoint
         // These work because they're not prefixed with NEXT_PUBLIC_ (which gets replaced at build time)
         RUNTIME_API_URL: api.url,
-        RUNTIME_STREAM_URL: api.url, // /chat/stream is an Express route — goes through API Gateway like all other routes
+        RUNTIME_STREAM_URL: functionUrl.url, // /chat/stream bypasses API GW (29s timeout) — uses Function URL (15min timeout)
         RUNTIME_USER_POOL_ID: this.userPool.userPoolId,
         RUNTIME_USER_POOL_CLIENT_ID: this.userPoolClient.userPoolClientId,
         RUNTIME_ADMIN_USER_POOL_ID: this.adminUserPool.userPoolId,
