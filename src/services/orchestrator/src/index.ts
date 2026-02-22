@@ -41,7 +41,10 @@ import * as AWS from 'aws-sdk';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import sharp from 'sharp';
+// sharp is platform-specific — lazy-load with graceful fallback if Linux binary is missing
+let _sharp: typeof import('sharp') | null = null;
+try { _sharp = require('sharp'); } catch { /* binary not available for this platform */ }
+function getSharp() { return _sharp; }
 import mammoth from 'mammoth';
 import JSZip from 'jszip';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -1026,47 +1029,43 @@ const WEBP_QUALITY = 80;
 const THUMBNAIL_SIZE = 400;
 
 async function optimizeImage(buffer: Buffer, contentType: string): Promise<{ buffer: Buffer; contentType: string; extension: string }> {
+  const s = getSharp();
+  if (!s) return { buffer, contentType, extension: contentType.split('/')[1] || 'bin' };
   try {
-    const image = sharp(buffer);
+    const image = s(buffer);
     const metadata = await image.metadata();
 
-    // Skip if not a processable image format
     if (!metadata.format || !['jpeg', 'png', 'webp', 'tiff', 'avif'].includes(metadata.format)) {
       return { buffer, contentType, extension: metadata.format || 'bin' };
     }
 
-    // Determine if image needs resize
     const needsResize = (metadata.width && metadata.width > MAX_IMAGE_DIMENSION) || 
                         (metadata.height && metadata.height > MAX_IMAGE_DIMENSION);
 
-    let pipeline = image.rotate(); // Auto-rotate based on EXIF
-
+    let pipeline = image.rotate();
     if (needsResize) {
       pipeline = pipeline.resize(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, { fit: 'inside', withoutEnlargement: true });
     }
 
-    // Convert to WebP for best compression (except PNGs with transparency)
     const hasAlpha = metadata.hasAlpha && metadata.format === 'png';
-    
     if (hasAlpha) {
-      // Keep PNG for transparency but optimize
       const optimized = await pipeline.png({ quality: 85, compressionLevel: 8 }).toBuffer();
       return { buffer: optimized, contentType: 'image/png', extension: 'png' };
     } else {
-      // Convert to WebP for everything else
       const optimized = await pipeline.webp({ quality: WEBP_QUALITY }).toBuffer();
       return { buffer: optimized, contentType: 'image/webp', extension: 'webp' };
     }
   } catch (err) {
-    // If sharp fails (e.g. SVG, GIF), return original
     console.warn('Image optimization skipped:', (err as Error).message);
     return { buffer, contentType, extension: contentType.split('/')[1] || 'bin' };
   }
 }
 
 async function generateThumbnail(buffer: Buffer): Promise<Buffer | null> {
+  const s = getSharp();
+  if (!s) return null;
   try {
-    return await sharp(buffer)
+    return await s(buffer)
       .resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE, { fit: 'cover' })
       .webp({ quality: 70 })
       .toBuffer();
@@ -4693,10 +4692,11 @@ app.post('/channels/upload', authMiddleware, upload.array('files', 5), async (re
       const ext = path.extname(f.originalname);
       const baseName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
       
-      // Optimize images with sharp
-      if (f.mimetype.startsWith('image/') && f.mimetype !== 'image/gif') {
+      // Optimize images with sharp (if available)
+      const s = getSharp();
+      if (s && f.mimetype.startsWith('image/') && f.mimetype !== 'image/gif') {
         try {
-          const optimized = await sharp(f.buffer)
+          const optimized = await s(f.buffer)
             .resize(1920, 1920, { fit: 'inside', withoutEnlargement: true })
             .webp({ quality: 85 })
             .toBuffer();
