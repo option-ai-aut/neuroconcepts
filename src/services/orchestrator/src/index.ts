@@ -11271,13 +11271,17 @@ async function handleStreamingChat(event: any, responseStream: any): Promise<voi
   let headersStarted = false;
   const writeSse = (data: any) => { responseStream.write(`data: ${JSON.stringify(data)}\n\n`); };
 
-  // Stream-specific headers only — CORS (Access-Control-Allow-Origin) is handled
-  // automatically by the Lambda Function URL config (infra-stack.ts). Setting it here
-  // would result in a duplicate header that browsers reject.
+  // CORS: Function URL has no cors config — we must set Access-Control-Allow-Origin here.
+  // The origin is validated against the same allowedOrigins list used by Express.
+  const requestOrigin = (event.headers?.origin || event.headers?.Origin || '') as string;
   const corsHeaders: Record<string, string> = {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
+    ...(allowedOrigins.includes(requestOrigin) ? {
+      'Access-Control-Allow-Origin': requestOrigin,
+      'Access-Control-Allow-Credentials': 'true',
+    } : {}),
   };
 
   try {
@@ -11397,11 +11401,36 @@ async function handleStreamingChat(event: any, responseStream: any): Promise<voi
   responseStream.end();
 }
 
-// Lambda handler: all requests go through serverless-http (Express).
-// Note: Function URL streaming (chat/stream) is handled by the Express SSE route above.
-export const handler = async (event: any, context: any) => {
-  return serverlessHandler(event, context);
-};
+// Lambda handler: routes /chat/stream POST to the streaming handler (streamifyResponse),
+// all other requests go through serverless-http (Express) piped to the responseStream.
+const _awslambda = (globalThis as any).awslambda;
+
+async function _unifiedStreamHandler(event: any, responseStream: any, context: any): Promise<void> {
+  const path = event.rawPath || event.path || '/';
+  const method = (event.requestContext?.http?.method || event.httpMethod || '').toUpperCase();
+
+  if (path === '/chat/stream' && method === 'POST') {
+    await handleStreamingChat(event, responseStream);
+    return;
+  }
+
+  // All other routes: run through Express (serverless-http), then pipe result to responseStream
+  const result: any = await serverlessHandler(event, context);
+  const statusCode = result?.statusCode ?? 200;
+  const headers: Record<string, string> = result?.headers ?? {};
+  const rawBody = result?.body ?? '';
+
+  const httpStream = _awslambda.HttpResponseStream.from(responseStream, { statusCode, headers });
+  const bodyBuffer = typeof rawBody === 'string'
+    ? Buffer.from(rawBody, result?.isBase64Encoded ? 'base64' : 'utf-8')
+    : rawBody;
+  if (bodyBuffer && bodyBuffer.length > 0) httpStream.write(bodyBuffer);
+  httpStream.end();
+}
+
+export const handler = _awslambda?.streamifyResponse
+  ? _awslambda.streamifyResponse(_unifiedStreamHandler)
+  : async (event: any, context: any) => serverlessHandler(event, context);
 
 // Local dev support
 if (require.main === module) {
