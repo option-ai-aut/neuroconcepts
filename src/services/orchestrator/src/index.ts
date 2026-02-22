@@ -11243,15 +11243,11 @@ app.get('/admin/ab-tests/:id/results', adminAuthMiddleware, async (req, res) => 
   res.json(results);
 });
 
-const serverlessHandler = serverless(app, {
-  binary: ['multipart/form-data', 'image/*', 'application/octet-stream'],
-});
+// --- Jarvis Chat Stream (Express route, works via both API Gateway and Function URL) ---
 
-// Cached Cognito JWT verifier for streaming handler
 let _streamVerifier: any;
 
-// Verify Cognito JWT token (standalone, no Express req/res needed)
-async function verifyToken(authHeader: string | undefined): Promise<any> {
+async function verifyTokenDirect(authHeader: string | undefined): Promise<any> {
   if (!authHeader?.startsWith('Bearer ')) throw new Error('Missing token');
   const token = authHeader.split(' ')[1];
   if (!_streamVerifier) {
@@ -11265,65 +11261,43 @@ async function verifyToken(authHeader: string | undefined): Promise<any> {
   return _streamVerifier.verify(token);
 }
 
-// Direct streaming handler for POST /chat/stream (bypasses serverless-http buffering)
-async function handleStreamingChat(event: any, responseStream: any): Promise<void> {
-  const awslambda = (globalThis as any).awslambda;
-  let headersStarted = false;
-  const writeSse = (data: any) => { responseStream.write(`data: ${JSON.stringify(data)}\n\n`); };
+app.options('/chat/stream', (req, res) => {
+  res.status(204).end();
+});
 
-  // CORS: Function URL has no cors config — we must set Access-Control-Allow-Origin here.
-  // The origin is validated against the same allowedOrigins list used by Express.
-  const requestOrigin = (event.headers?.origin || event.headers?.Origin || '') as string;
-  const corsHeaders: Record<string, string> = {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    ...(allowedOrigins.includes(requestOrigin) ? {
-      'Access-Control-Allow-Origin': requestOrigin,
-      'Access-Control-Allow-Credentials': 'true',
-    } : {}),
-  };
+app.post('/chat/stream', async (req, res) => {
+  const writeSse = (data: any) => { res.write(`data: ${JSON.stringify(data)}\n\n`); };
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
 
   try {
-    // Auth
-    const payload = await verifyToken(event.headers?.authorization);
+    const payload = await verifyTokenDirect(req.headers.authorization);
     const db = prisma || (await initializePrisma());
     const currentUser = await db.user.findUnique({ where: { email: payload.email } });
     if (!currentUser) {
-      responseStream = awslambda.HttpResponseStream.from(responseStream, { statusCode: 401, headers: corsHeaders });
-      headersStarted = true;
       writeSse({ error: 'Unauthorized' });
-      responseStream.end();
+      res.end();
       return;
     }
-
-    // Start SSE response
-    responseStream = awslambda.HttpResponseStream.from(responseStream, { statusCode: 200, headers: corsHeaders });
-    headersStarted = true;
 
     const tenantId = currentUser.tenantId;
     const userId = currentUser.id;
 
-    // Cost cap check
     const costCheck = await AiCostService.checkCostCap(tenantId);
     if (costCheck.exceeded) {
       const capUsd = (costCheck.capCents / 100).toFixed(2);
       const usedUsd = (costCheck.currentCostCents / 100).toFixed(2);
       writeSse({ chunk: `⚠️ Das monatliche KI-Budget deines Teams ist erreicht ($${usedUsd} / $${capUsd}).` });
       writeSse({ done: true });
-      responseStream.end();
+      res.end();
       return;
     }
 
-    // Parse body (JSON only for streaming path; file uploads fall back to API Gateway)
-    let body: any = {};
-    if (event.body) {
-      try { body = JSON.parse(event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString() : event.body); } catch {}
-    }
-    const message = body.message || '';
-    const pageContext = body.pageContext || '';
+    const message = req.body?.message || '';
+    const pageContext = req.body?.pageContext || '';
 
-    // Build user context
     const tenant = await db.tenant.findUnique({
       where: { id: tenantId },
       select: { name: true, description: true, phone: true, email: true, website: true, services: true, regions: true, slogan: true, address: true },
@@ -11343,7 +11317,6 @@ async function handleStreamingChat(event: any, responseStream: any): Promise<voi
       } : undefined,
     };
 
-    // Load recent chat history from DB (last 20 messages for context)
     const recentHistory = await db.userChat.findMany({
       where: { userId, archived: false },
       orderBy: { createdAt: 'desc' },
@@ -11351,17 +11324,14 @@ async function handleStreamingChat(event: any, responseStream: any): Promise<voi
       select: { role: true, content: true },
     }).then((msgs: any[]) => msgs.reverse());
 
-    // Save user message BEFORE streaming (so follow-ups see it immediately)
     await db.userChat.create({ data: { userId, role: 'USER', content: message } });
 
-    // Stream AI response
     const openai = new OpenAIService();
     let fullResponse = '';
     let hadFunctionCalls = false;
     let toolsUsed: string[] = [];
     let chunkCount = 0;
 
-    // Heartbeat to keep connection alive during tool execution
     let lastDataTime = Date.now();
     const heartbeatInterval = setInterval(() => {
       if (Date.now() - lastDataTime > 4000) {
@@ -11382,55 +11352,22 @@ async function handleStreamingChat(event: any, responseStream: any): Promise<voi
       clearInterval(heartbeatInterval);
     }
 
-    // Save assistant message BEFORE ending stream
     await db.userChat.create({ data: { userId, role: 'ASSISTANT', content: wrapAiResponse(fullResponse) } });
 
     writeSse({ done: true, hadFunctionCalls, toolsUsed });
     console.log(`📡 Stream: ${chunkCount} chunks, ${fullResponse.length} chars`);
   } catch (err: any) {
-    console.error('Streaming chat error:', err);
-    try {
-      // If headers not sent yet, set them now (headersSent doesn't exist on Lambda streams — check via flag)
-      if (!headersStarted) {
-        const awslambda2 = (globalThis as any).awslambda;
-        responseStream = awslambda2.HttpResponseStream.from(responseStream, { statusCode: 500, headers: corsHeaders });
-      }
-      writeSse({ error: 'AI Error' });
-    } catch {}
+    console.error('Chat stream error:', err);
+    try { writeSse({ error: 'AI Error' }); } catch {}
   }
-  responseStream.end();
-}
+  res.end();
+});
 
-// Lambda handler: routes /chat/stream POST to the streaming handler (streamifyResponse),
-// all other requests go through serverless-http (Express) piped to the responseStream.
-const _awslambda = (globalThis as any).awslambda;
+const serverlessHandler = serverless(app, {
+  binary: ['multipart/form-data', 'image/*', 'application/octet-stream'],
+});
 
-async function _unifiedStreamHandler(event: any, responseStream: any, context: any): Promise<void> {
-  const path = event.rawPath || event.path || '/';
-  const method = (event.requestContext?.http?.method || event.httpMethod || '').toUpperCase();
-
-  if (path === '/chat/stream' && method === 'POST') {
-    await handleStreamingChat(event, responseStream);
-    return;
-  }
-
-  // All other routes: run through Express (serverless-http), then pipe result to responseStream
-  const result: any = await serverlessHandler(event, context);
-  const statusCode = result?.statusCode ?? 200;
-  const headers: Record<string, string> = result?.headers ?? {};
-  const rawBody = result?.body ?? '';
-
-  const httpStream = _awslambda.HttpResponseStream.from(responseStream, { statusCode, headers });
-  const bodyBuffer = typeof rawBody === 'string'
-    ? Buffer.from(rawBody, result?.isBase64Encoded ? 'base64' : 'utf-8')
-    : rawBody;
-  if (bodyBuffer && bodyBuffer.length > 0) httpStream.write(bodyBuffer);
-  httpStream.end();
-}
-
-export const handler = _awslambda?.streamifyResponse
-  ? _awslambda.streamifyResponse(_unifiedStreamHandler)
-  : async (event: any, context: any) => serverlessHandler(event, context);
+export const handler = async (event: any, context: any) => serverlessHandler(event, context);
 
 // Local dev support
 if (require.main === module) {
