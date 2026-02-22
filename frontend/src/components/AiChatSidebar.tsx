@@ -41,12 +41,14 @@ interface UploadedFile {
 }
 
 interface Message {
+  id: string;
   role: 'USER' | 'ASSISTANT' | 'SYSTEM';
   content: string;
-  isAction?: boolean; // Flag for action messages
-  isExecutingTools?: boolean; // Flag for live tool execution indicator
-  attachments?: { name: string; type: string }[]; // Show attachments in message
-  toolsUsed?: string[]; // Tools that were used for this response
+  isAction?: boolean;
+  isExecutingTools?: boolean;
+  status?: 'thinking' | 'streaming' | 'done' | 'error';
+  attachments?: { name: string; type: string }[];
+  toolsUsed?: string[];
 }
 
 interface JarvisAction {
@@ -155,10 +157,25 @@ const TOOL_LABELS: Record<string, { label: string; icon: string }> = {
   delete_expose_template: { label: 'Vorlage gelöscht', icon: '🗑️' },
 };
 
-// Helper to get tool label
 const getToolLabel = (tool: string): { label: string; icon: string } => {
   return TOOL_LABELS[tool] || { label: tool.replace(/_/g, ' '), icon: '⚡' };
 };
+
+function renderMarkdown(text: string): string {
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code class="bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-[11px] font-mono">$1</code>')
+    .replace(/^### (.+)$/gm, '<div class="font-semibold text-sm mt-2 mb-1">$1</div>')
+    .replace(/^## (.+)$/gm, '<div class="font-bold text-sm mt-2 mb-1">$1</div>')
+    .replace(/^- (.+)$/gm, '<div class="flex gap-1.5 ml-1"><span class="text-gray-400 shrink-0">•</span><span>$1</span></div>')
+    .replace(/^\d+\. (.+)$/gm, (_, p1, offset, str) => {
+      const linesBefore = str.substring(0, offset).split('\n');
+      const num = linesBefore.filter((l: string) => /^\d+\./.test(l)).length + 1;
+      return `<div class="flex gap-1.5 ml-1"><span class="text-gray-400 shrink-0 tabular-nums">${num}.</span><span>${p1}</span></div>`;
+    });
+}
 
 // Contextual tips that show once per context
 interface ContextTip {
@@ -203,29 +220,38 @@ interface AiChatSidebarProps {
   onClose?: () => void;
 }
 
+const mkId = () => crypto.randomUUID?.() || Math.random().toString(36).substring(2, 11);
+
 export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const pathname = usePathname();
   const { aiChatDraft, setAiChatDraft, activeExposeContext, triggerExposeRefresh, notifyAiAction, aiActionPerformed } = useGlobalState();
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
   const [activeTip, setActiveTip] = useState<ContextTip | null>(null);
   const [tipVisible, setTipVisible] = useState(false);
   const tipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // File upload state
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Jarvis pending actions
   const [pendingActions, setPendingActions] = useState<JarvisAction[]>([]);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   
-  // Abort controller for stopping stream
   const abortControllerRef = useRef<AbortController | null>(null);
-  
-  // Store last sent message for restoring on stop
   const lastSentMessageRef = useRef<string>('');
+
+  // Cleanup AbortController on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
 
   // Get shown tips from localStorage
   const getShownTips = useCallback((): string[] => {
@@ -316,8 +342,10 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         const action = pendingActions.find(a => a.id === actionId);
         const option = action?.options?.find(o => o.id === response);
         setMessages(prev => [...prev, {
+          id: mkId(),
           role: 'ASSISTANT',
-          content: `✅ Erledigt: ${option?.label || response}`
+          content: `Erledigt: ${option?.label || response}`,
+          status: 'done',
         }]);
       }
     } catch (error) {
@@ -394,8 +422,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
-            console.log(`✅ Chat-Historie geladen: ${data.length} Nachrichten`);
-            setMessages(data);
+            setMessages(data.map((m: any) => ({ ...m, id: m.id || mkId(), status: 'done' as const })));
           } else {
             console.log('ℹ️ Keine Chat-Historie gefunden');
           }
@@ -416,7 +443,9 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (isNearBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
 
   const handleNewChat = async () => {
@@ -522,12 +551,15 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     e.preventDefault();
     if (!aiChatDraft.trim() && uploadedFiles.length === 0) return;
 
-    // Create user message with attachments info
+    if (isStreaming) return;
+
     const attachments = uploadedFiles.map(f => ({ name: f.name, type: f.type }));
     const userMsg: Message = { 
+      id: mkId(),
       role: 'USER', 
       content: aiChatDraft || (uploadedFiles.length > 0 ? `[${uploadedFiles.length} Datei(en) angehängt]` : ''),
-      attachments: attachments.length > 0 ? attachments : undefined
+      attachments: attachments.length > 0 ? attachments : undefined,
+      status: 'done',
     };
     setMessages(prev => [...prev, userMsg]);
     
@@ -550,8 +582,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
       const hasTemplateContext = activeExposeContext?.templateId && activeExposeContext.isTemplate;
       
       if (hasExposeContext || hasTemplateContext) {
-        // Show action indicator
-        setMessages(prev => [...prev, { role: 'SYSTEM', content: 'Jarvis führt Aktion aus...', isAction: true }]);
+        setMessages(prev => [...prev, { id: mkId(), role: 'SYSTEM', content: 'Jarvis führt Aktion aus...', isAction: true }]);
         
         // Determine endpoint — use API Gateway
         const baseUrl = getApiUrl();
@@ -573,10 +604,9 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         });
         const data = await res.json().catch(() => ({ response: 'Fehler bei der Verbindung zu Jarvis.' }));
         
-        // Remove action indicator and add response
         setMessages(prev => [
           ...prev.filter(m => !m.isAction), 
-          { role: 'ASSISTANT', content: data.response || data.text || 'Jarvis konnte nicht antworten.' }
+          { id: mkId(), role: 'ASSISTANT', content: data.response || data.text || 'Jarvis konnte nicht antworten.', status: 'done' }
         ]);
         
         if (data.actionsPerformed && data.actionsPerformed.length > 0) {
@@ -631,117 +661,100 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
 
         if (!res.body) throw new Error('No response body');
 
-        // Add empty assistant message that we'll update
-        const assistantMsgIndex = messages.length + 1;
-        setMessages(prev => [...prev, { role: 'ASSISTANT', content: '' }]);
+        const assistantMsgId = mkId();
+        setMessages(prev => [...prev, { id: assistantMsgId, role: 'ASSISTANT', content: '', status: 'thinking' }]);
         setIsLoading(false);
-        lastSentMessageRef.current = ''; // Response started — no need to restore
+        setIsStreaming(true);
+        lastSentMessageRef.current = '';
 
-        // Read the stream
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
         let hadFunctionCalls = false;
         let toolsUsed: string[] = [];
+        let streamTimeout: ReturnType<typeof setTimeout> | null = null;
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        const resetStreamTimeout = () => {
+          if (streamTimeout) clearTimeout(streamTimeout);
+          streamTimeout = setTimeout(() => {
+            abortControllerRef.current?.abort();
+          }, 45000);
+        };
+        resetStreamTimeout();
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n\n');
-          buffer = lines.pop() || '';
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            resetStreamTimeout();
 
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = JSON.parse(line.slice(6));
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop() || '';
 
-              // Skip heartbeat keepalive signals
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              let data: any;
+              try { data = JSON.parse(line.slice(6)); } catch { continue; }
+
               if (data.heartbeat) continue;
               
-              // Capture tools used and update message immediately with live action indicator
               if (data.toolsUsed && data.toolsUsed.length > 0) {
                 toolsUsed = data.toolsUsed;
-                // Update the assistant message with tools immediately and show action indicator
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  const assistantIdx = newMessages.findIndex((m, idx) => idx === assistantMsgIndex && m.role === 'ASSISTANT');
-                  if (assistantIdx !== -1) {
-                    newMessages[assistantIdx] = {
-                      ...newMessages[assistantIdx],
-                      toolsUsed: toolsUsed,
-                      isExecutingTools: true
-                    };
-                  }
-                  return newMessages;
-                });
+                setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
+                  ...m, toolsUsed, isExecutingTools: true, status: 'thinking' as const,
+                } : m));
               }
               
               if (data.error) {
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  newMessages[assistantMsgIndex] = { role: 'ASSISTANT', content: 'Fehler bei der Verbindung zu Jarvis.' };
-                  return newMessages;
-                });
+                setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
+                  ...m, content: data.error === 'AI Error' ? 'Fehler bei der Verbindung zu Jarvis.' : data.error,
+                  status: 'error' as const, isExecutingTools: false,
+                } : m));
                 break;
               }
               
               if (data.done) {
-                if (data.hadFunctionCalls) {
-                  hadFunctionCalls = true;
-                }
-                // Clear executing flag — all tools finished, response complete
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  const assistantIdx = newMessages.findIndex((m, idx) => idx === assistantMsgIndex && m.role === 'ASSISTANT');
-                  if (assistantIdx !== -1) {
-                    newMessages[assistantIdx] = {
-                      ...newMessages[assistantIdx],
-                      isExecutingTools: false
-                    };
-                  }
-                  return newMessages;
-                });
+                if (data.hadFunctionCalls) hadFunctionCalls = true;
+                setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
+                  ...m, isExecutingTools: false, status: 'done' as const,
+                  toolsUsed: data.toolsUsed?.length > 0 ? data.toolsUsed : m.toolsUsed,
+                } : m));
                 break;
               }
               
               if (data.chunk) {
-                // Update the assistant message with new chunk (preserve toolsUsed + executing state)
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  const assistantIdx = newMessages.findIndex((m, idx) => idx === assistantMsgIndex && m.role === 'ASSISTANT');
-                  if (assistantIdx !== -1) {
-                    newMessages[assistantIdx] = {
-                      ...newMessages[assistantIdx],
-                      content: (newMessages[assistantIdx]?.content || '') + data.chunk,
-                      // Keep pulsing until done — tools may still execute in background
-                    };
-                  }
-                  return newMessages;
-                });
+                setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
+                  ...m,
+                  content: (m.content || '') + data.chunk,
+                  status: 'streaming' as const,
+                } : m));
               }
             }
           }
+        } finally {
+          if (streamTimeout) clearTimeout(streamTimeout);
+          setIsStreaming(false);
         }
 
-        // Notify if AI performed actions
         if (hadFunctionCalls) {
           notifyAiAction();
         }
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        // User stopped the generation — just clean up
         setMessages(prev => prev.filter(m => !m.isAction));
         setIsLoading(false);
+        setIsStreaming(false);
         return;
       }
       console.error('Chat error:', error);
       const errMsg = error instanceof Error && error.message === 'Failed to fetch'
         ? 'Verbindung zum Server fehlgeschlagen. Bitte prüfe deine Internetverbindung und versuche es erneut.'
         : 'Fehler bei der Verbindung zu Jarvis.';
-      setMessages(prev => [...prev, { role: 'ASSISTANT', content: errMsg }]);
+      setMessages(prev => [...prev, { id: mkId(), role: 'ASSISTANT', content: errMsg, status: 'error' }]);
       setIsLoading(false);
+      setIsStreaming(false);
     }
   };
 
@@ -751,7 +764,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
       abortControllerRef.current = null;
     }
     setIsLoading(false);
-    // Remove any action indicator messages
+    setIsStreaming(false);
     setMessages(prev => prev.filter(m => !m.isAction));
     // Restore the sent message to the input field
     if (lastSentMessageRef.current) {
@@ -807,7 +820,12 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-3 bg-white" style={{ overscrollBehavior: 'contain' }}>
+      <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-3 bg-white" style={{ overscrollBehavior: 'contain' }}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        }}
+      >
         {/* Pending Jarvis Actions */}
         {pendingActions.length > 0 && (
           <div className="space-y-3 mb-4">
@@ -860,24 +878,22 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           </div>
         )}
         
-        {messages.map((msg, index) => {
-          // Action message (system) - just show visual indicator, no text
+        {messages.map((msg) => {
           if (msg.isAction) {
             return (
-              <div key={index} className="flex justify-center">
+              <div key={msg.id} className="flex justify-center">
                 <div className="bg-gray-100 text-gray-900 rounded-full px-3 py-1.5 text-xs font-medium flex items-center gap-1.5">
                   <div className="w-1 h-1 bg-gray-500 rounded-full animate-ping"></div>
-                  <div className="w-1 h-1 bg-gray-500 rounded-full animate-ping delay-75"></div>
-                  <div className="w-1 h-1 bg-gray-500 rounded-full animate-ping delay-150"></div>
+                  <div className="w-1 h-1 bg-gray-500 rounded-full animate-ping" style={{ animationDelay: '75ms' }}></div>
+                  <div className="w-1 h-1 bg-gray-500 rounded-full animate-ping" style={{ animationDelay: '150ms' }}></div>
                 </div>
               </div>
             );
           }
 
-          // System info message (e.g. "older messages archived")
           if (msg.role === 'SYSTEM') {
             return (
-              <div key={index} className="flex justify-center">
+              <div key={msg.id} className="flex justify-center">
                 <div className="bg-gray-100 text-gray-500 rounded-full px-3 py-1.5 text-[10px] font-medium">
                   {msg.content}
                 </div>
@@ -885,19 +901,28 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
             );
           }
           
-          // Regular messages
           return (
-            <div key={index} className={`flex ${msg.role === 'USER' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[92%] rounded-lg p-3 text-sm ${
+            <div key={msg.id} className={`flex ${msg.role === 'USER' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[92%] rounded-lg p-3 text-sm break-words ${
                 msg.role === 'USER' 
                   ? 'bg-gray-900 text-white rounded-br-none' 
                   : 'bg-white text-gray-800 rounded-bl-none'
               }`}>
-                {/* Show tools used as tags - grouped by tool type with count */}
+                {/* Status indicator for thinking/processing */}
+                {msg.role === 'ASSISTANT' && msg.status === 'thinking' && !msg.content && !msg.toolsUsed?.length && (
+                  <div className="flex items-center gap-2 text-gray-400 text-xs">
+                    <div className="flex space-x-0.5">
+                      <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
+                      <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '75ms' }}></div>
+                      <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    </div>
+                    <span>Denkt nach...</span>
+                  </div>
+                )}
+                {/* Tool tags */}
                 {msg.toolsUsed && msg.toolsUsed.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {(() => {
-                      // Group tools by name and count occurrences
                       const toolCounts = msg.toolsUsed.reduce((acc, tool) => {
                         acc[tool] = (acc[tool] || 0) + 1;
                         return acc;
@@ -905,14 +930,17 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                       
                       return Object.entries(toolCounts).map(([tool, count], i) => {
                         const { label, icon } = getToolLabel(tool);
+                        const isActive = msg.isExecutingTools;
                         return (
-                          <span key={i} className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium shadow-sm ${
-                            msg.isExecutingTools
+                          <span key={i} className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium shadow-sm transition-all ${
+                            isActive
                               ? 'bg-gradient-to-r from-indigo-50 to-blue-50 text-indigo-700 border border-indigo-200 animate-pulse'
-                              : 'bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 border border-gray-200'
+                              : 'bg-gradient-to-r from-emerald-50 to-green-50 text-emerald-700 border border-emerald-200'
                           }`}>
-                            {msg.isExecutingTools && (
+                            {isActive ? (
                               <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping" />
+                            ) : (
+                              <span className="text-emerald-500">✓</span>
                             )}
                             <span>{icon}</span>
                             {count > 1 ? `${count}x ${label}` : label}
@@ -922,7 +950,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                     })()}
                   </div>
                 )}
-                {/* Show attachments if any */}
+                {/* Attachments */}
                 {msg.attachments && msg.attachments.length > 0 && (
                   <div className="flex flex-wrap gap-1 mb-2">
                     {msg.attachments.map((att, i) => (
@@ -933,21 +961,18 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                     ))}
                   </div>
                 )}
-                {/* Render content with inline images for URLs */}
+                {/* Message content with basic markdown */}
                 {(() => {
-                  // Guard against undefined/null content
                   const msgContent = msg.content || '';
                   if (!msgContent) return null;
 
-                  // Detect image URLs in the message and render them as images
                   const imageUrlRegex = /(https?:\/\/[^\s]+?\.(png|jpg|jpeg|webp|gif)(\?[^\s]*)?)/gi;
                   const hasImageUrls = imageUrlRegex.test(msgContent);
                   
                   if (!hasImageUrls) {
-                    return <p className="whitespace-pre-wrap">{msgContent}</p>;
+                    return <div className="whitespace-pre-wrap jarvis-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(msgContent) }} />;
                   }
                   
-                  // Split text and render images inline
                   const elements: React.ReactNode[] = [];
                   let lastIndex = 0;
                   const content = msgContent;
@@ -955,27 +980,28 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                   let match;
                   
                   while ((match = regex.exec(content)) !== null) {
-                    // Text before the URL
                     if (match.index > lastIndex) {
                       const textBefore = content.slice(lastIndex, match.index).trim();
-                      if (textBefore) elements.push(<p key={`t-${lastIndex}`} className="whitespace-pre-wrap">{textBefore}</p>);
+                      if (textBefore) elements.push(<div key={`t-${lastIndex}`} className="whitespace-pre-wrap jarvis-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(textBefore) }} />);
                     }
-                    // The image
                     elements.push(
                       <a key={`img-${match.index}`} href={match[0]} target="_blank" rel="noopener noreferrer" className="block my-2">
-                        <img src={match[0]} alt="Ergebnis" className="rounded-lg max-w-full max-h-64 object-contain border border-gray-100" />
+                        <img src={match[0]} alt="Ergebnis" loading="lazy" className="rounded-lg max-w-full max-h-64 object-contain border border-gray-100" />
                       </a>
                     );
                     lastIndex = regex.lastIndex;
                   }
-                  // Remaining text
                   if (lastIndex < content.length) {
                     const remaining = content.slice(lastIndex).trim();
-                    if (remaining) elements.push(<p key={`t-${lastIndex}`} className="whitespace-pre-wrap">{remaining}</p>);
+                    if (remaining) elements.push(<div key={`t-${lastIndex}`} className="whitespace-pre-wrap jarvis-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(remaining) }} />);
                   }
                   
                   return <>{elements}</>;
                 })()}
+                {/* Streaming cursor */}
+                {msg.status === 'streaming' && (
+                  <span className="inline-block w-1.5 h-4 bg-gray-400 animate-pulse ml-0.5 align-text-bottom rounded-sm" />
+                )}
               </div>
             </div>
           );
@@ -983,10 +1009,13 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         {isLoading && (
           <div className="flex justify-start">
             <div className="bg-white rounded-lg rounded-bl-none p-3">
-              <div className="flex space-x-1">
-                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-75"></div>
-                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-150"></div>
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <div className="flex space-x-0.5">
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '75ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                </div>
+                <span>Verbindet...</span>
               </div>
             </div>
           </div>
@@ -1077,7 +1106,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
             >
               <Paperclip className="w-4 h-4" />
             </button>
-            {isLoading ? (
+            {isLoading || isStreaming ? (
               <button
                 type="button"
                 onClick={handleStop}

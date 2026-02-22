@@ -717,17 +717,6 @@ export const CRM_TOOLS = {
     }
   },
   
-  // === TEAM CHAT TOOLS ===
-  get_channels: {
-    name: "get_channels",
-    description: "Retrieves all team chat channels.",
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        limit: { type: SchemaType.NUMBER, description: "Maximum number (default: 50)" } as FunctionDeclarationSchema,
-      }
-    }
-  },
   get_channel_messages: {
     name: "get_channel_messages",
     description: "Retrieves messages from a specific channel.",
@@ -740,19 +729,6 @@ export const CRM_TOOLS = {
       required: ["channelId"]
     }
   },
-  send_channel_message: {
-    name: "send_channel_message",
-    description: "Sends a message to a team chat channel.",
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        channelId: { type: SchemaType.STRING, description: "ID of the channel" } as FunctionDeclarationSchema,
-        content: { type: SchemaType.STRING, description: "Message content" } as FunctionDeclarationSchema,
-      },
-      required: ["channelId", "content"]
-    }
-  },
-  
   // === DASHBOARD / STATS TOOLS ===
   get_dashboard_stats: {
     name: "get_dashboard_stats",
@@ -2746,15 +2722,6 @@ export class AiToolExecutor {
       }
 
       // === TEAM CHAT TOOLS ===
-      case 'get_channels': {
-        const { limit = 50 } = args;
-        return await getPrisma().channel.findMany({
-          where: { tenantId },
-          take: limit,
-          orderBy: { createdAt: 'desc' }
-        });
-      }
-
       case 'get_channel_messages': {
         const { channelId, limit = 50 } = args;
         // Verify channel belongs to user's tenant
@@ -2768,7 +2735,6 @@ export class AiToolExecutor {
         });
       }
 
-      case 'send_channel_message':
       case 'send_team_message': {
         let { channelId, content } = args;
         if (!userId) return 'Fehler: Kein Benutzer-Kontext verfügbar.';
@@ -3549,8 +3515,8 @@ export class AiToolExecutor {
               blocks.push({
                 id: blockId,
                 type: 'energyCertificate',
-                energyClass: 'B', // Placeholder
-                consumption: '85 kWh/(m²·a)',
+                energyClass: isTemplateMode ? '{{property.energyEfficiencyClass}}' : (property?.energyEfficiencyClass || 'B'),
+                consumption: isTemplateMode ? '{{property.energyConsumption}}' : (property?.energyConsumption || '85 kWh/(m²·a)'),
               });
               break;
 
@@ -3559,11 +3525,17 @@ export class AiToolExecutor {
                 id: blockId,
                 type: 'priceTable',
                 title: 'Kosten',
-                items: [
-                  { label: 'Kaltmiete', value: property.price ? `${Number(property.price).toLocaleString('de-DE')} €` : '-' },
-                  { label: 'Nebenkosten', value: 'ca. 200 €' },
-                  { label: 'Kaution', value: '3 Monatsmieten' },
-                ],
+                items: isTemplateMode
+                  ? [
+                      { label: 'Kaufpreis', value: '{{property.price}}' },
+                      { label: 'Provision', value: '{{property.commission}}' },
+                      { label: 'Nebenkosten', value: 'Auf Anfrage' },
+                    ]
+                  : [
+                      { label: 'Kaltmiete', value: property?.price ? `${Number(property.price).toLocaleString('de-DE')} €` : '-' },
+                      { label: 'Nebenkosten', value: 'ca. 200 €' },
+                      { label: 'Kaution', value: '3 Monatsmieten' },
+                    ],
               });
               break;
 
