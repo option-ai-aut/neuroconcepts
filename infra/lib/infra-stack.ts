@@ -564,6 +564,20 @@ export class ImmivoStack extends cdk.Stack {
       ),
     });
 
+    // --- SES DKIM (immivo.ai) — required for AWS SES DKIM signing in eu-central-1 ---
+    // Tokens from: aws ses get-identity-dkim-attributes --identities immivo.ai --region eu-central-1
+    // Fixes: "DKIM setup REVOKED for immivo.ai" — DNS records must exist for SES to sign outbound (Resend uses its own; SES used for inbound/verification)
+    if (props.stageName === 'prod') {
+      const sesDkimTokens = ['cztec6cd7jjiptw5pipfdicp37v3jngr', 'cb5vtkh7c7tprv2uqrcmwdzkkzcuohxc', 'q6tkl6njuisz6jhxdized6ry7fq2ao2f'];
+      sesDkimTokens.forEach((token, i) => {
+        new route53.CnameRecord(this, `SesDkimRecord${i + 1}`, {
+          zone: hostedZone,
+          recordName: `${token}._domainkey`,
+          domainName: `${token}.dkim.amazonses.com`,
+        });
+      });
+    }
+
     orchestratorLambda.addEnvironment('MEDIA_CDN_URL', `https://${mediaDomain}`);
 
     // Deploy landing page video to Media bucket (Lambda struggles with large static files)

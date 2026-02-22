@@ -43,6 +43,10 @@ export interface PlatformStats {
   emails: number;
   newTenantsThisMonth: number;
   newLeadsThisMonth: number;
+  payingTenants?: number;
+  mrrCents?: number;
+  stripeCustomers?: number;
+  billingEnabled?: boolean;
   leadsByStatus: Record<string, number>;
   propertiesByStatus: Record<string, number>;
   recentActivities: {
@@ -311,3 +315,81 @@ export interface TenantCost {
 }
 
 export const getTenantCosts = () => adminFetch<{ data: TenantCost[] }>('/admin/finance/tenant-costs');
+
+// Stripe Admin
+export interface StripeOverview {
+  configured: boolean;
+  billingEnabled: boolean;
+  mrrCents: number;
+  activeSubscriptions: number;
+  totalCustomers: number;
+  recentInvoices: { id: string; number: string | null; status: string; amountPaid: number; currency: string; customerEmail: string | null; createdAt: number }[];
+  error?: string;
+}
+
+export interface StripeCustomer {
+  id: string;
+  email: string | null;
+  name: string | null;
+  created: number;
+  metadata: Record<string, string>;
+}
+
+export interface StripeSubscription {
+  id: string;
+  status: string;
+  customerId: string;
+  customerEmail: string | null;
+  planAmount: number | null;
+  planCurrency: string;
+  planInterval: string;
+  productName: string | null;
+  currentPeriodEnd: number;
+  created: number;
+}
+
+export interface StripeInvoice {
+  id: string;
+  number: string | null;
+  status: string;
+  amountPaid: number;
+  amountDue: number;
+  currency: string;
+  customerEmail: string | null;
+  created: number;
+  paid: boolean;
+}
+
+export interface StripeSettings {
+  configured: boolean;
+  billingEnabled: boolean;
+  hasWebhookSecret: boolean;
+  priceIds: Record<string, Record<string, string>> | null;
+  mode: 'live' | 'test' | null;
+}
+
+export const getStripeOverview = () => adminFetch<StripeOverview>('/admin/stripe/overview');
+export const getStripeCustomers = (limit?: number, startingAfter?: string) => {
+  const params = new URLSearchParams();
+  if (limit) params.set('limit', String(limit));
+  if (startingAfter) params.set('startingAfter', startingAfter);
+  return adminFetch<{ data: StripeCustomer[]; hasMore: boolean }>(`/admin/stripe/customers?${params}`);
+};
+export const getStripeSubscriptions = (status?: string, limit?: number) => {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (limit) params.set('limit', String(limit));
+  return adminFetch<{ data: StripeSubscription[]; hasMore: boolean }>(`/admin/stripe/subscriptions?${params}`);
+};
+export const getStripeInvoices = (limit?: number, status?: string) => {
+  const params = new URLSearchParams();
+  if (limit) params.set('limit', String(limit));
+  if (status) params.set('status', status);
+  return adminFetch<{ data: StripeInvoice[]; hasMore: boolean }>(`/admin/stripe/invoices?${params}`);
+};
+export const getStripeProducts = () => adminFetch<{
+  products: { id: string; name: string; description: string | null }[];
+  prices: { priceId: string; productId: string; productName: string; amount: number | null; currency: string; interval: string; type: string }[];
+  stripePrices: Record<string, Record<string, string>>;
+}>('/admin/stripe/products');
+export const getStripeSettings = () => adminFetch<StripeSettings>('/admin/stripe/settings');

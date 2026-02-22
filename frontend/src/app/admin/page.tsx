@@ -5,13 +5,14 @@ import {
   Users, Building2, TrendingUp, Home, ArrowUpRight,
   Activity, Clock, CheckCircle2, AlertTriangle, Zap, Globe,
   MessageSquare, Calendar, HeadphonesIcon, FileText, Bot,
-  Loader2, FileImage, Mail
+  Loader2, FileImage, Mail, DollarSign
 } from 'lucide-react';
 import { getAdminStats, PlatformStats } from '@/lib/adminApi';
 import Link from 'next/link';
 
 const QUICK_ACTIONS = [
   { label: 'Tenants', icon: Building2, href: '/admin/sales' },
+  { label: 'Finance', icon: DollarSign, href: '/admin/finance' },
   { label: 'Support', icon: HeadphonesIcon, href: '/admin/support' },
   { label: 'Team Chat', icon: MessageSquare, href: '/admin/chat' },
   { label: 'Kalender', icon: Calendar, href: '/admin/calendar' },
@@ -79,6 +80,8 @@ export default function AdminDashboard() {
     { label: 'Gesamt-User', value: stats?.users ?? 0, icon: Users, color: 'bg-gray-800' },
     { label: 'Leads (gesamt)', value: stats?.leads ?? 0, icon: TrendingUp, color: 'bg-gray-700' },
     { label: 'Objekte', value: stats?.properties ?? 0, icon: Home, color: 'bg-gray-600' },
+    ...(typeof stats?.payingTenants === 'number' ? [{ label: 'Zahlende Tenants', value: stats.payingTenants, icon: DollarSign, color: 'bg-emerald-600' }] : []),
+    ...(typeof stats?.mrrCents === 'number' && stats.mrrCents > 0 ? [{ label: 'MRR', value: `$${(stats.mrrCents / 100).toFixed(0)}`, icon: DollarSign, color: 'bg-emerald-600' }] : []),
   ];
 
   return (
@@ -111,6 +114,7 @@ export default function AdminDashboard() {
           { label: 'E-Mails', value: stats?.emails ?? 0, icon: Mail },
           { label: 'Neue Tenants (30T)', value: stats?.newTenantsThisMonth ?? 0, icon: ArrowUpRight },
           { label: 'Neue Leads (30T)', value: stats?.newLeadsThisMonth ?? 0, icon: ArrowUpRight },
+          ...(typeof stats?.stripeCustomers === 'number' && stats.stripeCustomers > 0 ? [{ label: 'Stripe Kunden', value: stats.stripeCustomers, icon: DollarSign }] : []),
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-3 flex items-center gap-3">
             <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">

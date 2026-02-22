@@ -76,6 +76,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/support': 'Bug Reports',
   '/admin/sales': 'Tenants',
   '/admin/finance': 'Finance',
+  '/admin/finance/stripe': 'Stripe',
   '/admin/operations': 'Operations',
   '/admin/audit': 'Audit Log',
   '/admin/settings': 'Einstellungen',

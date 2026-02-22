@@ -7647,7 +7647,7 @@ app.get('/admin/platform/stats', adminAuthMiddleware, async (_req, res) => {
       db.tenant.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
       db.lead.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
       db.tenantSettings.findMany({
-        where: { stripeConfig: { not: null } as any },
+        where: { stripeConfig: { not: Prisma.JsonNull } },
         select: { stripeConfig: true },
       }),
     ]);
