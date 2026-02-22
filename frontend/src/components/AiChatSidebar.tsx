@@ -116,35 +116,35 @@ const TOOL_LABELS: Record<string, { label: string; icon: string }> = {
   get_memory_summary: { label: 'Gedächtnis abgerufen', icon: '🧠' },
   get_last_conversation: { label: 'Letzte Unterhaltung', icon: '💬' },
   
-  // Exposés
+  // Exposés & Vorlagen — für den User ist beides "Vorlage" / "Exposé"
   get_exposes: { label: 'Exposés geladen', icon: '📑' },
   create_expose_from_template: { label: 'Exposé erstellt', icon: '✨' },
-  create_full_expose: { label: 'Exposé erstellt', icon: '✨' },
+  create_full_expose: { label: 'Vorlage aufgebaut', icon: '✨' },
   delete_expose: { label: 'Exposé gelöscht', icon: '🗑️' },
   delete_all_exposes: { label: 'Alle Exposés gelöscht', icon: '🗑️' },
-  get_expose_status: { label: 'Status geladen', icon: '📊' },
+  get_expose_status: { label: 'Status geprüft', icon: '📊' },
   set_expose_status: { label: 'Status geändert', icon: '✏️' },
   set_expose_theme: { label: 'Design geändert', icon: '🎨' },
   generate_expose_pdf: { label: 'PDF generiert', icon: '📄' },
   generate_expose_text: { label: 'Text generiert', icon: '✍️' },
-  
-  // Exposé Blocks
+
   create_expose_block: { label: 'Block hinzugefügt', icon: '➕' },
   update_expose_block: { label: 'Block aktualisiert', icon: '✏️' },
   delete_expose_block: { label: 'Block gelöscht', icon: '🗑️' },
   clear_expose_blocks: { label: 'Blöcke gelöscht', icon: '🗑️' },
   reorder_expose_blocks: { label: 'Blöcke sortiert', icon: '↕️' },
-  
-  // Templates
+
   create_expose_template: { label: 'Vorlage erstellt', icon: '✨' },
-  get_expose_templates: { label: 'Vorlagen geladen', icon: '📋' },
+  get_expose_templates: { label: 'Vorlagen geprüft', icon: '📋' },
   get_template: { label: 'Vorlage geladen', icon: '📋' },
   update_template: { label: 'Vorlage aktualisiert', icon: '✏️' },
-  
+  update_expose_template: { label: 'Vorlage aktualisiert', icon: '✏️' },
+  delete_expose_template: { label: 'Vorlage gelöscht', icon: '🗑️' },
+
   // Team Chat
-  get_channels: { label: 'Kanäle geladen', icon: '💬' },
+  get_team_channels: { label: 'Kanäle geladen', icon: '💬' },
+  send_team_message: { label: 'Nachricht gesendet', icon: '📤' },
   get_channel_messages: { label: 'Nachrichten geladen', icon: '💬' },
-  send_channel_message: { label: 'Nachricht gesendet', icon: '📤' },
   
   // Dashboard
   get_dashboard_stats: { label: 'Dashboard geladen', icon: '📊' },
@@ -153,8 +153,11 @@ const TOOL_LABELS: Record<string, { label: string; icon: string }> = {
   virtual_staging: { label: 'Virtual Staging', icon: '🎨' },
   add_video_to_property: { label: 'Video hinzugefügt', icon: '🎬' },
   set_virtual_tour: { label: 'Tour gesetzt', icon: '🔄' },
-  update_expose_template: { label: 'Vorlage aktualisiert', icon: '✏️' },
-  delete_expose_template: { label: 'Vorlage gelöscht', icon: '🗑️' },
+
+  // Company & misc
+  get_company_info: { label: 'Firmendaten geladen', icon: '🏢' },
+  semantic_search: { label: 'Suche läuft', icon: '🔍' },
+  upload_documents_to_lead: { label: 'Dokument hochgeladen', icon: '📎' },
 };
 
 const getToolLabel = (tool: string): { label: string; icon: string } => {
@@ -673,14 +676,17 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         let hadFunctionCalls = false;
         let toolsUsed: string[] = [];
         let streamTimeout: ReturnType<typeof setTimeout> | null = null;
+        const tick = () => new Promise<void>(r => setTimeout(r, 0));
 
         const resetStreamTimeout = () => {
           if (streamTimeout) clearTimeout(streamTimeout);
-          streamTimeout = setTimeout(() => {
-            abortControllerRef.current?.abort();
-          }, 45000);
+          streamTimeout = setTimeout(() => { abortControllerRef.current?.abort(); }, 45000);
         };
         resetStreamTimeout();
+
+        const updateMsg = (patch: Partial<Message>) => {
+          setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, ...patch } : m));
+        };
 
         try {
           while (true) {
@@ -692,43 +698,62 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
             const lines = buffer.split('\n\n');
             buffer = lines.pop() || '';
 
+            // Collect all events from this chunk first
+            const events: any[] = [];
             for (const line of lines) {
               if (!line.startsWith('data: ')) continue;
-              let data: any;
-              try { data = JSON.parse(line.slice(6)); } catch { continue; }
+              try { events.push(JSON.parse(line.slice(6))); } catch { /* skip */ }
+            }
 
+            // Process events with micro-delays so React can render between them
+            let fullText = '';
+            for (const data of events) {
               if (data.heartbeat) continue;
               
               if (data.toolsUsed && data.toolsUsed.length > 0) {
                 toolsUsed = data.toolsUsed;
-                setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
-                  ...m, toolsUsed, isExecutingTools: true, status: 'thinking' as const,
-                } : m));
+                updateMsg({ toolsUsed: [...toolsUsed], isExecutingTools: true, status: 'thinking' });
+                await tick();
+                await new Promise(r => setTimeout(r, 150));
               }
               
               if (data.error) {
-                setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
-                  ...m, content: data.error === 'AI Error' ? 'Fehler bei der Verbindung zu Jarvis.' : data.error,
-                  status: 'error' as const, isExecutingTools: false,
-                } : m));
+                updateMsg({
+                  content: data.error === 'AI Error' ? 'Fehler bei der Verbindung zu Jarvis.' : data.error,
+                  status: 'error', isExecutingTools: false,
+                });
                 break;
               }
               
               if (data.done) {
                 if (data.hadFunctionCalls) hadFunctionCalls = true;
-                setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
-                  ...m, isExecutingTools: false, status: 'done' as const,
-                  toolsUsed: data.toolsUsed?.length > 0 ? data.toolsUsed : m.toolsUsed,
-                } : m));
+                updateMsg({
+                  isExecutingTools: false, status: 'done',
+                  toolsUsed: data.toolsUsed?.length > 0 ? data.toolsUsed : toolsUsed,
+                });
                 break;
               }
               
               if (data.chunk) {
-                setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
-                  ...m,
-                  content: (m.content || '') + data.chunk,
-                  status: 'streaming' as const,
-                } : m));
+                fullText += data.chunk;
+              }
+            }
+
+            // Animate text appearance — type out in word-sized chunks
+            if (fullText) {
+              const words = fullText.split(/(\s+)/);
+              let typed = '';
+              for (let i = 0; i < words.length; i++) {
+                typed += words[i];
+                if (i % 3 === 2 || i === words.length - 1) {
+                  const t = typed;
+                  setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
+                    ...m, content: (m.content || '') + t, status: 'streaming' as const,
+                  } : m));
+                  typed = '';
+                  await tick();
+                  await new Promise(r => setTimeout(r, 18));
+                }
               }
             }
           }
@@ -1015,7 +1040,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '75ms' }}></div>
                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                 </div>
-                <span>Verbindet...</span>
+                <span>Jarvis denkt nach...</span>
               </div>
             </div>
           </div>
