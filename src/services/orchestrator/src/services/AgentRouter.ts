@@ -46,12 +46,12 @@ const TOOL_CATEGORIES: Record<AgentCategory, string[]> = {
   email: [
     'get_emails', 'get_email', 'draft_email', 'send_email', 'reply_to_email',
     'get_email_templates',
-    'get_leads', 'get_lead',
+    'get_leads', 'get_lead', 'search_contacts',
   ],
   calendar: [
     'get_calendar_events', 'create_calendar_event', 'update_calendar_event', 
     'delete_calendar_event', 'get_calendar_availability',
-    'get_leads', 'get_lead', 'get_properties',
+    'get_leads', 'get_lead', 'get_properties', 'search_contacts',
   ],
   expose: [
     'create_full_expose', 'create_expose_from_template', 'create_expose_template',
@@ -74,7 +74,7 @@ const CLASSIFICATION_PROMPT = `Classify the user message into exactly ONE catego
 
 Categories:
 smalltalk = greetings, casual chat, humor, questions about yourself, short/ambiguous messages, numbers, jokes, counting, anything that is NOT a clear work instruction. Also: questions about the current conversation ("was hab ich gefragt?", "worüber haben wir geredet?") — the assistant already has the recent chat history.
-crm = leads, properties, search, stats, assignments, uploading images/photos/files to properties or leads, property media management (Bilder hinzufügen, Fotos hochladen, Grundriss, etc.)
+crm = leads, properties, search, stats, assignments, uploading images/photos/files to properties or leads, property media management, team chat (Nachricht ans Team, Team-Channels)
 email = read, write, send emails
 calendar = events, appointments, availability
 expose = ONLY explicit exposé/PDF creation, templates, blocks, themes. NOT image uploads to properties!
@@ -134,7 +134,8 @@ export class AgentRouter {
     if (/\b(termin|kalender|besichtigung|verfügbar|calendar|appointment)\b/i.test(m)) return 'calendar';
     
     // Expose patterns (block only with expose context)
-    if (/\b(exposé|expose|vorlage|template|pdf.*erstell)\b/i.test(m)) return 'expose';
+    if (/\b(exposé|expose|pdf.*erstell)\b/i.test(m)) return 'expose';
+    if (/\b(vorlage|template)\b/i.test(m) && !/\b(e-?mail|mail)\b/i.test(m)) return 'expose';
     if (/\b(block)\b/i.test(m) && /\b(exposé|expose)\b/i.test(m)) return 'expose';
     
     // Memory patterns — only for explicitly OLD/archived conversations
@@ -255,6 +256,9 @@ export class AgentRouter {
       }
     }
 
+    if (Object.keys(filtered).length === 0 && effectiveNames.length > 0) {
+      console.warn(`⚠️ Router: ${effectiveNames.length} tool names configured for category but none found in tool definitions. Check TOOL_CATEGORIES for typos.`);
+    }
     return Object.keys(filtered).length > 0 ? filtered : ALL_TOOLS;
   }
 
