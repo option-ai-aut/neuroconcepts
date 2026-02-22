@@ -4235,7 +4235,8 @@ app.post('/chat/stream',
         } : undefined,
       };
 
-      // Save user message to DB BEFORE streaming — include file context so follow-up messages can reference uploaded files/images
+      console.log(`💬 Chat message from ${currentUser.email}: "${message.substring(0, 200)}${message.length > 200 ? '...' : ''}"${pageContext ? ` [page: ${pageContext}]` : ''}`);
+
       await prisma.userChat.create({
         data: { userId, role: 'USER', content: fullMessage || message }
       });
