@@ -1552,8 +1552,9 @@ app.delete('/billing/subscription', authMiddleware, billingRateLimitMiddleware, 
 // Get Current User Profile
 app.get('/me', authMiddleware, async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { email: req.user!.email },
+    const db = prisma || (await initializePrisma());
+    const user = await db.user.findUnique({
+      where: { id: req.user!.sub },
       include: { tenant: true }
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -1648,8 +1649,9 @@ app.put('/settings/tenant', authMiddleware, validate(schemas.updateTenantSetting
 // Dashboard Stats
 app.get('/dashboard/stats', authMiddleware, async (req, res) => {
   try {
-    const currentUser = await prisma.user.findUnique({ 
-      where: { email: req.user!.email },
+    const db = prisma || (await initializePrisma());
+    const currentUser = await db.user.findUnique({ 
+      where: { id: req.user!.sub },
       include: { tenant: true }
     });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
@@ -1676,31 +1678,31 @@ app.get('/dashboard/stats', authMiddleware, async (req, res) => {
       recentActivities
     ] = await Promise.all([
       // Lead counts
-      prisma.lead.count({ where: { tenantId } }),
-      prisma.lead.count({ where: { tenantId, createdAt: { gte: startOfToday } } }),
-      prisma.lead.count({ where: { tenantId, createdAt: { gte: startOfWeek } } }),
-      prisma.lead.count({ where: { tenantId, createdAt: { gte: startOfMonth } } }),
+      db.lead.count({ where: { tenantId } }),
+      db.lead.count({ where: { tenantId, createdAt: { gte: startOfToday } } }),
+      db.lead.count({ where: { tenantId, createdAt: { gte: startOfWeek } } }),
+      db.lead.count({ where: { tenantId, createdAt: { gte: startOfMonth } } }),
       // Lead status breakdown
-      prisma.lead.groupBy({ by: ['status'], where: { tenantId }, _count: { status: true } }),
+      db.lead.groupBy({ by: ['status'], where: { tenantId }, _count: { status: true } }),
       // Property counts
-      prisma.property.count({ where: { tenantId } }),
-      prisma.property.groupBy({ by: ['status'], where: { tenantId }, _count: { status: true } }),
+      db.property.count({ where: { tenantId } }),
+      db.property.groupBy({ by: ['status'], where: { tenantId }, _count: { status: true } }),
       // Recent leads (last 5)
-      prisma.lead.findMany({
+      db.lead.findMany({
         where: { tenantId },
         include: { property: { select: { title: true } } },
         orderBy: { createdAt: 'desc' },
         take: 5
       }),
       // Leads needing attention (NEW, oldest first, limit 5)
-      prisma.lead.findMany({
+      db.lead.findMany({
         where: { tenantId, status: 'NEW' },
         include: { property: { select: { title: true } } },
         orderBy: { createdAt: 'asc' },
         take: 5
       }),
       // Recent activities (last 10)
-      prisma.leadActivity.findMany({
+      db.leadActivity.findMany({
         where: { lead: { tenantId } },
         include: { lead: { select: { firstName: true, lastName: true, email: true } } },
         orderBy: { createdAt: 'desc' },
@@ -2087,10 +2089,11 @@ app.delete('/account', authMiddleware, async (req, res) => {
 // Presence heartbeat — updates lastSeenAt for the current user
 app.post('/presence/heartbeat', authMiddleware, async (req, res) => {
   try {
-    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    const db = prisma || (await initializePrisma());
+    const currentUser = await db.user.findUnique({ where: { id: req.user!.sub } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
 
-    await prisma.user.update({
+    await db.user.update({
       where: { id: currentUser.id },
       data: { lastSeenAt: new Date() }
     });
@@ -3808,18 +3811,18 @@ function replacePlaceholders(blocks: any[], property: any, user: any, lead?: any
 // --- AI Assistant ---
 app.get('/chat/history', authMiddleware, async (req, res) => {
   try {
-    // Get user from auth - only return history for authenticated user
-    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    const db = prisma || (await initializePrisma());
+    const currentUser = await db.user.findUnique({ where: { id: req.user!.sub } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
 
     // Only load last 100 messages to prevent frontend from hanging
     const MAX_HISTORY = 100;
     
-    const totalCount = await prisma.userChat.count({
+    const totalCount = await db.userChat.count({
       where: { userId: currentUser.id, archived: false }
     });
 
-    const history = await prisma.userChat.findMany({
+    const history = await db.userChat.findMany({
       where: { 
         userId: currentUser.id,
         archived: false
@@ -5754,8 +5757,7 @@ app.get('/calendar/status', authMiddleware, async (req, res) => {
 // Get Calendar Events
 app.get('/calendar/events', authMiddleware, async (req, res) => {
   try {
-    const db = await initializePrisma();
-    const userEmail = req.user!.email;
+    const db = prisma || (await initializePrisma());
     const { start, end } = req.query;
 
     if (!start || !end) {
@@ -5764,7 +5766,7 @@ app.get('/calendar/events', authMiddleware, async (req, res) => {
 
     // Get user's tenantId from database
     const user = await db.user.findUnique({
-      where: { email: userEmail },
+      where: { id: req.user!.sub },
       select: { tenantId: true }
     });
 
@@ -10317,8 +10319,8 @@ app.post('/calendar/events/sync-to-office', authMiddleware, async (req: any, res
 
 app.get('/events/stream', authMiddleware, async (req: any, res) => {
   try {
-    const db = await initializePrisma();
-    const currentUser = await db.user.findUnique({ where: { email: req.user!.email } });
+    const db = prisma || (await initializePrisma());
+    const currentUser = await db.user.findUnique({ where: { id: req.user!.sub } });
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
 
     // Set SSE headers
