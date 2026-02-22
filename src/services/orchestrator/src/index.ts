@@ -36,7 +36,7 @@ import { authMiddleware, adminAuthMiddleware, verifyInternalSecret } from './mid
 import { AiSafetyMiddleware, wrapAiResponse } from './middleware/aiSafety';
 import { validate, schemas } from './middleware/validation';
 import { AiCostService } from './services/AiCostService';
-import { getStripe, BILLING_ENABLED, getPriceId, parsePlan, StripeConfig, PlanId, BillingCycle, checkoutIdempotencyKey, TRIAL_DURATION_DAYS, getTrialDaysLeft } from './services/BillingService';
+import { getStripe, BILLING_ENABLED, getPriceId, parsePlan, StripeConfig, PlanId, BillingCycle, checkoutIdempotencyKey, TRIAL_DURATION_DAYS, getTrialDaysLeft, STRIPE_PRICES } from './services/BillingService';
 import * as AWS from 'aws-sdk';
 import multer from 'multer';
 import path from 'path';
@@ -1170,13 +1170,20 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
   try {
     const db = prisma || (await initializePrisma());
     const { sub, given_name, family_name, address, phone_number } = req.user!;
-    const email = req.user!.email?.toLowerCase().trim();
+    if (!sub) {
+      structuredLog('warn', 'Auth sync: sub missing from token');
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    // Cognito may put email in "email" or "cognito:username" depending on sign-in config
+    const rawEmail = req.user!.email ?? req.user!['cognito:username'];
+    const email = typeof rawEmail === 'string' ? rawEmail.toLowerCase().trim() : undefined;
     const companyName = req.user!['custom:company_name'];
     const postalCode = req.user!['custom:postal_code'];
     const city = req.user!['custom:city'];
     const country = req.user!['custom:country'];
     
     if (!email) {
+      structuredLog('warn', 'Auth sync: email missing from token', { sub });
       return res.status(400).json({ error: 'Email required' });
     }
     
@@ -1234,19 +1241,24 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
         },
       });
 
-      // Create default team chat channel with company name
-      await db.channel.create({
-        data: {
-          name: companyName || 'Team',
-          description: 'Standard-Channel für das gesamte Team',
-          type: 'PUBLIC',
-          isDefault: true,
-          tenantId: newTenant.id,
-          members: {
-            create: [{ userId: user.id }]
+      // Create default team chat channel with company name (non-blocking)
+      try {
+        await db.channel.create({
+          data: {
+            name: companyName || 'Team',
+            description: 'Standard-Channel für das gesamte Team',
+            type: 'PUBLIC',
+            isDefault: true,
+            tenantId: newTenant.id,
+            members: {
+              create: [{ userId: user.id }]
+            }
           }
-        }
-      });
+        });
+      } catch (channelErr: any) {
+        console.warn('Auth sync: default channel creation failed (user created)', { error: channelErr?.message });
+        // User and tenant were created; channel can be created later
+      }
     } else {
       // Existing user - check if this is an invited user (Pending)
       const isPendingInvite = user.firstName === 'Pending' && user.lastName === 'Invite';
@@ -1281,8 +1293,12 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
     }
 
     res.json({ user, tenantId, needsOnboarding });
-  } catch (error) {
-    console.error('Auth sync error:', error);
+  } catch (error: any) {
+    const msg = error?.message || String(error);
+    const code = error?.code || error?.meta?.code;
+    console.error('Auth sync error:', { message: msg, code, stack: error?.stack });
+    structuredLog('error', 'Auth sync failed', { error: msg, code });
+    // Don't expose internal details; return generic 500
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -7621,7 +7637,7 @@ app.get('/admin/platform/stats', adminAuthMiddleware, async (_req, res) => {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     const [tenantCount, userCount, leadCount, propertyCount, exposeCount, emailCount,
-           newTenantsThisMonth, newLeadsThisMonth, newUsersThisMonth] = await Promise.all([
+           newTenantsThisMonth, newLeadsThisMonth, allSettingsWithStripe] = await Promise.all([
       db.tenant.count(),
       db.user.count(),
       db.lead.count(),
@@ -7630,8 +7646,39 @@ app.get('/admin/platform/stats', adminAuthMiddleware, async (_req, res) => {
       db.email.count(),
       db.tenant.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
       db.lead.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
-      db.user.count({ where: {} }), // Can't filter by createdAt on User (no field), use total
+      db.tenantSettings.findMany({
+        where: { stripeConfig: { not: null } as any },
+        select: { stripeConfig: true },
+      }),
     ]);
+
+    // Stripe: count paying tenants (active subscription in DB)
+    const payingTenantCount = allSettingsWithStripe.filter((s: any) => {
+      const cfg = s.stripeConfig as { status?: string; subscriptionId?: string } | null;
+      return cfg?.subscriptionId && (cfg?.status === 'active' || cfg?.status === 'trialing');
+    }).length;
+
+    // MRR from Stripe (if configured)
+    let mrrCents = 0;
+    let stripeCustomersTotal = 0;
+    try {
+      if (BILLING_ENABLED && process.env.STRIPE_SECRET_KEY) {
+        const stripe = getStripe();
+        const subs = await stripe.subscriptions.list({ status: 'active', limit: 100 });
+        for (const sub of subs.data) {
+          const item = sub.items?.data?.[0];
+          if (item?.plan?.amount) {
+            const amt = item.plan.amount;
+            const interval = item.plan.interval || 'month';
+            mrrCents += interval === 'year' ? Math.round(amt / 12) : amt;
+          }
+        }
+        const custs = await stripe.customers.list({ limit: 1 });
+        stripeCustomersTotal = custs.total_count ?? 0;
+      }
+    } catch {
+      // Stripe not configured or API error — leave mrr 0
+    }
 
     // Lead status distribution
     const leadsByStatus = await db.lead.groupBy({ by: ['status'], _count: true });
@@ -7657,6 +7704,10 @@ app.get('/admin/platform/stats', adminAuthMiddleware, async (_req, res) => {
       emails: emailCount,
       newTenantsThisMonth,
       newLeadsThisMonth,
+      payingTenants: payingTenantCount,
+      mrrCents,
+      stripeCustomers: stripeCustomersTotal,
+      billingEnabled: BILLING_ENABLED,
       leadsByStatus: leadsByStatus.reduce((acc: any, s: any) => ({ ...acc, [s.status]: s._count }), {}),
       propertiesByStatus: propertiesByStatus.reduce((acc: any, s: any) => ({ ...acc, [s.status]: s._count }), {}),
       recentActivities: recentActivities.map(a => ({
@@ -10845,6 +10896,225 @@ app.get('/admin/finance/tenant-costs', adminAuthMiddleware, async (_req, res) =>
   } catch (error: any) {
     console.error('Tenant costs error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// ============================================
+// Admin Stripe Endpoints (Finance > Stripe)
+// ============================================
+
+function getStripeOrNull() {
+  try {
+    if (!process.env.STRIPE_SECRET_KEY) return null;
+    return getStripe();
+  } catch {
+    return null;
+  }
+}
+
+// GET /admin/stripe/overview — MRR, counts, recent activity
+app.get('/admin/stripe/overview', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const stripe = getStripeOrNull();
+    if (!stripe) {
+      return res.json({
+        configured: false,
+        billingEnabled: BILLING_ENABLED,
+        mrrCents: 0,
+        activeSubscriptions: 0,
+        totalCustomers: 0,
+        recentInvoices: [],
+        error: 'Stripe nicht konfiguriert (STRIPE_SECRET_KEY fehlt)',
+      });
+    }
+
+    const [subs, customers, invoices] = await Promise.all([
+      stripe.subscriptions.list({ status: 'active', limit: 100 }),
+      stripe.customers.list({ limit: 1 }),
+      stripe.invoices.list({ limit: 10 }),
+    ]);
+
+    let mrrCents = 0;
+    for (const sub of subs.data) {
+      const item = sub.items?.data?.[0];
+      if (item?.plan?.amount) {
+        const interval = item.plan.interval || 'month';
+        mrrCents += interval === 'year' ? Math.round(item.plan.amount / 12) : item.plan.amount;
+      }
+    }
+
+    res.json({
+      configured: true,
+      billingEnabled: BILLING_ENABLED,
+      mrrCents,
+      activeSubscriptions: subs.data.length,
+      totalCustomers: customers.total_count ?? 0,
+      recentInvoices: invoices.data.map(inv => ({
+        id: inv.id,
+        number: inv.number,
+        status: inv.status,
+        amountPaid: inv.amount_paid,
+        currency: inv.currency,
+        customerEmail: inv.customer_email,
+        createdAt: inv.created,
+      })),
+    });
+  } catch (e: any) {
+    console.error('Stripe overview error:', e);
+    res.status(500).json({ error: e.message || 'Stripe API Fehler' });
+  }
+});
+
+// GET /admin/stripe/customers — paginated customer list
+app.get('/admin/stripe/customers', adminAuthMiddleware, async (req, res) => {
+  try {
+    const stripe = getStripeOrNull();
+    if (!stripe) return res.status(503).json({ error: 'Stripe nicht konfiguriert' });
+
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const startingAfter = (req.query.startingAfter as string) || undefined;
+
+    const customers = await stripe.customers.list({ limit, starting_after: startingAfter });
+    const data = customers.data.map(c => ({
+      id: c.id,
+      email: c.email,
+      name: c.name,
+      created: c.created,
+      metadata: c.metadata,
+    }));
+
+    res.json({
+      data,
+      hasMore: customers.has_more,
+      totalCount: undefined, // Stripe doesn't return total for list
+    });
+  } catch (e: any) {
+    console.error('Stripe customers error:', e);
+    res.status(500).json({ error: e.message || 'Stripe API Fehler' });
+  }
+});
+
+// GET /admin/stripe/subscriptions — list subscriptions
+app.get('/admin/stripe/subscriptions', adminAuthMiddleware, async (req, res) => {
+  try {
+    const stripe = getStripeOrNull();
+    if (!stripe) return res.status(503).json({ error: 'Stripe nicht konfiguriert' });
+
+    const status = (req.query.status as string) || 'active';
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+
+    const subs = await stripe.subscriptions.list({ status: status as any, limit, expand: ['data.customer', 'data.items.data.price.product'] });
+    const data = subs.data.map(s => {
+      const item = s.items?.data?.[0];
+      const price = item?.price;
+      const product = price?.product as any;
+      return {
+        id: s.id,
+        status: s.status,
+        customerId: s.customer,
+        customerEmail: typeof s.customer === 'object' ? (s.customer as any)?.email : null,
+        planAmount: price?.unit_amount,
+        planCurrency: price?.currency,
+        planInterval: price?.recurring?.interval,
+        productName: product?.name,
+        currentPeriodEnd: s.current_period_end,
+        created: s.created,
+      };
+    });
+
+    res.json({ data, hasMore: subs.has_more });
+  } catch (e: any) {
+    console.error('Stripe subscriptions error:', e);
+    res.status(500).json({ error: e.message || 'Stripe API Fehler' });
+  }
+});
+
+// GET /admin/stripe/invoices — list invoices
+app.get('/admin/stripe/invoices', adminAuthMiddleware, async (req, res) => {
+  try {
+    const stripe = getStripeOrNull();
+    if (!stripe) return res.status(503).json({ error: 'Stripe nicht konfiguriert' });
+
+    const limit = Math.min(parseInt(req.query.limit as string) || 30, 100);
+    const status = req.query.status as string | undefined;
+
+    const invoices = await stripe.invoices.list({ limit, status: status as any });
+    const data = invoices.data.map(inv => ({
+      id: inv.id,
+      number: inv.number,
+      status: inv.status,
+      amountPaid: inv.amount_paid,
+      amountDue: inv.amount_due,
+      currency: inv.currency,
+      customerEmail: inv.customer_email,
+      created: inv.created,
+      paid: inv.paid,
+    }));
+
+    res.json({ data, hasMore: invoices.has_more });
+  } catch (e: any) {
+    console.error('Stripe invoices error:', e);
+    res.status(500).json({ error: e.message || 'Stripe API Fehler' });
+  }
+});
+
+// GET /admin/stripe/products — products & prices
+app.get('/admin/stripe/products', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const stripe = getStripeOrNull();
+    if (!stripe) return res.status(503).json({ error: 'Stripe nicht konfiguriert' });
+
+    const products = await stripe.products.list({ active: true });
+    const prices = await stripe.prices.list({ active: true });
+
+    const productMap = new Map<string, any>();
+    for (const p of products.data) productMap.set(p.id, { id: p.id, name: p.name, description: p.description });
+
+    const data = prices.data
+      .filter(pr => pr.product && productMap.has(pr.product as string))
+      .map(pr => {
+        const prod = productMap.get(pr.product as string);
+        return {
+          priceId: pr.id,
+          productId: pr.product,
+          productName: prod?.name,
+          amount: pr.unit_amount,
+          currency: pr.currency,
+          interval: pr.recurring?.interval,
+          type: pr.type,
+        };
+      });
+
+    res.json({
+      products: products.data.map(p => ({ id: p.id, name: p.name, description: p.description })),
+      prices: data,
+      stripePrices: STRIPE_PRICES,
+    });
+  } catch (e: any) {
+    console.error('Stripe products error:', e);
+    res.status(500).json({ error: e.message || 'Stripe API Fehler' });
+  }
+});
+
+// GET /admin/stripe/settings — Stripe config status
+app.get('/admin/stripe/settings', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const stripe = getStripeOrNull();
+    res.json({
+      configured: !!stripe,
+      billingEnabled: BILLING_ENABLED,
+      hasWebhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET,
+      priceIds: stripe ? STRIPE_PRICES : null,
+      mode: process.env.STRIPE_SECRET_KEY?.startsWith('sk_live_') ? 'live' : 'test',
+    });
+  } catch {
+    res.json({
+      configured: false,
+      billingEnabled: BILLING_ENABLED,
+      hasWebhookSecret: false,
+      priceIds: null,
+      mode: null,
+    });
   }
 });
 
