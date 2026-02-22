@@ -225,12 +225,31 @@ export class EmailSyncService {
     let bodyHtml = '';
     let bodyText = '';
 
+    // Collect inline images keyed by Content-ID for cid: substitution
+    const inlineImages: Record<string, string> = {};
+    const MAX_INLINE_IMAGE_BYTES = 500 * 1024; // 500 KB limit per image
+
     const extractBody = (parts: any[]): void => {
       for (const part of parts) {
         if (part.mimeType === 'text/html' && part.body?.data) {
           bodyHtml = Buffer.from(part.body.data, 'base64').toString('utf-8');
         } else if (part.mimeType === 'text/plain' && part.body?.data) {
           bodyText = Buffer.from(part.body.data, 'base64').toString('utf-8');
+        } else if (part.mimeType?.startsWith('image/') && part.body?.data) {
+          // Extract inline images — parts with a Content-ID header are cid: references
+          const partHeaders: any[] = part.headers || [];
+          const contentId = partHeaders.find((h: any) => h.name.toLowerCase() === 'content-id')?.value;
+          if (contentId) {
+            const rawData = part.body.data as string;
+            const byteSize = Math.ceil(rawData.length * 0.75); // base64url → approx bytes
+            if (byteSize <= MAX_INLINE_IMAGE_BYTES) {
+              // Content-ID can be wrapped in <...>
+              const cleanCid = contentId.replace(/^<|>$/g, '').trim();
+              // Gmail uses base64url encoding; convert to standard base64 for data URLs
+              const base64 = rawData.replace(/-/g, '+').replace(/_/g, '/');
+              inlineImages[cleanCid] = `data:${part.mimeType};base64,${base64}`;
+            }
+          }
         } else if (part.parts) {
           extractBody(part.parts);
         }
@@ -248,8 +267,21 @@ export class EmailSyncService {
       }
     }
 
-    // Check for attachments
-    const hasAttachments = message.payload?.parts?.some((p: any) => p.filename && p.filename.length > 0) || false;
+    // Replace cid: references in HTML with base64 data URLs so images display without external requests
+    if (bodyHtml && Object.keys(inlineImages).length > 0) {
+      for (const [cid, dataUrl] of Object.entries(inlineImages)) {
+        // Escape special regex chars in the CID, match both cid:XXX and cid:XXX with optional spaces
+        const escaped = cid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        bodyHtml = bodyHtml.replace(new RegExp(`cid:${escaped}`, 'gi'), dataUrl);
+      }
+    }
+
+    // hasAttachments: true only for real (non-inline) attachments
+    const hasAttachments = (message.payload?.parts || []).some(
+      (p: any) => p.filename && p.filename.length > 0 && !p.headers?.some(
+        (h: any) => h.name.toLowerCase() === 'content-disposition' && h.value.startsWith('inline')
+      )
+    );
 
     return {
       messageId: message.id,

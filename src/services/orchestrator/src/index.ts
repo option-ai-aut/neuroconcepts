@@ -26,7 +26,7 @@ import { PdfService } from './services/PdfService';
 import { encryptionService } from './services/EncryptionService';
 import { ConversationMemory, setPrismaClient as setConversationPrisma } from './services/ConversationMemory';
 import { CalendarService } from './services/CalendarService';
-import { setPrismaClient as setAiToolsPrisma } from './services/AiTools';
+import { setPrismaClient as setAiToolsPrisma, setReplacePlaceholders as setAiToolsReplacePlaceholders } from './services/AiTools';
 import { setJarvisActionPrisma } from './services/JarvisActionService';
 import { setEmailResponsePrisma } from './services/EmailResponseHandler';
 import { setEmailSyncPrisma } from './services/EmailSyncService';
@@ -214,6 +214,8 @@ function injectPrismaIntoServices(client: PrismaClient) {
   setFollowUpPrisma(client);
   setLeadEnrichmentPrisma(client);
   setPredictivePrisma(client);
+  // replacePlaceholders is a pure function defined later in this file — inject after it's hoisted
+  setAiToolsReplacePlaceholders(replacePlaceholders);
 }
 
 // Function to initialize Prisma with DATABASE_URL from AWS Secrets Manager
@@ -1585,10 +1587,10 @@ app.delete('/billing/subscription', authMiddleware, billingRateLimitMiddleware, 
 app.get('/me', authMiddleware, async (req, res) => {
   try {
     const db = prisma || (await initializePrisma());
-    const user = await db.user.findUnique({
-      where: { id: req.user!.sub },
-      include: { tenant: true }
-    });
+    let user = await db.user.findUnique({ where: { id: req.user!.sub }, include: { tenant: true } });
+    if (!user && req.user!.email) {
+      user = await db.user.findUnique({ where: { email: req.user!.email.toLowerCase().trim() }, include: { tenant: true } });
+    }
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user);
   } catch (error) {
@@ -1682,10 +1684,10 @@ app.put('/settings/tenant', authMiddleware, validate(schemas.updateTenantSetting
 app.get('/dashboard/stats', authMiddleware, async (req, res) => {
   try {
     const db = prisma || (await initializePrisma());
-    const currentUser = await db.user.findUnique({ 
-      where: { id: req.user!.sub },
-      include: { tenant: true }
-    });
+    let currentUser = await db.user.findUnique({ where: { id: req.user!.sub }, include: { tenant: true } });
+    if (!currentUser && req.user!.email) {
+      currentUser = await db.user.findUnique({ where: { email: req.user!.email.toLowerCase().trim() }, include: { tenant: true } });
+    }
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
 
     const tenantId = currentUser.tenantId;
@@ -2117,22 +2119,30 @@ app.delete('/account', authMiddleware, async (req, res) => {
   }
 });
 
-// Get Seats (Team Members)
 // Presence heartbeat — updates lastSeenAt for the current user
 app.post('/presence/heartbeat', authMiddleware, async (req, res) => {
   try {
     const db = prisma || (await initializePrisma());
-    const currentUser = await db.user.findUnique({ where: { id: req.user!.sub } });
+    // Try sub first (fast path), fall back to email for users whose id hasn't been synced yet
+    let currentUser = await db.user.findUnique({ where: { id: req.user!.sub } });
+    if (!currentUser && req.user!.email) {
+      currentUser = await db.user.findUnique({ where: { email: req.user!.email.toLowerCase().trim() } });
+    }
     if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
 
-    await db.user.update({
-      where: { id: currentUser.id },
-      data: { lastSeenAt: new Date() }
-    });
+    // lastSeenAt update is non-fatal — never return 500 for this
+    try {
+      await db.user.update({
+        where: { id: currentUser.id },
+        data: { lastSeenAt: new Date() }
+      });
+    } catch (updateErr: any) {
+      structuredLog('warn', 'Heartbeat: lastSeenAt update failed (non-fatal)', { error: updateErr?.message });
+    }
 
     res.json({ ok: true });
-  } catch (error) {
-    console.error('Heartbeat error:', error);
+  } catch (error: any) {
+    structuredLog('error', 'Heartbeat error', { error: error?.message });
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -11261,14 +11271,13 @@ async function handleStreamingChat(event: any, responseStream: any): Promise<voi
   let headersStarted = false;
   const writeSse = (data: any) => { responseStream.write(`data: ${JSON.stringify(data)}\n\n`); };
 
-  // CORS headers
-  const origin = event.headers?.origin || 'https://app.immivo.ai';
+  // Stream-specific headers only — CORS (Access-Control-Allow-Origin) is handled
+  // automatically by the Lambda Function URL config (infra-stack.ts). Setting it here
+  // would result in a duplicate header that browsers reject.
   const corsHeaders: Record<string, string> = {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Credentials': 'true',
   };
 
   try {

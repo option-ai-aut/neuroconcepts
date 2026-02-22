@@ -32,6 +32,8 @@ function sanitizeEmailHtml(html: string): string {
     ],
     ALLOW_DATA_ATTR: false,
     ADD_ATTR: ['target'],
+    // Allow data: URIs on img src so that inline images stored as base64 data URLs display correctly
+    ADD_URI_SAFE_ATTR: ['src'],
   });
 }
 

@@ -46,6 +46,19 @@ function getPrisma(): PrismaClient {
   return prisma;
 }
 
+// replacePlaceholders is injected from index.ts to avoid circular imports
+let _replacePlaceholders: ((blocks: any[], property: any, user: any, lead?: any) => any[]) | null = null;
+
+export function setReplacePlaceholders(fn: (blocks: any[], property: any, user: any, lead?: any) => any[]) {
+  _replacePlaceholders = fn;
+}
+
+function replacePlaceholders(blocks: any[], property: any, user: any, lead?: any): any[] {
+  if (_replacePlaceholders) return _replacePlaceholders(blocks, property, user, lead);
+  // Minimal fallback if not injected: return blocks as-is
+  return blocks;
+}
+
 export const CRM_TOOLS = {
   // === SEMANTIC SEARCH (RAG) ===
   semantic_search: {
@@ -795,13 +808,14 @@ export const CRM_TOOLS = {
   },
   update_expose_template: {
     name: "update_expose_template",
-    description: "Updates an Exposé template's name or theme.",
+    description: "Updates an Exposé template's name, theme, or content blocks. Use this to improve a template layout, add/edit sections, or rename/restyle it.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         templateId: { type: SchemaType.STRING, description: "ID of the template to update" } as FunctionDeclarationSchema,
         name: { type: SchemaType.STRING, description: "New template name" } as FunctionDeclarationSchema,
         theme: { type: SchemaType.STRING, description: "Theme: modern, classic, elegant, minimal, luxury, bold" } as FunctionDeclarationSchema,
+        blocks: { type: SchemaType.ARRAY, description: "Full replacement of template content blocks as JSON array. Each block has an 'id', 'type', and type-specific fields. Supported types: hero, stats, gallery, text, contact, map, features, timeline, video." } as FunctionDeclarationSchema,
       },
       required: ["templateId"]
     }
@@ -2589,16 +2603,24 @@ export class AiToolExecutor {
         });
         if (!property) return { error: "Das Objekt wurde nicht gefunden." };
 
+        // Load current user so placeholders like {{user.name}} are resolved
+        const currentUser = await getPrisma().user.findUnique({ where: { id: userId } });
+
+        // Replace {{property.X}} and {{user.X}} placeholders in the template blocks
+        const resolvedBlocks = currentUser
+          ? replacePlaceholders(template.blocks as any[], property, currentUser)
+          : template.blocks as any;
+
         const expose = await getPrisma().expose.create({
           data: {
             tenantId,
             propertyId,
             templateId,
-            blocks: template.blocks as any,
+            blocks: resolvedBlocks as any,
             status: 'DRAFT'
           }
         });
-        return `Exposé für "${property.title}" wurde erfolgreich erstellt.`;
+        return { message: `Exposé für "${(property as any).title}" wurde erfolgreich erstellt.`, exposeId: expose.id };
       }
 
       case 'create_expose_template': {
@@ -2663,7 +2685,64 @@ export class AiToolExecutor {
 
       case 'generate_expose_pdf': {
         const { exposeId } = args;
-        return { message: `Die PDF-Generierung für das Exposé wurde gestartet.` };
+        if (!exposeId) return { error: 'exposeId ist erforderlich.' };
+
+        const expose = await getPrisma().expose.findFirst({
+          where: { id: exposeId, tenantId },
+          include: { property: true }
+        });
+        if (!expose) return { error: `Exposé mit ID "${exposeId}" nicht gefunden.` };
+
+        // Load current user for the PDF footer
+        const pdfUser = await getPrisma().user.findUnique({ where: { id: userId } });
+
+        const { PdfService } = await import('./PdfService');
+        const pdfBuffer = await PdfService.generateExposePdf({
+          id: expose.id,
+          blocks: expose.blocks as any[],
+          theme: expose.theme,
+          property: {
+            title: (expose.property as any).title,
+            address: (expose.property as any).address || '',
+            price: Number((expose.property as any).price) || 0,
+            area: Number((expose.property as any).area) || 0,
+            rooms: Number((expose.property as any).rooms) || 0,
+            description: (expose.property as any).description || undefined,
+            images: (expose.property as any).images || [],
+          },
+          user: pdfUser ? {
+            name: `${pdfUser.firstName || ''} ${pdfUser.lastName || ''}`.trim(),
+            email: pdfUser.email,
+          } : undefined,
+        });
+
+        // Upload PDF to S3
+        const mediaBucket = process.env.MEDIA_BUCKET_NAME || '';
+        const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'eu-central-1';
+        const s3Key = `exposes/${tenantId}/${exposeId}-${Date.now()}.pdf`;
+
+        if (!mediaBucket) {
+          return { error: 'MEDIA_BUCKET_NAME ist nicht konfiguriert. PDF kann nicht gespeichert werden.' };
+        }
+
+        const AWS = require('aws-sdk');
+        const s3 = new AWS.S3();
+        await s3.putObject({
+          Bucket: mediaBucket,
+          Key: s3Key,
+          Body: pdfBuffer,
+          ContentType: 'application/pdf',
+        }).promise();
+
+        const cdnUrl = process.env.MEDIA_CDN_URL;
+        const pdfUrl = cdnUrl
+          ? `${cdnUrl}/${s3Key}`
+          : `https://${mediaBucket}.s3.${region}.amazonaws.com/${s3Key}`;
+
+        return {
+          message: `Das PDF für "${(expose as any).title || 'Exposé'}" wurde erfolgreich generiert.`,
+          url: pdfUrl,
+        };
       }
 
       // === TEAM CHAT TOOLS ===

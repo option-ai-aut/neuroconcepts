@@ -192,8 +192,8 @@ function getPageContext(pathname: string, exposeCtx?: { isTemplate?: boolean; te
   else if (pathname.startsWith('/dashboard/activities')) parts.push('Aktivitäten');
   else if (pathname === '/dashboard') parts.push('Dashboard-Übersicht');
 
-  if (exposeCtx?.isTemplate && exposeCtx.templateId) parts.push('Exposé-Vorlage wird gerade im Editor bearbeitet');
-  else if (!exposeCtx?.isTemplate && exposeCtx?.exposeId) parts.push('Exposé wird gerade im Editor bearbeitet');
+  if (exposeCtx?.isTemplate && exposeCtx.templateId) parts.push(`Exposé-Vorlage wird gerade im Editor bearbeitet (templateId: ${exposeCtx.templateId})`);
+  else if (!exposeCtx?.isTemplate && exposeCtx?.exposeId) parts.push(`Exposé wird gerade im Editor bearbeitet (exposeId: ${exposeCtx.exposeId})`);
 
   return parts.join(' – ');
 }
