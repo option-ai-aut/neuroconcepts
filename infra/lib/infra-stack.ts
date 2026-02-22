@@ -382,20 +382,13 @@ export class ImmivoStack extends cdk.Stack {
       resources: ['*'],
     }));
 
-    // Lambda Function URL for streaming endpoints (bypasses API Gateway 29s timeout)
-    const allowedStreamOrigins = [
-      'https://test.immivo.ai',
-      'https://app.immivo.ai', 'https://immivo.ai',
-      'https://admin.immivo.ai',
-    ];
+    // Lambda Function URL for streaming endpoints (bypasses API Gateway 29s timeout).
+    // CORS is intentionally NOT configured here — the Express CORS middleware in index.ts
+    // handles Access-Control-Allow-Origin. Configuring it on the Function URL as well
+    // causes duplicate headers that browsers reject.
     const functionUrl = orchestratorLambda.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
       invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
-      cors: {
-        allowedOrigins: allowedStreamOrigins,
-        allowedHeaders: ['Content-Type', 'Authorization'],
-        allowedMethods: [lambda.HttpMethod.ALL],
-      },
     });
 
     // Export the Function URL for frontend to use for streaming
