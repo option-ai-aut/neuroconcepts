@@ -75,13 +75,13 @@ export default function AdminDashboard() {
     );
   }
 
-  const kpis = [
+  const kpis: { label: string; value: number; displayValue?: string; icon: any; color: string }[] = [
     { label: 'Aktive Tenants', value: stats?.tenants ?? 0, icon: Building2, color: 'bg-gray-900' },
     { label: 'Gesamt-User', value: stats?.users ?? 0, icon: Users, color: 'bg-gray-800' },
     { label: 'Leads (gesamt)', value: stats?.leads ?? 0, icon: TrendingUp, color: 'bg-gray-700' },
     { label: 'Objekte', value: stats?.properties ?? 0, icon: Home, color: 'bg-gray-600' },
     ...(typeof stats?.payingTenants === 'number' ? [{ label: 'Zahlende Tenants', value: stats.payingTenants, icon: DollarSign, color: 'bg-emerald-600' }] : []),
-    ...(typeof stats?.mrrCents === 'number' && stats.mrrCents > 0 ? [{ label: 'MRR', value: `$${(stats.mrrCents / 100).toFixed(0)}`, icon: DollarSign, color: 'bg-emerald-600' }] : []),
+    ...(typeof stats?.mrrCents === 'number' && stats.mrrCents > 0 ? [{ label: 'MRR', value: stats.mrrCents, displayValue: `$${(stats.mrrCents / 100).toFixed(0)}`, icon: DollarSign, color: 'bg-emerald-600' }] : []),
   ];
 
   return (
@@ -101,7 +101,7 @@ export default function AdminDashboard() {
                 <stat.icon className="w-4.5 h-4.5 text-white" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-gray-900">{stat.value.toLocaleString('de-DE')}</p>
+            <p className="text-2xl font-bold text-gray-900">{stat.displayValue ?? stat.value.toLocaleString('de-DE')}</p>
             <p className="text-xs text-gray-500 mt-0.5">{stat.label}</p>
           </div>
         ))}

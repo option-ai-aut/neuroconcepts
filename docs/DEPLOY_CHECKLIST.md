@@ -1,15 +1,28 @@
 # Deploy-Checkliste: Lokal → Test → Main
 
-Dieses Dokument beschreibt alle Schritte die beim Deployen von lokal nach `test` (und `test` nach `main`) zu beachten sind.
+Dieses Dokument beschreibt alle Schritte beim Deployen von lokal nach `test` (und `test` nach `main`).
+
+---
+
+## Automatische Safeguards (seit 2026-02-22)
+
+Nach **jedem** CDK-Deploy (`push test` oder `push main`) führt die GitHub Actions Pipeline **automatisch** aus:
+
+1. `POST /admin/setup-db` — erstellt alle Core-Tabellen falls sie fehlen (idempotent)
+2. `POST /admin/migrate?force=true` — wendet alle Schema-Änderungen an (idempotent)
+3. `POST /admin/seed-portals` — befüllt Portal-Tabelle (idempotent, upsert)
+4. `GET /health` — verifiziert dass der Lambda antwortet
+
+**Das bedeutet:** Ein leeres/frisches DB-Schema kann nicht mehr passieren. Selbst wenn Aurora neu provisioniert wird, repariert sich die DB bei jedem Deploy automatisch. Schlägt einer dieser Schritte fehl, scheitert der gesamte Deploy-Job und du wirst benachrichtigt.
 
 ---
 
 ## Schnell-Referenz: AWS Ressourcen
 
-| Stage | API Gateway URL | Secret Name | CloudFormation Stack |
-|-------|----------------|-------------|----------------------|
-| test  | `https://8fiutkddgi.execute-api.eu-central-1.amazonaws.com/test` | `Immivo-App-Secret-test` | `Immivo-Test` |
-| main  | *(prod URL)* | `Immivo-App-Secret-prod` | `Immivo-Prod` |
+| Stage | API Gateway URL | Secret Name | CloudFormation Stack | Frontend |
+|-------|----------------|-------------|----------------------|---------|
+| test  | `https://8fiutkddgi.execute-api.eu-central-1.amazonaws.com/test` | `Immivo-App-Secret-test` | `Immivo-Test` | `test.immivo.ai` |
+| prod  | `https://6bvhhew3b0.execute-api.eu-central-1.amazonaws.com/prod` | `Immivo-App-Secret-prod` | `Immivo-Prod` | `app.immivo.ai` |
 
 ---
 
@@ -18,7 +31,7 @@ Dieses Dokument beschreibt alle Schritte die beim Deployen von lokal nach `test`
 ### 1. Vor dem Push: Code prüfen
 
 ```bash
-# Lokale TypeScript-Kompilierung prüfen
+# TypeScript kompilierung prüfen
 cd src/services/orchestrator
 npm run build
 
@@ -42,78 +55,55 @@ Hat sich `schema.prisma` geändert? Wenn ja:
 **Option A: Push-Script (empfohlen)**
 
 ```bash
-# Auf test deployen
 push test
-
-# Auf main (Prod) deployen
-push main
 ```
-
-> Die `push`-Funktion in `~/.zshrc` stasht automatisch ungetrackte/geänderte Dateien (z.B. `telegram-agent/bot-error.log`) vor dem Branch-Wechsel und poppt sie danach wieder. So blockieren lokale Log-Änderungen nicht mehr.
 
 **Option B: Manuell**
 
 ```bash
 cd /Users/dennis/NeuroConcepts.ai
-
-# Aktuellen Branch-Stand nach test pushen
 git add .
 git commit -m "feat: ..."
 git push origin HEAD:test
 ```
 
-GitHub Actions deployt automatisch sobald der `test`/`main`-Branch aktualisiert wird. Dauer: **~10–15 Minuten**.
+GitHub Actions deployt automatisch sobald der `test`-Branch aktualisiert wird. Dauer: **~10–15 Minuten**.
 
-### 4. Nach dem Deploy: Datenbank migrieren
+### 4. Deploy beobachten
 
-Das ist der **wichtigste Schritt** — ohne diesen fehlen neue Spalten in der DB.
+Die Pipeline führt nach dem CDK-Deploy automatisch aus:
+- setup-db → migrate → seed-portals → health-check
 
-```bash
-# ADMIN_SECRET aus AWS Secrets Manager holen und Force-Migrate ausführen
-ADMIN_SECRET=$(aws secretsmanager get-secret-value \
-  --secret-id Immivo-App-Secret-test \
-  --query SecretString \
-  --output text \
-  --region eu-central-1 | python3 -c "import sys,json; print(json.load(sys.stdin)['ADMIN_SECRET'])")
+Alle 4 Schritte müssen grün sein. Wenn einer rot wird → Deploy-Job schlägt fehl, kein weiteres Handeln notwendig bis das Problem behoben ist.
 
-curl -s -X POST https://8fiutkddgi.execute-api.eu-central-1.amazonaws.com/test/admin/migrate \
-  -H "Content-Type: application/json" \
-  -H "x-admin-secret: $ADMIN_SECRET" \
-  -d '{"force":true}' | python3 -m json.tool
-```
-
-**Erwartete Antwort:**
-```json
-{
-  "success": true,
-  "tables": ["User", "Lead", "Property", ...]
-}
-```
-
-> `force: true` löscht `_MigrationMeta` und führt **alle** Migration-Statements neu aus. Das ist idempotent — jedes Statement hat `IF NOT EXISTS`, also passiert bei bereits vorhandenen Spalten/Tabellen nichts.
-
-### 5. Deployment verifizieren
+### 5. Nach dem Deploy: Manuell verifizieren
 
 ```bash
 # Health Check
-curl -s https://8fiutkddgi.execute-api.eu-central-1.amazonaws.com/test/health | python3 -m json.tool
+curl -s https://8fiutkddgi.execute-api.eu-central-1.amazonaws.com/test/health
 
-# Login testen (im Browser)
+# Login im Browser testen
 open https://test.immivo.ai
 ```
 
-Checkliste nach dem Deploy:
-- [ ] Login funktioniert
-- [ ] Dashboard lädt
+Pflicht-Checkliste nach dem Deploy auf test:
+- [ ] Login funktioniert (kein 500 bei `/auth/sync`)
+- [ ] Dashboard lädt vollständig
 - [ ] CRM / Leads öffnet ohne 500er
-- [ ] Settings / Billing öffnet ohne Fehler
+- [ ] Settings → Portale zeigt Portal-Cards
+- [ ] Settings → Billing öffnet ohne Fehler
+- [ ] Team Chat funktioniert
+- [ ] Einstellungen → E-Mail konfigurierbar
+
+**Erst wenn alle Punkte gecheckt sind → main pushen.**
 
 ---
 
 ## Test → Main pushen
 
-### Voraussetzung
-Test muss **vollständig funktionieren** (Login, Dashboard, CRM, alle Seiten).
+### Voraussetzung (STRIKT)
+
+Test muss **vollständig** die 7-Punkte-Checkliste oben bestehen. Kein Punkt darf offen sein.
 
 ### 1. Push
 
@@ -121,27 +111,31 @@ Test muss **vollständig funktionieren** (Login, Dashboard, CRM, alle Seiten).
 git push origin test:main
 ```
 
-GitHub Actions benötigt für `main` eine **manuelle Bestätigung** (Environment Protection). Im GitHub Actions UI auf "Review deployments" → "Approve" klicken.
+GitHub Actions benötigt für `main` eine **manuelle Bestätigung** (Environment Protection).  
+Im GitHub Actions UI → "Review deployments" → "Approve" klicken.
 
-### 2. Datenbank migrieren (Main/Prod)
+### 2. Deploy Pipeline beobachten
+
+Die Pipeline führt nach dem CDK-Deploy automatisch aus:
+- setup-db → migrate → seed-portals → health-check
+
+Alle 4 Schritte müssen grün sein.
+
+### 3. Nach dem Deploy: Prod verifizieren
 
 ```bash
-ADMIN_SECRET=$(aws secretsmanager get-secret-value \
-  --secret-id Immivo-App-Secret-prod \
-  --query SecretString \
-  --output text \
-  --region eu-central-1 | python3 -c "import sys,json; print(json.load(sys.stdin)['ADMIN_SECRET'])")
+curl -s https://6bvhhew3b0.execute-api.eu-central-1.amazonaws.com/prod/health \
+  -H "Origin: https://app.immivo.ai"
 
-curl -s -X POST https://api.immivo.ai/admin/migrate \
-  -H "Content-Type: application/json" \
-  -H "x-admin-secret: $ADMIN_SECRET" \
-  -H "Origin: https://app.immivo.ai" \
-  -d '{"force":true}' | python3 -m json.tool
+open https://app.immivo.ai/login
 ```
 
-> **Hinweis:** Prod blockiert Requests ohne `Origin`-Header. Bei curl `-H "Origin: https://app.immivo.ai"` setzen.
-
-> **Achtung bei Main/Prod**: `force:true` ist sicher (idempotent), aber auf Prod nur ausführen wenn neue Schema-Änderungen da sind. Bei reinen Code-Changes ohne Schema-Änderungen reicht ein normaler Aufruf ohne `force`.
+Pflicht-Checkliste nach dem Prod-Deploy:
+- [ ] Login auf `app.immivo.ai` funktioniert
+- [ ] Dashboard lädt ohne 500er
+- [ ] CRM / Leads öffnet
+- [ ] Settings → Portale zeigt Portal-Cards
+- [ ] Billing öffnet ohne Fehler
 
 ---
 
@@ -151,9 +145,11 @@ Das Projekt hat **3 Migrations-Schichten**:
 
 | Schicht | Datei | Wann ausgeführt |
 |---------|-------|-----------------|
-| `migration.sql` | `prisma/migrations/.../migration.sql` | Einmalig bei DB-Setup via `/admin/setup-db` |
-| `applyPendingMigrations` | `src/index.ts` | Bei jedem Lambda Cold Start (version-gated) |
+| `migration.sql` | `prisma/migrations/.../migration.sql` | Via `/admin/setup-db` — einmalig bei neuem DB-Schema, idempotent |
+| `applyPendingMigrations` | `src/index.ts` | Bei jedem Lambda Cold Start (version-gated) + via `/admin/migrate` |
 | `ensureAdminTables` | `src/index.ts` | Bei jedem Lambda Cold Start (idempotent) |
+
+**Wichtig**: `admin/setup-db` erstellt alle Core-Tabellen (User, Tenant, Portal, Channel, Message, ...). `applyPendingMigrations` fügt nur neue Spalten/Zusatztabellen hinzu. Beide werden jetzt bei jedem Deploy automatisch aufgerufen.
 
 ### Neue Spalte hinzufügen (Schritt-für-Schritt)
 
@@ -163,7 +159,7 @@ Das Projekt hat **3 Migrations-Schichten**:
    ```typescript
    'ALTER TABLE "MeinModel" ADD COLUMN IF NOT EXISTS "meinFeld" TEXT',
    ```
-4. Pushen + nach Deploy `admin/migrate` mit `force:true` aufrufen
+4. `push test` → Pipeline führt migrate automatisch aus
 
 ### Neue Tabelle hinzufügen (Schritt-für-Schritt)
 
@@ -175,26 +171,22 @@ Das Projekt hat **3 Migrations-Schichten**:
      created++;
    }
    ```
-3. Pushen + nach Deploy `admin/migrate` mit `force:true` aufrufen
+3. `push test` → Pipeline führt setup-db + migrate automatisch aus
 
 ---
 
 ## Push-Workflow (zshrc)
 
-Das Projekt nutzt eine `push`-Funktion in `~/.zshrc` für vereinfachtes Deployen:
+Das Projekt nutzt eine `push`-Funktion in `~/.zshrc`:
 
 ```bash
-push test             # commit + push auf test → deployt auf test.immivo.ai
-push main             # merged test → main, pushed (braucht GitHub-Approval) → app.immivo.ai
+push test    # commit + push auf test → deployt auf test.immivo.ai
+push main    # merged test → main, pushed (braucht GitHub-Approval) → app.immivo.ai
 ```
 
-**Hinweis:** Die dev-Stage wurde entfernt. Es gibt nur noch test und main.
-
-Die Funktion stasht automatisch ungetrackte/geänderte Dateien (z.B. `bot-error.log`) vor Branch-Wechseln und stellt sie danach wieder her.
+Die Funktion stasht automatisch ungetrackte/geänderte Dateien vor Branch-Wechseln und stellt sie danach wieder her.
 
 ## Lokale Entwicklung
-
-Für lokale Entwicklung wird kein separates Stage-Backend benötigt:
 
 ```bash
 # Backend starten
@@ -206,19 +198,26 @@ cd frontend
 npm run dev   # startet auf localhost:3000
 ```
 
-Das lokale Frontend verbindet sich automatisch mit `localhost:3001` (via `NODE_ENV === 'development'` Logik in `next.config.mjs`).
+Das lokale Frontend verbindet sich automatisch mit `localhost:3001` (via `NODE_ENV === 'development'` in `next.config.mjs`).
 
 ---
 
 ## Häufige Fehler & Lösungen
 
 ### `500` beim Login (`/auth/sync`)
-**Ursache**: Spalte fehlt in DB (z.B. `lastSeenAt`, `assistantThreadId`).  
-**Fix**: `admin/migrate` mit `force:true` aufrufen (siehe Schritt 4 oben).
+**Ursache A**: Tabellen fehlen in DB (Core-Schema nie initialisiert).  
+**Fix**: `POST /admin/setup-db` aufrufen (passiert jetzt automatisch im Deploy).
+
+**Ursache B**: Spalte fehlt in DB (z.B. `lastSeenAt`, `assistantThreadId`).  
+**Fix**: `POST /admin/migrate` mit `{"force":true}` aufrufen (passiert jetzt automatisch im Deploy).
 
 ### `500` beim CRM / Billing
-**Ursache**: Spalte fehlt (z.B. `tenantId` wird aus DB geholt, Tabelle existiert nicht).  
+**Ursache**: Tabelle oder Spalte fehlt.  
 **Fix**: `admin/migrate` mit `force:true` aufrufen.
+
+### Keine Portal-Cards in Einstellungen
+**Ursache**: Portal-Tabelle leer (seed nie ausgeführt).  
+**Fix**: `POST /admin/seed-portals` aufrufen (passiert jetzt automatisch im Deploy).
 
 ### Deploy hängt in CloudFormation
 **Häufige Ursache**: Security Group Description geändert (immutable Property).  
@@ -232,22 +231,18 @@ Das lokale Frontend verbindet sich automatisch mit `localhost:3001` (via `NODE_E
 **Ursache**: Falscher Secret-Name im `aws secretsmanager` Befehl.  
 **Korrekte Namen**: `Immivo-App-Secret-test`, `Immivo-App-Secret-prod`.
 
-### Eingehende E-Mails landen nicht (401 Unauthorized)
-**Ursache**: `INTERNAL_API_SECRET` fehlt in AWS Secrets Manager oder Email-Parser hat keinen Zugriff auf AppSecret.  
-**Fix**: In `Immivo-App-Secret-{stage}` muss der Key `INTERNAL_API_SECRET` existieren. CDK gibt dem Email-Parser `APP_SECRET_ARN` + `grantRead` — nach Deploy sollte es automatisch funktionieren.
-
 ### Deploy auf `main` hängt auf "Warten"
 **Ursache**: GitHub Actions `environment: production` erfordert manuelle Genehmigung.  
 **Fix**: Im GitHub Actions UI → "Review deployments" → "Approve" klicken.
 
 ### Lambda crasht mit `DOMMatrix is not defined` (502/500)
-**Ursache**: `xlsx` (SheetJS) nutzt Browser-APIs (`DOMMatrix`), die auf AWS Lambda nicht existieren. Wenn der Bundler `xlsx` einbündelt, crasht der Orchestrator beim Startup.  
+**Ursache**: `xlsx` (SheetJS) nutzt Browser-APIs (`DOMMatrix`), die auf AWS Lambda nicht existieren.  
 **Fix**: `xlsx`, `mammoth`, `pdf-parse`, `jszip` müssen in `infra/lib/infra-stack.ts` unter `externalModules` stehen und in `afterBundling` separat installiert werden. Außerdem: `xlsx` nur lazy laden (z.B. per `require('xlsx')` erst bei Excel-Upload).
 
-### Lambda startet nicht: `DOMMatrix is not defined`
-**Ursache**: Eine npm-Library (z.B. `xlsx`/SheetJS) wird von esbuild eingebündelt und ihr statischer Initializer braucht Browser-APIs (DOMMatrix), die in Lambda nicht existieren.  
-**Fix**: Library zu `externalModules` in `infra/lib/infra-stack.ts` (OrchestratorLambda) hinzufügen UND in `afterBundling` via `npm install` installieren. Aktuell extern: `xlsx`, `mammoth`, `pdf-parse`, `jszip`.
-
 ### `push test` schlägt fehl: "local changes would be overwritten by checkout"
-**Ursache**: Lokale Datei (z.B. `telegram-agent/bot-error.log`) ist auf dem Ziel-Branch getrackt, aber lokal verändert.  
-**Fix**: Die `push`-Funktion in `~/.zshrc` stasht automatisch — falls das Problem erneut auftritt, manuell `git stash` vor `push test` ausführen. Oder: `git rm --cached <datei>` auf dem Ziel-Branch ausführen und pushen.
+**Ursache**: Lokale Datei ist auf dem Ziel-Branch getrackt, aber lokal verändert.  
+**Fix**: Die `push`-Funktion in `~/.zshrc` stasht automatisch — falls Problem erneut auftritt, manuell `git stash` vor `push test` ausführen.
+
+### Post-Deploy Step schlägt fehl: `curl: (22) The requested URL returned error: 403`
+**Ursache**: ADMIN_SECRET konnte nicht aus Secrets Manager geladen werden (IAM-Rechte fehlen für Deploy-Role).  
+**Fix**: Sicherstellen dass `AWS_DEPLOY_ROLE_ARN` IAM-Recht `secretsmanager:GetSecretValue` auf `Immivo-App-Secret-*` hat.

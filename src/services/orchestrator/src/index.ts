@@ -7673,8 +7673,11 @@ app.get('/admin/platform/stats', adminAuthMiddleware, async (_req, res) => {
             mrrCents += interval === 'year' ? Math.round(amt / 12) : amt;
           }
         }
-        const custs = await stripe.customers.list({ limit: 1 });
-        stripeCustomersTotal = custs.total_count ?? 0;
+        // total_count does not exist in Stripe list API — count from our own DB instead
+        stripeCustomersTotal = allSettingsWithStripe.filter((s: any) => {
+          const cfg = s.stripeConfig as { customerId?: string } | null;
+          return !!cfg?.customerId;
+        }).length;
       }
     } catch {
       // Stripe not configured or API error — leave mrr 0

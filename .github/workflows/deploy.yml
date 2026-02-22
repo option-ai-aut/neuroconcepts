@@ -42,6 +42,40 @@ jobs:
       - name: Deploy to Test
         run: cd infra && npx cdk deploy Immivo-Test --require-approval never
 
+      - name: Post-Deploy DB Setup (Test)
+        run: |
+          set -e
+          API_URL="https://8fiutkddgi.execute-api.eu-central-1.amazonaws.com/test"
+          ADMIN_SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id Immivo-App-Secret-test \
+            --query SecretString --output text --region eu-central-1 \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['ADMIN_SECRET'])")
+
+          echo "=== 1/4 Setup DB (creates core schema if missing) ==="
+          RESULT=$(curl -sf -X POST "$API_URL/admin/setup-db" \
+            -H "x-admin-secret: $ADMIN_SECRET" \
+            -H "Origin: https://test.immivo.ai" \
+            -H "Content-Type: application/json")
+          echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print('setup-db: executed=' + str(d.get('executed',0)))"
+
+          echo "=== 2/4 Apply pending migrations (v13 columns) ==="
+          RESULT=$(curl -sf -X POST "$API_URL/admin/migrate" \
+            -H "x-admin-secret: $ADMIN_SECRET" \
+            -H "Origin: https://test.immivo.ai" \
+            -H "Content-Type: application/json" \
+            -d '{"force":true}')
+          echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print('migrate: tables=' + str(len(d.get('tables',[]))))"
+
+          echo "=== 3/4 Seed portals ==="
+          RESULT=$(curl -sf -X POST "$API_URL/admin/seed-portals" \
+            -H "x-admin-secret: $ADMIN_SECRET" \
+            -H "Origin: https://test.immivo.ai")
+          echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print('seed-portals: created=' + str(d.get('created',0)) + ' total=' + str(d.get('total',0)))"
+
+          echo "=== 4/4 Health check ==="
+          curl -sf "$API_URL/health" | python3 -c "import sys,json; d=json.load(sys.stdin); print('health: ' + d.get('status','?'))"
+          echo "Post-deploy checks PASSED"
+
   deploy-prod:
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod')
     runs-on: ubuntu-latest
@@ -67,3 +101,37 @@ jobs:
           aws-region: eu-central-1
       - name: Deploy to Prod
         run: cd infra && npx cdk deploy Immivo-Prod --require-approval never
+
+      - name: Post-Deploy DB Setup (Prod)
+        run: |
+          set -e
+          API_URL="https://6bvhhew3b0.execute-api.eu-central-1.amazonaws.com/prod"
+          ADMIN_SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id Immivo-App-Secret-prod \
+            --query SecretString --output text --region eu-central-1 \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['ADMIN_SECRET'])")
+
+          echo "=== 1/4 Setup DB (creates core schema if missing) ==="
+          RESULT=$(curl -sf -X POST "$API_URL/admin/setup-db" \
+            -H "x-admin-secret: $ADMIN_SECRET" \
+            -H "Origin: https://app.immivo.ai" \
+            -H "Content-Type: application/json")
+          echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print('setup-db: executed=' + str(d.get('executed',0)))"
+
+          echo "=== 2/4 Apply pending migrations ==="
+          RESULT=$(curl -sf -X POST "$API_URL/admin/migrate" \
+            -H "x-admin-secret: $ADMIN_SECRET" \
+            -H "Origin: https://app.immivo.ai" \
+            -H "Content-Type: application/json" \
+            -d '{"force":true}')
+          echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print('migrate: tables=' + str(len(d.get('tables',[]))))"
+
+          echo "=== 3/4 Seed portals ==="
+          RESULT=$(curl -sf -X POST "$API_URL/admin/seed-portals" \
+            -H "x-admin-secret: $ADMIN_SECRET" \
+            -H "Origin: https://app.immivo.ai")
+          echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print('seed-portals: created=' + str(d.get('created',0)) + ' total=' + str(d.get('total',0)))"
+
+          echo "=== 4/4 Health check ==="
+          curl -sf "$API_URL/health" -H "Origin: https://app.immivo.ai" | python3 -c "import sys,json; d=json.load(sys.stdin); print('health: ' + d.get('status','?'))"
+          echo "Post-deploy checks PASSED"
