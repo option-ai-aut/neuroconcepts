@@ -1,7 +1,7 @@
 /**
- * EmailParserService - Uses Jarvis (AI) to classify & parse ALL incoming emails
+ * EmailParserService - Uses Mivo (AI) to classify & parse ALL incoming emails
  * 
- * Jarvis reads every email and decides:
+ * Mivo reads every email and decides:
  * - LEAD_INQUIRY: Real lead/inquiry from a portal or direct → create lead
  * - NEWSLETTER: Marketing/newsletter email → skip
  * - INVOICE: Invoice/billing email → skip
@@ -41,7 +41,7 @@ export interface PropertyReference {
 export interface EmailParseResult {
   success: boolean;
   classification: EmailClassification;
-  classificationReason: string;   // Why Jarvis classified it this way
+  classificationReason: string;   // Why Mivo classified it this way
   hasClickLink: boolean;           // Email requires clicking a link to see data
   clickLinkUrl?: string;           // The URL to click if hasClickLink is true
   portal: string;                  // Detected portal name (or "Direct" / "Unknown")
@@ -147,8 +147,8 @@ Antworte NUR mit validem JSON im folgenden Format:
 Für NICHT-LEAD Emails setze leadData auf leere Werte und propertyRef auf null.`;
 
 /**
- * Classify and parse ANY incoming email with Jarvis
- * Jarvis decides if it's a real lead or something else
+ * Classify and parse ANY incoming email with Mivo
+ * Mivo decides if it's a real lead or something else
  */
 export async function classifyAndParseEmail(params: {
   from: string;
@@ -226,7 +226,7 @@ ${content || '(Kein Text-Inhalt)'}
       rawMessage: result.leadData?.message || undefined,
     };
   } catch (error: any) {
-    console.error('Error classifying email with Jarvis:', error);
+    console.error('Error classifying email with Mivo:', error);
     return {
       success: false,
       classification: 'OTHER',
@@ -244,9 +244,9 @@ ${content || '(Kein Text-Inhalt)'}
 export const parsePortalEmail = classifyAndParseEmail;
 
 /**
- * @deprecated Use classifyAndParseEmail instead - Jarvis now classifies ALL emails
+ * @deprecated Use classifyAndParseEmail instead - Mivo now classifies ALL emails
  */
 export function isPortalEmail(_from: string, _subject: string): boolean {
-  // Always return true - Jarvis now handles classification
+  // Always return true - Mivo now handles classification
   return true;
 }

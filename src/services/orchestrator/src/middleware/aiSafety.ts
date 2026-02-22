@@ -58,7 +58,7 @@ const PROMPT_INJECTION_PATTERNS = [
 ];
 
 // ============================================
-// OUTPUT PATTERNS - things Jarvis should never say
+// OUTPUT PATTERNS - things Mivo should never say
 // ============================================
 const OUTPUT_BLOCK_PATTERNS = [
   // System/env info

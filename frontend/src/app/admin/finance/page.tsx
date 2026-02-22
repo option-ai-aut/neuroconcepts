@@ -69,8 +69,8 @@ function formatTokens(tokens: number): string {
 
 // Endpoint labels
 const ENDPOINT_LABELS: Record<string, string> = {
-  'chat': 'Jarvis Chat',
-  'chat-stream': 'Jarvis Chat (Stream)',
+  'chat': 'Mivo Chat',
+  'chat-stream': 'Mivo Chat (Stream)',
   'email-parse': 'Email Parsing',
   'email-response': 'Email Analyse',
   'memory': 'Gesprächs-Gedächtnis',
@@ -608,7 +608,7 @@ export default function FinancePage() {
                 <div>
                   <p className="text-xs font-medium text-blue-800">Kosten pro Lead sinken ueber die Zeit</p>
                   <p className="text-[10px] text-blue-600 mt-0.5">
-                    AWS-Fixkosten (RDS, NAT Gateway, etc.) verteilen sich auf mehr Leads. Die KI-Kosten pro Lead bleiben relativ konstant (pro Email-Parsing + Jarvis-Interaktion), aber der AWS-Anteil sinkt mit jedem neuen Lead.
+                    AWS-Fixkosten (RDS, NAT Gateway, etc.) verteilen sich auf mehr Leads. Die KI-Kosten pro Lead bleiben relativ konstant (pro Email-Parsing + Mivo-Interaktion), aber der AWS-Anteil sinkt mit jedem neuen Lead.
                   </p>
                 </div>
               </div>

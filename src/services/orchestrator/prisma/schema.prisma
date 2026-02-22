@@ -32,7 +32,7 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Company Profile (used by Jarvis for context)
+  // Company Profile (used by Mivo for context)
   description   String?  // Kurzbeschreibung des Unternehmens
   phone         String?  // Haupttelefonnummer
   email         String?  // Kontakt-E-Mail
@@ -76,7 +76,7 @@ model TenantSettings {
   outlookMailConfig Json? // { accessToken, refreshToken, expiryDate, email }
   
   // Auto-Reply Settings
-  autoReplyEnabled Boolean @default(false) // If true, Jarvis sends emails automatically
+  autoReplyEnabled Boolean @default(false) // If true, Mivo sends emails automatically
   autoReplyDelay   Int     @default(5)     // Minutes to wait before auto-sending
   
   // KI-Hinweis bei Auto-Reply
@@ -117,7 +117,7 @@ model User {
   portalConnections PortalConnection[]
   settings  UserSettings?
   notifications Notification[]
-  pendingActions JarvisPendingAction[]
+  pendingActions MivoPendingAction[]
   assignedProperties PropertyAssignment[]
 
   // Presence tracking
@@ -249,9 +249,9 @@ model LeadActivity {
   propertyId String?
   property   Property? @relation(fields: [propertyId], references: [id])
   
-  // Link to JarvisAction (for displaying buttons in activities)
-  jarvisActionId String? @unique
-  jarvisAction   JarvisPendingAction? @relation(fields: [jarvisActionId], references: [id])
+  // Link to MivoAction (for displaying buttons in activities)
+  mivoActionId String? @unique
+  mivoAction   MivoPendingAction? @relation(fields: [mivoActionId], references: [id])
   
   createdBy String? // User ID
   createdAt DateTime @default(now())
@@ -272,7 +272,7 @@ enum ActivityType {
   EXPOSE_SENT          // Expose was sent
   VIEWING_SCHEDULED    // Viewing appointment scheduled
   VIEWING_DONE         // Viewing completed
-  JARVIS_QUERY         // Jarvis is asking a question
+  MIVO_QUERY         // Mivo is asking a question
   LINK_CLICK_REQUIRED  // Portal email requires link click
 }
 
@@ -595,7 +595,7 @@ model ChannelMessage {
   user      User     @relation(fields: [userId], references: [id])
   
   content   String   @db.Text
-  isJarvis  Boolean  @default(false) // Sent by Jarvis AI
+  isMivo  Boolean  @default(false) // Sent by Mivo AI
   
   // Mentions (stored as JSON array of user IDs)
   mentions  Json?    // ["userId1", "userId2"]
@@ -848,9 +848,9 @@ enum PortalSyncStatus {
   FAILED
 }
 
-// --- Jarvis Automation System ---
+// --- Mivo Automation System ---
 
-model JarvisPendingAction {
+model MivoPendingAction {
   id          String   @id @default(uuid())
   tenantId    String
   
@@ -861,7 +861,7 @@ model JarvisPendingAction {
   propertyId  String?  // Related property (if any)
   
   type        PendingActionType
-  question    String   // What Jarvis is asking
+  question    String   // What Mivo is asking
   context     Json?    // Additional context data
   
   // Button options for user to choose from
@@ -929,7 +929,7 @@ model Notification {
 }
 
 enum NotificationType {
-  JARVIS_QUESTION
+  MIVO_QUESTION
   NEW_LEAD
   LEAD_RESPONSE
   REMINDER

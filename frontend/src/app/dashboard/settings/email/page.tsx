@@ -63,7 +63,7 @@ export default function EmailSettingsPage() {
     if (!apiUrl || !user) return;
     setGenerating(true);
     try {
-      const response = await fetchWithAuth(`${apiUrl}/jarvis/generate-signature`, {
+      const response = await fetchWithAuth(`${apiUrl}/mivo/generate-signature`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -180,7 +180,7 @@ export default function EmailSettingsPage() {
           ) : (
             <Sparkles className="w-4 h-4" />
           )}
-          Mit Jarvis generieren
+          Mit Mivo generieren
         </button>
       </div>
 
@@ -244,7 +244,7 @@ export default function EmailSettingsPage() {
             <p className="font-medium mb-1">HTML-Signatur</p>
             <p className="text-blue-600">
               Du kannst HTML verwenden, um deine Signatur zu formatieren. Die Signatur wird automatisch 
-              an alle E-Mails angehängt, die du über das System versendest. Jarvis kann die Signatur 
+              an alle E-Mails angehängt, die du über das System versendest. Mivo kann die Signatur 
               auch automatisch bei E-Mails einfügen.
             </p>
           </div>

@@ -17,7 +17,7 @@ const PLANS = [
     tagline: 'Für Einzelmakler',
     monthly: 149,
     yearly: 134,
-    features: ['Unbegrenzter Jarvis', 'Unbegrenztes Bildstudio', '24 Portal-Integrationen', 'KI-Exposé-Editor', 'CRM + Lead-Management', 'Priority Support'],
+    features: ['Unbegrenzter Mivo', 'Unbegrenztes Bildstudio', '24 Portal-Integrationen', 'KI-Exposé-Editor', 'CRM + Lead-Management', 'Priority Support'],
   },
   {
     id: 'team' as const,

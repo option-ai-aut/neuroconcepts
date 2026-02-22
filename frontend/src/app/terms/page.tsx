@@ -61,7 +61,7 @@ export default function AGBPage() {
               </p>
               <ul className="list-disc pl-6 space-y-2 text-gray-600">
                 <li><strong>CRM und Lead-Management:</strong> Verwalten von Kontakten, Leads und Objekten</li>
-                <li><strong>KI-Assistent „Jarvis“:</strong> Unterstützung bei E-Mail-Klassifizierung, Lead-Qualifizierung und Formulierungen</li>
+                <li><strong>KI-Assistent „Mivo“:</strong> Unterstützung bei E-Mail-Klassifizierung, Lead-Qualifizierung und Formulierungen</li>
                 <li><strong>KI-Bildbearbeitung (Virtual Staging):</strong> Virtuelle Einrichtung und Bildoptimierung von Immobilienfotos</li>
                 <li><strong>Exposé-Editor:</strong> Erstellung und Bearbeitung von Exposés</li>
                 <li><strong>E-Mail-Automatisierung:</strong> Automatisierte E-Mail-Kommunikation und Templates</li>
@@ -101,7 +101,7 @@ export default function AGBPage() {
                 dieser Zeit stehen die Leistungen mit folgenden Einschränkungen zur Verfügung:
               </p>
               <ul className="list-disc pl-6 space-y-2 text-gray-600 mb-4">
-                <li>Jarvis KI-Assistent: maximal 20 Eingaben</li>
+                <li>Mivo KI-Assistent: maximal 20 Eingaben</li>
                 <li>Bildstudio (Virtual Staging): maximal 3 Bildgenerierungen</li>
                 <li>Kein Portal-Push (Veröffentlichung auf Immobilienportalen)</li>
               </ul>
@@ -199,7 +199,7 @@ export default function AGBPage() {
                 § 8 KI-Dienste und Haftung
               </h2>
               <p className="text-gray-600 leading-relaxed mb-4">
-                Die Plattform umfasst KI-gestützte Dienste (insbesondere den KI-Assistenten Jarvis,
+                Die Plattform umfasst KI-gestützte Dienste (insbesondere den KI-Assistenten Mivo,
                 Bildbearbeitung/Virtual Staging und Exposé-Erstellung).
                 Diese Dienste dienen ausschließlich als <strong>unterstützende Hilfsmittel</strong> und
                 ersetzen nicht die eigenverantwortliche fachliche Beurteilung des Nutzers.

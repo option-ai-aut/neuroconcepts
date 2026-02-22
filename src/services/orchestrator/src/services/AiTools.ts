@@ -627,7 +627,7 @@ export const CRM_TOOLS = {
   // === TEAM CHAT TOOLS ===
   send_team_message: {
     name: "send_team_message",
-    description: "Sends a message to a team chat channel on behalf of Jarvis (the AI assistant). Use this when the user asks you to post something in the team chat, notify the team, or share information with colleagues. The message will be clearly marked as sent by Jarvis AI.",
+    description: "Sends a message to a team chat channel on behalf of Mivo (the AI assistant). Use this when the user asks you to post something in the team chat, notify the team, or share information with colleagues. The message will be clearly marked as sent by Mivo AI.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -850,7 +850,7 @@ export const CRM_TOOLS = {
   },
 };
 
-// Exposé Tools for Jarvis - Full palette of block types
+// Exposé Tools for Mivo - Full palette of block types
 export const EXPOSE_TOOLS = {
   create_expose_block: {
     name: "create_expose_block",
@@ -1251,7 +1251,7 @@ export class AiToolExecutor {
         return {
           message: `Letzte Unterhaltung (${messages.length} Nachrichten):`,
           conversation: messages.map(m => ({
-            role: m.role === 'USER' ? 'Du' : 'Jarvis',
+            role: m.role === 'USER' ? 'Du' : 'Mivo',
             content: m.content.substring(0, 500) + (m.content.length > 500 ? '...' : ''),
             date: new Date(m.date).toLocaleDateString('de-DE')
           }))
@@ -1446,7 +1446,7 @@ export class AiToolExecutor {
           db.message.deleteMany({ where: { leadId } }),
           db.leadActivity.deleteMany({ where: { leadId } }),
           db.email.updateMany({ where: { leadId }, data: { leadId: null } }),
-          db.jarvisPendingAction.updateMany({ where: { leadId }, data: { leadId: null } }),
+          db.mivoPendingAction.updateMany({ where: { leadId }, data: { leadId: null } }),
           db.lead.delete({ where: { id: leadId } }),
         ]);
         const deletedName = [leadToDelete.firstName, leadToDelete.lastName].filter(Boolean).join(' ') || leadToDelete.email;
@@ -1470,7 +1470,7 @@ export class AiToolExecutor {
           db.message.deleteMany({ where: { leadId: { in: leadIds } } }),
           db.leadActivity.deleteMany({ where: { leadId: { in: leadIds } } }),
           db.email.updateMany({ where: { leadId: { in: leadIds } }, data: { leadId: null } }),
-          db.jarvisPendingAction.updateMany({ where: { leadId: { in: leadIds } }, data: { leadId: null } }),
+          db.mivoPendingAction.updateMany({ where: { leadId: { in: leadIds } }, data: { leadId: null } }),
           db.lead.deleteMany({ where: { tenantId } }),
         ]);
         return `${leadIds.length} Lead(s) wurden gelöscht.`;
@@ -2004,7 +2004,7 @@ export class AiToolExecutor {
             folder: 'DRAFTS',
             isRead: true,
             leadId: leadId || undefined,
-            providerData: { aiGenerated: true, generatedBy: 'jarvis' },
+            providerData: { aiGenerated: true, generatedBy: 'mivo' },
           }
         });
         
@@ -2167,7 +2167,7 @@ export class AiToolExecutor {
             provider: provider,
             leadId: leadId || undefined,
             sentAt: new Date(),
-            providerData: { aiGenerated: true, generatedBy: 'jarvis' },
+            providerData: { aiGenerated: true, generatedBy: 'mivo' },
           }
         });
         
@@ -2759,10 +2759,10 @@ export class AiToolExecutor {
             channelId,
             userId,
             content,
-            isJarvis: true
+            isMivo: true
           }
         });
-        return `Nachricht als Jarvis gesendet in Channel.`;
+        return `Nachricht als Mivo gesendet in Channel.`;
       }
 
       case 'get_team_channels': {
@@ -2964,7 +2964,7 @@ export class AiToolExecutor {
         const mimeType = matches[1];
         const imgData = matches[2];
         
-        console.log(`🎨 Jarvis virtual staging: style=${style}, room=${roomType}, prompt="${(prompt || '').substring(0, 50)}"`);
+        console.log(`🎨 Mivo virtual staging: style=${style}, room=${roomType}, prompt="${(prompt || '').substring(0, 50)}"`);
         
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
@@ -3027,7 +3027,7 @@ export class AiToolExecutor {
           }
         }
         
-        console.log(`✅ Jarvis virtual staging complete: ${resultUrl}`);
+        console.log(`✅ Mivo virtual staging complete: ${resultUrl}`);
         
         return {
           success: true,

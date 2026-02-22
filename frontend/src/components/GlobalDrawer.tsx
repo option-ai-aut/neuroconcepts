@@ -1373,7 +1373,7 @@ export default function GlobalDrawer() {
                       />
                     </div>
                     <div>
-                      <label className={labelClass}>Jarvis-Fakten (Intern)</label>
+                      <label className={labelClass}>Mivo-Fakten (Intern)</label>
                       <textarea
                         rows={2}
                         value={propertyFormData.aiFacts || ''}

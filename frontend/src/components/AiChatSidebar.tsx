@@ -51,7 +51,7 @@ interface Message {
   toolsUsed?: string[];
 }
 
-interface JarvisAction {
+interface MivoAction {
   id: string;
   leadId?: string;
   propertyId?: string;
@@ -195,7 +195,7 @@ const CONTEXT_TIPS: ContextTip[] = [
   { id: 'inbox', context: 'inbox', message: 'Ich kann E-Mails zusammenfassen, beantworten oder Leads daraus erstellen.' },
 ];
 
-// Map pathname to human-readable page context for Jarvis
+// Map pathname to human-readable page context for Mivo
 function getPageContext(pathname: string, exposeCtx?: { isTemplate?: boolean; templateId?: string; exposeId?: string } | null): string {
   const parts: string[] = [];
 
@@ -240,7 +240,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [pendingActions, setPendingActions] = useState<JarvisAction[]>([]);
+  const [pendingActions, setPendingActions] = useState<MivoAction[]>([]);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -260,7 +260,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
   const getShownTips = useCallback((): string[] => {
     if (typeof window === 'undefined') return [];
     try {
-      return JSON.parse(localStorage.getItem('jarvis-shown-tips') || '[]');
+      return JSON.parse(localStorage.getItem('mivo-shown-tips') || '[]');
     } catch {
       return [];
     }
@@ -271,7 +271,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     if (typeof window === 'undefined') return;
     const shown = getShownTips();
     if (!shown.includes(tipId)) {
-      localStorage.setItem('jarvis-shown-tips', JSON.stringify([...shown, tipId]));
+      localStorage.setItem('mivo-shown-tips', JSON.stringify([...shown, tipId]));
     }
   }, [getShownTips]);
 
@@ -300,7 +300,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     setTimeout(() => setActiveTip(null), 300);
   }, []);
 
-  // Load pending Jarvis actions
+  // Load pending Mivo actions
   const loadPendingActions = useCallback(async () => {
     const apiUrl = getApiUrl();
     if (!apiUrl) {
@@ -310,7 +310,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     
     try {
       const authHeaders = await getAuthHeaders();
-      const res = await fetch(`${apiUrl}/jarvis/actions?status=PENDING`, { headers: authHeaders });
+      const res = await fetch(`${apiUrl}/mivo/actions?status=PENDING`, { headers: authHeaders });
       if (res.ok) {
         const data = await res.json();
         setPendingActions(data.actions || []);
@@ -321,7 +321,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     }
   }, []);
 
-  // Respond to a Jarvis action
+  // Respond to a Mivo action
   const handleRespondToAction = async (actionId: string, response: string) => {
     const apiUrl = getApiUrl();
     if (!apiUrl) return;
@@ -330,7 +330,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     try {
       const authHeaders = await getAuthHeaders();
 
-      const res = await fetch(`${apiUrl}/jarvis/actions/${actionId}/respond`, {
+      const res = await fetch(`${apiUrl}/mivo/actions/${actionId}/respond`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({ response }),
@@ -452,7 +452,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
   }, [messages]);
 
   const handleNewChat = async () => {
-    if (!confirm('Chat-Verlauf archivieren?\n\nJarvis behält sein Gedächtnis und kann bei Bedarf auf archivierte Gespräche zugreifen. Archivierte Chats werden nach 30 Tagen gelöscht.')) return;
+    if (!confirm('Chat-Verlauf archivieren?\n\nMivo behält sein Gedächtnis und kann bei Bedarf auf archivierte Gespräche zugreifen. Archivierte Chats werden nach 30 Tagen gelöscht.')) return;
     
     try {
       const apiUrl = getApiUrl();
@@ -585,7 +585,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
       const hasTemplateContext = activeExposeContext?.templateId && activeExposeContext.isTemplate;
       
       if (hasExposeContext || hasTemplateContext) {
-        setMessages(prev => [...prev, { id: mkId(), role: 'SYSTEM', content: 'Jarvis führt Aktion aus...', isAction: true }]);
+        setMessages(prev => [...prev, { id: mkId(), role: 'SYSTEM', content: 'Mivo führt Aktion aus...', isAction: true }]);
         
         // Determine endpoint — use API Gateway
         const baseUrl = getApiUrl();
@@ -605,11 +605,11 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           }),
           signal: abortController.signal,
         });
-        const data = await res.json().catch(() => ({ response: 'Fehler bei der Verbindung zu Jarvis.' }));
+        const data = await res.json().catch(() => ({ response: 'Fehler bei der Verbindung zu Mivo.' }));
         
         setMessages(prev => [
           ...prev.filter(m => !m.isAction), 
-          { id: mkId(), role: 'ASSISTANT', content: data.response || data.text || 'Jarvis konnte nicht antworten.', status: 'done' }
+          { id: mkId(), role: 'ASSISTANT', content: data.response || data.text || 'Mivo konnte nicht antworten.', status: 'done' }
         ]);
         
         if (data.actionsPerformed && data.actionsPerformed.length > 0) {
@@ -719,7 +719,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
               
               if (data.error) {
                 updateMsg({
-                  content: data.error === 'AI Error' ? 'Fehler bei der Verbindung zu Jarvis.' : data.error,
+                  content: data.error === 'AI Error' ? 'Fehler bei der Verbindung zu Mivo.' : data.error,
                   status: 'error', isExecutingTools: false,
                 });
                 break;
@@ -747,12 +747,13 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                 typed += words[i];
                 if (i % 3 === 2 || i === words.length - 1) {
                   const t = typed;
+                  const isLast = i === words.length - 1;
                   setMessages(prev => prev.map(m => m.id === assistantMsgId ? {
-                    ...m, content: (m.content || '') + t, status: 'streaming' as const,
+                    ...m, content: (m.content || '') + t, status: isLast ? 'done' as const : 'streaming' as const,
                   } : m));
                   typed = '';
                   await tick();
-                  await new Promise(r => setTimeout(r, 18));
+                  if (!isLast) await new Promise(r => setTimeout(r, 18));
                 }
               }
             }
@@ -760,6 +761,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         } finally {
           if (streamTimeout) clearTimeout(streamTimeout);
           setIsStreaming(false);
+          setMessages(prev => prev.map(m => m.status === 'streaming' ? { ...m, status: 'done' as const } : m));
         }
 
         if (hadFunctionCalls) {
@@ -776,7 +778,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
       console.error('Chat error:', error);
       const errMsg = error instanceof Error && error.message === 'Failed to fetch'
         ? 'Verbindung zum Server fehlgeschlagen. Bitte prüfe deine Internetverbindung und versuche es erneut.'
-        : 'Fehler bei der Verbindung zu Jarvis.';
+        : 'Fehler bei der Verbindung zu Mivo.';
       setMessages(prev => [...prev, { id: mkId(), role: 'ASSISTANT', content: errMsg, status: 'error' }]);
       setIsLoading(false);
       setIsStreaming(false);
@@ -822,8 +824,8 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
       )}
       <div className={`px-4 flex items-center justify-between bg-white shrink-0 ${mobile ? 'h-14 pt-[env(safe-area-inset-top)]' : 'h-12'}`}>
         <div className="flex items-center space-x-2">
-          <NextImage src="/logo-icon-only.png" alt="Jarvis" width={28} height={28} />
-          <span className="text-sm font-bold text-gray-900">Jarvis</span>
+          <NextImage src="/logo-icon-only.png" alt="Mivo" width={28} height={28} />
+          <span className="text-sm font-bold text-gray-900">Mivo</span>
           <span className="text-[9px] font-medium text-blue-500 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 leading-none">KI</span>
         </div>
         <div className="flex items-center space-x-1">
@@ -851,7 +853,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
       >
-        {/* Pending Jarvis Actions */}
+        {/* Pending Mivo Actions */}
         {pendingActions.length > 0 && (
           <div className="space-y-3 mb-4">
             {pendingActions.map((action) => (
@@ -882,7 +884,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
 
         {messages.length === 0 && pendingActions.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 space-y-3">
-            <NextImage src="/logo-icon-only.png" alt="Jarvis" width={48} height={48} className="opacity-40" />
+            <NextImage src="/logo-icon-only.png" alt="Mivo" width={48} height={48} className="opacity-40" />
             <div>
               <p className="font-medium text-gray-600">Wie kann ich helfen?</p>
               <p className="text-xs mt-1">
@@ -893,7 +895,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
               </p>
               <div className="mt-4 mx-2 p-3 bg-gray-50 rounded-lg border border-gray-100 text-center">
                 <p className="text-[10px] text-gray-400 leading-relaxed">
-                  Jarvis ist ein KI-Assistent. Deine Nachrichten werden 
+                  Mivo ist ein KI-Assistent. Deine Nachrichten werden 
                   zur Verarbeitung an OpenAI übermittelt. Alle Interaktionen werden 
                   protokolliert. Antworten können fehlerhaft sein — bitte prüfe 
                   wichtige Angaben.
@@ -995,7 +997,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                   const hasImageUrls = imageUrlRegex.test(msgContent);
                   
                   if (!hasImageUrls) {
-                    return <div className="whitespace-pre-wrap jarvis-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(msgContent) }} />;
+                    return <div className="whitespace-pre-wrap mivo-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(msgContent) }} />;
                   }
                   
                   const elements: React.ReactNode[] = [];
@@ -1007,7 +1009,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                   while ((match = regex.exec(content)) !== null) {
                     if (match.index > lastIndex) {
                       const textBefore = content.slice(lastIndex, match.index).trim();
-                      if (textBefore) elements.push(<div key={`t-${lastIndex}`} className="whitespace-pre-wrap jarvis-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(textBefore) }} />);
+                      if (textBefore) elements.push(<div key={`t-${lastIndex}`} className="whitespace-pre-wrap mivo-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(textBefore) }} />);
                     }
                     elements.push(
                       <a key={`img-${match.index}`} href={match[0]} target="_blank" rel="noopener noreferrer" className="block my-2">
@@ -1018,7 +1020,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                   }
                   if (lastIndex < content.length) {
                     const remaining = content.slice(lastIndex).trim();
-                    if (remaining) elements.push(<div key={`t-${lastIndex}`} className="whitespace-pre-wrap jarvis-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(remaining) }} />);
+                    if (remaining) elements.push(<div key={`t-${lastIndex}`} className="whitespace-pre-wrap mivo-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(remaining) }} />);
                   }
                   
                   return <>{elements}</>;
@@ -1040,7 +1042,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '75ms' }}></div>
                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                 </div>
-                <span>Jarvis denkt nach...</span>
+                <span>Mivo denkt nach...</span>
               </div>
             </div>
           </div>
@@ -1112,7 +1114,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                 handleSubmit(e);
               }
             }}
-            placeholder="Nachricht an Jarvis..."
+            placeholder="Nachricht an Mivo..."
             rows={1}
             className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-[16px] lg:text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all placeholder-gray-400 resize-none overflow-y-auto"
             style={{ maxHeight: '5.5rem', minHeight: '2.25rem' }}
@@ -1153,7 +1155,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           </div>
         </form>
         <p className="text-[10px] text-gray-400 text-center mt-2 leading-tight">
-          KI-generierte Antworten. Jarvis kann Fehler machen — wichtige Angaben bitte prüfen.
+          KI-generierte Antworten. Mivo kann Fehler machen — wichtige Angaben bitte prüfen.
         </p>
       </div>
     </div>

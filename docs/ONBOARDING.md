@@ -39,7 +39,7 @@ Dieser Guide beschreibt den Prozess, um einen neuen Mandanten (Immobilienfirma) 
 - *Test-E-Mail senden lassen zur Bestätigung.*
 
 #### B. Kalender Integration
-*Damit Jarvis Termine buchen kann.*
+*Damit Mivo Termine buchen kann.*
 - Klick auf "Google Kalender verbinden" oder "Outlook Kalender verbinden"
 - OAuth Consent Screen bestätigen
 - Auswahl der Kalender, die auf "Verfügbarkeit" geprüft werden sollen
@@ -55,7 +55,7 @@ Dieser Guide beschreibt den Prozess, um einen neuen Mandanten (Immobilienfirma) 
 - **Preis, Zimmer, Fläche:** Eckdaten
 - **Status:** Aktiv (Standard)
 - **Beschreibung:** Öffentliche Beschreibung
-- **Jarvis-Fakten:** Wichtige Infos für die KI (z.B. "Keine WG", "Hund erlaubt")
+- **Mivo-Fakten:** Wichtige Infos für die KI (z.B. "Keine WG", "Hund erlaubt")
 
 #### B. Erster Lead anlegen
 - Klick auf "Neuer Lead" → GlobalDrawer öffnet sich
@@ -82,13 +82,13 @@ Dieser Guide beschreibt den Prozess, um einen neuen Mandanten (Immobilienfirma) 
 2.  Wir senden eine E-Mail von einem neutralen Account an die Inbound-Adresse.
 3.  **Beobachten:**
     - Lead erscheint im Dashboard ("New").
-    - Jarvis analysiert und sendet Exposé (Status -> "Contacted").
+    - Mivo analysiert und sendet Exposé (Status -> "Contacted").
     - E-Mail kommt im Test-Postfach an.
 4.  Wir antworten: "Sieht gut aus, wann kann ich besichtigen?"
 5.  **Beobachten:**
-    - Jarvis erkennt Intent "Besichtigung".
-    - Jarvis prüft Kalender des Maklers.
-    - Jarvis antwortet mit konkreten Terminvorschlägen.
+    - Mivo erkennt Intent "Besichtigung".
+    - Mivo prüft Kalender des Maklers.
+    - Mivo antwortet mit konkreten Terminvorschlägen.
 6.  Wir klicken den Link und buchen.
 7.  Termin erscheint im Kalender des Maklers.
 
@@ -106,6 +106,6 @@ Dieser Guide beschreibt den Prozess, um einen neuen Mandanten (Immobilienfirma) 
 - Prüfen: Hat der Token die richtigen Scopes?
 - Re-Connect durchführen.
 
-**Jarvis antwortet nicht:**
+**Mivo antwortet nicht:**
 - Prüfen: Ist das Objekt "aktiv"?
 - Prüfen: Gibt es offene To-Dos/Eskalationen für diesen Lead?

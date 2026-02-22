@@ -67,7 +67,7 @@
 
 ### Budget & Präferenzen → Automatisches Matching
 ```typescript
-// Jarvis kann jetzt automatisch passende Objekte finden:
+// Mivo kann jetzt automatisch passende Objekte finden:
 "Zeige mir alle Objekte für Lead XYZ"
 → Budget: 300k-450k
 → Typ: Wohnung
@@ -126,18 +126,18 @@ SOCIAL_MEDIA: 20% Conversion
 ### Lead Scoring (Automatisch)
 - **Lead Score** - Integer (0-100)
   - Basierend auf: Budget, Zeitrahmen, Finanzierung, Aktivität
-  - Automatisch berechnet von Jarvis
+  - Automatisch berechnet von Mivo
 
 ### DSGVO & Compliance
 - **Einwilligung Marketing** - Boolean + Datum
 - **Einwilligung Datenspeicherung** - Boolean + Datum
 - **Löschfrist** - Datum
 
-## JARVIS-INTEGRATION
+## MIVO-INTEGRATION
 
 ### Automatische Lead-Qualifizierung
 ```typescript
-// Jarvis analysiert Lead automatisch:
+// Mivo analysiert Lead automatisch:
 "Dieser Lead hat:
 - Budget: 400k-500k (hoch)
 - Zeitrahmen: Sofort (sehr hoch)
@@ -148,7 +148,7 @@ SOCIAL_MEDIA: 20% Conversion
 
 ### Intelligentes Matching
 ```typescript
-// Jarvis schlägt passende Objekte vor:
+// Mivo schlägt passende Objekte vor:
 "Für Lead Max Mustermann habe ich 3 passende Objekte gefunden:
 1. Wohnung Berlin-Mitte, 3.5 Zi, 85m², 450k
 2. Wohnung Berlin-Prenzlauer Berg, 4 Zi, 90m², 480k
@@ -157,7 +157,7 @@ SOCIAL_MEDIA: 20% Conversion
 
 ### Proaktive Benachrichtigungen
 ```typescript
-// Jarvis benachrichtigt bei neuem Match:
+// Mivo benachrichtigt bei neuem Match:
 "Neues Objekt passt zu 3 Leads:
 - Max Mustermann (Score: 95%)
 - Anna Schmidt (Score: 88%)

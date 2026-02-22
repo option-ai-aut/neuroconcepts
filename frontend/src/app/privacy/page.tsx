@@ -101,10 +101,10 @@ export default function DatenschutzPage() {
               </p>
 
               <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-2">
-                5.1 OpenAI ({'\u201E'}Jarvis{'\u201C'})
+                5.1 OpenAI ({'\u201E'}Mivo{'\u201C'})
               </h3>
               <p className="text-gray-600 leading-relaxed mb-2">
-                Wir setzen <strong>OpenAI (GPT-5 und GPT-5-mini)</strong> für unseren KI-Assistenten {'\u201E'}Jarvis{'\u201C'} ein. Dieser verarbeitet insbesondere:
+                Wir setzen <strong>OpenAI (GPT-5 und GPT-5-mini)</strong> für unseren KI-Assistenten {'\u201E'}Mivo{'\u201C'} ein. Dieser verarbeitet insbesondere:
               </p>
               <ul className="list-disc pl-6 space-y-1 text-gray-600 mb-4">
                 <li>E-Mail-Texte zur Klassifizierung und Kategorisierung (GPT-5-mini)</li>
@@ -137,14 +137,14 @@ export default function DatenschutzPage() {
                 5.4 Automatisierte Entscheidungen
               </h3>
               <p className="text-gray-600 leading-relaxed mb-4">
-                Jarvis klassifiziert E-Mails und qualifiziert Leads automatisiert. Eine rein automatisierte Entscheidung mit rechtlicher oder ähnlich erheblicher Wirkung findet <strong>nicht</strong> statt – finale Entscheidungen treffen stets Sie als Nutzer. Sie können sich jederzeit bei uns melden, um einen menschlichen Überblick zu verlangen.
+                Mivo klassifiziert E-Mails und qualifiziert Leads automatisiert. Eine rein automatisierte Entscheidung mit rechtlicher oder ähnlich erheblicher Wirkung findet <strong>nicht</strong> statt – finale Entscheidungen treffen stets Sie als Nutzer. Sie können sich jederzeit bei uns melden, um einen menschlichen Überblick zu verlangen.
               </p>
 
               <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-2">
                 5.5 Opt-out
               </h3>
               <p className="text-gray-600 leading-relaxed mb-4">
-                Sie können die KI-Verarbeitung in den Einstellungen deaktivieren. In diesem Fall werden keine Texte oder Bilder an OpenAI oder Google übermittelt. Bestimmte Funktionen (z. B. Jarvis oder virtuelle Einrichtung) stehen dann nicht mehr zur Verfügung.
+                Sie können die KI-Verarbeitung in den Einstellungen deaktivieren. In diesem Fall werden keine Texte oder Bilder an OpenAI oder Google übermittelt. Bestimmte Funktionen (z. B. Mivo oder virtuelle Einrichtung) stehen dann nicht mehr zur Verfügung.
               </p>
 
               <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-2">
@@ -234,7 +234,7 @@ export default function DatenschutzPage() {
                 Wir arbeiten mit folgenden Auftragsverarbeitern (Auftragsverarbeitungsverträge gemäß Art. 28 DSGVO):
               </p>
               <ul className="list-disc pl-6 space-y-1 text-gray-600">
-                <li><strong>OpenAI, Inc.</strong> (USA) – KI-Assistent Jarvis (GPT-5, GPT-5-mini)</li>
+                <li><strong>OpenAI, Inc.</strong> (USA) – KI-Assistent Mivo (GPT-5, GPT-5-mini)</li>
                 <li><strong>Google Cloud / Google LLC</strong> (USA/EU) – Bildbearbeitung (Gemini)</li>
                 <li><strong>Amazon Web Services</strong> (EU) – Hosting, Speicherung, E-Mail (SES, WorkMail), Cognito</li>
                 <li><strong>Resend</strong> (USA) – Transaktionale E-Mails</li>

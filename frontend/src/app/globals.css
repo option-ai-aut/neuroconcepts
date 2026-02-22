@@ -329,7 +329,7 @@ html:has(.app-shell) body {
   animation: float-rotate 4s ease-in-out infinite;
 }
 
-/* Mobile slide-up animation for Jarvis chat */
+/* Mobile slide-up animation for Mivo chat */
 @keyframes slide-up {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
@@ -354,7 +354,7 @@ html:has(.app-shell) body {
   animation: slide-right 0.25s ease-out forwards;
 }
 
-/* Jarvis FAB pulse */
+/* Mivo FAB pulse */
 @keyframes fab-pulse {
   0%, 100% { box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4); }
   50% { box-shadow: 0 4px 20px rgba(79, 70, 229, 0.6); }

@@ -105,7 +105,7 @@ Die Datenschicht nutzt **Prisma ORM** (`schema.prisma`). Aktuelle Models:
 | **Kommunikation** | `UserChat`, `Channel`, `ChannelMember`, `ChannelMessage`, `Email` |
 | **Orchestrierung** | `EmailTemplate`, `ExposeTemplate`, `Expose` |
 | **Portal-Integration** | `Portal`, `PortalConnection`, `PortalSyncLog` |
-| **Automatisierung** | `JarvisPendingAction`, `Notification`, `ConversationSummary` |
+| **Automatisierung** | `MivoPendingAction`, `Notification`, `ConversationSummary` |
 | **AI Tracking** | `AiUsageLog`, `AiAuditLog`, `RealtimeEvent` |
 | **Admin (intern)** | `AdminStaff`, `AdminChannel`, `AdminChatMessage` |
 | **Website/Marketing** | `BlogPost`, `NewsletterSubscriber`, `NewsletterCampaign` |
@@ -151,10 +151,10 @@ When a new lead is created from email: (1) LeadEnrichmentService runs async (dup
 
 ### 4. AI Engine
 *   **Chat Completions API (Assistants API deprecated, sunset Aug 2026):** The chat system uses the Chat Completions API with routed tool subsets instead of the deprecated Assistants API. The OpenAI Responses API is the recommended successor for potential future migration. Conversation history is managed per user.
-*   **Chat & Tools:** OpenAI GPT-5.2 (flagship, Dec 2025, knowledge cutoff Aug 2025) — Jarvis-Assistent für Lead-Kommunikation, CRM-Aktionen, Exposé-Erstellung. Unterstützt **Multi-Round Tool Calls** (bis zu 8 Runden pro Antwort) für komplexe Aufgaben. Uses `max_completion_tokens` (replaces deprecated `max_tokens`).
-*   **Image Editing:** Google Gemini (gemini-2.5-flash-image) — Virtual Staging im KI-Bildstudio und direkt im Jarvis-Chat via `virtual_staging`-Tool.
+*   **Chat & Tools:** OpenAI GPT-5.2 (flagship, Dec 2025, knowledge cutoff Aug 2025) — Mivo-Assistent für Lead-Kommunikation, CRM-Aktionen, Exposé-Erstellung. Unterstützt **Multi-Round Tool Calls** (bis zu 8 Runden pro Antwort) für komplexe Aufgaben. Uses `max_completion_tokens` (replaces deprecated `max_tokens`).
+*   **Image Editing:** Google Gemini (gemini-2.5-flash-image) — Virtual Staging im KI-Bildstudio und direkt im Mivo-Chat via `virtual_staging`-Tool.
 *   **Multi-Agent Router (Phase 2.3):** `AgentRouter.ts` uses gpt-5-mini to classify user intent into categories (smalltalk, crm, email, calendar, expose, memory, multi). Smalltalk goes directly to gpt-5-mini with no tools (cost-optimized). Other categories receive filtered tool subsets for faster, more accurate responses. Email parsing/reading also uses gpt-5-mini; email response generation uses gpt-5.2.
-*   **pgvector RAG & semantic_search (Phase 2.2):** `EmbeddingService.ts` handles embedding generation via `text-embedding-3-small`, storage in the Embedding table, and cosine similarity search. New Jarvis tool `semantic_search` enables natural language entity search across Properties and Leads.
+*   **pgvector RAG & semantic_search (Phase 2.2):** `EmbeddingService.ts` handles embedding generation via `text-embedding-3-small`, storage in the Embedding table, and cosine similarity search. New Mivo tool `semantic_search` enables natural language entity search across Properties and Leads.
 *   **63+ Tools:** Leads, Properties (inkl. aller Felder), Exposés, Templates, Team-Chat, Statistiken, Virtual Staging, Gedächtnis, `semantic_search` u.v.m.
 *   **Pricing (OpenAI):** gpt-5.2 $1.75/$14 per 1M tokens (input/output), gpt-5-mini $0.25/$2 per 1M tokens.
 *   **Aufgaben:**
@@ -162,7 +162,7 @@ When a new lead is created from email: (1) LeadEnrichmentService runs async (dup
     *   **Response Generation:** Erstellen von natürlichen, mehrsprachigen Antworten.
     *   **Extraction:** Strukturierte Daten aus Freitext ziehen (z.B. Terminwunsch "nächsten Dienstag").
     *   **Exposé-Erstellung:** Live-Bearbeitung von Exposés im Editor via Tool-Calls.
-    *   **Virtual Staging:** KI-basierte Bildbearbeitung (Möblierung) im Bildstudio und direkt im Jarvis-Chat. Bilder können von Properties oder Chat-Uploads stammen. Ergebnisse werden inline im Chat angezeigt und optional einer Property zugewiesen.
+    *   **Virtual Staging:** KI-basierte Bildbearbeitung (Möblierung) im Bildstudio und direkt im Mivo-Chat. Bilder können von Properties oder Chat-Uploads stammen. Ergebnisse werden inline im Chat angezeigt und optional einer Property zugewiesen.
     *   **Datei-Verarbeitung:** Server-seitiges Parsing für docx, xlsx, pdf, pptx, txt, json. OpenAI Vision für Bilder. CRM-Massenimport aus Tabellen.
 *   **Chat UX:**
     *   **Live Tool-Tags:** Pulsierende blaue Tags während der Tool-Ausführung, statisch nach Abschluss.

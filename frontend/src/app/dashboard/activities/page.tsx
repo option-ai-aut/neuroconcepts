@@ -27,7 +27,7 @@ interface LeadActivity {
   type: string;
   description: string;
   propertyId?: string;
-  jarvisActionId?: string;
+  mivoActionId?: string;
   createdBy?: string;
   createdByName?: string;
   createdAt: string;
@@ -43,7 +43,7 @@ interface LeadActivity {
     title: string;
     address: string;
   };
-  jarvisAction?: {
+  mivoAction?: {
     id: string;
     status: string;
     question: string;
@@ -52,7 +52,7 @@ interface LeadActivity {
   };
 }
 
-interface JarvisAction {
+interface MivoAction {
   id: string;
   leadId?: string;
   propertyId?: string;
@@ -81,7 +81,7 @@ const activityTypeIcons: Record<string, any> = {
   EXPOSE_SENT: Mail,
   VIEWING_SCHEDULED: Calendar,
   VIEWING_DONE: CheckCircle,
-  JARVIS_QUERY: AlertCircle,
+  MIVO_QUERY: AlertCircle,
   LINK_CLICK_REQUIRED: AlertCircle,
 };
 
@@ -97,13 +97,13 @@ const activityTypeLabels: Record<string, string> = {
   EXPOSE_SENT: 'Exposé gesendet',
   VIEWING_SCHEDULED: 'Besichtigung geplant',
   VIEWING_DONE: 'Besichtigung durchgeführt',
-  JARVIS_QUERY: 'Jarvis-Frage',
+  MIVO_QUERY: 'Mivo-Frage',
   LINK_CLICK_REQUIRED: 'Link-Klick erforderlich',
 };
 
 export default function ActivitiesPage() {
   const [activities, setActivities] = useState<LeadActivity[]>([]);
-  const [pendingActions, setPendingActions] = useState<JarvisAction[]>([]);
+  const [pendingActions, setPendingActions] = useState<MivoAction[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'mine' | 'pending'>('all');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -127,8 +127,8 @@ export default function ActivitiesPage() {
         }
       }
 
-      // Load pending Jarvis actions
-      const actionsRes = await fetch(`${apiUrl}/jarvis/actions?status=PENDING`, { headers });
+      // Load pending Mivo actions
+      const actionsRes = await fetch(`${apiUrl}/mivo/actions?status=PENDING`, { headers });
       if (actionsRes.ok) {
         const data = await actionsRes.json();
         setPendingActions(data.actions || []);
@@ -172,7 +172,7 @@ export default function ActivitiesPage() {
       const apiUrl = getApiUrl();
       const headers = await getAuthHeaders();
 
-      const res = await fetch(`${apiUrl}/jarvis/actions/${actionId}/respond`, {
+      const res = await fetch(`${apiUrl}/mivo/actions/${actionId}/respond`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ response }),
@@ -232,7 +232,7 @@ export default function ActivitiesPage() {
       // This ensures users see their own activities even if createdBy wasn't set
       filtered = acts.filter(a => a.createdBy === currentUserId || !a.createdBy);
     } else if (filter === 'pending') {
-      filtered = acts.filter(a => a.jarvisAction?.status === 'PENDING');
+      filtered = acts.filter(a => a.mivoAction?.status === 'PENDING');
     }
     
     if (filtered.length > 0) {
@@ -334,7 +334,7 @@ export default function ActivitiesPage() {
                       .map((activity) => {
                         const Icon = activityTypeIcons[activity.type] || Activity;
                         const isMine = isMyActivity(activity);
-                        const isPending = activity.jarvisAction?.status === 'PENDING';
+                        const isPending = activity.mivoAction?.status === 'PENDING';
                         const leadName = activity.lead 
                           ? [activity.lead.firstName, activity.lead.lastName].filter(Boolean).join(' ') || activity.lead.email
                           : 'Unbekannt';
@@ -376,7 +376,7 @@ export default function ActivitiesPage() {
                                       Meine
                                     </span>
                                   )}
-                                  {activity.jarvisActionId && (
+                                  {activity.mivoActionId && (
                                     <span className="px-2 py-0.5 text-xs font-medium bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-full">
                                       Automatisiert
                                     </span>
@@ -421,22 +421,22 @@ export default function ActivitiesPage() {
                                   )}
                                 </div>
 
-                                {/* Jarvis Action Buttons */}
-                                {activity.jarvisAction && isPending && (
+                                {/* Mivo Action Buttons */}
+                                {activity.mivoAction && isPending && (
                                   <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-white dark:bg-[#1a1a1a] rounded-lg border border-gray-200 dark:border-gray-700">
                                     <p className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-                                      {activity.jarvisAction.question}
+                                      {activity.mivoAction.question}
                                     </p>
                                     
                                     <div className="flex flex-wrap gap-2">
-                                      {activity.jarvisAction.options?.map((option) => (
+                                      {activity.mivoAction.options?.map((option) => (
                                         <button
                                           key={option.id}
-                                          onClick={(e) => { e.preventDefault(); handleRespondToAction(activity.jarvisAction!.id, option.id); }}
-                                          disabled={respondingTo === activity.jarvisAction!.id}
+                                          onClick={(e) => { e.preventDefault(); handleRespondToAction(activity.mivoAction!.id, option.id); }}
+                                          disabled={respondingTo === activity.mivoAction!.id}
                                           className="px-3 sm:px-4 py-2 text-sm font-medium bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
                                         >
-                                          {respondingTo === activity.jarvisAction!.id && (
+                                          {respondingTo === activity.mivoAction!.id && (
                                             <Loader2 className="w-4 h-4 animate-spin" />
                                           )}
                                           {option.label}

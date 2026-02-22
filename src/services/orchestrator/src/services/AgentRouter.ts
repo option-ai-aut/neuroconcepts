@@ -112,7 +112,7 @@ export class AgentRouter {
       return 'smalltalk';
     }
     
-    // Smalltalk patterns (allow optional name/word after greeting, e.g. "hallo jarvis")
+    // Smalltalk patterns (allow optional name/word after greeting, e.g. "hallo mivo")
     const smalltalkPatterns = [
       /^(hey|hi|hallo|servus|moin|guten (morgen|tag|abend)|na\??|yo|grüß|grüss|gruss)(\s+\w+)?[\s!?.]*$/i,
       /^(wie geht'?s|was geht|alles klar|danke|tschüss|bis dann|ciao)(\s+\w+)?[\s!?.]*$/i,

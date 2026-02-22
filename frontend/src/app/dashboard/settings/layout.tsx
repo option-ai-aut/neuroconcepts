@@ -18,7 +18,7 @@ export default function SettingsLayout({
     { name: 'Integrationen', href: '/dashboard/settings/integrations' },
     { name: 'Portale', href: '/dashboard/settings/portals' },
     { name: 'E-Mail', href: '/dashboard/settings/email' },
-    { name: 'Jarvis (KI)', href: '/dashboard/settings/jarvis' },
+    { name: 'Mivo (KI)', href: '/dashboard/settings/mivo' },
     { name: 'Profil', href: '/dashboard/settings/profile' },
     { name: 'Abrechnung', href: '/dashboard/settings/billing', adminOnly: true },
   ];

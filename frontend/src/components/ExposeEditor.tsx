@@ -3322,7 +3322,7 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                           <>
                             <LayoutGrid className="w-16 h-16 mb-4 opacity-50" />
                             <p className="text-lg font-medium mb-2">Noch keine Blöcke</p>
-                            <p className="text-sm mb-4">Füge Blöcke hinzu oder lass Jarvis das Exposé erstellen</p>
+                            <p className="text-sm mb-4">Füge Blöcke hinzu oder lass Mivo das Exposé erstellen</p>
                           </>
                         ) : (
                           // Other empty pages - simpler state

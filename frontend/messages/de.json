@@ -58,7 +58,7 @@
   },
   "publicNav": {
     "product": "Produkt",
-    "jarvisAi": "Jarvis KI",
+    "mivoAi": "Mivo KI",
     "features": "Features",
     "aiImageEditing": "KI-Bildbearbeitung",
     "pricing": "Preise",
@@ -95,8 +95,8 @@
       "trustNoCard": "Keine Kreditkarte",
       "trust7Days": "7 Tage gratis",
       "trustGdpr": "DSGVO",
-      "badge": "Jarvis 1.0",
-      "introText": "Immivo ist das erste <bold>vollständig KI-gesteuerte</bold> Betriebssystem für Immobilienmakler. Jarvis übernimmt dein Tagesgeschäft — du konzentrierst dich auf Abschlüsse.",
+      "badge": "Mivo 1.0",
+      "introText": "Immivo ist das erste <bold>vollständig KI-gesteuerte</bold> Betriebssystem für Immobilienmakler. Mivo übernimmt dein Tagesgeschäft — du konzentrierst dich auf Abschlüsse.",
       "gdprCompliant": "DSGVO-konform",
       "awsHosting": "AWS Hosting EU",
       "securePayment": "Sichere Bezahlung via Stripe"
@@ -104,11 +104,11 @@
     "preview": {
       "newLeadsToday": "Neue Leads heute",
       "appointmentsBooked": "Termine gebucht",
-      "byJarvis": "von Jarvis",
+      "byMivo": "von Mivo",
       "exposesSent": "Exposés gesendet",
       "automatic": "automatisch",
-      "jarvisJustNow": "Jarvis • Gerade eben",
-      "jarvisMessage": "Ich habe 3 neue Anfragen bearbeitet, Exposés versendet und einen Besichtigungstermin für morgen 14 Uhr eingetragen. Alles erledigt! 🎯",
+      "mivoJustNow": "Mivo • Gerade eben",
+      "mivoMessage": "Ich habe 3 neue Anfragen bearbeitet, Exposés versendet und einen Besichtigungstermin für morgen 14 Uhr eingetragen. Alles erledigt! 🎯",
       "activity1": "Lead qualifiziert: Familie Müller",
       "activity2": "Besichtigung gebucht: Penthouse Wien",
       "activity3": "Exposé erstellt: 3-Zi-Wohnung Berlin",
@@ -129,7 +129,7 @@
       "subtitle": "80% deiner Zeit geht für E-Mails, Terminabsprachen und Papierkram drauf. Nur 20% für das, was wirklich zählt: Kunden treffen und Deals abschließen.",
       "emailFlood": "E-Mail-Flut",
       "emailProblem": "50+ E-Mails täglich",
-      "emailSolution": "Jarvis antwortet in Sekunden",
+      "emailSolution": "Mivo antwortet in Sekunden",
       "appointmentChaos": "Termin-Chaos",
       "appointmentProblem": "3-5 Mails pro Termin",
       "appointmentSolution": "Automatische Buchung",
@@ -137,14 +137,14 @@
       "exposeProblem": "2h pro Exposé",
       "exposeSolution": "2 Minuten mit KI"
     },
-    "jarvis": {
+    "mivo": {
       "badge": "Powered by OpenAI GPT-5",
-      "title": "Triff <bold>Jarvis</bold>, deinen KI-Assistenten.",
-      "subtitle": "Jarvis ist kein Chatbot. Er ist ein vollwertiger Mitarbeiter, der dein Business versteht. Er liest E-Mails, qualifiziert Leads, erstellt Exposés und bucht Termine — <bold>24/7, ohne Pause, ohne Fehler.</bold>",
+      "title": "Triff <bold>Mivo</bold>, deinen KI-Assistenten.",
+      "subtitle": "Mivo ist kein Chatbot. Er ist ein vollwertiger Mitarbeiter, der dein Business versteht. Er liest E-Mails, qualifiziert Leads, erstellt Exposés und bucht Termine — <bold>24/7, ohne Pause, ohne Fehler.</bold>",
       "feature1": "Vollständiger Zugriff auf CRM, E-Mails, Kalender & Objekte",
       "feature2": "Erstellt professionelle Exposés in Sekunden",
       "feature3": "Bearbeitet Bilder mit KI-Staging (Möbel einbauen)",
-      "cta": "Jarvis kennenlernen",
+      "cta": "Mivo kennenlernen",
       "emails": "E-Mails",
       "appointments": "Termine",
       "exposesLabel": "Exposés",
@@ -168,8 +168,8 @@
       "sectionLabel": "Alles inklusive",
       "title": "Ein System. Unendliche Möglichkeiten.",
       "subtitle": "Immivo ersetzt dein CRM, deine E-Mail-Tools und deine Exposé-Software — in einer einzigen, KI-gesteuerten Plattform.",
-      "jarvisTitle": "Jarvis KI-Assistent",
-      "jarvisDesc": "24/7 verfügbar, beantwortet Anfragen in Sekunden, qualifiziert Leads automatisch.",
+      "mivoTitle": "Mivo KI-Assistent",
+      "mivoDesc": "24/7 verfügbar, beantwortet Anfragen in Sekunden, qualifiziert Leads automatisch.",
       "imageTitle": "KI-Bildbearbeitung",
       "imageDesc": "Virtual Staging: Möbel einbauen, Räume umgestalten — ultra-realistisch mit KI.",
       "crmTitle": "Intelligentes CRM",
@@ -181,7 +181,7 @@
       "calendarTitle": "Kalender-Integration",
       "calendarDesc": "Automatische Terminbuchung direkt in Google Calendar oder Outlook.",
       "emailTitle": "E-Mail-Automatisierung",
-      "emailDesc": "White-Label-Versand über deine Domain. Jarvis antwortet in deinem Namen.",
+      "emailDesc": "White-Label-Versand über deine Domain. Mivo antwortet in deinem Namen.",
       "portalsTitle": "Portal-Anbindung",
       "portalsDesc": "Alle gängigen Portale — ImmoScout, Willhaben, Immowelt und mehr.",
       "analyticsTitle": "Analytics & Reports",
@@ -207,14 +207,14 @@
       "step1Title": "Verbinden",
       "step1Desc": "Verknüpfe deine E-Mail, deinen Kalender und deine Portale. Dauert 5 Minuten.",
       "step2Title": "Einrichten",
-      "step2Desc": "Lade deine Objekte hoch und erstelle Exposé-Vorlagen — selbst im Editor oder lass Jarvis sie für dich generieren.",
+      "step2Desc": "Lade deine Objekte hoch und erstelle Exposé-Vorlagen — selbst im Editor oder lass Mivo sie für dich generieren.",
       "step3Title": "Entspannen",
-      "step3Desc": "Jarvis übernimmt. Du bekommst nur noch Benachrichtigungen bei wichtigen Events."
+      "step3Desc": "Mivo übernimmt. Du bekommst nur noch Benachrichtigungen bei wichtigen Events."
     },
     "demo": {
       "badge": "Persönliche Demo",
       "title": "Erlebe Immivo <bold>live in Aktion</bold>",
-      "subtitle": "In einer 30-minütigen Demo zeigen wir dir, wie Jarvis dein Tagesgeschäft revolutioniert. Keine Verpflichtungen, keine Verkaufsgespräche — nur Mehrwert.",
+      "subtitle": "In einer 30-minütigen Demo zeigen wir dir, wie Mivo dein Tagesgeschäft revolutioniert. Keine Verpflichtungen, keine Verkaufsgespräche — nur Mehrwert.",
       "feature1": "Individuelle Beratung für dein Business",
       "feature2": "Live-Demonstration aller Features",
       "feature3": "Antworten auf alle deine Fragen",
@@ -244,13 +244,13 @@
       "tagline": "Kostenlos testen",
       "subtext": "1 Woche gratis",
       "price": "0€",
-      "features": ["Alle Grundfunktionen", "Jarvis beschränkt", "Bildstudio beschränkt", "KEIN Portal-Push", "E-Mail-Support"],
+      "features": ["Alle Grundfunktionen", "Mivo beschränkt", "Bildstudio beschränkt", "KEIN Portal-Push", "E-Mail-Support"],
       "cta": "Jetzt testen"
     },
     "solo": {
       "tagline": "Für Einzelmakler",
       "seats": "1 Seat",
-      "features": ["Zugriff auf ALLES", "Unbegrenzter Jarvis", "Unbegrenztes Bildstudio", "24 Portal-Integrationen", "KI-Exposé-Editor", "CRM + Lead-Management", "E-Mail & Kalender", "Priority Support"],
+      "features": ["Zugriff auf ALLES", "Unbegrenzter Mivo", "Unbegrenztes Bildstudio", "24 Portal-Integrationen", "KI-Exposé-Editor", "CRM + Lead-Management", "E-Mail & Kalender", "Priority Support"],
       "cta": "Jetzt starten"
     },
     "team": {
@@ -271,7 +271,7 @@
     "faqTitle": "Häufige Fragen",
     "faq": {
       "q1": "Kann ich Immivo kostenlos testen?",
-      "a1": "Ja! Du bekommst eine vollständige Testwoche — komplett kostenlos und ohne Kreditkarte. In dieser Zeit hast du Zugriff auf alle Grundfunktionen, inkl. CRM, E-Mails, Kalender und Objekte. Jarvis (KI-Assistent) und das Bildstudio sind in der Testphase beschränkt nutzbar. Nach Ablauf der 7 Tage wird dein Konto automatisch pausiert — es entstehen keine Kosten, solange du keinen Plan wählst.",
+      "a1": "Ja! Du bekommst eine vollständige Testwoche — komplett kostenlos und ohne Kreditkarte. In dieser Zeit hast du Zugriff auf alle Grundfunktionen, inkl. CRM, E-Mails, Kalender und Objekte. Mivo (KI-Assistent) und das Bildstudio sind in der Testphase beschränkt nutzbar. Nach Ablauf der 7 Tage wird dein Konto automatisch pausiert — es entstehen keine Kosten, solange du keinen Plan wählst.",
       "q2": "Was passiert nach der Testphase?",
       "a2": "Nach Ablauf der kostenlosen Woche kannst du dich für einen der drei Pläne (Solo, Team oder Enterprise) entscheiden. Es gibt keine automatische Umstellung auf einen kostenpflichtigen Plan. Wenn du keinen Plan wählst, wird dein Zugang pausiert — deine Daten bleiben aber 30 Tage gespeichert, falls du dich später entscheidest.",
       "q3": "Kann ich jederzeit kündigen?",
@@ -289,7 +289,7 @@
       "q9": "Ist Immivo DSGVO-konform?",
       "a9": "Ja, vollständig. Wir hosten alle Daten auf AWS EU (Frankfurt). Sämtliche Daten sind im Ruhezustand (AES-256) und bei der Übertragung (TLS/HTTPS) verschlüsselt. Jeder Kunde hat seinen eigenen isolierten Datenbereich (Mandantentrennung). Es findet kein Tracking durch Drittanbieter statt.",
       "q10": "Was ist in der Free-Version enthalten?",
-      "a10": "In der kostenlosen Testphase hast du Zugriff auf alle Grundfunktionen: CRM, Lead-Management, Objekte, E-Mail-Anbindung und Kalender. Der KI-Assistent Jarvis und das KI-Bildstudio sind beschränkt nutzbar. Portal-Push (Veröffentlichung auf Immobilienportalen) ist in der Free-Version nicht verfügbar."
+      "a10": "In der kostenlosen Testphase hast du Zugriff auf alle Grundfunktionen: CRM, Lead-Management, Objekte, E-Mail-Anbindung und Kalender. Der KI-Assistent Mivo und das KI-Bildstudio sind beschränkt nutzbar. Portal-Push (Veröffentlichung auf Immobilienportalen) ist in der Free-Version nicht verfügbar."
     },
     "stillQuestions": "Noch Fragen? Wir helfen dir gerne weiter."
   },
@@ -300,7 +300,7 @@
     "storyTitle": "Vom Frust zur Lösung",
     "storyP1": "Wien. Zwei Gründer sitzen in einem Kaffeehaus und reden über ein Problem, das die gesamte Immobilienbranche betrifft: Makler verbringen 80% ihrer Zeit mit E-Mails, Papierkram und Organisation — statt mit dem, wofür sie eigentlich brennen.",
     "storyP2": "Die Idee war einfach: Was wäre, wenn ein KI-Assistent das gesamte Tagesgeschäft übernimmt? Nicht ein weiteres CRM. Nicht noch ein Tool. Ein komplettes Betriebssystem, das mitdenkt.",
-    "storyP3": "Aus dieser Idee wurde Immivo — und aus dem Assistenten wurde Jarvis.",
+    "storyP3": "Aus dieser Idee wurde Immivo — und aus dem Assistenten wurde Mivo.",
     "developedIn": "in Wien",
     "developed": "Entwickelt",
     "teamLabel": "Das Team",
@@ -615,7 +615,7 @@
       "confirmDeleteTitle": "Konto endgültig löschen?",
       "confirmDeleteWarning": "Diese Aktion ist unwiderruflich. Folgende Daten werden gelöscht:",
       "deleteItem1": "Ihr Benutzerkonto und Profildaten",
-      "deleteItem2": "Chat-Verlauf mit Jarvis",
+      "deleteItem2": "Chat-Verlauf mit Mivo",
       "deleteItem3": "Benachrichtigungen und Einstellungen",
       "deleteItem4": "KI-Audit-Logs",
       "typeDeleteConfirm": "Tippen Sie LÖSCHEN zur Bestätigung:",
@@ -708,10 +708,10 @@
   "calendar": {
     "emptyState": {
       "title": "Kein Kalender verbunden",
-      "description": "Verbinden Sie Ihren Google oder Outlook Kalender, um Termine zu verwalten und Jarvis die automatische Buchung zu ermöglichen.",
+      "description": "Verbinden Sie Ihren Google oder Outlook Kalender, um Termine zu verwalten und Mivo die automatische Buchung zu ermöglichen.",
       "connectButton": "Kalender verbinden",
       "autoBooking": "Automatische Terminbuchung",
-      "autoBookingDesc": "Jarvis bucht Besichtigungen direkt in deinen Kalender",
+      "autoBookingDesc": "Mivo bucht Besichtigungen direkt in deinen Kalender",
       "teamSync": "Team-Synchronisation",
       "teamSyncDesc": "Alle Termine werden mit deinem Team geteilt",
       "locationIntegration": "Standort-Integration",
@@ -762,7 +762,7 @@
       "centralInbox": "Zentraler Posteingang",
       "centralInboxDesc": "Alle E-Mails an einem Ort verwalten",
       "aiResponses": "KI-Antworten",
-      "aiResponsesDesc": "Jarvis beantwortet Anfragen automatisch",
+      "aiResponsesDesc": "Mivo beantwortet Anfragen automatisch",
       "leadSync": "Lead-Zuordnung",
       "leadSyncDesc": "E-Mails werden automatisch Leads zugeordnet"
     },
@@ -836,8 +836,8 @@
       "create": "Erstellen",
       "error": "Fehler beim Erstellen"
     },
-    "jarvisBadge": "KI",
-    "jarvisMentionLabel": "KI-Assistent",
+    "mivoBadge": "KI",
+    "mivoMentionLabel": "KI-Assistent",
     "adminBadge": "Admin",
     "imageAlt": "Bild",
     "yesterday": "Gestern {time}",

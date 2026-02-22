@@ -151,7 +151,7 @@ Der Exposé-Editor ist ein zentrales Feature mit eigenem Design-System:
 *   **Fläche (m²):** Number-Input
 *   **Status:** Dropdown (Aktiv, Reserviert, Verkauft, Vermietet, Inaktiv)
 *   **Beschreibung:** Textarea
-*   **Jarvis-Fakten:** Textarea für interne KI-Infos
+*   **Mivo-Fakten:** Textarea für interne KI-Infos
 
 ### Layout
 *   2-Spalten für Titel/Typ

@@ -12,8 +12,8 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 
 ### Hauptfunktionen (Ticket 1 - MVP)
 - **Lead Intake:** Automatische Erfassung aus E-Mail-Weiterleitungen (ImmoScout, Willhaben) und Web-Formularen. Smart Email Processing: AutoClick (Portal-Link-Extraktion via Puppeteer), LeadEnrichment (Duplikat-Check, Telefon-Normalisierung DACH, Vollständigkeit), Sentiment-Analyse (Buying/Risk-Signale).
-- **Jarvis-Kommunikation:** OpenAI GPT-5.2 via Chat Completions API mit 64+ Tools, Multi-Agent Router (gpt-5-mini Intent-Klassifikation), pgvector RAG, persistente Konversationen, Multi-Round Tool Calls, Live Tool-Tags, Inline-Bilder, Virtual Staging. Server-seitige Datei-Verarbeitung (docx, xlsx, pdf, pptx, txt, json), OpenAI Vision für Bilder, automatische Spracherkennung.
-- **KI-Bildstudio:** Virtual Staging mit Google Gemini (Möblierung). Settings-Sidebar links, Bildvorschau rechts. Auch direkt via Jarvis-Chat nutzbar.
+- **Mivo-Kommunikation:** OpenAI GPT-5.2 via Chat Completions API mit 64+ Tools, Multi-Agent Router (gpt-5-mini Intent-Klassifikation), pgvector RAG, persistente Konversationen, Multi-Round Tool Calls, Live Tool-Tags, Inline-Bilder, Virtual Staging. Server-seitige Datei-Verarbeitung (docx, xlsx, pdf, pptx, txt, json), OpenAI Vision für Bilder, automatische Spracherkennung.
+- **KI-Bildstudio:** Virtual Staging mit Google Gemini (Möblierung). Settings-Sidebar links, Bildvorschau rechts. Auch direkt via Mivo-Chat nutzbar.
 - **E-Mail Thread Intelligence:** Ordnet Antworten korrekt zu und führt den Dialog kontextbezogen fort.
 - **Kalender:** AWS WorkMail Kalender via CalDAV mit Google Meet Integration (geplant).
 - **White-Labeling:** Versand über OAuth (Gmail/Outlook) mit Makler-Domain.
@@ -31,7 +31,7 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 - **IaC:** AWS CDK
 
 ### AI & Intelligence
-- **Chat Engine:** OpenAI GPT-5.2 (Jarvis Assistent) via Chat Completions API mit gerouteten Tool-Subsets (Assistants API deprecated, sunset Aug 2026)
+- **Chat Engine:** OpenAI GPT-5.2 (Mivo Assistent) via Chat Completions API mit gerouteten Tool-Subsets (Assistants API deprecated, sunset Aug 2026)
 - **Router:** GPT-5-mini Multi-Agent Router (Intent-Klassifikation, Tool-Filterung)
 - **RAG:** pgvector Embeddings (text-embedding-3-small, 1536 Dimensionen) + Cosine Similarity
 - **Image Editing:** Google Gemini (gemini-2.5-flash-image) — Virtual Staging
@@ -67,11 +67,11 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 │   ├── ADMIN_ACCESS.md   # Anleitung für Admin-Zugriff
 │   ├── ARCHITECTURE.md   # Technische Architektur & Datenflüsse
 │   ├── AI_GUIDELINES.md  # Prompting-Strategien & Sicherheitsregeln
-│   ├── JARVIS_CAPABILITIES.md # Alle Jarvis-Tools & Fähigkeiten (64+ Tools)
+│   ├── MIVO_CAPABILITIES.md # Alle Mivo-Tools & Fähigkeiten (64+ Tools)
 │   ├── ONBOARDING.md     # Checklisten für neue Kunden
 │   ├── PROPERTY_FIELDS_RESEARCH.md # Property-Felder Spezifikation
 │   ├── FILE_PROCESSING.md # Datei-Verarbeitung (docx, xlsx, pdf, pptx, txt, json, Bilder)
-│   ├── CONVERSATION_MEMORY.md # Jarvis Gedächtnis-System
+│   ├── CONVERSATION_MEMORY.md # Mivo Gedächtnis-System
 │   └── DEV_ENVIRONMENT_SETUP.md # Anleitung für Dev-Environment & Stack Updates
 ├── frontend/             # Next.js Frontend App (Dockerized)
 ├── infra/                # AWS CDK Infrastructure Code
@@ -84,8 +84,8 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 ### Phase 1: MVP - ✅ COMPLETED
 - [x] AWS Infrastruktur Setup (VPC, RDS, Lambda, S3)
 - [x] E-Mail Inbound Parser & DB Schema
-- [x] Jarvis-Engine Integration (OpenAI GPT-5-mini)
-- [x] KI-Bildstudio (Google Gemini Virtual Staging + Jarvis-Integration)
+- [x] Mivo-Engine Integration (OpenAI GPT-5-mini)
+- [x] KI-Bildstudio (Google Gemini Virtual Staging + Mivo-Integration)
 - [x] Exposé-Editor mit KI-Unterstützung
 - [x] CRM (Leads, Objekte, Bildupload zu S3, erweiterte Property-Felder)
 - [x] Dashboard & Admin Panel (real data)
@@ -94,8 +94,8 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 - [x] System-E-Mails via Resend
 - [x] Bug Reports mit Screenshot + Console-Log-Capture
 - [x] Dark Mode
-- [x] Jarvis Multi-Round Tool Calls (bis zu 8 Runden)
-- [x] Virtual Staging via Jarvis-Chat
+- [x] Mivo Multi-Round Tool Calls (bis zu 8 Runden)
+- [x] Virtual Staging via Mivo-Chat
 - [x] Live Tool-Tags & Inline-Bilder im Chat
 
 ### Intelligence Roadmap - ✅ COMPLETED (16/22)
@@ -145,7 +145,7 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 
 - **Datenhaltung:** Konform mit österreichischen und EU-Rechtsvorgaben (DSGVO).
 - **Isolation:** Logische Mandantentrennung (Multi-Tenancy).
-- **Transparenz:** Jarvis-Nachrichten sind im Dashboard klar gekennzeichnet.
+- **Transparenz:** Mivo-Nachrichten sind im Dashboard klar gekennzeichnet.
 - **Audit (Feb 2026):** Sicherheitsaudit v4 umgesetzt — IDOR-Schutz, interne Endpoint-Auth, Rate-Limits, XSS-Escaping, CSP, SHA-Pinning. Details: `docs/SECURITY_AUDIT_V4.md`.
 
 ## 📞 Support

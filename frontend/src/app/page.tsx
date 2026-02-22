@@ -238,7 +238,7 @@ export default function LandingPage() {
     const hashMap: Record<string, number> = {
       '#demo': 7,
       '#features': 4,
-      '#jarvis': 2,
+      '#mivo': 2,
       '#bildbearbeitung': 5,
     };
 
@@ -283,7 +283,7 @@ export default function LandingPage() {
   ];
 
   const featureItems = [
-    { icon: Bot, title: t('features.jarvisTitle'), desc: t('features.jarvisDesc') },
+    { icon: Bot, title: t('features.mivoTitle'), desc: t('features.mivoDesc') },
     { icon: Wand2, title: t('features.imageTitle'), desc: t('features.imageDesc') },
     { icon: Users, title: t('features.crmTitle'), desc: t('features.crmDesc') },
     { icon: Building2, title: t('features.propertiesTitle'), desc: t('features.propertiesDesc') },
@@ -302,7 +302,7 @@ export default function LandingPage() {
     { value: 25, suffix: '%', label: t('results.higherConversion'), icon: TrendingUp },
   ];
 
-  const jarvisTitleText = String(t.raw('jarvis.title')).replace(/<[^>]*>/g, '');
+  const mivoTitleText = String(t.raw('mivo.title')).replace(/<[^>]*>/g, '');
   const config = useRuntimeConfig();
   const heroVideoRef = useRef<HTMLVideoElement>(null);
   const [heroPhase, setHeroPhase] = useState<'idle' | 'revealing' | 'rewinding'>('idle');
@@ -763,22 +763,22 @@ export default function LandingPage() {
           </Slide>
 
           {/* ══════════════════════════════════════════
-              2. JARVIS
+              2. MIVO
               ══════════════════════════════════════════ */}
           <Slide idx={2} active={activeIdx === 2} className="bg-white text-gray-900">
             <div className="h-full flex flex-col items-center justify-center px-5 sm:px-10 relative overflow-hidden">
               <Stagger active={activeIdx === 2} delay={0}>
                 <h2 className="font-extrabold tracking-tight text-gray-900 text-center px-2" style={{ fontSize: 'clamp(1.3rem, 5vw, 4.5rem)', lineHeight: 1.1 }}>
-                  {jarvisTitleText}
+                  {mivoTitleText}
               </h2>
               </Stagger>
               <Stagger active={activeIdx === 2} delay={120}>
                 <p className="text-xs sm:text-lg text-gray-500 max-w-xl text-center leading-relaxed mt-4 sm:mt-8 px-2">
-                  {t.rich('jarvis.subtitle', { bold: (chunks) => <span className="text-gray-900 font-medium">{chunks}</span> })}
+                  {t.rich('mivo.subtitle', { bold: (chunks) => <span className="text-gray-900 font-medium">{chunks}</span> })}
                 </p>
               </Stagger>
               <div className="mt-5 sm:mt-10 space-y-2.5 sm:space-y-3">
-                {[String(t('jarvis.feature1')), String(t('jarvis.feature2')), String(t('jarvis.feature3'))].map((item, i) => (
+                {[String(t('mivo.feature1')), String(t('mivo.feature2')), String(t('mivo.feature3'))].map((item, i) => (
                   <Stagger key={i} active={activeIdx === 2} delay={260 + i * 100}>
                     <div className="flex items-center gap-2.5 sm:gap-3">
                       <div className="w-5 h-5 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
@@ -845,7 +845,7 @@ export default function LandingPage() {
                     <div className="orbital-ring absolute inset-0 rounded-full border border-gray-200/60" />
                     <div className="orbital-ring-reverse absolute inset-[15%] rounded-full border border-gray-200/40" />
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <NextImage src="/logo-icon-only.png" alt="Jarvis" width={80} height={80} className="w-14 sm:w-20" />
+                      <NextImage src="/logo-icon-only.png" alt="Mivo" width={80} height={80} className="w-14 sm:w-20" />
                     </div>
                     <div className="orbital-icons absolute inset-0">
                       {[Mail, Calendar, FileText, Users, Building2, MessageSquare].map((Icon, i) => {

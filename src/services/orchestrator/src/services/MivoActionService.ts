@@ -1,19 +1,19 @@
 /**
- * JarvisActionService - Manages Jarvis pending actions and questions
+ * MivoActionService - Manages Mivo pending actions and questions
  * Handles: Creating questions, reminders, escalations, resolutions
  */
 
 import { PrismaClient, PendingActionType, PendingActionStatus, NotificationType } from '@prisma/client';
 import { 
   sendSystemEmail, 
-  renderJarvisQuestionEmail, 
+  renderMivoQuestionEmail, 
   renderReminderEmail, 
   renderEscalationEmail 
 } from './SystemEmailService';
 
 let prisma: PrismaClient;
 
-export function setJarvisActionPrisma(client: PrismaClient) {
+export function setMivoActionPrisma(client: PrismaClient) {
   prisma = client;
 }
 
@@ -67,7 +67,7 @@ export async function createPendingAction(params: CreateActionParams) {
   }
 
   // Create the pending action
-  const action = await getPrisma().jarvisPendingAction.create({
+  const action = await getPrisma().mivoPendingAction.create({
     data: {
       tenantId,
       userId,
@@ -84,8 +84,8 @@ export async function createPendingAction(params: CreateActionParams) {
     data: {
       tenantId,
       userId,
-      type: 'JARVIS_QUESTION',
-      title: 'Jarvis benötigt deine Hilfe',
+      type: 'MIVO_QUESTION',
+      title: 'Mivo benötigt deine Hilfe',
       message: question,
       metadata: { actionId: action.id, leadId, type }
     }
@@ -98,8 +98,8 @@ export async function createPendingAction(params: CreateActionParams) {
 
     await sendSystemEmail({
       to: user.email,
-      subject: `Jarvis: ${question.substring(0, 50)}...`,
-      html: renderJarvisQuestionEmail({
+      subject: `Mivo: ${question.substring(0, 50)}...`,
+      html: renderMivoQuestionEmail({
         userName,
         question,
         leadName,
@@ -117,7 +117,7 @@ export async function createPendingAction(params: CreateActionParams) {
  * Send reminder for a pending action (called by EventBridge after 24h)
  */
 export async function sendReminder(actionId: string) {
-  const action = await getPrisma().jarvisPendingAction.findUnique({
+  const action = await getPrisma().mivoPendingAction.findUnique({
     where: { id: actionId },
     include: { user: { include: { settings: true } } }
   });
@@ -133,7 +133,7 @@ export async function sendReminder(actionId: string) {
   const actionUrl = `${APP_URL}/dashboard/assistant?action=${action.id}`;
 
   // Update action status
-  await getPrisma().jarvisPendingAction.update({
+  await getPrisma().mivoPendingAction.update({
     where: { id: actionId },
     data: { 
       status: 'REMINDED',
@@ -147,7 +147,7 @@ export async function sendReminder(actionId: string) {
       tenantId: action.tenantId,
       userId: user.id,
       type: 'REMINDER',
-      title: 'Erinnerung: Jarvis wartet auf dich',
+      title: 'Erinnerung: Mivo wartet auf dich',
       message: action.question,
       metadata: { actionId: action.id }
     }
@@ -174,7 +174,7 @@ export async function sendReminder(actionId: string) {
  * Escalate a pending action to admin (called by EventBridge after 48h)
  */
 export async function escalateAction(actionId: string) {
-  const action = await getPrisma().jarvisPendingAction.findUnique({
+  const action = await getPrisma().mivoPendingAction.findUnique({
     where: { id: actionId },
     include: { 
       user: true
@@ -214,7 +214,7 @@ export async function escalateAction(actionId: string) {
   }
 
   // Update action status
-  await getPrisma().jarvisPendingAction.update({
+  await getPrisma().mivoPendingAction.update({
     where: { id: actionId },
     data: { 
       status: 'ESCALATED',
@@ -262,7 +262,7 @@ export async function escalateAction(actionId: string) {
  * Resolve a pending action
  */
 export async function resolveAction(actionId: string, resolution: string, resolvedBy?: string) {
-  const action = await getPrisma().jarvisPendingAction.update({
+  const action = await getPrisma().mivoPendingAction.update({
     where: { id: actionId },
     data: {
       status: 'RESOLVED',
@@ -279,7 +279,7 @@ export async function resolveAction(actionId: string, resolution: string, resolv
  * Cancel a pending action
  */
 export async function cancelAction(actionId: string, reason?: string) {
-  const action = await getPrisma().jarvisPendingAction.update({
+  const action = await getPrisma().mivoPendingAction.update({
     where: { id: actionId },
     data: {
       status: 'CANCELLED',
@@ -296,7 +296,7 @@ export async function cancelAction(actionId: string, reason?: string) {
  * Get pending actions for a user
  */
 export async function getPendingActionsForUser(userId: string) {
-  return getPrisma().jarvisPendingAction.findMany({
+  return getPrisma().mivoPendingAction.findMany({
     where: {
       userId,
       status: { in: ['PENDING', 'REMINDED', 'ESCALATED'] }
@@ -309,7 +309,7 @@ export async function getPendingActionsForUser(userId: string) {
  * Get all pending actions for a tenant (for admin view)
  */
 export async function getPendingActionsForTenant(tenantId: string) {
-  return getPrisma().jarvisPendingAction.findMany({
+  return getPrisma().mivoPendingAction.findMany({
     where: {
       tenantId,
       status: { in: ['PENDING', 'REMINDED', 'ESCALATED'] }

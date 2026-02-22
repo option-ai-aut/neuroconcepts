@@ -689,16 +689,16 @@ export async function deleteExpose(id: string) {
   return res.json();
 }
 
-// --- Jarvis AI ---
+// --- Mivo AI ---
 
-export async function chatWithJarvisForExpose(exposeId: string, message: string, history: { role: string; content: string }[] = []) {
+export async function chatWithMivoForExpose(exposeId: string, message: string, history: { role: string; content: string }[] = []) {
   const headers = await getAuthHeaders();
   const res = await fetch(`${getApiUrl()}/exposes/${exposeId}/chat`, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, history }),
   });
-  if (!res.ok) throw new Error('Failed to chat with Jarvis');
+  if (!res.ok) throw new Error('Failed to chat with Mivo');
   return res.json();
 }
 

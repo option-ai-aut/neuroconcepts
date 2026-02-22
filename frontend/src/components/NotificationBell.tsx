@@ -22,7 +22,7 @@ interface Notification {
 }
 
 const notificationIcons: Record<string, React.ReactNode> = {
-  JARVIS_QUESTION: <MessageSquare className="w-4 h-4 text-blue-400" />,
+  MIVO_QUESTION: <MessageSquare className="w-4 h-4 text-blue-400" />,
   REMINDER: <Clock className="w-4 h-4 text-amber-400" />,
   ESCALATION: <AlertCircle className="w-4 h-4 text-red-400" />,
   NEW_LEAD: <UserPlus className="w-4 h-4 text-green-400" />,
@@ -112,7 +112,7 @@ export default function NotificationBell() {
       case 'LEAD_RESPONSE':
         if (leadId) return `/dashboard/leads/${leadId}`;
         return '/dashboard/leads';
-      case 'JARVIS_QUESTION':
+      case 'MIVO_QUESTION':
       case 'ESCALATION':
         if (leadId) return `/dashboard/leads/${leadId}`;
         return '/dashboard/activities';

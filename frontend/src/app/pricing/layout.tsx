@@ -17,14 +17,14 @@ const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Product',
   name: 'Immivo AI',
-  description: 'KI-gesteuertes Betriebssystem für Immobilienmakler mit Jarvis KI-Assistent, CRM, Exposé-Editor und 24 Portal-Integrationen.',
+  description: 'KI-gesteuertes Betriebssystem für Immobilienmakler mit Mivo KI-Assistent, CRM, Exposé-Editor und 24 Portal-Integrationen.',
   brand: { '@type': 'Brand', name: 'Immivo AI' },
   url: 'https://immivo.ai/pricing',
   offers: [
     {
       '@type': 'Offer',
       name: 'Free Trial',
-      description: '7 Tage kostenlos testen — Jarvis auf 20 Eingaben, Bildstudio auf 3 Generierungen',
+      description: '7 Tage kostenlos testen — Mivo auf 20 Eingaben, Bildstudio auf 3 Generierungen',
       price: '0',
       priceCurrency: 'EUR',
       availability: 'https://schema.org/InStock',

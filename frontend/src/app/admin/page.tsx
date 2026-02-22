@@ -27,7 +27,7 @@ const ACTIVITY_ICONS: Record<string, { icon: any; bg: string; color: string }> =
   STATUS_CHANGED: { icon: Activity, bg: 'bg-gray-100', color: 'text-gray-600' },
   EXPOSE_SENT: { icon: FileImage, bg: 'bg-amber-100', color: 'text-amber-600' },
   VIEWING_SCHEDULED: { icon: Calendar, bg: 'bg-blue-100', color: 'text-blue-600' },
-  JARVIS_QUERY: { icon: Bot, bg: 'bg-gray-100', color: 'text-gray-600' },
+  MIVO_QUERY: { icon: Bot, bg: 'bg-gray-100', color: 'text-gray-600' },
 };
 
 function formatTimeAgo(dateStr: string) {

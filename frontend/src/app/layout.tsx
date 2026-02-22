@@ -46,7 +46,7 @@ const cormorantGaramond = Cormorant_Garamond({
 
 const SITE_URL = 'https://immivo.ai';
 const SITE_NAME = 'Immivo AI';
-const DEFAULT_DESCRIPTION = 'Das erste KI-gesteuerte Betriebssystem für Immobilienmakler. Jarvis übernimmt E-Mails, Termine, Exposés und Lead-Qualifizierung — vollautomatisch, 24/7.';
+const DEFAULT_DESCRIPTION = 'Das erste KI-gesteuerte Betriebssystem für Immobilienmakler. Mivo übernimmt E-Mails, Termine, Exposés und Lead-Qualifizierung — vollautomatisch, 24/7.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -64,7 +64,7 @@ export const metadata: Metadata = {
     'Lead Management Immobilien',
     'Virtual Staging',
     'Immobilien Automatisierung',
-    'Jarvis KI Assistent',
+    'Mivo KI Assistent',
     'Immivo',
     'Real Estate AI',
     'Immobilien KI',
@@ -214,7 +214,7 @@ const jsonLd = {
         offerCount: 4,
       },
       featureList: [
-        'KI-Assistent Jarvis',
+        'KI-Assistent Mivo',
         'Automatische Lead-Qualifizierung',
         'Exposé-Editor mit KI',
         'Virtual Staging',

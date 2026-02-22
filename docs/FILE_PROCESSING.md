@@ -1,8 +1,8 @@
-# Datei-Verarbeitung in Jarvis
+# Datei-Verarbeitung in Mivo
 
 ## Übersicht
 
-Jarvis kann **alle gängigen Dateiformate** direkt im Chat verarbeiten. Die Verarbeitung erfolgt **server-seitig** im Orchestrator — der Text/Inhalt wird extrahiert und als Kontext an das LLM übergeben. So kann Jarvis Dokumente lesen, analysieren, Daten importieren und auf Bilder reagieren.
+Mivo kann **alle gängigen Dateiformate** direkt im Chat verarbeiten. Die Verarbeitung erfolgt **server-seitig** im Orchestrator — der Text/Inhalt wird extrahiert und als Kontext an das LLM übergeben. So kann Mivo Dokumente lesen, analysieren, Daten importieren und auf Bilder reagieren.
 
 ---
 
@@ -36,7 +36,7 @@ Parser extrahiert Text/Struktur (mammoth / xlsx / pdf-parse / jszip)
        ↓
 Inhalt wird als [DOKUMENT "..." — INHALT: ...] in den Message-Kontext eingebettet
        ↓
-Jarvis (GPT-5) liest den Inhalt und antwortet
+Mivo (GPT-5) liest den Inhalt und antwortet
 ```
 
 ### 2. Intelligentes Routing (AgentRouter)
@@ -45,25 +45,25 @@ Der AgentRouter erkennt automatisch die Intention:
 
 | Datei + Nachricht | Routing | Verhalten |
 |---|---|---|
-| `.xlsx` + "importiere alle Leads" | `crm` | CRM-Tools aktiv, Jarvis legt Zeile für Zeile an |
-| `.docx` + "fass das zusammen" | `smalltalk` | Kein Tool-Call, Jarvis antwortet direkt aus Kontext |
+| `.xlsx` + "importiere alle Leads" | `crm` | CRM-Tools aktiv, Mivo legt Zeile für Zeile an |
+| `.docx` + "fass das zusammen" | `smalltalk` | Kein Tool-Call, Mivo antwortet direkt aus Kontext |
 | `.pdf` + "erstelle einen Lead daraus" | `crm` | CRM-Tools aktiv |
 | Bild + "möbliere das" | `expose/crm` | Virtual Staging Tool |
 
 ### 3. Bilder: Vision-Input
 
-Hochgeladene Bilder werden als echte **OpenAI Vision-Inputs** (image_url content blocks) an GPT-5 gesendet — Jarvis kann das Bild wirklich *sehen*, nicht nur die URL kennen.
+Hochgeladene Bilder werden als echte **OpenAI Vision-Inputs** (image_url content blocks) an GPT-5 gesendet — Mivo kann das Bild wirklich *sehen*, nicht nur die URL kennen.
 
 ### 4. Persistenz über mehrere Nachrichten
 
-Bild-URLs und Dateiinhalte werden in der Chat-History gespeichert. Jarvis kann also 2 Nachrichten später noch auf ein zuvor hochgeladenes Bild oder Dokument referenzieren:
+Bild-URLs und Dateiinhalte werden in der Chat-History gespeichert. Mivo kann also 2 Nachrichten später noch auf ein zuvor hochgeladenes Bild oder Dokument referenzieren:
 
 ```
 User: [lädt Foto hoch] Hier ein Foto der Wohnung
-Jarvis: Ich sehe ein modernes Wohnzimmer mit Parkettboden...
+Mivo: Ich sehe ein modernes Wohnzimmer mit Parkettboden...
 
 User: (2 Nachrichten später) Mach daraus ein Virtual Staging
-Jarvis: [virtual_staging mit URL aus History] → zeigt Ergebnis
+Mivo: [virtual_staging mit URL aus History] → zeigt Ergebnis
 ```
 
 ---
@@ -77,7 +77,7 @@ Jarvis: [virtual_staging mit URL aus History] → zeigt Ergebnis
 | Tabellen-Inhalt Cap | 40.000 Zeichen (≈500 Zeilen) |
 | Max. Excel-Zeilen pro Batch | 500 (danach wird gekürzt + Hinweis) |
 
-> Bei sehr großen Excel-Dateien fragt Jarvis vor dem Import nach Bestätigung (>50 Einträge).
+> Bei sehr großen Excel-Dateien fragt Mivo vor dem Import nach Bestätigung (>50 Einträge).
 
 ---
 
@@ -89,7 +89,7 @@ Jarvis: [virtual_staging mit URL aus History] → zeigt Ergebnis
 User: [lädt Objektliste.xlsx hoch]
       Importiere alle Objekte
 
-Jarvis: Tabelle "Objektliste.xlsx" gelesen: 45 Zeilen
+Mivo: Tabelle "Objektliste.xlsx" gelesen: 45 Zeilen
         Lege Objekt 1/45 an: Friedrichstraße 1, Wien, 450.000€ ✓
         Lege Objekt 2/45 an: Maximilianstraße 8, München, 890.000€ ✓
         ...
@@ -117,7 +117,7 @@ Jarvis: Tabelle "Objektliste.xlsx" gelesen: 45 Zeilen
 | fläche / area | livingArea |
 | stadt / city | city |
 
-> Jarvis erkennt auch abweichende Spaltenbezeichnungen (z.B. "Wohnfläche" → livingArea) durch das LLM-Mapping.
+> Mivo erkennt auch abweichende Spaltenbezeichnungen (z.B. "Wohnfläche" → livingArea) durch das LLM-Mapping.
 
 ---
 
@@ -129,7 +129,7 @@ Jarvis: Tabelle "Objektliste.xlsx" gelesen: 45 Zeilen
 User: [lädt Mietvertrag.pdf hoch]
       Extrahiere alle relevanten Daten
 
-Jarvis: Vertrag analysiert:
+Mivo: Vertrag analysiert:
         - Mieter: Max Mustermann (max@test.de)
         - Objekt: Friedrichstraße 123, 1010 Wien
         - Miete: 1.200€ kalt
@@ -144,7 +144,7 @@ Jarvis: Vertrag analysiert:
 User: [lädt Objektpräsentation.pptx hoch]
       Was steht auf den Folien?
 
-Jarvis: Folie 1: Luxuswohnung Wien-Innere Stadt
+Mivo: Folie 1: Luxuswohnung Wien-Innere Stadt
         Folie 2: 3 Zimmer, 95m², Baujahr 1910 saniert...
         Folie 3: Preis: 1.200.000 €
 ```

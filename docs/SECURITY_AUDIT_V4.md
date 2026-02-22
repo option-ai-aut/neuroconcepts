@@ -93,7 +93,7 @@ Dieses Dokument beschreibt alle umgesetzten Sicherheitsmaßnahmen aus dem finale
 ## 8. HOCH: Rate-Limits AI/Upload/Search
 
 **Fix:** Zusätzliche Rate-Limits:
-- `POST /jarvis/generate-signature` – 20/min/User
+- `POST /mivo/generate-signature` – 20/min/User
 - `POST /properties/:id/generate-text` – 20/min/User
 - `GET /search` – 30/min/User
 - `POST /properties/:id/images`, `POST /properties/:id/documents`, `POST /leads/:id/documents` – 20/min/User

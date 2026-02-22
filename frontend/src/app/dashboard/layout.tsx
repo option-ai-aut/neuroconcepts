@@ -64,13 +64,13 @@ function MobileRouteGuard({ children, pathname }: { children: React.ReactNode; p
 }
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
-  const { drawerOpen, drawerType, exposeEditorData, closeDrawer, mobileJarvisOpen, setMobileJarvisOpen } = useGlobalState();
+  const { drawerOpen, drawerType, exposeEditorData, closeDrawer, mobileMivoOpen, setMobileMivoOpen } = useGlobalState();
   const { isDark } = useDarkMode();
   const pathname = usePathname();
-  const [jarvisClosing, setJarvisClosing] = useState(false);
+  const [mivoClosing, setMivoClosing] = useState(false);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Draggable Jarvis FAB state
+  // Draggable Mivo FAB state
   const [fabY, setFabY] = useState<number | null>(null);
   const fabRef = useRef<HTMLDivElement>(null);
   const fabDragging = useRef(false);
@@ -125,7 +125,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       }
       fabDragging.current = false;
       if (!fabMoved.current) {
-        setMobileJarvisOpen(true);
+        setMobileMivoOpen(true);
       }
     };
 
@@ -138,7 +138,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       el.removeEventListener('touchmove', onTouchMove);
       el.removeEventListener('touchend', onTouchEnd);
     };
-  }, [setMobileJarvisOpen]);
+  }, [setMobileMivoOpen]);
 
   // Presence heartbeat — send every 60 seconds
   useEffect(() => {
@@ -147,14 +147,14 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     return () => { if (heartbeatRef.current) clearInterval(heartbeatRef.current); };
   }, []);
 
-  const handleCloseJarvis = useCallback(() => {
-    setJarvisClosing(true);
+  const handleCloseMivo = useCallback(() => {
+    setMivoClosing(true);
     fabMoved.current = false;
     setTimeout(() => {
-      setMobileJarvisOpen(false);
-      setJarvisClosing(false);
+      setMobileMivoOpen(false);
+      setMivoClosing(false);
     }, 250);
-  }, [setMobileJarvisOpen]);
+  }, [setMobileMivoOpen]);
 
   return (
     <div className={`app-shell flex h-full overflow-hidden font-sans transition-colors duration-300 ${isDark ? 'dark bg-[#111111]' : 'bg-white'}`} style={{ overscrollBehavior: 'none' }}>
@@ -169,7 +169,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         {/* Top Header Bar */}
         <PageHeader />
         {/* Scrollable Content - extra bottom padding on mobile for nav bar */}
-        <main className={`flex-1 overflow-y-auto bg-white dark:bg-[#111111] overflow-x-hidden pb-16 lg:pb-0 transition-colors ${mobileJarvisOpen ? 'overflow-hidden' : ''}`} style={{ overscrollBehavior: 'none' }}>
+        <main className={`flex-1 overflow-y-auto bg-white dark:bg-[#111111] overflow-x-hidden pb-16 lg:pb-0 transition-colors ${mobileMivoOpen ? 'overflow-hidden' : ''}`} style={{ overscrollBehavior: 'none' }}>
           <MobileRouteGuard pathname={pathname}>
             {children}
           </MobileRouteGuard>
@@ -181,12 +181,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         <AiChatSidebar />
       </div>
 
-      {/* Mobile: Jarvis Floating Action Button (draggable vertically) — always mounted to keep touch listeners alive */}
+      {/* Mobile: Mivo Floating Action Button (draggable vertically) — always mounted to keep touch listeners alive */}
       <div
         ref={fabRef}
-        onClick={() => { if (!fabMoved.current) setMobileJarvisOpen(true); }}
+        onClick={() => { if (!fabMoved.current) setMobileMivoOpen(true); }}
         className={`lg:hidden fixed right-4 z-40 cursor-pointer select-none transition-opacity duration-200 ${
-          mobileJarvisOpen || jarvisClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'
+          mobileMivoOpen || mivoClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'
         }`}
         style={{
           top: fabY != null ? `${fabY}px` : undefined,
@@ -197,18 +197,18 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           WebkitUserSelect: 'none',
         }}
         role="button"
-        aria-label="Jarvis KI-Chat öffnen"
+        aria-label="Mivo KI-Chat öffnen"
       >
-        <Image src="/logo-icon-only.png" alt="Jarvis" width={52} height={52} className="pointer-events-none" draggable={false} />
+        <Image src="/logo-icon-only.png" alt="Mivo" width={52} height={52} className="pointer-events-none" draggable={false} />
       </div>
 
-      {/* Mobile: Jarvis Full-Screen Chat Overlay */}
-      {(mobileJarvisOpen || jarvisClosing) && (
+      {/* Mobile: Mivo Full-Screen Chat Overlay */}
+      {(mobileMivoOpen || mivoClosing) && (
         <div
-          className={`lg:hidden fixed inset-0 z-50 ${isDark ? 'bg-[#111111]' : 'bg-white'} ${jarvisClosing ? 'animate-slide-down' : 'animate-slide-up'}`}
+          className={`lg:hidden fixed inset-0 z-50 ${isDark ? 'bg-[#111111]' : 'bg-white'} ${mivoClosing ? 'animate-slide-down' : 'animate-slide-up'}`}
           style={{ overscrollBehavior: 'none' }}
         >
-          <AiChatSidebar mobile onClose={handleCloseJarvis} />
+          <AiChatSidebar mobile onClose={handleCloseMivo} />
         </div>
       )}
 

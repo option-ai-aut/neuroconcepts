@@ -144,13 +144,13 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
                 <div className={`${dropdownBg} rounded-xl shadow-xl border py-2 min-w-[200px]`} style={dropdownStyle}>
                   {currentPage === 'home' ? (
                     <>
-                      <a href="#jarvis" onClick={(e) => handleAnchorClick(e, 'jarvis')} className={`block px-4 py-2 text-sm ${dropdownText}`}>{t('jarvisAi')}</a>
+                      <a href="#mivo" onClick={(e) => handleAnchorClick(e, 'mivo')} className={`block px-4 py-2 text-sm ${dropdownText}`}>{t('mivoAi')}</a>
                       <a href="#features" onClick={(e) => handleAnchorClick(e, 'features')} className={`block px-4 py-2 text-sm ${dropdownText}`}>{t('features')}</a>
                       <a href="#bildbearbeitung" onClick={(e) => handleAnchorClick(e, 'bildbearbeitung')} className={`block px-4 py-2 text-sm ${dropdownText}`}>{t('aiImageEditing')}</a>
                     </>
                   ) : (
                     <>
-                      <Link href="/#jarvis" prefetch={false} className={`block px-4 py-2 text-sm ${dropdownText}`}>{t('jarvisAi')}</Link>
+                      <Link href="/#mivo" prefetch={false} className={`block px-4 py-2 text-sm ${dropdownText}`}>{t('mivoAi')}</Link>
                       <Link href="/#features" prefetch={false} className={`block px-4 py-2 text-sm ${dropdownText}`}>{t('features')}</Link>
                       <Link href="/#bildbearbeitung" prefetch={false} className={`block px-4 py-2 text-sm ${dropdownText}`}>{t('aiImageEditing')}</Link>
                     </>
@@ -215,13 +215,13 @@ export default function PublicNavigation({ currentPage }: PublicNavigationProps)
               <p className={`text-[11px] font-semibold uppercase tracking-wider mb-2 ${menuLabel}`}>{t('product')}</p>
               {currentPage === 'home' ? (
                 <>
-                  <a href="#jarvis" onClick={(e) => handleAnchorClick(e, 'jarvis')} className={`block py-2 text-sm transition-colors ${menuText}`}>{t('jarvisAi')}</a>
+                  <a href="#mivo" onClick={(e) => handleAnchorClick(e, 'mivo')} className={`block py-2 text-sm transition-colors ${menuText}`}>{t('mivoAi')}</a>
                   <a href="#features" onClick={(e) => handleAnchorClick(e, 'features')} className={`block py-2 text-sm transition-colors ${menuText}`}>{t('features')}</a>
                   <a href="#bildbearbeitung" onClick={(e) => handleAnchorClick(e, 'bildbearbeitung')} className={`block py-2 text-sm transition-colors ${menuText}`}>{t('aiImageEditing')}</a>
                 </>
               ) : (
                 <>
-                  <Link href="/#jarvis" prefetch={false} className={`block py-2 text-sm transition-colors ${menuText}`} onClick={() => setMobileMenuOpen(false)}>{t('jarvisAi')}</Link>
+                  <Link href="/#mivo" prefetch={false} className={`block py-2 text-sm transition-colors ${menuText}`} onClick={() => setMobileMenuOpen(false)}>{t('mivoAi')}</Link>
                   <Link href="/#features" prefetch={false} className={`block py-2 text-sm transition-colors ${menuText}`} onClick={() => setMobileMenuOpen(false)}>{t('features')}</Link>
                   <Link href="/#bildbearbeitung" prefetch={false} className={`block py-2 text-sm transition-colors ${menuText}`} onClick={() => setMobileMenuOpen(false)}>{t('aiImageEditing')}</Link>
                 </>

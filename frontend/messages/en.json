@@ -58,7 +58,7 @@
   },
   "publicNav": {
     "product": "Product",
-    "jarvisAi": "Jarvis AI",
+    "mivoAi": "Mivo AI",
     "features": "Features",
     "aiImageEditing": "AI Image Editing",
     "pricing": "Pricing",
@@ -95,8 +95,8 @@
       "trustNoCard": "No credit card",
       "trust7Days": "7 days free",
       "trustGdpr": "GDPR",
-      "badge": "Jarvis 1.0",
-      "introText": "Immivo is the first <bold>fully AI-powered</bold> operating system for real estate agents. Jarvis handles your daily operations — you focus on closing deals.",
+      "badge": "Mivo 1.0",
+      "introText": "Immivo is the first <bold>fully AI-powered</bold> operating system for real estate agents. Mivo handles your daily operations — you focus on closing deals.",
       "gdprCompliant": "GDPR compliant",
       "awsHosting": "AWS Hosting EU",
       "securePayment": "Secure payments via Stripe"
@@ -104,11 +104,11 @@
     "preview": {
       "newLeadsToday": "New leads today",
       "appointmentsBooked": "Appointments booked",
-      "byJarvis": "by Jarvis",
+      "byMivo": "by Mivo",
       "exposesSent": "Exposés sent",
       "automatic": "automatic",
-      "jarvisJustNow": "Jarvis • Just now",
-      "jarvisMessage": "I processed 3 new inquiries, sent exposés and scheduled a viewing for tomorrow at 2 PM. All done! 🎯",
+      "mivoJustNow": "Mivo • Just now",
+      "mivoMessage": "I processed 3 new inquiries, sent exposés and scheduled a viewing for tomorrow at 2 PM. All done! 🎯",
       "activity1": "Lead qualified: Miller Family",
       "activity2": "Viewing booked: Penthouse Vienna",
       "activity3": "Exposé created: 3-room apt. Berlin",
@@ -129,7 +129,7 @@
       "subtitle": "80% of your time is spent on emails, scheduling and paperwork. Only 20% on what really matters: meeting clients and closing deals.",
       "emailFlood": "Email Flood",
       "emailProblem": "50+ emails daily",
-      "emailSolution": "Jarvis responds in seconds",
+      "emailSolution": "Mivo responds in seconds",
       "appointmentChaos": "Scheduling Chaos",
       "appointmentProblem": "3-5 emails per appointment",
       "appointmentSolution": "Automatic booking",
@@ -137,14 +137,14 @@
       "exposeProblem": "2h per exposé",
       "exposeSolution": "2 minutes with AI"
     },
-    "jarvis": {
+    "mivo": {
       "badge": "Powered by OpenAI GPT-5",
-      "title": "Meet <bold>Jarvis</bold>, your AI assistant.",
-      "subtitle": "Jarvis isn't a chatbot. He's a full-fledged team member who understands your business. He reads emails, qualifies leads, creates exposés and books appointments — <bold>24/7, no breaks, no mistakes.</bold>",
+      "title": "Meet <bold>Mivo</bold>, your AI assistant.",
+      "subtitle": "Mivo isn't a chatbot. He's a full-fledged team member who understands your business. He reads emails, qualifies leads, creates exposés and books appointments — <bold>24/7, no breaks, no mistakes.</bold>",
       "feature1": "Full access to CRM, emails, calendar & properties",
       "feature2": "Creates professional exposés in seconds",
       "feature3": "Edits images with AI staging (furnishing rooms)",
-      "cta": "Meet Jarvis",
+      "cta": "Meet Mivo",
       "emails": "Emails",
       "appointments": "Appointments",
       "exposesLabel": "Exposés",
@@ -168,8 +168,8 @@
       "sectionLabel": "All inclusive",
       "title": "One system. Infinite possibilities.",
       "subtitle": "Immivo replaces your CRM, your email tools and your exposé software — in a single, AI-powered platform.",
-      "jarvisTitle": "Jarvis AI Assistant",
-      "jarvisDesc": "Available 24/7, answers inquiries in seconds, qualifies leads automatically.",
+      "mivoTitle": "Mivo AI Assistant",
+      "mivoDesc": "Available 24/7, answers inquiries in seconds, qualifies leads automatically.",
       "imageTitle": "AI Image Editing",
       "imageDesc": "Virtual staging: furnish rooms, redesign spaces — ultra-realistic with AI.",
       "crmTitle": "Smart CRM",
@@ -181,7 +181,7 @@
       "calendarTitle": "Calendar Integration",
       "calendarDesc": "Automatic appointment booking directly in Google Calendar or Outlook.",
       "emailTitle": "Email Automation",
-      "emailDesc": "White-label sending via your domain. Jarvis responds on your behalf.",
+      "emailDesc": "White-label sending via your domain. Mivo responds on your behalf.",
       "portalsTitle": "Portal Integration",
       "portalsDesc": "All major portals — ImmoScout, Willhaben, Immowelt and more.",
       "analyticsTitle": "Analytics & Reports",
@@ -207,14 +207,14 @@
       "step1Title": "Connect",
       "step1Desc": "Link your email, calendar and portals. Takes 5 minutes.",
       "step2Title": "Set up",
-      "step2Desc": "Upload your properties and create exposé templates — in the editor or let Jarvis generate them for you.",
+      "step2Desc": "Upload your properties and create exposé templates — in the editor or let Mivo generate them for you.",
       "step3Title": "Relax",
-      "step3Desc": "Jarvis takes over. You only receive notifications for important events."
+      "step3Desc": "Mivo takes over. You only receive notifications for important events."
     },
     "demo": {
       "badge": "Personal Demo",
       "title": "Experience Immivo <bold>live in action</bold>",
-      "subtitle": "In a 30-minute demo, we'll show you how Jarvis revolutionizes your daily operations. No commitments, no sales pitches — just value.",
+      "subtitle": "In a 30-minute demo, we'll show you how Mivo revolutionizes your daily operations. No commitments, no sales pitches — just value.",
       "feature1": "Individual consultation for your business",
       "feature2": "Live demonstration of all features",
       "feature3": "Answers to all your questions",
@@ -244,13 +244,13 @@
       "tagline": "Try for free",
       "subtext": "1 week free",
       "price": "€0",
-      "features": ["All basic features", "Limited Jarvis", "Limited Image Studio", "NO portal push", "Email support"],
+      "features": ["All basic features", "Limited Mivo", "Limited Image Studio", "NO portal push", "Email support"],
       "cta": "Try now"
     },
     "solo": {
       "tagline": "For individual agents",
       "seats": "1 Seat",
-      "features": ["Access to EVERYTHING", "Unlimited Jarvis", "Unlimited Image Studio", "24 portal integrations", "AI Exposé Editor", "CRM + Lead Management", "Email & Calendar", "Priority Support"],
+      "features": ["Access to EVERYTHING", "Unlimited Mivo", "Unlimited Image Studio", "24 portal integrations", "AI Exposé Editor", "CRM + Lead Management", "Email & Calendar", "Priority Support"],
       "cta": "Get started"
     },
     "team": {
@@ -271,7 +271,7 @@
     "faqTitle": "Frequently Asked Questions",
     "faq": {
       "q1": "Can I try Immivo for free?",
-      "a1": "Yes! You get a full trial week — completely free and without a credit card. During this time you have access to all basic features, including CRM, emails, calendar and properties. Jarvis (AI assistant) and the Image Studio have limited availability during the trial. After 7 days, your account is automatically paused — no charges unless you choose a plan.",
+      "a1": "Yes! You get a full trial week — completely free and without a credit card. During this time you have access to all basic features, including CRM, emails, calendar and properties. Mivo (AI assistant) and the Image Studio have limited availability during the trial. After 7 days, your account is automatically paused — no charges unless you choose a plan.",
       "q2": "What happens after the trial period?",
       "a2": "After the free week, you can choose one of the three plans (Solo, Team or Enterprise). There's no automatic upgrade to a paid plan. If you don't choose a plan, your access is paused — but your data is kept for 30 days in case you decide later.",
       "q3": "Can I cancel anytime?",
@@ -289,7 +289,7 @@
       "q9": "Is Immivo GDPR-compliant?",
       "a9": "Yes, fully. We host all data on AWS EU (Frankfurt). All data is encrypted at rest (AES-256) and in transit (TLS/HTTPS). Each customer has their own isolated data space (multi-tenancy). There is no third-party tracking.",
       "q10": "What's included in the free version?",
-      "a10": "In the free trial, you have access to all basic features: CRM, lead management, properties, email integration and calendar. Jarvis AI assistant and the AI Image Studio have limited availability. Portal push (publishing to real estate portals) is not available in the free version."
+      "a10": "In the free trial, you have access to all basic features: CRM, lead management, properties, email integration and calendar. Mivo AI assistant and the AI Image Studio have limited availability. Portal push (publishing to real estate portals) is not available in the free version."
     },
     "stillQuestions": "Still have questions? We're happy to help."
   },
@@ -300,7 +300,7 @@
     "storyTitle": "From frustration to solution",
     "storyP1": "Vienna. Two founders sit in a coffee house discussing a problem that affects the entire real estate industry: agents spend 80% of their time on emails, paperwork and organization — instead of doing what they're passionate about.",
     "storyP2": "The idea was simple: What if an AI assistant could handle all daily operations? Not another CRM. Not another tool. A complete operating system that thinks ahead.",
-    "storyP3": "From this idea, Immivo was born — and from the assistant came Jarvis.",
+    "storyP3": "From this idea, Immivo was born — and from the assistant came Mivo.",
     "developedIn": "in Vienna",
     "developed": "Developed",
     "teamLabel": "The Team",
@@ -615,7 +615,7 @@
       "confirmDeleteTitle": "Permanently delete account?",
       "confirmDeleteWarning": "This action is irreversible. The following data will be deleted:",
       "deleteItem1": "Your user account and profile data",
-      "deleteItem2": "Chat history with Jarvis",
+      "deleteItem2": "Chat history with Mivo",
       "deleteItem3": "Notifications and settings",
       "deleteItem4": "AI audit logs",
       "typeDeleteConfirm": "Type DELETE to confirm:",
@@ -708,10 +708,10 @@
   "calendar": {
     "emptyState": {
       "title": "No calendar connected",
-      "description": "Connect your Google or Outlook calendar to manage appointments and enable Jarvis to book automatically.",
+      "description": "Connect your Google or Outlook calendar to manage appointments and enable Mivo to book automatically.",
       "connectButton": "Connect calendar",
       "autoBooking": "Automatic appointment booking",
-      "autoBookingDesc": "Jarvis books viewings directly into your calendar",
+      "autoBookingDesc": "Mivo books viewings directly into your calendar",
       "teamSync": "Team synchronization",
       "teamSyncDesc": "All appointments are shared with your team",
       "locationIntegration": "Location integration",
@@ -762,7 +762,7 @@
       "centralInbox": "Central inbox",
       "centralInboxDesc": "Manage all emails in one place",
       "aiResponses": "AI responses",
-      "aiResponsesDesc": "Jarvis automatically answers inquiries",
+      "aiResponsesDesc": "Mivo automatically answers inquiries",
       "leadSync": "Lead assignment",
       "leadSyncDesc": "Emails are automatically assigned to leads"
     },
@@ -836,8 +836,8 @@
       "create": "Create",
       "error": "Error creating channel"
     },
-    "jarvisBadge": "AI",
-    "jarvisMentionLabel": "AI Assistant",
+    "mivoBadge": "AI",
+    "mivoMentionLabel": "AI Assistant",
     "adminBadge": "Admin",
     "imageAlt": "Image",
     "yesterday": "Yesterday {time}",

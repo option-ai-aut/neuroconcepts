@@ -27,7 +27,7 @@ import { encryptionService } from './services/EncryptionService';
 import { ConversationMemory, setPrismaClient as setConversationPrisma } from './services/ConversationMemory';
 import { CalendarService } from './services/CalendarService';
 import { setPrismaClient as setAiToolsPrisma, setReplacePlaceholders as setAiToolsReplacePlaceholders } from './services/AiTools';
-import { setJarvisActionPrisma } from './services/JarvisActionService';
+import { setMivoActionPrisma } from './services/MivoActionService';
 import { setEmailResponsePrisma } from './services/EmailResponseHandler';
 import { setEmailSyncPrisma } from './services/EmailSyncService';
 import { setPropertyMatchingPrisma } from './services/PropertyMatchingService';
@@ -209,7 +209,7 @@ function injectPrismaIntoServices(client: PrismaClient) {
   setTemplatePrisma(client);
   setConversationPrisma(client);
   setAiToolsPrisma(client);
-  setJarvisActionPrisma(client);
+  setMivoActionPrisma(client);
   setEmailResponsePrisma(client);
   setEmailSyncPrisma(client);
   setPropertyMatchingPrisma(client);
@@ -340,7 +340,7 @@ async function applyPendingMigrations(db: PrismaClient) {
     'ALTER TABLE "ChannelMember" ADD COLUMN IF NOT EXISTS "role" "ChannelRole" NOT NULL DEFAULT \'MEMBER\'',
     'ALTER TABLE "ChannelMember" ADD COLUMN IF NOT EXISTS "joinedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
     // ChannelMessage fixes
-    'ALTER TABLE "ChannelMessage" ADD COLUMN IF NOT EXISTS "isJarvis" BOOLEAN NOT NULL DEFAULT false',
+    'ALTER TABLE "ChannelMessage" ADD COLUMN IF NOT EXISTS "isMivo" BOOLEAN NOT NULL DEFAULT false',
     'ALTER TABLE "ChannelMessage" ADD COLUMN IF NOT EXISTS "mentions" JSONB',
     'ALTER TABLE "ChannelMessage" ADD COLUMN IF NOT EXISTS "editedAt" TIMESTAMP(3)',
     // 2026-02-12: AI Usage & Cost Tracking
@@ -440,7 +440,7 @@ async function applyPendingMigrations(db: PrismaClient) {
     `DROP TRIGGER IF EXISTS lead_search_trigger ON "Lead"`,
     `CREATE TRIGGER lead_search_trigger BEFORE INSERT OR UPDATE ON "Lead"
      FOR EACH ROW EXECUTE FUNCTION lead_search_update()`,
-    // 2026-02-15: Tenant Company Profile (for Jarvis context)
+    // 2026-02-15: Tenant Company Profile (for Mivo context)
     'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "description" TEXT',
     'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "phone" TEXT',
     'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "email" TEXT',
@@ -465,9 +465,9 @@ async function applyPendingMigrations(db: PrismaClient) {
     // Lead documents + alternate emails
     'ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "documents" JSONB',
     'ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "alternateEmails" JSONB',
-    // LeadActivity property + jarvis links
+    // LeadActivity property + mivo links
     'ALTER TABLE "LeadActivity" ADD COLUMN IF NOT EXISTS "propertyId" TEXT',
-    'ALTER TABLE "LeadActivity" ADD COLUMN IF NOT EXISTS "jarvisActionId" TEXT',
+    'ALTER TABLE "LeadActivity" ADD COLUMN IF NOT EXISTS "mivoActionId" TEXT',
     // Property address fields
     'ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "street" TEXT',
     'ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "houseNumber" TEXT',
@@ -495,8 +495,8 @@ async function applyPendingMigrations(db: PrismaClient) {
     `ALTER TABLE "PropertyAssignment" ADD CONSTRAINT "PropertyAssignment_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE`,
     // Unique index for inboundLeadEmail
     `CREATE UNIQUE INDEX IF NOT EXISTS "TenantSettings_inboundLeadEmail_key" ON "TenantSettings"("inboundLeadEmail")`,
-    // Unique index for LeadActivity.jarvisActionId
-    `CREATE UNIQUE INDEX IF NOT EXISTS "LeadActivity_jarvisActionId_key" ON "LeadActivity"("jarvisActionId")`,
+    // Unique index for LeadActivity.mivoActionId
+    `CREATE UNIQUE INDEX IF NOT EXISTS "LeadActivity_mivoActionId_key" ON "LeadActivity"("mivoActionId")`,
   ];
   
   for (const sql of migrations) {
@@ -2093,7 +2093,7 @@ app.delete('/account', authMiddleware, async (req, res) => {
       await tx.propertyAssignment.deleteMany({ where: { userId: user.id } });
       
       // 7. Resolve/cancel pending actions
-      await tx.jarvisPendingAction.updateMany({
+      await tx.mivoPendingAction.updateMany({
         where: { userId: user.id, status: 'PENDING' },
         data: { status: 'CANCELLED', resolvedAt: new Date(), resolution: 'Account gelöscht' }
       });
@@ -3299,7 +3299,7 @@ app.post('/leads', authMiddleware, validate(schemas.createLead), async (req, res
       console.log(`📝 Draft message created for lead: ${lead.id}`);
     }
 
-    // 5. Handle Auto-Reply or Jarvis Question
+    // 5. Handle Auto-Reply or Mivo Question
     const assignedUserId = assignedToId || currentUser.id;
     
     if (tenantSettings?.autoReplyEnabled && emailDraft && property) {
@@ -3323,10 +3323,10 @@ app.post('/leads', authMiddleware, validate(schemas.createLead), async (req, res
         }
       });
     } else if (emailDraft && property) {
-      // Auto-Reply is disabled - ask Jarvis to confirm
+      // Auto-Reply is disabled - ask Mivo to confirm
       const leadName = [firstName, lastName].filter(Boolean).join(' ') || email;
       
-      await JarvisActionService.createPendingAction({
+      await MivoActionService.createPendingAction({
         tenantId,
         userId: assignedUserId,
         leadId: lead.id,
@@ -3339,7 +3339,7 @@ app.post('/leads', authMiddleware, validate(schemas.createLead), async (req, res
         }
       });
       
-      console.log(`❓ Jarvis question created for lead ${lead.id}`);
+      console.log(`❓ Mivo question created for lead ${lead.id}`);
     }
 
     // 6. Notify assigned agent about new lead
@@ -3355,7 +3355,7 @@ app.post('/leads', authMiddleware, validate(schemas.createLead), async (req, res
       id: lead.id, 
       message: 'Lead processed',
       autoReplyScheduled: tenantSettings?.autoReplyEnabled && !!emailDraft,
-      jarvisQuestionCreated: !tenantSettings?.autoReplyEnabled && !!emailDraft
+      mivoQuestionCreated: !tenantSettings?.autoReplyEnabled && !!emailDraft
     });
 
     // Generate lead embedding + score async (fire-and-forget)
@@ -3882,7 +3882,7 @@ app.get('/chat/history', authMiddleware, async (req, res) => {
     if (totalCount > MAX_HISTORY) {
       formattedHistory.push({
         role: 'SYSTEM',
-        content: `[${totalCount - MAX_HISTORY} ältere Nachrichten wurden archiviert. Jarvis erinnert sich an den Kontext.]`
+        content: `[${totalCount - MAX_HISTORY} ältere Nachrichten wurden archiviert. Mivo erinnert sich an den Kontext.]`
       });
     }
 
@@ -3929,7 +3929,7 @@ app.post('/chat/new', authMiddleware, async (req, res) => {
 });
 
 // Generate email signature with AI
-app.post('/jarvis/generate-signature', authMiddleware, AiSafetyMiddleware.rateLimit(20, 60000), async (req, res) => {
+app.post('/mivo/generate-signature', authMiddleware, AiSafetyMiddleware.rateLimit(20, 60000), async (req, res) => {
   try {
     const { name, email, phone, company, website } = req.body;
     
@@ -4293,7 +4293,7 @@ app.post('/chat/stream',
   }
 );
 
-// Exposé-specific Chat with Jarvis (full tool access)
+// Exposé-specific Chat with Mivo (full tool access)
 app.post('/exposes/:id/chat',
   authMiddleware,
   AiSafetyMiddleware.rateLimit(50, 60000),
@@ -4331,7 +4331,7 @@ app.post('/exposes/:id/chat',
   }
 );
 
-// Template-specific Chat with Jarvis (full tool access)
+// Template-specific Chat with Mivo (full tool access)
 app.post('/templates/:id/chat',
   authMiddleware,
   AiSafetyMiddleware.rateLimit(50, 60000),
@@ -4762,7 +4762,7 @@ app.post('/channels/:channelId/messages', authMiddleware, async (req, res) => {
         userId: currentUser.id,
         content,
         mentions: mentions.length > 0 ? mentions : undefined,
-        isJarvis: false
+        isMivo: false
       },
       include: {
         user: {
@@ -4771,13 +4771,13 @@ app.post('/channels/:channelId/messages', authMiddleware, async (req, res) => {
       }
     });
 
-    // Respond immediately — then handle @jarvis in the background
+    // Respond immediately — then handle @mivo in the background
     res.json(message);
 
-    // Check if @jarvis was mentioned (as @[Jarvis](jarvis), plain @jarvis, or @Jarvis)
-    const jarvisMentioned = /(@\[Jarvis\]\([^)]*\)|@jarvis\b)/i.test(content);
-    if (jarvisMentioned) {
-      // Fire-and-forget: generate Jarvis response asynchronously
+    // Check if @mivo was mentioned (as @[Mivo](mivo), plain @mivo, or @Mivo)
+    const mivoMentioned = /(@\[Mivo\]\([^)]*\)|@mivo\b)/i.test(content);
+    if (mivoMentioned) {
+      // Fire-and-forget: generate Mivo response asynchronously
       (async () => {
         try {
           // Fetch recent channel messages for context (last 20)
@@ -4791,16 +4791,16 @@ app.post('/channels/:channelId/messages', authMiddleware, async (req, res) => {
           });
 
           const history = recentMessages.reverse().map(m => ({
-            role: m.isJarvis ? 'assistant' : 'user',
-            content: `${m.isJarvis ? 'Jarvis' : `${m.user.firstName || ''} ${m.user.lastName || ''}`.trim()}: ${m.content}`,
+            role: m.isMivo ? 'assistant' : 'user',
+            content: `${m.isMivo ? 'Mivo' : `${m.user.firstName || ''} ${m.user.lastName || ''}`.trim()}: ${m.content}`,
           }));
 
-          // Strip all forms of @jarvis mention from the actual question
-          const cleanContent = content.replace(/@\[Jarvis\]\([^)]*\)/gi, '').replace(/@jarvis\b/gi, '').trim();
+          // Strip all forms of @mivo mention from the actual question
+          const cleanContent = content.replace(/@\[Mivo\]\([^)]*\)/gi, '').replace(/@mivo\b/gi, '').trim();
 
           const openai = new OpenAIService();
-          const jarvisResponse = await openai.chat(
-            `Du bist Jarvis, der KI-Assistent im Team Chat. Antworte wie TARS aus Interstellar — kurz, prägnant, mit einem Hauch trockenem Humor. Keine Semikolons (;), keine Floskeln, keine Emojis. Deutsch, du-Form, locker und menschlich. Beantworte die Frage basierend auf dem Kontext der bisherigen Unterhaltung.\n\nFrage von ${currentUser.firstName || ''} ${currentUser.lastName || ''}: ${cleanContent}`,
+          const mivoResponse = await openai.chat(
+            `Du bist Mivo, der KI-Assistent im Team Chat. Antworte wie TARS aus Interstellar — kurz, prägnant, mit einem Hauch trockenem Humor. Keine Semikolons (;), keine Floskeln, keine Emojis. Deutsch, du-Form, locker und menschlich. Beantworte die Frage basierend auf dem Kontext der bisherigen Unterhaltung.\n\nFrage von ${currentUser.firstName || ''} ${currentUser.lastName || ''}: ${cleanContent}`,
             currentUser.tenantId,
             history,
             {
@@ -4810,17 +4810,17 @@ app.post('/channels/:channelId/messages', authMiddleware, async (req, res) => {
             }
           );
 
-          // Save Jarvis response as a channel message
+          // Save Mivo response as a channel message
           await prisma.channelMessage.create({
             data: {
               channelId,
-              userId: currentUser.id, // Use the invoking user's ID (Jarvis doesn't have its own)
-              content: jarvisResponse,
-              isJarvis: true,
+              userId: currentUser.id, // Use the invoking user's ID (Mivo doesn't have its own)
+              content: mivoResponse,
+              isMivo: true,
             }
           });
         } catch (err) {
-          console.error('Jarvis team chat response error:', err);
+          console.error('Mivo team chat response error:', err);
         }
       })();
     }
@@ -4938,7 +4938,7 @@ async function cleanupOldData() {
     });
 
     // 4. Delete resolved/cancelled pending actions older than 90 days
-    const actionsResult = await prisma.jarvisPendingAction.deleteMany({
+    const actionsResult = await prisma.mivoPendingAction.deleteMany({
       where: {
         status: { in: ['RESOLVED', 'CANCELLED'] },
         createdAt: { lt: ninetyDaysAgo }
@@ -7458,7 +7458,7 @@ app.post('/emails/incoming', verifyInternalSecret, async (req, res) => {
 // ============================================
 
 import NotificationService from './services/NotificationService';
-import JarvisActionService from './services/JarvisActionService';
+import MivoActionService from './services/MivoActionService';
 import SchedulerService from './services/SchedulerService';
 
 // Get notifications for current user
@@ -7560,7 +7560,7 @@ app.get('/activities', authMiddleware, async (req: any, res) => {
         description: true,
         metadata: true,
         propertyId: true,
-        jarvisActionId: true,
+        mivoActionId: true,
         createdBy: true,
         createdAt: true,
         lead: {
@@ -7569,7 +7569,7 @@ app.get('/activities', authMiddleware, async (req: any, res) => {
         property: {
           select: { id: true, title: true, address: true }
         },
-        jarvisAction: {
+        mivoAction: {
           select: { id: true, status: true, question: true, options: true, allowCustom: true }
         }
       },
@@ -8055,22 +8055,22 @@ async function ensureAdminTables(db: any) {
       created++;
     }
 
-    // --- JarvisPendingAction ---
-    if (!existing.has('JarvisPendingAction')) {
-      console.log('🔧 Creating JarvisPendingAction table...');
+    // --- MivoPendingAction ---
+    if (!existing.has('MivoPendingAction')) {
+      console.log('🔧 Creating MivoPendingAction table...');
       await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "PendingActionType" AS ENUM ('SEND_EXPOSE','SCHEDULE_VIEWING','ANSWER_QUESTION','ESCALATION','ASSIGN_PROPERTY','LINK_CLICK_REQUIRED','CLARIFICATION'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
       await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "PendingActionStatus" AS ENUM ('PENDING','REMINDED','ESCALATED','RESOLVED','CANCELLED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
-      await db.$executeRawUnsafe(`CREATE TABLE "JarvisPendingAction" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "tenantId" TEXT NOT NULL, "userId" TEXT NOT NULL, "leadId" TEXT, "propertyId" TEXT, "type" "PendingActionType" NOT NULL, "question" TEXT NOT NULL, "context" JSONB, "options" JSONB, "allowCustom" BOOLEAN NOT NULL DEFAULT true, "status" "PendingActionStatus" NOT NULL DEFAULT 'PENDING', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "reminderSentAt" TIMESTAMP(3), "escalatedAt" TIMESTAMP(3), "resolvedAt" TIMESTAMP(3), "resolution" TEXT, "scheduledReminderId" TEXT, "scheduledEscalationId" TEXT, CONSTRAINT "JarvisPendingAction_pkey" PRIMARY KEY ("id"))`);
-      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "JarvisPendingAction_tenantId_status_idx" ON "JarvisPendingAction"("tenantId","status")`);
-      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "JarvisPendingAction_userId_status_idx" ON "JarvisPendingAction"("userId","status")`);
-      await db.$executeRawUnsafe(`ALTER TABLE "JarvisPendingAction" ADD CONSTRAINT "JarvisPendingAction_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE`).catch(() => {});
+      await db.$executeRawUnsafe(`CREATE TABLE "MivoPendingAction" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "tenantId" TEXT NOT NULL, "userId" TEXT NOT NULL, "leadId" TEXT, "propertyId" TEXT, "type" "PendingActionType" NOT NULL, "question" TEXT NOT NULL, "context" JSONB, "options" JSONB, "allowCustom" BOOLEAN NOT NULL DEFAULT true, "status" "PendingActionStatus" NOT NULL DEFAULT 'PENDING', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "reminderSentAt" TIMESTAMP(3), "escalatedAt" TIMESTAMP(3), "resolvedAt" TIMESTAMP(3), "resolution" TEXT, "scheduledReminderId" TEXT, "scheduledEscalationId" TEXT, CONSTRAINT "MivoPendingAction_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "MivoPendingAction_tenantId_status_idx" ON "MivoPendingAction"("tenantId","status")`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "MivoPendingAction_userId_status_idx" ON "MivoPendingAction"("userId","status")`);
+      await db.$executeRawUnsafe(`ALTER TABLE "MivoPendingAction" ADD CONSTRAINT "MivoPendingAction_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE`).catch(() => {});
       created++;
     }
 
     // --- Notification ---
     if (!existing.has('Notification')) {
       console.log('🔧 Creating Notification table...');
-      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "NotificationType" AS ENUM ('JARVIS_QUESTION','NEW_LEAD','LEAD_RESPONSE','REMINDER','ESCALATION','SYSTEM'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "NotificationType" AS ENUM ('MIVO_QUESTION','NEW_LEAD','LEAD_RESPONSE','REMINDER','ESCALATION','SYSTEM'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
       await db.$executeRawUnsafe(`CREATE TABLE "Notification" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "tenantId" TEXT NOT NULL, "userId" TEXT NOT NULL, "type" "NotificationType" NOT NULL, "title" TEXT NOT NULL, "message" TEXT NOT NULL, "metadata" JSONB, "read" BOOLEAN NOT NULL DEFAULT false, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "Notification_pkey" PRIMARY KEY ("id"))`);
       await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Notification_tenantId_userId_read_idx" ON "Notification"("tenantId","userId","read")`);
       await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Notification_userId_createdAt_idx" ON "Notification"("userId","createdAt")`);
@@ -8903,14 +8903,14 @@ app.patch('/admin/platform/bug-reports/:id', adminAuthMiddleware, async (req, re
 });
 
 // ============================================
-// Jarvis Pending Actions API
+// Mivo Pending Actions API
 // ============================================
 
 // Get pending actions for current user
-app.get('/jarvis/actions', authMiddleware, async (req: any, res) => {
+app.get('/mivo/actions', authMiddleware, async (req: any, res) => {
   try {
     const userId = req.user.sub;
-    const actions = await JarvisActionService.getPendingActionsForUser(userId);
+    const actions = await MivoActionService.getPendingActionsForUser(userId);
     res.json({ actions });
   } catch (error: any) {
     console.error('Error fetching pending actions:', error);
@@ -8919,7 +8919,7 @@ app.get('/jarvis/actions', authMiddleware, async (req: any, res) => {
 });
 
 // Get all pending actions for tenant (admin only)
-app.get('/jarvis/actions/all', authMiddleware, async (req: any, res) => {
+app.get('/mivo/actions/all', authMiddleware, async (req: any, res) => {
   try {
     const db = await initializePrisma();
     const userId = req.user.sub;
@@ -8929,7 +8929,7 @@ app.get('/jarvis/actions/all', authMiddleware, async (req: any, res) => {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    const actions = await JarvisActionService.getPendingActionsForTenant(user.tenantId);
+    const actions = await MivoActionService.getPendingActionsForTenant(user.tenantId);
     res.json({ actions });
   } catch (error: any) {
     console.error('Error fetching all pending actions:', error);
@@ -8938,7 +8938,7 @@ app.get('/jarvis/actions/all', authMiddleware, async (req: any, res) => {
 });
 
 // Resolve a pending action
-app.post('/jarvis/actions/:id/resolve', authMiddleware, async (req: any, res) => {
+app.post('/mivo/actions/:id/resolve', authMiddleware, async (req: any, res) => {
   try {
     const db = await initializePrisma();
     const userId = req.user.sub;
@@ -8950,7 +8950,7 @@ app.post('/jarvis/actions/:id/resolve', authMiddleware, async (req: any, res) =>
     }
 
     // Verify user owns this action or is admin
-    const action = await db.jarvisPendingAction.findUnique({ where: { id } });
+    const action = await db.mivoPendingAction.findUnique({ where: { id } });
     if (!action) {
       return res.status(404).json({ error: 'Action not found' });
     }
@@ -8963,7 +8963,7 @@ app.post('/jarvis/actions/:id/resolve', authMiddleware, async (req: any, res) =>
     // Cancel any pending schedules
     await SchedulerService.cancelActionSchedules(id);
 
-    const resolved = await JarvisActionService.resolveAction(id, resolution, userId);
+    const resolved = await MivoActionService.resolveAction(id, resolution, userId);
     res.json({ success: true, action: resolved });
   } catch (error: any) {
     console.error('Error resolving action:', error);
@@ -8972,7 +8972,7 @@ app.post('/jarvis/actions/:id/resolve', authMiddleware, async (req: any, res) =>
 });
 
 // Respond to a pending action (simplified version of resolve)
-app.post('/jarvis/actions/:id/respond', authMiddleware, async (req: any, res) => {
+app.post('/mivo/actions/:id/respond', authMiddleware, async (req: any, res) => {
   try {
     const db = await initializePrisma();
     const userEmail = req.user!.email;
@@ -8989,7 +8989,7 @@ app.post('/jarvis/actions/:id/respond', authMiddleware, async (req: any, res) =>
     }
 
     // Get the action
-    const action = await db.jarvisPendingAction.findUnique({ 
+    const action = await db.mivoPendingAction.findUnique({ 
       where: { id },
       include: { activity: true }
     });
@@ -9025,7 +9025,7 @@ app.post('/jarvis/actions/:id/respond', authMiddleware, async (req: any, res) =>
     }
 
     // Resolve the action
-    const resolved = await db.jarvisPendingAction.update({
+    const resolved = await db.mivoPendingAction.update({
       where: { id },
       data: {
         status: 'RESOLVED',
@@ -9055,7 +9055,7 @@ app.post('/jarvis/actions/:id/respond', authMiddleware, async (req: any, res) =>
 });
 
 // Cancel a pending action
-app.post('/jarvis/actions/:id/cancel', authMiddleware, async (req: any, res) => {
+app.post('/mivo/actions/:id/cancel', authMiddleware, async (req: any, res) => {
   try {
     const db = await initializePrisma();
     const userId = req.user.sub;
@@ -9063,7 +9063,7 @@ app.post('/jarvis/actions/:id/cancel', authMiddleware, async (req: any, res) => 
     const { reason } = req.body;
 
     // Verify user owns this action or is admin
-    const action = await db.jarvisPendingAction.findUnique({ where: { id } });
+    const action = await db.mivoPendingAction.findUnique({ where: { id } });
     if (!action) {
       return res.status(404).json({ error: 'Action not found' });
     }
@@ -9076,7 +9076,7 @@ app.post('/jarvis/actions/:id/cancel', authMiddleware, async (req: any, res) => 
     // Cancel any pending schedules
     await SchedulerService.cancelActionSchedules(id);
 
-    const cancelled = await JarvisActionService.cancelAction(id, reason);
+    const cancelled = await MivoActionService.cancelAction(id, reason);
     res.json({ success: true, action: cancelled });
   } catch (error: any) {
     console.error('Error cancelling action:', error);
@@ -9211,13 +9211,13 @@ app.post('/internal/scheduler/auto-reply', async (req, res) => {
     if (!EmailService.hasEmailProvider(emailConfig)) {
       console.log(`⚠️ No email provider configured for tenant ${tenantId}`);
       
-      // Create Jarvis action to notify admin
+      // Create Mivo action to notify admin
       const admin = await db.user.findFirst({
         where: { tenantId, role: { in: ['ADMIN', 'SUPER_ADMIN'] } }
       });
       
       if (admin) {
-        await JarvisActionService.createPendingAction({
+        await MivoActionService.createPendingAction({
           tenantId,
           userId: admin.id,
           leadId,
@@ -9293,7 +9293,7 @@ app.post('/internal/scheduler/auto-reply', async (req, res) => {
       
       // Notify assigned agent about the failure
       if (lead.assignedToId) {
-        await JarvisActionService.createPendingAction({
+        await MivoActionService.createPendingAction({
           tenantId,
           userId: lead.assignedToId,
           leadId,
@@ -9332,7 +9332,7 @@ app.post('/internal/scheduler/follow-up', async (req, res) => {
 app.post('/internal/scheduler/reminder', async (req, res) => {
   try {
     const { actionId } = req.body;
-    await JarvisActionService.sendReminder(actionId);
+    await MivoActionService.sendReminder(actionId);
     res.json({ success: true });
   } catch (error: any) {
     console.error('Reminder error:', error);
@@ -9344,7 +9344,7 @@ app.post('/internal/scheduler/reminder', async (req, res) => {
 app.post('/internal/scheduler/escalation', async (req, res) => {
   try {
     const { actionId } = req.body;
-    await JarvisActionService.escalateAction(actionId);
+    await MivoActionService.escalateAction(actionId);
     res.json({ success: true });
   } catch (error: any) {
     console.error('Escalation error:', error);
@@ -9386,8 +9386,8 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
     const tenantId = tenantSettings.tenantId;
     console.log(`✅ Tenant identified: ${tenantSettings.tenant.name} (${tenantId})`);
 
-    // 2. Jarvis classifies & parses the email (ALL emails, not just portal ones)
-    console.log('🤖 Jarvis classifying email...');
+    // 2. Mivo classifies & parses the email (ALL emails, not just portal ones)
+    console.log('🤖 Mivo classifying email...');
     const parseResult = await classifyAndParseEmail({ from, subject, text, html });
 
     console.log(`📋 Classification: ${parseResult.classification} (${parseResult.classificationReason})`);
@@ -9549,7 +9549,7 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
     }
 
     // 9. Create notifications
-    const notificationType = parseResult.hasClickLink ? 'JARVIS_QUESTION' : 'NEW_LEAD';
+    const notificationType = parseResult.hasClickLink ? 'MIVO_QUESTION' : 'NEW_LEAD';
     const leadName = [leadData.firstName, leadData.lastName].filter(Boolean).join(' ') || leadData.email || 'Unbekannt';
     const notificationTitle = parseResult.hasClickLink
       ? `Neue Portal-Anfrage - Link-Klick erforderlich`
@@ -9599,8 +9599,8 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
       }
     }
 
-    // 10. If no property matched, create JarvisQuery for assignment
-    let jarvisAction = null;
+    // 10. If no property matched, create MivoQuery for assignment
+    let mivoAction = null;
     if (!matchedProperty && !parseResult.hasClickLink) {
       const propertyOptions = await getPropertiesForSelection(tenantId);
       const options = [
@@ -9610,7 +9610,7 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
 
       const targetUser = usersToNotify[0];
       if (targetUser) {
-        jarvisAction = await db.jarvisPendingAction.create({
+        mivoAction = await db.mivoPendingAction.create({
           data: {
             tenantId,
             userId: targetUser,
@@ -9630,30 +9630,30 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
         await db.leadActivity.update({
           where: { id: activity.id },
           data: {
-            type: 'JARVIS_QUERY',
-            jarvisActionId: jarvisAction.id,
+            type: 'MIVO_QUERY',
+            mivoActionId: mivoAction.id,
           }
         });
 
-        console.log(`❓ JarvisQuery created for property assignment: ${jarvisAction.id}`);
+        console.log(`❓ MivoQuery created for property assignment: ${mivoAction.id}`);
         
         // Emit SSE event for pending action
         try {
           await db.realtimeEvent.create({
             data: {
               tenantId, userId: targetUser, type: 'PENDING_ACTION',
-              data: { actionId: jarvisAction.id, actionType: 'ASSIGN_PROPERTY', leadId: lead.id, leadName },
+              data: { actionId: mivoAction.id, actionType: 'ASSIGN_PROPERTY', leadId: lead.id, leadName },
             }
           });
         } catch (e: any) { console.warn('RealtimeEvent error:', e.message); }
       }
     }
 
-    // 11. If hasClickLink, create JarvisQuery for link click
+    // 11. If hasClickLink, create MivoQuery for link click
     if (parseResult.hasClickLink) {
       const targetUser = usersToNotify[0];
       if (targetUser) {
-        jarvisAction = await db.jarvisPendingAction.create({
+        mivoAction = await db.mivoPendingAction.create({
           data: {
             tenantId,
             userId: targetUser,
@@ -9676,17 +9676,17 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
 
         await db.leadActivity.update({
           where: { id: activity.id },
-          data: { jarvisActionId: jarvisAction.id }
+          data: { mivoActionId: mivoAction.id }
         });
 
-        console.log(`❓ JarvisQuery created for link click: ${jarvisAction.id}`);
+        console.log(`❓ MivoQuery created for link click: ${mivoAction.id}`);
         
         // Emit SSE event for link click required
         try {
           await db.realtimeEvent.create({
             data: {
               tenantId, userId: targetUser, type: 'PENDING_ACTION',
-              data: { actionId: jarvisAction.id, actionType: 'LINK_CLICK_REQUIRED', leadId: lead.id, leadName },
+              data: { actionId: mivoAction.id, actionType: 'LINK_CLICK_REQUIRED', leadId: lead.id, leadName },
             }
           });
         } catch (e: any) { console.warn('RealtimeEvent error:', e.message); }
@@ -9699,7 +9699,7 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
       leadCreated: true,
       leadId: lead.id,
       propertyId: matchedProperty?.id,
-      jarvisActionId: jarvisAction?.id,
+      mivoActionId: mivoAction?.id,
       notifiedUsers: usersToNotify.length,
       parseResult: {
         portal: parseResult.portal,
@@ -10631,7 +10631,7 @@ app.get('/admin/fine-tuning/export', adminAuthMiddleware, async (req, res) => {
       for (const example of trainingExamples) {
         const line = JSON.stringify({
           messages: [
-            { role: 'system', content: 'Du bist Jarvis, der KI-Assistent von Immivo — ein Immobilien-CRM. Sei natürlich, kurz, auf Deutsch.' },
+            { role: 'system', content: 'Du bist Mivo, der KI-Assistent von Immivo — ein Immobilien-CRM. Sei natürlich, kurz, auf Deutsch.' },
             { role: 'user', content: example.user },
             { role: 'assistant', content: example.assistant },
           ]

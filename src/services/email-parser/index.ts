@@ -2,7 +2,7 @@
  * Email Parser Lambda
  * 
  * Receives emails from AWS SES via S3 and forwards them to the Orchestrator
- * for processing by Jarvis (AI-based parsing).
+ * for processing by Mivo (AI-based parsing).
  * 
  * This Lambda no longer does any parsing itself - it just extracts the raw
  * email data and sends it to /internal/ingest-lead.
@@ -86,7 +86,7 @@ export const handler = async (event: any, context: Context) => {
       console.log(`   From: ${from}`);
       console.log(`   Subject: ${subject}`);
 
-      // 4. Send to Orchestrator for Jarvis processing
+      // 4. Send to Orchestrator for Mivo processing
       await processEmail({
         to,
         from,

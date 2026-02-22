@@ -27,7 +27,7 @@ E-Mail: datenschutz@immivo.ai
 Die Verarbeitung umfasst die Bereitstellung der Immivo AI Plattform für Immobilienmakler, einschließlich:
 - CRM-Verwaltung (Lead-Management)
 - E-Mail-Kommunikation (Versand und Empfang)
-- KI-gestützter Assistent (Jarvis) für Textgenerierung und Aufgabenverwaltung
+- KI-gestützter Assistent (Mivo) für Textgenerierung und Aufgabenverwaltung
 - Exposé-Erstellung und PDF-Generierung
 - Kalender-Integration
 - Team-Kommunikation
@@ -110,7 +110,7 @@ Folgende Unterauftragsverarbeiter werden eingesetzt:
 | Anbieter | Zweck | Standort | Garantien |
 |----------|-------|----------|-----------|
 | Amazon Web Services (AWS) | Hosting, DB, E-Mail-Empfang (SES), Storage (S3), WorkMail | Frankfurt, DE (eu-central-1) | EU-Rechenzentrum |
-| OpenAI, Inc. | KI-Chat & Tools (Jarvis, GPT-5-mini) | USA | EU-Standardvertragsklauseln (SCCs) |
+| OpenAI, Inc. | KI-Chat & Tools (Mivo, GPT-5-mini) | USA | EU-Standardvertragsklauseln (SCCs) |
 | Google LLC | KI-Bildbearbeitung (Gemini), Kalender-Integration (optional) | USA | EU-Standardvertragsklauseln (SCCs) |
 | Resend, Inc. | System-E-Mail-Versand (Benachrichtigungen) | USA | EU-Standardvertragsklauseln (SCCs) |
 

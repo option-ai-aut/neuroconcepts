@@ -58,6 +58,6 @@ The `Dockerfile` is a multi-stage build optimized for production:
   - CRM (Leads, Objekte, Bildupload zu S3)
   - Exposé-Editor mit KI-Unterstützung
   - KI-Bildstudio (Virtual Staging mit Gemini)
-  - Jarvis AI Chat (GPT-5-mini)
+  - Mivo AI Chat (GPT-5-mini)
   - Bug Reports mit Screenshot + Console-Log-Capture
   - Admin Panel (Stats, Tenants, Users, Audit, Health, Bug Reports)

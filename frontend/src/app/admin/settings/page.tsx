@@ -9,7 +9,7 @@ import {
 import { getAdminSettings, PlatformSettings } from '@/lib/adminApi';
 
 const SECTIONS = [
-  { id: 'ai', label: 'KI / Jarvis', icon: Bot },
+  { id: 'ai', label: 'KI / Mivo', icon: Bot },
   { id: 'auth', label: 'Authentifizierung', icon: Shield },
   { id: 'email', label: 'E-Mail (Resend)', icon: Mail },
   { id: 'storage', label: 'Storage (S3)', icon: Database },
@@ -82,7 +82,7 @@ export default function SettingsPage() {
           {activeSection === 'ai' && settings && (
             <>
               <div>
-                <h3 className="text-base font-semibold text-gray-900">KI / Jarvis Konfiguration</h3>
+                <h3 className="text-base font-semibold text-gray-900">KI / Mivo Konfiguration</h3>
                 <p className="text-xs text-gray-500 mt-0.5">API-Keys und KI-Einstellungen (aus Umgebungsvariablen)</p>
               </div>
               <div className="bg-white rounded-xl border border-gray-200">

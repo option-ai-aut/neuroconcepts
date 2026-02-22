@@ -2,7 +2,7 @@
 
 ## Übersicht
 
-Dieses Dokument beschreibt die Sicherheitsmaßnahmen für Jarvis (unseren KI-Assistenten, basierend auf OpenAI GPT-5.2 für Hauptantworten; gpt-5-mini für E-Mail-Parsing, Intent-Routing und Smalltalk) und die Bildbearbeitung (Google Gemini) in der Immivo-Plattform.
+Dieses Dokument beschreibt die Sicherheitsmaßnahmen für Mivo (unseren KI-Assistenten, basierend auf OpenAI GPT-5.2 für Hauptantworten; gpt-5-mini für E-Mail-Parsing, Intent-Routing und Smalltalk) und die Bildbearbeitung (Google Gemini) in der Immivo-Plattform.
 
 ## Sicherheitsebenen
 
@@ -84,7 +84,7 @@ const expose = await prisma.expose.findFirst({
 
 **Lösung:**
 - ✅ Chat/Stream: 50 Requests pro Minute pro User
-- ✅ Jarvis generate-signature, generate-text: 20 req/min
+- ✅ Mivo generate-signature, generate-text: 20 req/min
 - ✅ Search: 30 req/min, Uploads (Images/Documents): 20 req/min
 - ✅ Öffentliche Endpoints (contact, newsletter, jobs/apply, calendar): 3–20 req/min pro IP
 - ✅ 429 Status Code bei Überschreitung
@@ -132,7 +132,7 @@ model AiAuditLog {
 
 **Console Logging:**
 ```
-[AI Audit] 2026-01-30T22:40:00Z | User: user-123 | Tenant: tenant-456 | Message: Hallo Jarvis...
+[AI Audit] 2026-01-30T22:40:00Z | User: user-123 | Tenant: tenant-456 | Message: Hallo Mivo...
 ```
 
 ### 6. Response Sanitization
@@ -232,7 +232,7 @@ const poolConfig = {
 ## AI Provider Safety Settings
 
 ### OpenAI (Chat & Tools)
-OpenAI GPT-5.2 wird für Jarvis-Hauptchat und Tool-Aufrufe verwendet; gpt-5-mini für E-Mail-Parsing, AgentRouter (Intent) und Smalltalk. OpenAI hat eingebaute Content-Moderation. **Pricing:** gpt-5.2 $1.75/$14 per 1M tokens (input/output), gpt-5-mini $0.25/$2.
+OpenAI GPT-5.2 wird für Mivo-Hauptchat und Tool-Aufrufe verwendet; gpt-5-mini für E-Mail-Parsing, AgentRouter (Intent) und Smalltalk. OpenAI hat eingebaute Content-Moderation. **Pricing:** gpt-5.2 $1.75/$14 per 1M tokens (input/output), gpt-5-mini $0.25/$2.
 
 ### Google Gemini (Bildbearbeitung)
 Google Gemini wird für Virtual Staging im KI-Bildstudio verwendet. Gemini hat eingebaute Safety-Filter:

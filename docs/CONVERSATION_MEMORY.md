@@ -41,7 +41,7 @@ The `ConversationMemory` class is kept for:
 
 | Method | Purpose |
 |--------|---------|
-| `searchChatHistory()` | Memory Jarvis tool — semantic search over past conversations |
+| `searchChatHistory()` | Memory Mivo tool — semantic search over past conversations |
 | `getLastArchivedConversation()` | Past conversation recall |
 | `getContextAroundTopic()` | Topic-based context retrieval |
 
@@ -66,7 +66,7 @@ Chat messages continue to be saved to the `UserChat` table for:
 
 ### Problem (Original)
 
-Long conversations with Jarvis caused:
+Long conversations with Mivo caused:
 1. **Performance**: Each message slowed down as full history was sent
 2. **Cost**: More input tokens = higher API costs
 3. **Context limit**: Token limits eventually reached
@@ -83,7 +83,7 @@ All messages (e.g. 50):
 │                       │                                 │
 │ "User asked about      │  USER: What's the status?      │
 │  property in Berlin,   │  ASSISTANT: The property...    │
-│  Jarvis showed 3       │  USER: Perfect, thanks!        │
+│  Mivo showed 3       │  USER: Perfect, thanks!        │
 │  options..."           │  ASSISTANT: You're welcome!    │
 └─────────────────────────────────────────────────────────┘
          ↓                            ↓

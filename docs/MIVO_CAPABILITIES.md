@@ -1,14 +1,14 @@
-# Jarvis - AI Assistant Capabilities
+# Mivo - AI Assistant Capabilities
 
 ## Übersicht
 
-Jarvis ist der zentrale KI-Assistent für Immivo, basierend auf **OpenAI GPT-5.2** (flagship, Dec 2025, knowledge cutoff Aug 2025), mit Zugriff auf das **gesamte System**. Für Bildbearbeitung (Virtual Staging) wird **Google Gemini** verwendet. **gpt-5-mini** wird für E-Mail-Parsing/-Lesen, Intent-Klassifikation (AgentRouter) und Smalltalk genutzt; E-Mail-Antwortgenerierung nutzt gpt-5.2.
+Mivo ist der zentrale KI-Assistent für Immivo, basierend auf **OpenAI GPT-5.2** (flagship, Dec 2025, knowledge cutoff Aug 2025), mit Zugriff auf das **gesamte System**. Für Bildbearbeitung (Virtual Staging) wird **Google Gemini** verwendet. **gpt-5-mini** wird für E-Mail-Parsing/-Lesen, Intent-Klassifikation (AgentRouter) und Smalltalk genutzt; E-Mail-Antwortgenerierung nutzt gpt-5.2.
 
 ### Architektur-Highlights
-- **Chat Completions API:** Jarvis uses the **Chat Completions API** with routed tool subsets. The Assistants API was deprecated by OpenAI (sunset Aug 2026); the Responses API is the recommended successor for potential future migration.
-- **Multi-Round Tool Calls:** Jarvis kann bis zu **8 aufeinanderfolgende Tool-Runden** in einer Antwort ausführen (z.B. 3 Properties anlegen → Exposés erstellen → PDFs generieren)
+- **Chat Completions API:** Mivo uses the **Chat Completions API** with routed tool subsets. The Assistants API was deprecated by OpenAI (sunset Aug 2026); the Responses API is the recommended successor for potential future migration.
+- **Multi-Round Tool Calls:** Mivo kann bis zu **8 aufeinanderfolgende Tool-Runden** in einer Antwort ausführen (z.B. 3 Properties anlegen → Exposés erstellen → PDFs generieren)
 - **Saubere Antworten:** Keine internen Gedanken, kein JSON-Leak, keine Tool-Argumente — nur die finale Antwort
-- **Live Tool-Tags:** Während Jarvis arbeitet, sieht der User pulsende Aktions-Tags (z.B. "🏠 Objekt erstellt"), die nach Abschluss statisch werden
+- **Live Tool-Tags:** Während Mivo arbeitet, sieht der User pulsierende Aktions-Tags (z.B. "🏠 Objekt erstellt"), die nach Abschluss statisch werden
 - **Inline-Bilder im Chat:** Ergebnis-Bilder (z.B. Virtual Staging) werden direkt im Chat angezeigt
 
 ### Multi-Agent Router
@@ -42,7 +42,7 @@ This reduces latency and cost for simple queries (e.g. smalltalk) while keeping 
 | `get_lead_statistics` | Lead-Statistiken | "Wie ist unsere Conversion-Rate diesen Monat?" |
 | `search_contacts` | Kontakte durchsuchen | "Suche nach Kontakt Müller" |
 
-**Lead Scoring:** Lead data now includes scores (0–100) with factor breakdowns, visible to Jarvis for prioritization and follow-up. **Lead Enrichment** adds completeness score (0–100%), duplicate flags, and normalized phone numbers. **Sentiment** from email messages (buying/risk signals) is stored as activity for context.
+**Lead Scoring:** Lead data now includes scores (0–100) with factor breakdowns, visible to Mivo for prioritization and follow-up. **Lead Enrichment** adds completeness score (0–100%), duplicate flags, and normalized phone numbers. **Sentiment** from email messages (buying/risk signals) is stored as activity for context.
 
 **Lead-Felder:**
 - `salutation`: Anrede (NONE, MR/Herr, MS/Frau, DIVERSE/Divers)
@@ -213,7 +213,7 @@ Datum:    {{date.today}}, {{date.year}}
 
 ### 📂 DATEI-VERARBEITUNG
 
-**Keine Tools nötig** — Jarvis verarbeitet Dateien server-seitig: Text wird extrahiert und direkt in den Kontext eingebettet.
+**Keine Tools nötig** — Mivo verarbeitet Dateien server-seitig: Text wird extrahiert und direkt in den Kontext eingebettet.
 
 | Format | Parser | Fähigkeit |
 |--------|--------|-----------|
@@ -225,7 +225,7 @@ Datum:    {{date.today}}, {{date.year}}
 | 🖼️ Bilder (jpg/png/webp) | OpenAI Vision | Foto wirklich sehen, Virtual Staging |
 
 **Intelligentes Routing:**
-- ✅ Datei + Lese-Intent → kein Tool-Call, Jarvis antwortet direkt
+- ✅ Datei + Lese-Intent → kein Tool-Call, Mivo antwortet direkt
 - ✅ Datei + Import-Intent → CRM-Tools aktiv, Zeile-für-Zeile anlegen
 - ✅ Bild → Vision-Input (GPT sieht das Foto wirklich)
 - ✅ Datei-URLs persistent in Chat-History → 2 Nachrichten später noch nutzbar
@@ -239,12 +239,12 @@ Datum:    {{date.today}}, {{date.year}}
 - 🧠 **4 Gedächtnis-Tools** (Chatverlauf, Kontext, Memory)
 - 🔄 **Multi-Round Tool Calls** (bis zu 8 Runden pro Antwort)
 - 🖼️ **Inline-Bilder im Chat** (Virtual Staging Ergebnisse etc.)
-- 🌍 **Automatische Spracherkennung** (Jarvis antwortet in der Sprache des Users)
+- 🌍 **Automatische Spracherkennung** (Mivo antwortet in der Sprache des Users)
 
 ## Chat UX
 
 ### Live Tool-Tags
-Wenn Jarvis Tools ausführt, sieht der User pulsierende Aktions-Tags:
+Wenn Mivo Tools ausführt, sieht der User pulsierende Aktions-Tags:
 - **Während der Ausführung:** Blaue pulsierende Tags (z.B. "🏠 Objekt erstellt" mit Animation)
 - **Nach Abschluss:** Statische graue Tags
 
@@ -260,36 +260,36 @@ The `semantic_search` tool finds properties and leads by meaning using **pgvecto
 When the user starts **"Neuer Chat"**, the current OpenAI thread is deleted and a new one is created. This gives a fresh context without old conversation history.
 
 ### Multi-Round Execution
-Bei komplexen Aufgaben (z.B. "Lege 3 Objekte an und erstelle Exposés") führt Jarvis bis zu 8 Tool-Runden automatisch aus und gibt am Ende eine zusammenfassende Antwort. Kein JSON-Leak, keine internen Gedanken.
+Bei komplexen Aufgaben (z.B. "Lege 3 Objekte an und erstelle Exposés") führt Mivo bis zu 8 Tool-Runden automatisch aus und gibt am Ende eine zusammenfassende Antwort. Kein JSON-Leak, keine internen Gedanken.
 
 ## Beispiel-Konversationen
 
 ### Beispiel 1: Lead-Management
 ```
 User: Zeig mir alle neuen Leads dieser Woche
-Jarvis: [get_leads mit status=NEW, period=week]
+Mivo: [get_leads mit status=NEW, period=week]
         "Du hast 12 neue Leads diese Woche. Die wichtigsten sind..."
 
 User: Ändere den Status von Lead ABC auf QUALIFIED
-Jarvis: [update_lead]
+Mivo: [update_lead]
         "Lead wurde auf QUALIFIED gesetzt. Möchtest du einen Termin vereinbaren?"
 ```
 
 ### Beispiel 2: Property-Verwaltung
 ```
 User: Leg ein Test-Objekt an
-Jarvis: [create_property]
+Mivo: [create_property]
         "Objekt 'Test-Wohnung' wurde angelegt. Möchtest du ein Exposé erstellen?"
 
 User: Ja, erstelle ein Exposé
-Jarvis: [create_expose_from_template]
+Mivo: [create_expose_from_template]
         "Exposé wurde erstellt. Öffne den Editor um es anzupassen."
 ```
 
 ### Beispiel 3: Multi-Action (Multi-Round)
 ```
 User: Lege 3 Test-Objekte an
-Jarvis: [create_property] → [create_property] → [create_property]
+Mivo: [create_property] → [create_property] → [create_property]
         "3 Objekte wurden angelegt: Test-Wohnung Berlin, Test-Villa München, 
          Test-Büro Hamburg. Soll ich Exposés erstellen?"
 ```
@@ -297,7 +297,7 @@ Jarvis: [create_property] → [create_property] → [create_property]
 ### Beispiel 4: Virtual Staging im Chat
 ```
 User: [Lädt Foto hoch] Möbliere dieses Wohnzimmer im skandinavischen Stil
-Jarvis: [virtual_staging mit style=skandinavisch, roomType=Wohnzimmer]
+Mivo: [virtual_staging mit style=skandinavisch, roomType=Wohnzimmer]
         "Hier ist das Ergebnis:"
         [Zeigt möbliertes Bild inline an]
         "Soll ich das Bild einem Objekt hinzufügen?"
@@ -306,7 +306,7 @@ Jarvis: [virtual_staging mit style=skandinavisch, roomType=Wohnzimmer]
 ### Beispiel 5: Dashboard & Statistiken
 ```
 User: Wie läuft es diesen Monat?
-Jarvis: [get_dashboard_stats, get_lead_statistics]
+Mivo: [get_dashboard_stats, get_lead_statistics]
         "Diesen Monat: 45 neue Leads, 12 qualifiziert (27% Conversion).
          8 Properties verkauft, 15 Exposés erstellt."
 ```
@@ -316,7 +316,7 @@ Jarvis: [get_dashboard_stats, get_lead_statistics]
 User: [Lädt leads.xlsx hoch]
       Wir steigen von unserem alten CRM um. Importiere alle Leads.
 
-Jarvis: Excel-Datei analysiert: 200 Leads gefunden.
+Mivo: Excel-Datei analysiert: 200 Leads gefunden.
         
         Importiere Lead 1/200: max@test.de ✓
         Importiere Lead 2/200: anna@test.de ✓
@@ -328,11 +328,11 @@ Jarvis: Excel-Datei analysiert: 200 Leads gefunden.
 
 ## Proaktives Verhalten
 
-Jarvis schlägt automatisch nächste Schritte vor:
+Mivo schlägt automatisch nächste Schritte vor:
 
 ```
 User: Lead Max Mustermann hat gerade angefragt
-Jarvis: "Möchtest du dass ich:
+Mivo: "Möchtest du dass ich:
          1. Einen Lead anlege
          2. Eine Antwort-E-Mail entwerfe
          3. Einen Besichtigungstermin vorschlage?"
@@ -346,7 +346,7 @@ Alle Tools sind durch die AI Safety Middleware geschützt:
 - ✅ Tenant Isolation
 - ✅ Audit Logging
 
-Bei kritischen Operationen (Löschen, E-Mail-Versand) fragt Jarvis nach Bestätigung.
+Bei kritischen Operationen (Löschen, E-Mail-Versand) fragt Mivo nach Bestätigung.
 
 ## Performance
 
@@ -361,7 +361,7 @@ Bei kritischen Operationen (Löschen, E-Mail-Versand) fragt Jarvis nach Bestäti
 - ✅ Vollständige CRM-Tools (inkl. erweiterte Property-Felder)
 - ✅ Exposé-Editor-Integration
 - ✅ Team-Chat-Tools
-- ✅ Virtual Staging via Jarvis-Chat
+- ✅ Virtual Staging via Mivo-Chat
 - ✅ Multi-Round Tool Calls
 - ✅ Inline-Bilder im Chat
 - ✅ Live Tool-Tags mit Animation

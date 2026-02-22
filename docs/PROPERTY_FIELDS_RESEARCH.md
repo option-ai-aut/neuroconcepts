@@ -332,9 +332,9 @@
 - **Notizen (intern)** - Text
 - **Tags** - Multi-Select (Custom)
 
-## 13. JARVIS-KONTEXT (AI-Fakten)
+## 13. MIVO-KONTEXT (AI-Fakten)
 
-- **AI-Fakten** - Text (Freitext für Jarvis)
+- **AI-Fakten** - Text (Freitext für Mivo)
   - Besonderheiten, die nicht in Standardfeldern passen
   - Verhandlungsspielraum
   - Besondere Vereinbarungen

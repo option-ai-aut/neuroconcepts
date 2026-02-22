@@ -1,6 +1,6 @@
 /**
  * SystemEmailService - Sends system emails via Resend
- * Used for: Registration confirmations, password resets, Jarvis notifications, escalations
+ * Used for: Registration confirmations, password resets, Mivo notifications, escalations
  * NOT for lead communication (that uses EmailService with user's connected provider)
  */
 
@@ -80,9 +80,9 @@ export async function sendSystemEmail(params: SendEmailParams): Promise<boolean>
 // ============================================
 
 /**
- * Jarvis Question Email - When Jarvis needs user input
+ * Mivo Question Email - When Mivo needs user input
  */
-export function renderJarvisQuestionEmail(params: {
+export function renderMivoQuestionEmail(params: {
   userName: string;
   question: string;
   leadName?: string;
@@ -100,7 +100,7 @@ export function renderJarvisQuestionEmail(params: {
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 30px; border-radius: 16px 16px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">Jarvis benötigt deine Hilfe</h1>
+    <h1 style="color: white; margin: 0; font-size: 24px;">Mivo benötigt deine Hilfe</h1>
   </div>
   
   <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 16px 16px;">
@@ -118,7 +118,7 @@ export function renderJarvisQuestionEmail(params: {
     </a>
     
     <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
-      Diese Nachricht wurde automatisch von Jarvis gesendet.
+      Diese Nachricht wurde automatisch von Mivo gesendet.
     </p>
   </div>
 </body>
@@ -146,20 +146,20 @@ export function renderReminderEmail(params: {
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background: #f59e0b; padding: 30px; border-radius: 16px 16px 0 0;">
-    <h1 style="color: white; margin: 0; font-size: 24px;">⏰ Erinnerung: Jarvis wartet auf dich</h1>
+    <h1 style="color: white; margin: 0; font-size: 24px;">⏰ Erinnerung: Mivo wartet auf dich</h1>
   </div>
   
   <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 16px 16px;">
     <p style="margin-top: 0;">Hallo ${userName},</p>
     
-    <p>Jarvis wartet seit <strong>${hoursWaiting} Stunden</strong> auf deine Antwort:</p>
+    <p>Mivo wartet seit <strong>${hoursWaiting} Stunden</strong> auf deine Antwort:</p>
     
     <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
       <p style="margin: 0; font-weight: 600; color: #92400e;">${question}</p>
     </div>
     
     <p style="color: #dc2626; font-weight: 600;">
-      Ohne deine Antwort kann Jarvis nicht fortfahren.
+      Ohne deine Antwort kann Mivo nicht fortfahren.
     </p>
     
     <a href="${actionUrl}" style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 20px;">
@@ -199,7 +199,7 @@ export function renderEscalationEmail(params: {
   <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 16px 16px;">
     <p style="margin-top: 0;">Hallo ${adminName},</p>
     
-    <p><strong>${agentName}</strong> hat seit <strong>${hoursWaiting} Stunden</strong> nicht auf folgende Jarvis-Anfrage reagiert:</p>
+    <p><strong>${agentName}</strong> hat seit <strong>${hoursWaiting} Stunden</strong> nicht auf folgende Mivo-Anfrage reagiert:</p>
     
     <div style="background: #fee2e2; border-left: 4px solid #dc2626; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
       <p style="margin: 0; font-weight: 600; color: #991b1b;">${question}</p>
@@ -313,7 +313,7 @@ export function renderLeadResponseEmail(params: {
 
 export default {
   sendSystemEmail,
-  renderJarvisQuestionEmail,
+  renderMivoQuestionEmail,
   renderReminderEmail,
   renderEscalationEmail,
   renderNewLeadEmail,

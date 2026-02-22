@@ -21,7 +21,7 @@ import useSWR from 'swr';
 interface ChannelMessage {
   id: string;
   content: string;
-  isJarvis: boolean;
+  isMivo: boolean;
   mentions: string[] | null;
   editedAt: string | null;
   createdAt: string;
@@ -388,12 +388,12 @@ export default function TeamChatPage() {
     }
   };
 
-  // Jarvis virtual seat for mentions
-  const jarvisSeat: Seat = { id: 'jarvis', firstName: 'Jarvis', lastName: '', email: t('jarvisMentionLabel'), role: 'BOT', lastSeenAt: new Date().toISOString() };
+  // Mivo virtual seat for mentions
+  const mivoSeat: Seat = { id: 'mivo', firstName: 'Mivo', lastName: '', email: t('mivoMentionLabel'), role: 'BOT', lastSeenAt: new Date().toISOString() };
 
   const filteredMentionSeats = [
-    // Always show Jarvis if it matches the query
-    ...( 'jarvis'.includes(mentionQuery) || 'ki'.includes(mentionQuery) ? [jarvisSeat] : []),
+    // Always show Mivo if it matches the query
+    ...( 'mivo'.includes(mentionQuery) || 'ki'.includes(mentionQuery) ? [mivoSeat] : []),
     ...seats.filter((s: Seat) => {
       if (s.id === user?.id) return false;
       const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
@@ -840,8 +840,8 @@ export default function TeamChatPage() {
                     >
                       {/* Avatar */}
                       <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300 shrink-0 mt-0.5">
-                        {msg.isJarvis ? (
-                          <Image src="/logo-icon-only.png" alt="Jarvis" width={20} height={20} className="w-5 h-5" />
+                        {msg.isMivo ? (
+                          <Image src="/logo-icon-only.png" alt="Mivo" width={20} height={20} className="w-5 h-5" />
                         ) : (
                           <>{msg.user.firstName?.charAt(0)}{msg.user.lastName?.charAt(0)}</>
                         )}
@@ -850,12 +850,12 @@ export default function TeamChatPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-baseline gap-2">
                           <span className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">
-                            {msg.isJarvis ? 'Jarvis' : `${msg.user.firstName} ${msg.user.lastName}`}
+                            {msg.isMivo ? 'Mivo' : `${msg.user.firstName} ${msg.user.lastName}`}
                           </span>
-                          {msg.isJarvis && (
-                            <span className="text-[9px] font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded leading-none">{t('jarvisBadge')}</span>
+                          {msg.isMivo && (
+                            <span className="text-[9px] font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded leading-none">{t('mivoBadge')}</span>
                           )}
-                          {msg.user.role === 'ADMIN' && !msg.isJarvis && (
+                          {msg.user.role === 'ADMIN' && !msg.isMivo && (
                             <span className="text-[9px] font-medium text-gray-500 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded leading-none">{t('adminBadge')}</span>
                           )}
                           <span className="text-[10px] lg:text-xs text-gray-400 shrink-0">{formatTime(msg.createdAt, (time) => t('yesterday', { time }))}</span>
@@ -935,8 +935,8 @@ export default function TeamChatPage() {
                         onClick={() => insertMention(seat)}
                         className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 ${i === mentionIndex ? 'bg-gray-50 dark:bg-gray-700' : ''}`}
                       >
-                        {seat.id === 'jarvis' ? (
-                          <Image src="/logo-icon-only.png" alt="Jarvis" width={24} height={24} className="w-6 h-6 shrink-0" />
+                        {seat.id === 'mivo' ? (
+                          <Image src="/logo-icon-only.png" alt="Mivo" width={24} height={24} className="w-6 h-6 shrink-0" />
                         ) : (
                           <div className="w-6 h-6 rounded bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-[10px] font-bold">
                             {seat.firstName?.charAt(0)}{seat.lastName?.charAt(0)}
@@ -946,7 +946,7 @@ export default function TeamChatPage() {
                           {seat.firstName}{seat.lastName ? ` ${seat.lastName}` : ''}
                         </span>
                         <span className="text-gray-400 text-xs ml-auto">
-                          {seat.id === 'jarvis' ? t('jarvisMentionLabel') : seat.email}
+                          {seat.id === 'mivo' ? t('mivoMentionLabel') : seat.email}
                         </span>
                       </button>
                     ))}

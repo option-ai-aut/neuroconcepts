@@ -351,7 +351,7 @@ export default function IntegrationsSettingsPage() {
           <div className="bg-gray-50 rounded-xl p-6">
             <p className="text-sm text-gray-700 mb-4">
               Leite Anfragen von Immobilienportalen an diese E-Mail-Adresse weiter. 
-              Jarvis wird die Anfragen automatisch verarbeiten und Leads erstellen.
+              Mivo wird die Anfragen automatisch verarbeiten und Leads erstellen.
             </p>
             
             <div className="flex items-center gap-3">

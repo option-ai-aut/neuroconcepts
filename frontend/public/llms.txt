@@ -4,22 +4,22 @@
 
 ## Was ist Immivo?
 
-Immivo ist eine SaaS-Plattform mit dem KI-Assistenten "Jarvis", der E-Mails beantwortet, Leads qualifiziert, Exposés erstellt, Termine bucht und Objekte auf 24 Immobilienportale pusht — vollautomatisch, 24/7.
+Immivo ist eine SaaS-Plattform mit dem KI-Assistenten "Mivo", der E-Mails beantwortet, Leads qualifiziert, Exposés erstellt, Termine bucht und Objekte auf 24 Immobilienportale pusht — vollautomatisch, 24/7.
 
 Immivo wurde 2026 in Wien gegründet und richtet sich an Einzelmakler, kleine Maklerteams und große Immobilienunternehmen im DACH-Raum.
 
 ## Kernprodukt
 
-Immivo ersetzt CRM, E-Mail-Tools und Exposé-Software in einer einzigen KI-gesteuerten Plattform. Der KI-Assistent Jarvis (basierend auf OpenAI GPT-5) übernimmt das gesamte Tagesgeschäft eines Immobilienmaklers.
+Immivo ersetzt CRM, E-Mail-Tools und Exposé-Software in einer einzigen KI-gesteuerten Plattform. Der KI-Assistent Mivo (basierend auf OpenAI GPT-5) übernimmt das gesamte Tagesgeschäft eines Immobilienmaklers.
 
 ## Features
 
-- **Jarvis KI-Assistent**: Beantwortet Anfragen in Sekunden, qualifiziert Leads automatisch, erstellt Exposés, bucht Termine — 24/7 verfügbar
+- **Mivo KI-Assistent**: Beantwortet Anfragen in Sekunden, qualifiziert Leads automatisch, erstellt Exposés, bucht Termine — 24/7 verfügbar
 - **Virtual Staging / KI-Bildbearbeitung**: Leere Räume mit ultra-realistischen Möbeln einrichten per KI (powered by Google Gemini)
 - **Intelligentes CRM**: Leads mit Anrede, Du/Sie-Präferenz, Suchprofilen und automatischer Qualifizierung
 - **KI-Exposé-Editor**: Professionelle Exposés in Minuten mit Templates, Variablen und Live-Vorschau
 - **24 Portal-Integrationen**: Ein-Klick-Push auf ImmoScout24, Willhaben, Immowelt, Homegate, Kleinanzeigen und 19 weitere Portale
-- **E-Mail-Automatisierung**: White-Label-Versand über eigene Domain, Jarvis antwortet im Namen des Maklers
+- **E-Mail-Automatisierung**: White-Label-Versand über eigene Domain, Mivo antwortet im Namen des Maklers
 - **Kalender-Integration**: Automatische Terminbuchung direkt in Google Calendar oder Outlook
 - **Analytics & Reports**: Echtzeit-Dashboards mit Conversion-Rates, Lead-Quellen und Performance
 
@@ -27,8 +27,8 @@ Immivo ersetzt CRM, E-Mail-Tools und Exposé-Software in einer einzigen KI-geste
 
 Alle Preise in EUR, jederzeit kündbar. 10% Rabatt bei jährlicher Zahlung.
 
-- **Free Trial**: 7 Tage kostenlos — 20 Jarvis-Eingaben, 3 Bildstudio-Generierungen, kein Portal-Push
-- **Solo**: 99 EUR/Monat — 1 Seat, Zugriff auf alle Features inklusive unbegrenzter Jarvis und Bildstudio
+- **Free Trial**: 7 Tage kostenlos — 20 Mivo-Eingaben, 3 Bildstudio-Generierungen, kein Portal-Push
+- **Solo**: 99 EUR/Monat — 1 Seat, Zugriff auf alle Features inklusive unbegrenzter Mivo und Bildstudio
 - **Team**: 249 EUR/Monat — 3 Seats inklusive, Team-Verwaltung, gemeinsame Objekte & Leads
 - **Enterprise**: 699 EUR/Monat — bis zu 10 Seats, eigene Domain, dedizierter Account Manager, API-Zugang, SLA-Garantie. Jeder weitere Seat +50 EUR/Monat
 
@@ -36,7 +36,7 @@ Alle Preise in EUR, jederzeit kündbar. 10% Rabatt bei jährlicher Zahlung.
 
 - Frontend: Next.js (React), gehostet auf AWS Amplify
 - Backend: Node.js/Express, Prisma ORM
-- KI: OpenAI GPT-5 (Jarvis), Google Gemini (Bildbearbeitung)
+- KI: OpenAI GPT-5 (Mivo), Google Gemini (Bildbearbeitung)
 - Hosting: AWS Frankfurt (EU), DSGVO-konform
 - Authentifizierung: AWS Cognito
 - E-Mail: Resend, AWS SES

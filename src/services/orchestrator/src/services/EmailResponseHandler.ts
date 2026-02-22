@@ -4,7 +4,7 @@
  */
 
 import { PrismaClient, LeadStatus } from '@prisma/client';
-import JarvisActionService from './JarvisActionService';
+import MivoActionService from './MivoActionService';
 import NotificationService from './NotificationService';
 import OpenAI from 'openai';
 import { AiCostService } from './AiCostService';
@@ -265,7 +265,7 @@ export async function processEmailResponse(
     });
 
     if (admins.length > 0) {
-      await JarvisActionService.createPendingAction({
+      await MivoActionService.createPendingAction({
         tenantId,
         userId: admins[0].id,
         type: 'ESCALATION',
@@ -332,7 +332,7 @@ export async function processEmailResponse(
 
       // Create action for scheduling viewing
       if (assignedUserId) {
-        await JarvisActionService.createPendingAction({
+        await MivoActionService.createPendingAction({
           tenantId,
           userId: assignedUserId,
           leadId: lead.id,
@@ -353,7 +353,7 @@ export async function processEmailResponse(
 
       // Create action for answering question
       if (assignedUserId) {
-        await JarvisActionService.createPendingAction({
+        await MivoActionService.createPendingAction({
           tenantId,
           userId: assignedUserId,
           leadId: lead.id,
@@ -387,7 +387,7 @@ export async function processEmailResponse(
     default:
       // Escalate to agent
       if (assignedUserId) {
-        await JarvisActionService.createPendingAction({
+        await MivoActionService.createPendingAction({
           tenantId,
           userId: assignedUserId,
           leadId: lead.id,

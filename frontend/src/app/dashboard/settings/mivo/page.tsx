@@ -37,7 +37,7 @@ const WEEKDAYS = [
   { value: 0, label: 'So' },
 ];
 
-export default function JarvisSettingsPage() {
+export default function MivoSettingsPage() {
   const { apiUrl } = useEnv();
   const [autoReply, setAutoReply] = useState(false);
   const [delay, setDelay] = useState(5);
@@ -150,9 +150,9 @@ export default function JarvisSettingsPage() {
     <div className="space-y-10">
       {/* Automation Settings */}
       <div>
-        <h2 className="text-base font-semibold text-gray-900 mb-1">Jarvis Automatisierung</h2>
+        <h2 className="text-base font-semibold text-gray-900 mb-1">Mivo Automatisierung</h2>
         <p className="text-sm text-gray-500 mb-6">
-          Konfigurieren Sie, wie Jarvis auf neue Leads reagieren soll.
+          Konfigurieren Sie, wie Mivo auf neue Leads reagieren soll.
         </p>
 
         <div className="space-y-6">
@@ -164,7 +164,7 @@ export default function JarvisSettingsPage() {
               </div>
               <div>
                 <span className="text-sm font-medium text-gray-900">Automatische Antwort</span>
-                <p className="text-xs text-gray-500">Jarvis sendet automatisch Exposés an neue Leads</p>
+                <p className="text-xs text-gray-500">Mivo sendet automatisch Exposés an neue Leads</p>
               </div>
             </div>
             <button
@@ -301,7 +301,7 @@ export default function JarvisSettingsPage() {
               </div>
               <div>
                 <span className="text-sm font-medium text-gray-900">E-Mail-Benachrichtigungen</span>
-                <p className="text-xs text-gray-500">Jarvis-Fragen und Erinnerungen per E-Mail erhalten</p>
+                <p className="text-xs text-gray-500">Mivo-Fragen und Erinnerungen per E-Mail erhalten</p>
               </div>
             </div>
             <button
@@ -327,7 +327,7 @@ export default function JarvisSettingsPage() {
                 </div>
                 <div>
                   <span className="text-sm font-medium text-gray-900">Besichtigungs-Präferenzen</span>
-                  <p className="text-xs text-gray-500">Wann Jarvis Besichtigungen vorschlagen darf</p>
+                  <p className="text-xs text-gray-500">Wann Mivo Besichtigungen vorschlagen darf</p>
                 </div>
               </div>
               <button

@@ -128,7 +128,7 @@ export default async function OGImage() {
             border: '1px solid rgba(255,255,255,0.08)',
           }}
         >
-          {['Jarvis KI', 'CRM', 'Exposés', 'Bildstudio', '24 Portale'].map((text) => (
+          {['Mivo KI', 'CRM', 'Exposés', 'Bildstudio', '24 Portale'].map((text) => (
             <div key={text} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.7)', fontSize: '17px' }}>
               <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', display: 'flex' }} />
               <span>{text}</span>

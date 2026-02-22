@@ -36,7 +36,7 @@ export default function PublicFooter({ bare = false }: { bare?: boolean }) {
           <div>
             <h4 className="font-semibold mb-4">{t('product')}</h4>
             <ul className="space-y-3 text-gray-400 text-sm">
-              <li><Link href="/#jarvis" prefetch={false} className="hover:text-white transition-colors">{nav('jarvisAi')}</Link></li>
+              <li><Link href="/#mivo" prefetch={false} className="hover:text-white transition-colors">{nav('mivoAi')}</Link></li>
               <li><Link href="/#features" prefetch={false} className="hover:text-white transition-colors">{nav('features')}</Link></li>
               <li><Link href="/#bildbearbeitung" prefetch={false} className="hover:text-white transition-colors">{nav('aiImageEditing')}</Link></li>
               <li><Link href="/pricing" prefetch={false} className="hover:text-white transition-colors">{nav('pricing')}</Link></li>

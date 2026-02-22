@@ -80,7 +80,7 @@ interface CalendarEvent {
 
 // ─── Feed item type ────────────────────────────────────────────────────────────
 
-type FeedItemKind = 'new_lead' | 'jarvis_reply' | 'lead_reply' | 'overdue' | 'status_change' | 'activity';
+type FeedItemKind = 'new_lead' | 'mivo_reply' | 'lead_reply' | 'overdue' | 'status_change' | 'activity';
 
 interface FeedItem {
   id: string;
@@ -170,16 +170,16 @@ function buildFeed(stats: DashboardStats): FeedItem[] {
     });
   }
 
-  // 2. Jarvis / lead replies from activities
+  // 2. Mivo / lead replies from activities
   for (const act of stats.activities) {
     const time = new Date(act.createdAt);
     const diffDays = Math.floor((Date.now() - time.getTime()) / 86400000);
     if (diffDays > 7) continue;
 
-    if (act.type === 'EMAIL_RECEIVED' || act.type === 'JARVIS_REPLY' || act.type === 'MESSAGE_RECEIVED') {
+    if (act.type === 'EMAIL_RECEIVED' || act.type === 'MIVO_REPLY' || act.type === 'MESSAGE_RECEIVED') {
       items.push({
         id: `act-reply-${act.id}`,
-        kind: act.type === 'EMAIL_RECEIVED' ? 'lead_reply' : 'jarvis_reply',
+        kind: act.type === 'EMAIL_RECEIVED' ? 'lead_reply' : 'mivo_reply',
         priority: 2,
         time,
         leadId: act.leadId,
@@ -233,11 +233,11 @@ function buildFeed(stats: DashboardStats): FeedItem[] {
 function FeedCard({ item, onDismiss }: { item: FeedItem; onDismiss: (id: string) => void }) {
   const isOverdue = item.kind === 'overdue';
   const isNew = item.kind === 'new_lead';
-  const isReply = item.kind === 'lead_reply' || item.kind === 'jarvis_reply';
+  const isReply = item.kind === 'lead_reply' || item.kind === 'mivo_reply';
 
   const icon = isNew ? (
     <UserPlus className="w-3.5 h-3.5 text-gray-900" />
-  ) : item.kind === 'jarvis_reply' ? (
+  ) : item.kind === 'mivo_reply' ? (
     <Zap className="w-3.5 h-3.5 text-gray-600" />
   ) : item.kind === 'lead_reply' ? (
     <Mail className="w-3.5 h-3.5 text-gray-600" />
@@ -249,8 +249,8 @@ function FeedCard({ item, onDismiss }: { item: FeedItem; onDismiss: (id: string)
 
   const badge = isNew ? (
     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-900 text-white">NEU</span>
-  ) : item.kind === 'jarvis_reply' ? (
-    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">Jarvis</span>
+  ) : item.kind === 'mivo_reply' ? (
+    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">Mivo</span>
   ) : item.kind === 'lead_reply' ? (
     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">Antwort</span>
   ) : isOverdue ? (
@@ -523,8 +523,8 @@ export default function DashboardPage() {
   const todayEventCount = calendarEvents.filter(e => isToday(e.start)).length;
   const newLeadsToday = stats.leads.newToday;
   const uncontacted = stats.leads.byStatus.NEW;
-  const jarvisActivity = stats.activities.filter(a =>
-    a.type === 'JARVIS_REPLY' || a.type === 'EMAIL_RECEIVED' || a.type === 'MESSAGE_RECEIVED'
+  const mivoActivity = stats.activities.filter(a =>
+    a.type === 'MIVO_REPLY' || a.type === 'EMAIL_RECEIVED' || a.type === 'MESSAGE_RECEIVED'
   ).length;
 
   const hour = new Date().getHours();
@@ -533,7 +533,7 @@ export default function DashboardPage() {
   // Summary chips
   const chips = [
     newLeadsToday > 0 && { label: `${newLeadsToday} neuer Lead${newLeadsToday !== 1 ? 's' : ''}`, icon: UserPlus, urgent: false },
-    jarvisActivity > 0 && { label: `${jarvisActivity} Jarvis-Aktivität${jarvisActivity !== 1 ? 'en' : ''}`, icon: Zap, urgent: false },
+    mivoActivity > 0 && { label: `${mivoActivity} Mivo-Aktivität${mivoActivity !== 1 ? 'en' : ''}`, icon: Zap, urgent: false },
     todayEventCount > 0 && { label: `${todayEventCount} Termin${todayEventCount !== 1 ? 'e' : ''} heute`, icon: Calendar, urgent: false },
     uncontacted > 0 && { label: `${uncontacted} warten auf Kontakt`, icon: AlertCircle, urgent: true },
   ].filter(Boolean) as Array<{ label: string; icon: any; urgent: boolean }>;
