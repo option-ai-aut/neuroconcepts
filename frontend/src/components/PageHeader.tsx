@@ -79,7 +79,7 @@ export default function PageHeader() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await mutate(() => true, undefined, { revalidate: true });
+    await mutate(() => true);
     router.refresh();
     setTimeout(() => setRefreshing(false), 600);
   };

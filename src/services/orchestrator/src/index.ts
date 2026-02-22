@@ -47,8 +47,12 @@ try { _sharp = require('sharp'); } catch { /* binary not available for this plat
 function getSharp() { return _sharp; }
 import mammoth from 'mammoth';
 import JSZip from 'jszip';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require('pdf-parse') as (buffer: Buffer) => Promise<{ text: string }>;
+// pdf-parse: lazy-load to avoid DOMMatrix crash on Lambda startup (pdfjs-dist requires canvas APIs)
+let _pdfParse: ((buffer: Buffer) => Promise<{ text: string }>) | null = null;
+function getPdfParse() {
+  if (!_pdfParse) { try { _pdfParse = require('pdf-parse'); } catch { /* not available */ } }
+  return _pdfParse;
+}
 // xlsx / XLSX is loaded lazily (only when Excel files are processed) — avoids DOMMatrix crash on Lambda startup
 let _XLSX: typeof import('xlsx') | null = null;
 function getXLSX(): typeof import('xlsx') {
@@ -4103,7 +4107,9 @@ app.post('/chat/stream',
               const result = await mammoth.extractRawText({ buffer: f.buffer });
               extractedText = result.value?.trim() || null;
             } else if (ext === '.pdf' || f.mimetype === 'application/pdf') {
-              const result = await pdfParse(f.buffer);
+              const pp = getPdfParse();
+              if (!pp) throw new Error('pdf-parse not available');
+              const result = await pp(f.buffer);
               extractedText = result.text?.trim() || null;
             } else if (ext === '.txt' || f.mimetype === 'text/plain') {
               extractedText = f.buffer.toString('utf-8').trim();
@@ -11248,7 +11254,98 @@ const serverlessHandler = serverless(app, {
   binary: ['multipart/form-data', 'image/*', 'application/octet-stream'],
 });
 
-export const handler = async (event: any, context: any) => serverlessHandler(event, context);
+const ALLOWED_ORIGINS = ['https://app.immivo.ai', 'https://test.immivo.ai', 'http://localhost:3000'];
+
+// Dedicated handler for /chat/stream via Function URL — bypasses serverless-http buffering
+async function handleChatStream(event: any) {
+  const headers = event.headers || {};
+  const origin = headers['origin'] || headers['Origin'] || '';
+  const corsOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : '';
+  const cors = { 'Access-Control-Allow-Origin': corsOrigin, 'Access-Control-Allow-Credentials': 'true' };
+
+  // CORS preflight
+  if ((event.requestContext?.http?.method || '').toUpperCase() === 'OPTIONS') {
+    return { statusCode: 204, headers: { ...cors, 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Max-Age': '86400' }, body: '' };
+  }
+
+  const sseHeaders = { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', ...cors };
+  const chunks: string[] = [];
+  const write = (data: any) => { chunks.push(`data: ${JSON.stringify(data)}\n\n`); };
+
+  try {
+    const authHeader = headers['authorization'] || headers['Authorization'] || '';
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    if (!token) { write({ error: 'Unauthorized' }); return { statusCode: 200, headers: sseHeaders, body: chunks.join('') }; }
+
+    const { CognitoJwtVerifier } = await import('aws-jwt-verify');
+    const v = CognitoJwtVerifier.create({ userPoolId: process.env.USER_POOL_ID!, tokenUse: 'id' as const, clientId: process.env.CLIENT_ID! });
+    const userPayload = await v.verify(token) as any;
+    if (userPayload.email) userPayload.email = (userPayload.email as string).toLowerCase().trim();
+
+    const rawBody = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString() : event.body;
+    const body = JSON.parse(rawBody || '{}');
+    const message = body.message || '';
+    const pageContext = body.pageContext || '';
+
+    const db = prisma || (await initializePrisma());
+    const currentUser = await db.user.findUnique({ where: { email: userPayload.email } });
+    if (!currentUser) { write({ error: 'User not found' }); return { statusCode: 200, headers: sseHeaders, body: chunks.join('') }; }
+
+    const userId = currentUser.id;
+    const tenantId = currentUser.tenantId;
+
+    const costCheck = await AiCostService.checkCostCap(tenantId);
+    if (costCheck.exceeded) {
+      write({ chunk: `KI-Budget erreicht ($${(costCheck.currentCostCents / 100).toFixed(2)}/$${(costCheck.capCents / 100).toFixed(2)}).` });
+      write({ done: true }); return { statusCode: 200, headers: sseHeaders, body: chunks.join('') };
+    }
+
+    const openai = new OpenAIService();
+    let fullResponse = '';
+    let hadFunctionCalls = false;
+    let toolsUsed: string[] = [];
+
+    const recentHistory = await db.userChat.findMany({ where: { userId, archived: false }, orderBy: { createdAt: 'desc' }, take: 20, select: { role: true, content: true } }).then((m: any[]) => m.reverse());
+    const tenant = await db.tenant.findUnique({ where: { id: tenantId }, select: { name: true, description: true, phone: true, email: true, website: true, services: true, regions: true, slogan: true, address: true } });
+
+    const userContext = {
+      name: `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email,
+      email: currentUser.email, role: currentUser.role, pageContext: pageContext || undefined,
+      company: tenant ? { name: tenant.name, description: tenant.description || undefined, phone: tenant.phone || undefined, email: tenant.email || undefined, website: tenant.website || undefined, address: tenant.address || undefined } : undefined,
+    };
+
+    console.log(`💬 [FnURL] ${currentUser.email}: "${message.substring(0, 200)}"${pageContext ? ` [${pageContext}]` : ''}`);
+    await db.userChat.create({ data: { userId, role: 'USER', content: message } });
+
+    for await (const result of openai.chatStream(message, tenantId, recentHistory, [], currentUser.id, userContext)) {
+      fullResponse += result.chunk;
+      if (result.hadFunctionCalls) hadFunctionCalls = true;
+      if (result.toolsUsed) toolsUsed = result.toolsUsed;
+      write(result.toolsUsed ? { chunk: result.chunk, toolsUsed: result.toolsUsed } : { chunk: result.chunk });
+    }
+
+    await db.userChat.create({ data: { userId, role: 'ASSISTANT', content: wrapAiResponse(fullResponse) } });
+    write({ done: true, hadFunctionCalls, toolsUsed });
+  } catch (err) {
+    console.error('[FnURL] Chat error:', err);
+    write({ error: 'AI Error' });
+  }
+
+  return { statusCode: 200, headers: sseHeaders, body: chunks.join('') };
+}
+
+// Main handler: routes Function URL /chat/stream to dedicated handler, everything else to Express
+export const handler = async (event: any, context: any) => {
+  const isFunctionUrl = !!event.requestContext?.http;
+  const method = event.requestContext?.http?.method || event.httpMethod || '';
+  const rawPath = event.requestContext?.http?.path || event.rawPath || event.path || '';
+
+  if (isFunctionUrl && (method === 'POST' || method === 'OPTIONS') && rawPath === '/chat/stream') {
+    return handleChatStream(event);
+  }
+
+  return serverlessHandler(event, context);
+};
 
 // Local dev support
 if (require.main === module) {
