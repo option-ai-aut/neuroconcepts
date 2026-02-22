@@ -224,8 +224,8 @@ Das lokale Frontend verbindet sich automatisch mit `localhost:3001` (via `NODE_E
 **Fix**: Nie die `description` eines Security Groups ändern. Sieh `infra/lib/infra-stack.ts`.
 
 ### Lambda-Paket zu groß (>262MB)
-**Ursache**: `sourceMap: true` in CDK Bundling-Config erzeugt ~110MB Source Maps.  
-**Fix**: In `infra-stack.ts` bei `OrchestratorLambda` → `bundling: { sourceMap: false }`.
+**Ursache**: `sourceMap: true` in CDK Bundling-Config erzeugt ~110MB Source Maps, oder unnötige platform-spezifische Binaries (`@napi-rs/canvas`, `pdfjs-dist`).  
+**Fix**: In `infra-stack.ts` bei `OrchestratorLambda` → `bundling: { sourceMap: false }`. Bei manuellem Deploy: S3-basiertes Upload verwenden (`aws s3 cp orchestrator.zip s3://... && aws lambda update-function-code --s3-bucket ... --s3-key ...`).
 
 ### `Forbidden` beim Aufrufen von `/admin/migrate`
 **Ursache**: Falscher Secret-Name im `aws secretsmanager` Befehl.  
@@ -236,8 +236,8 @@ Das lokale Frontend verbindet sich automatisch mit `localhost:3001` (via `NODE_E
 **Fix**: Im GitHub Actions UI → "Review deployments" → "Approve" klicken.
 
 ### Lambda crasht mit `DOMMatrix is not defined` (502/500)
-**Ursache**: `xlsx` (SheetJS) nutzt Browser-APIs (`DOMMatrix`), die auf AWS Lambda nicht existieren.  
-**Fix**: `xlsx`, `mammoth`, `pdf-parse`, `jszip` müssen in `infra/lib/infra-stack.ts` unter `externalModules` stehen und in `afterBundling` separat installiert werden. Außerdem: `xlsx` nur lazy laden (z.B. per `require('xlsx')` erst bei Excel-Upload).
+**Ursache**: `xlsx` (SheetJS) oder `pdf-parse` (via `pdfjs-dist`) nutzen Browser-APIs (`DOMMatrix`), die auf AWS Lambda nicht existieren.  
+**Fix**: `xlsx`, `mammoth`, `pdf-parse`, `jszip`, `sharp` müssen in `infra/lib/infra-stack.ts` unter `externalModules` stehen und in `afterBundling` separat installiert werden. Außerdem: `xlsx`, `pdf-parse` und `sharp` werden **lazy geladen** (erst bei Bedarf per `require()`), damit Lambda-Startup nicht crasht.
 
 ### `push test` schlägt fehl: "local changes would be overwritten by checkout"
 **Ursache**: Lokale Datei ist auf dem Ziel-Branch getrackt, aber lokal verändert.  

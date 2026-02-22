@@ -21,6 +21,7 @@ graph TD
 
     subgraph "Core Application (AWS Lambda)"
         API --> Orchestrator
+        FnURLOrch[Orchestrator Function URL] --> Orchestrator
         SES -->|Lambda| EmailParser
         EmailParser --> Orchestrator
         
@@ -68,7 +69,7 @@ graph TD
 *   **Mail Poller:** Ein Hintergrund-Service, der optional IMAP-Postfächer der Makler auf neue direkte Antworten überwacht (für White-Labeling ohne Weiterleitung).
 
 ### 2. Core Application
-*   **Orchestrator (Lambda + API Gateway):** Die zentrale Schaltstelle. Verwaltet den Status eines Leads (`NEW` -> `CONTACTED` -> `CONVERSATION` -> `BOOKED`). Entscheidet, wann die KI aufgerufen wird und wann ein Mensch eingreifen muss.
+*   **Orchestrator (Lambda + API Gateway + Function URL):** Die zentrale Schaltstelle. Verwaltet den Status eines Leads (`NEW` -> `CONTACTED` -> `CONVERSATION` -> `BOOKED`). Entscheidet, wann die KI aufgerufen wird und wann ein Mensch eingreifen muss. `/chat/stream` läuft über eine dedizierte **Lambda Function URL** (BUFFERED, 15min Timeout) statt API Gateway (29s Limit). Der Handler erkennt automatisch ob ein Request von API Gateway oder Function URL kommt und routet entsprechend.
 *   **Lead Scoring Engine (Phase 3.1):** `LeadScoringService.ts` calculates 0-100 scores based on: timeFrame (25pts), financing (25pts), budget match (15pts), source quality (15pts), engagement (10pts), completeness (10pts). Scores are auto-calculated on lead creation. New `score` and `scoreFactors` fields on the Lead model.
 *   **Property Recommendations (Phase 3.2):** Enhanced `PropertyMatchingService.ts` with `getPropertyRecommendations()` that combines rule-based filtering (budget, type, location, rooms, area) with pgvector semantic similarity boost.
 *   **Follow-Up Sequences (Phase 3.3):** `FollowUpService.ts` schedules automatic follow-ups at Day 3/7/14 via EventBridge. Checks engagement before acting. Auto-marks leads as LOST after 14 days without response.

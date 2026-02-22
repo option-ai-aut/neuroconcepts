@@ -11,7 +11,7 @@ The stack (`lib/infra-stack.ts`) provisions the following resources:
     - **Test:** PostgreSQL `t4g.micro` instance (private subnet, `RETAIN`).
     - **Prod:** Aurora Serverless v2 (PostgreSQL compatible, private subnet).
 3.  **Authentication:** AWS Cognito User Pool (Users) + Admin User Pool (Platform Admins).
-4.  **Backend API:** AWS Lambda (Node.js, in VPC) + API Gateway.
+4.  **Backend API:** AWS Lambda (Node.js, in VPC) + API Gateway + **Orchestrator Function URL** (BUFFERED, 15min Timeout für `/chat/stream`).
 5.  **Email Ingest:** S3 Bucket + Lambda Trigger (Email Parser).
 6.  **Media Storage:** S3 Bucket (Property images, floorplans, bug report screenshots).
 7.  **Frontend:** AWS Lambda (Docker) with Function URL.

@@ -162,7 +162,7 @@ Jarvis: Folie 1: Luxuswohnung Wien-Innere Stadt
 | `pdf-parse` | latest | `.pdf` Text-Extraktion |
 | `jszip` | (bereits im Projekt) | `.pptx` ZIP-Parsing + XML |
 
-> **Lambda-Hinweis:** `xlsx` wird **lazy geladen** (erst beim ersten Excel-Upload) um den `DOMMatrix is not defined`-Crash auf Lambda-Startup zu vermeiden. `xlsx`, `mammoth`, `pdf-parse` und `jszip` sind in `externalModules` der CDK-Bundling-Config eingetragen und werden separat in `afterBundling` installiert.
+> **Lambda-Hinweis:** `xlsx`, `pdf-parse` und `sharp` werden **lazy geladen** (erst bei Bedarf per `require()`) um `DOMMatrix is not defined`- und native-Binary-Crashes auf Lambda-Startup zu vermeiden. `xlsx`, `mammoth`, `pdf-parse`, `jszip` und `sharp` sind in `externalModules` der CDK-Bundling-Config eingetragen und werden separat in `afterBundling` installiert.
 
 ### Speicherung
 
