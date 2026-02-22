@@ -17,8 +17,10 @@ export function setOpenAIServicePrisma(client: PrismaClient) {
 // Convert our tool definitions to OpenAI function format
 function convertPropertyToOpenAI(value: any): any {
   const result: any = { type: value.type?.toLowerCase() || 'string', description: value.description };
-  if (result.type === 'array' && value.items) {
-    result.items = { type: value.items.type?.toLowerCase() || 'string' };
+  if (result.type === 'array') {
+    result.items = value.items
+      ? convertPropertyToOpenAI(value.items)
+      : { type: 'string' };
   }
   if (value.enum) {
     result.enum = value.enum;

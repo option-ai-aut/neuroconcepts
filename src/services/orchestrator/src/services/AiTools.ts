@@ -815,7 +815,7 @@ export const CRM_TOOLS = {
         templateId: { type: SchemaType.STRING, description: "ID of the template to update" } as FunctionDeclarationSchema,
         name: { type: SchemaType.STRING, description: "New template name" } as FunctionDeclarationSchema,
         theme: { type: SchemaType.STRING, description: "Theme: modern, classic, elegant, minimal, luxury, bold" } as FunctionDeclarationSchema,
-        blocks: { type: SchemaType.ARRAY, description: "Full replacement of template content blocks as JSON array. Each block has an 'id', 'type', and type-specific fields. Supported types: hero, stats, gallery, text, contact, map, features, timeline, video." } as FunctionDeclarationSchema,
+        blocks: { type: SchemaType.ARRAY, description: "Full replacement of template content blocks as JSON array. Each block has an 'id', 'type', and type-specific fields. Supported types: hero, stats, gallery, text, contact, map, features, timeline, video.", items: { type: SchemaType.OBJECT } } as FunctionDeclarationSchema,
       },
       required: ["templateId"]
     }
