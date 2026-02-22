@@ -585,8 +585,10 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         setIsLoading(false);
         lastSentMessageRef.current = '';
       } else {
-        // Regular chat endpoint with STREAMING via API Gateway Express SSE route
-        const streamBaseUrl = getApiUrl();
+        // Use Lambda Function URL for streaming (no 29s API Gateway timeout)
+        // Falls back to regular API URL if streamUrl not configured
+        const runtimeCfg = getRuntimeConfig();
+        const streamBaseUrl = (runtimeCfg.streamUrl || runtimeCfg.apiUrl || '').replace(/\/+$/, '');
         const apiBaseUrl = getApiUrl();
         const authHeaders = await getAuthHeaders();
         

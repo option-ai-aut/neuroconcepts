@@ -171,7 +171,7 @@ export const CRM_TOOLS = {
         yearBuilt: { type: SchemaType.NUMBER, description: "Year built (YYYY)" } as FunctionDeclarationSchema,
         yearRenovated: { type: SchemaType.NUMBER, description: "Year last renovated (YYYY)" } as FunctionDeclarationSchema,
         condition: { type: SchemaType.STRING, description: "Condition: FIRST_OCCUPANCY, NEW, RENOVATED, REFURBISHED, WELL_MAINTAINED, MODERNIZED, NEEDS_RENOVATION" } as FunctionDeclarationSchema,
-        buildingType: { type: SchemaType.STRING, description: "Building type: MULTI_FAMILY, SINGLE_FAMILY, SEMI_DETACHED, TERRACED, BUNGALOW, VILLA, HIGH_RISE, OTHER" } as FunctionDeclarationSchema,
+        buildingType: { type: SchemaType.STRING, description: "Building type enum: NEW_BUILDING, OLD_BUILDING, MONUMENT" } as FunctionDeclarationSchema,
         totalFloors: { type: SchemaType.INTEGER, description: "Total number of floors in the building" } as FunctionDeclarationSchema,
         heatingType: { type: SchemaType.STRING, description: "Heating type (e.g., 'Fernwärme', 'Gas', 'Wärmepumpe')" } as FunctionDeclarationSchema,
         energyCertificateType: { type: SchemaType.STRING, description: "Energy certificate type: DEMAND, CONSUMPTION" } as FunctionDeclarationSchema,
@@ -330,7 +330,7 @@ export const CRM_TOOLS = {
         yearBuilt: { type: SchemaType.NUMBER, description: "Year built (YYYY)" } as FunctionDeclarationSchema,
         yearRenovated: { type: SchemaType.NUMBER, description: "Year last renovated (YYYY)" } as FunctionDeclarationSchema,
         condition: { type: SchemaType.STRING, description: "Condition: FIRST_OCCUPANCY, NEW, RENOVATED, REFURBISHED, WELL_MAINTAINED, MODERNIZED, NEEDS_RENOVATION" } as FunctionDeclarationSchema,
-        buildingType: { type: SchemaType.STRING, description: "Building type: MULTI_FAMILY, SINGLE_FAMILY, SEMI_DETACHED, TERRACED, BUNGALOW, VILLA, HIGH_RISE, OTHER" } as FunctionDeclarationSchema,
+        buildingType: { type: SchemaType.STRING, description: "Building type enum: NEW_BUILDING, OLD_BUILDING, MONUMENT" } as FunctionDeclarationSchema,
         totalFloors: { type: SchemaType.INTEGER, description: "Total number of floors in the building" } as FunctionDeclarationSchema,
         heatingType: { type: SchemaType.STRING, description: "Heating type (e.g., 'Fernwärme', 'Gas', 'Wärmepumpe')" } as FunctionDeclarationSchema,
         energyCertificateType: { type: SchemaType.STRING, description: "Energy certificate type: DEMAND, CONSUMPTION" } as FunctionDeclarationSchema,
@@ -3832,7 +3832,9 @@ async function executeCreateProperty(args: any, tenantId: string) {
       yearBuilt: args.yearBuilt || null,
       yearRenovated: args.yearRenovated || null,
       condition: args.condition || null,
-      buildingType: args.buildingType || null,
+      buildingType: (['NEW_BUILDING', 'OLD_BUILDING', 'MONUMENT'].includes(args.buildingType))
+        ? args.buildingType as any
+        : null,
       totalFloors: args.totalFloors != null ? parseInt(args.totalFloors) : null,
       heatingType: args.heatingType || null,
       energyCertificateType: args.energyCertificateType || null,
