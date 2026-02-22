@@ -190,7 +190,7 @@ export class AgentRouter {
       const response = await openai.chat.completions.create({
         model: ROUTER_MODEL,
         messages: llmMessages,
-        max_completion_tokens: 16,
+        max_completion_tokens: 256,
       });
 
       // Log cost
@@ -215,10 +215,9 @@ export class AgentRouter {
         return category;
       }
 
-      // LLM returned garbage — fall back to smalltalk for general questions, crm for everything else
       const usageInfo = response.usage ? `${response.usage.prompt_tokens}→${response.usage.completion_tokens}tok` : 'no-usage';
-      console.warn(`⚠️ Router: LLM returned "${rawContent}" (${usageInfo}), falling back to crm`);
-      return 'crm';
+      console.warn(`⚠️ Router: LLM returned "${rawContent}" (${usageInfo}), falling back to multi (all tools)`);
+      return 'multi';
     } catch (error) {
       console.error('Router classification error:', error);
       return 'multi'; // Safe fallback: all tools
