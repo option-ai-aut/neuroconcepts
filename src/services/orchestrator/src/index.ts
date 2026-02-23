@@ -10954,7 +10954,7 @@ app.get('/admin/finance/summary', adminAuthMiddleware, async (req, res) => {
         ? 'Fehlende IAM-Berechtigung (ce:GetCostAndUsage)'
         : awsErr.name === 'OptInRequired'
         ? 'Cost Explorer muss im AWS-Konto aktiviert werden'
-        : awsErr.message || 'Unbekannter Fehler';
+        : 'Fehler beim Abrufen der AWS-Kostendaten';
       awsCosts = { totalCents: 0, byService: {}, error: `Cost Explorer: ${errorDetail}` };
     }
     

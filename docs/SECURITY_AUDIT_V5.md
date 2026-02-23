@@ -48,11 +48,11 @@ Basis: vollständiges Neues Audit nach Implementierung aller v4-Fixes.
 
 ---
 
-## 5. HOCH: KMS Policy `resources: ['*']`
+## 5. KMS Policy `resources: ['*']` — KEIN FIX NOTWENDIG
 
-**Problem:** Der `cognitoEmailKmsKey`-Resource-Policy nutzte `resources: ['*']` statt dem konkreten Key-ARN.
+**Analyse:** `resources: ['*']` in einer KMS Key Resource Policy ist korrekt und AWS-Standard. In resource-basierten Policies bedeutet `*` immer "diese Ressource selbst" (der Key, an dem die Policy hängt). Die Verwendung von `cognitoEmailKmsKey.keyArn` stattdessen erzeugt eine **CloudFormation Circular Dependency** und lässt den Deploy fehlschlagen.
 
-**Fix:** `resources: [cognitoEmailKmsKey.keyArn]`.
+**Entscheidung:** Revert — `resources: ['*']` bleibt. Kein Sicherheitsproblem.
 
 **Datei:** `infra/lib/infra-stack.ts`
 

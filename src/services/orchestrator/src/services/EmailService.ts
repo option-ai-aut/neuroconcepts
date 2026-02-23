@@ -295,8 +295,8 @@ export class EmailService {
       .filter(a => emailRegex.test(a))
       .map(a => ({ emailAddress: { address: a } }));
     if (toList.length === 0) throw new Error('No valid recipient email addresses provided');
-    const ccList = options?.cc ? options.cc.split(',').map(a => ({ emailAddress: { address: a.trim() } })) : undefined;
-    const bccList = options?.bcc ? options.bcc.split(',').map(a => ({ emailAddress: { address: a.trim() } })) : undefined;
+    const ccList = options?.cc ? options.cc.split(',').map(a => a.trim()).filter(a => emailRegex.test(a)).map(a => ({ emailAddress: { address: a } })) : undefined;
+    const bccList = options?.bcc ? options.bcc.split(',').map(a => a.trim()).filter(a => emailRegex.test(a)).map(a => ({ emailAddress: { address: a } })) : undefined;
 
     const graphAttachments = options?.attachments?.map(att => ({
       '@odata.type': '#microsoft.graph.fileAttachment',

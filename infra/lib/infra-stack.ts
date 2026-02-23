@@ -134,11 +134,13 @@ export class ImmivoStack extends cdk.Stack {
     });
 
     // Allow Cognito to encrypt codes with this key
+    // resources: ['*'] is correct here — in a KMS key resource policy, '*' means
+    // "this key". Using keyArn directly causes a CloudFormation circular dependency.
     cognitoEmailKmsKey.addToResourcePolicy(new cdk.aws_iam.PolicyStatement({
       effect: cdk.aws_iam.Effect.ALLOW,
       principals: [new cdk.aws_iam.ServicePrincipal('cognito-idp.amazonaws.com')],
       actions: ['kms:CreateGrant', 'kms:Encrypt'],
-      resources: [cognitoEmailKmsKey.keyArn],
+      resources: ['*'],
     }));
 
     // Custom Email Sender Lambda — decrypts code + sends branded email via Resend
