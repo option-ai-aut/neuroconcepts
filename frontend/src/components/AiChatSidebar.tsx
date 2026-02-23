@@ -245,6 +245,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
   
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastSentMessageRef = useRef<string>('');
+  const [removingMsgId, setRemovingMsgId] = useState<string | null>(null);
 
   // Cleanup AbortController on unmount
   useEffect(() => {
@@ -792,12 +793,29 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     }
     setIsLoading(false);
     setIsStreaming(false);
-    setMessages(prev => prev.filter(m => !m.isAction));
+
     // Restore the sent message to the input field
     if (lastSentMessageRef.current) {
       setAiChatDraft(lastSentMessageRef.current);
       lastSentMessageRef.current = '';
     }
+
+    setMessages(prev => {
+      // Remove isAction + incomplete (thinking/streaming) assistant messages immediately
+      const cleaned = prev.filter(m =>
+        !m.isAction && !(m.role === 'ASSISTANT' && m.status !== 'done')
+      );
+      // Find the last USER message and animate it out
+      const lastUserMsg = [...cleaned].reverse().find(m => m.role === 'USER');
+      if (lastUserMsg) {
+        setRemovingMsgId(lastUserMsg.id);
+        setTimeout(() => {
+          setMessages(p => p.filter(m => m.id !== lastUserMsg.id));
+          setRemovingMsgId(null);
+        }, 320);
+      }
+      return cleaned;
+    });
   };
 
   return (
@@ -929,7 +947,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           }
           
           return (
-            <div key={msg.id} className={`flex ${msg.role === 'USER' ? 'justify-end' : 'justify-start'}`}>
+            <div key={msg.id} className={`flex ${msg.role === 'USER' ? 'justify-end' : 'justify-start'} transition-all duration-300 ${removingMsgId === msg.id ? 'opacity-0 translate-y-4 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
               <div className={`max-w-[92%] rounded-lg p-3 text-sm break-words ${
                 msg.role === 'USER' 
                   ? 'bg-gray-900 text-white rounded-br-none' 
