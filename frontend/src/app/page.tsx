@@ -201,6 +201,114 @@ function Stagger({ children, active, className = '', delay = 0 }: { children: Re
 /* ═══════════════════════════════════════════════
    MAIN LANDING PAGE
    ═══════════════════════════════════════════════ */
+const STRUCTURED_DATA = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "Immivo AI",
+      "url": "https://immivo.ai",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "description": "Das erste KI-gesteuerte Betriebssystem für Immobilienmakler. Mivo übernimmt E-Mails, Termine, Exposés und Lead-Qualifizierung — vollautomatisch, 24/7.",
+      "featureList": [
+        "Mivo KI-Assistent: 24/7 verfügbar, antwortet in Sekunden, qualifiziert Leads automatisch",
+        "Intelligentes CRM mit automatischer Lead-Qualifizierung und Sentiment-Analyse",
+        "E-Mail-Automatisierung mit White-Label-Versand über eigene Domain",
+        "Kalender-Integration für Google Calendar und Outlook",
+        "KI-Exposé-Editor: professionelle Exposés in Minuten",
+        "KI-Bildbearbeitung (Virtual Staging): Möbel in leere Räume einbauen",
+        "Portal-Anbindung: 24 Immobilienportale mit einem Klick",
+        "Analytics & Reports mit Echtzeit-Dashboards"
+      ],
+      "offers": {
+        "@type": "AggregateOffer",
+        "priceCurrency": "EUR",
+        "offerCount": 4,
+        "offers": [
+          { "@type": "Offer", "name": "Starter", "price": "0", "priceCurrency": "EUR" },
+          { "@type": "Offer", "name": "Solo", "description": "Alle Funktionen, unbegrenzt" },
+          { "@type": "Offer", "name": "Team", "description": "Team-Verwaltung, gemeinsame Objekte" },
+          { "@type": "Offer", "name": "Enterprise", "description": "Custom Integrationen, SLA, API" }
+        ]
+      },
+      "audience": {
+        "@type": "Audience",
+        "audienceType": "Immobilienmakler in Deutschland, Österreich und der Schweiz"
+      },
+      "inLanguage": ["de", "de-AT", "de-CH"],
+      "screenshot": "https://immivo.ai/og-image.jpg",
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.9",
+        "reviewCount": "47"
+      }
+    },
+    {
+      "@type": "Organization",
+      "name": "Immivo AI",
+      "url": "https://immivo.ai",
+      "logo": "https://immivo.ai/logo-white.png",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "customer support",
+        "availableLanguage": ["German"]
+      }
+    },
+    {
+      "@type": "WebPage",
+      "name": "Immivo AI — KI-Betriebssystem für Immobilienmakler",
+      "url": "https://immivo.ai",
+      "description": "Das erste KI-gesteuerte Betriebssystem für Immobilienmakler. 15h Zeitersparnis pro Woche, 40% mehr qualifizierte Leads, 3x schnellere Reaktionszeit.",
+      "mainEntity": {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Was ist Immivo?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Immivo ist das erste vollständig KI-gesteuerte Betriebssystem für Immobilienmakler. Der KI-Assistent Mivo übernimmt E-Mails, Terminvereinbarungen, Exposé-Erstellung und Lead-Qualifizierung — vollautomatisch, 24 Stunden täglich."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Was ist Mivo?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Mivo ist der KI-Assistent von Immivo. Er liest eingehende E-Mails und Portal-Anfragen, qualifiziert Leads, erstellt Exposés und bucht Termine — 24/7, ohne Pause. Powered by OpenAI GPT-5."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Welche Immobilienportale unterstützt Immivo?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Immivo unterstützt 24 Immobilienportale, darunter ImmoScout24, Willhaben, Immowelt, Homegate und Kleinanzeigen. Mit einem Klick können Objekte auf alle Portale gleichzeitig gepusht werden."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Wie viel Zeit spare ich mit Immivo?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Durchschnittlich sparen Nutzer 15 Stunden pro Woche, erzielen 40% mehr qualifizierte Leads und eine 3-fach schnellere Reaktionszeit auf Anfragen."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Ist Immivo DSGVO-konform?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Ja. Immivo hostet alle Daten auf AWS Frankfurt (EU). Es gibt keine US-Server und keinen Datentransfer außerhalb der EU. Alle Daten sind verschlüsselt."
+            }
+          }
+        ]
+      }
+    }
+  ]
+};
+
 export default function LandingPage() {
   const t = useTranslations('landing');
   const [splashDone, setSplashDone] = useState(splashShownThisSession);
@@ -532,6 +640,10 @@ export default function LandingPage() {
 
   return (
     <div className={`${S_DARK} font-sans text-white`}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA) }}
+      />
       {!splashDone && <SplashScreen onComplete={handleSplashComplete} />}
       <PublicNavigation currentPage="home" />
 

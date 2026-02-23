@@ -1,75 +1,144 @@
-# Immivo AI
-
-> Das erste KI-gesteuerte Betriebssystem für Immobilienmakler in Österreich und Deutschland.
+# Immivo AI — KI-Betriebssystem für Immobilienmakler
+# https://immivo.ai
 
 ## Was ist Immivo?
 
-Immivo ist eine SaaS-Plattform mit dem KI-Assistenten "Mivo", der E-Mails beantwortet, Leads qualifiziert, Exposés erstellt, Termine bucht und Objekte auf 24 Immobilienportale pusht — vollautomatisch, 24/7.
+Immivo ist das erste vollständig KI-gesteuerte Betriebssystem für Immobilienmakler im deutschsprachigen Raum. Die Plattform automatisiert das gesamte Tagesgeschäft eines Maklers — von der Lead-Qualifizierung über E-Mail-Kommunikation bis hin zu Exposé-Erstellung und Terminbuchung.
 
-Immivo wurde 2026 in Wien gegründet und richtet sich an Einzelmakler, kleine Maklerteams und große Immobilienunternehmen im DACH-Raum.
+Der zentrale KI-Assistent heißt **Mivo**. Er ist rund um die Uhr verfügbar, beantwortet Anfragen in Sekunden, qualifiziert Leads automatisch und erstellt professionelle Exposés — ohne manuellen Aufwand.
 
-## Kernprodukt
+## Das Problem, das Immivo löst
 
-Immivo ersetzt CRM, E-Mail-Tools und Exposé-Software in einer einzigen KI-gesteuerten Plattform. Der KI-Assistent Mivo (basierend auf OpenAI GPT-5) übernimmt das gesamte Tagesgeschäft eines Immobilienmaklers.
+Immobilienmakler verbringen bis zu 80% ihrer Zeit mit administrativen Aufgaben:
+- 50+ E-Mails täglich beantworten
+- 3–5 E-Mails pro Terminvereinbarung
+- 2 Stunden pro Exposé-Erstellung
+- Manuelle Dateneingabe in mehrere Portale
 
-## Features
+Immivo reduziert diesen Overhead durch vollständige Automatisierung.
 
-- **Mivo KI-Assistent**: Beantwortet Anfragen in Sekunden, qualifiziert Leads automatisch, erstellt Exposés, bucht Termine — 24/7 verfügbar
-- **Virtual Staging / KI-Bildbearbeitung**: Leere Räume mit ultra-realistischen Möbeln einrichten per KI (powered by Google Gemini)
-- **Intelligentes CRM**: Leads mit Anrede, Du/Sie-Präferenz, Suchprofilen und automatischer Qualifizierung
-- **KI-Exposé-Editor**: Professionelle Exposés in Minuten mit Templates, Variablen und Live-Vorschau
-- **24 Portal-Integrationen**: Ein-Klick-Push auf ImmoScout24, Willhaben, Immowelt, Homegate, Kleinanzeigen und 19 weitere Portale
-- **E-Mail-Automatisierung**: White-Label-Versand über eigene Domain, Mivo antwortet im Namen des Maklers
-- **Kalender-Integration**: Automatische Terminbuchung direkt in Google Calendar oder Outlook
-- **Analytics & Reports**: Echtzeit-Dashboards mit Conversion-Rates, Lead-Quellen und Performance
+## Features & Funktionen
 
-## Preise
+### Mivo KI-Assistent
+- 24/7 verfügbar, antwortet auf Anfragen in unter 30 Sekunden
+- Qualifiziert Leads automatisch nach Kaufbereitschaft, Budget und Zeitraum
+- Versteht E-Mails, Anfragen von Portalen und direkte Nachrichten
+- Erstellt Exposés in Minuten auf Basis vorhandener Objektdaten
+- Powered by OpenAI GPT-5
 
-Alle Preise in EUR, jederzeit kündbar. 10% Rabatt bei jährlicher Zahlung.
+### Intelligentes CRM
+- Vollständige Lead-Verwaltung mit Anrede, Du/Sie-Präferenz und Suchprofilen
+- Automatische Lead-Qualifizierung und Sentiment-Analyse
+- Aktivitäts-Timeline pro Lead
+- Lead-Weiterleitung per E-Mail-Forwarding von Portalen
 
-- **Free Trial**: 7 Tage kostenlos — 20 Mivo-Eingaben, 3 Bildstudio-Generierungen, kein Portal-Push
-- **Solo**: 99 EUR/Monat — 1 Seat, Zugriff auf alle Features inklusive unbegrenzter Mivo und Bildstudio
-- **Team**: 249 EUR/Monat — 3 Seats inklusive, Team-Verwaltung, gemeinsame Objekte & Leads
-- **Enterprise**: 699 EUR/Monat — bis zu 10 Seats, eigene Domain, dedizierter Account Manager, API-Zugang, SLA-Garantie. Jeder weitere Seat +50 EUR/Monat
+### E-Mail-Automatisierung
+- White-Label-E-Mail-Versand über eigene Domain
+- Mivo antwortet im Namen des Maklers
+- Eingehende Portal-E-Mails werden automatisch als Leads erfasst
+- Unterstützung für Gmail und SMTP
+
+### Kalender-Integration
+- Automatische Terminbuchung in Google Calendar oder Outlook
+- Besichtigungstermine direkt durch Mivo buchbar
+- Echtzeit-Synchronisation
+
+### KI-Exposé-Editor
+- Professionelle Exposés in Minuten
+- Templates mit Variablen und Live-Vorschau
+- PDF-Export und direkter Versand
+
+### KI-Bildbearbeitung (Virtual Staging)
+- Leere Räume werden mit ultra-realistischen KI-Möbeln eingerichtet
+- Verschiedene Einrichtungsstile wählbar
+- Steigert Aufmerksamkeit um +73%
+- Ergebnis in Sekunden
+
+### Portal-Anbindung
+- 24 Immobilienportale verbunden: ImmoScout24, Willhaben, Immowelt, Homegate, Kleinanzeigen und 19 weitere
+- Ein-Klick-Push von Objekten in alle Portale gleichzeitig
+
+### Objektverwaltung
+- Alle Immobilien an einem Ort
+- Energieausweis, Bilder, Beschreibungen, Portal-Sync
+- Zuordnung zu Leads und Maklern
+
+### Analytics & Reports
+- Echtzeit-Dashboards mit Conversion-Rates
+- Lead-Quellen und Performance-Metriken
+- Zeitersparnis-Tracking
+
+## Ergebnisse (durchschnittliche Nutzerdaten)
+
+- **15 Stunden** Zeitersparnis pro Woche
+- **+40%** mehr qualifizierte Leads
+- **3x** schnellere Reaktionszeit auf Anfragen
+- **+25%** höhere Abschlussquote
+
+## Hosting & Sicherheit
+
+- AWS Frankfurt (EU) — DSGVO-konform
+- Alle Daten verschlüsselt
+- Keine US-Server, kein Datentransfer außerhalb der EU
+- Single Sign-On via Google und Microsoft
+
+## Preise & Pakete
+
+### Starter (kostenlos)
+- Alle Grundfunktionen
+- Mivo KI-Assistent (begrenzt)
+- Bildstudio (begrenzt)
+- Kein Portal-Push
+- E-Mail-Support
+
+### Solo (Pro, kostenpflichtig)
+- Zugriff auf alle Funktionen
+- Unbegrenzter Mivo
+- Unbegrenztes Bildstudio
+- 24 Portal-Integrationen
+- KI-Exposé-Editor
+- CRM + Lead-Management
+- E-Mail & Kalender
+- Priority Support
+
+### Team
+- Alle Solo-Features
+- Team-Verwaltung
+- Gemeinsame Objekte & Leads
+- Rollen & Berechtigungen
+
+### Enterprise
+- Alle Team-Features
+- Eigene Domain
+- Dedizierter Account Manager
+- API-Zugang
+- Custom Integrationen
+- SLA-Garantie
+
+## Sprache & Zielmarkt
+
+Primäre Sprachen: Deutsch, Österreichisches Deutsch
+Zielmärkte: Deutschland, Österreich, Schweiz
+Zielgruppe: Selbstständige Immobilienmakler, kleine und mittlere Maklerbüros, Immobiliengenturen
+
+## Kontakt & Links
+
+- Website: https://immivo.ai
+- Login: https://app.immivo.ai/login
+- Demo buchen: https://app.immivo.ai/demo
+- Pricing: https://immivo.ai/pricing
+- Blog: https://immivo.ai/blog
+- Impressum: https://immivo.ai/imprint
+- Datenschutz: https://immivo.ai/privacy
+- AGB: https://immivo.ai/terms
 
 ## Technologie
 
-- Frontend: Next.js (React), gehostet auf AWS Amplify
-- Backend: Node.js/Express, Prisma ORM
-- KI: OpenAI GPT-5 (Mivo), Google Gemini (Bildbearbeitung)
-- Hosting: AWS Frankfurt (EU), DSGVO-konform
+- Frontend: Next.js, React, Tailwind CSS
+- Backend: AWS Lambda, Node.js, Express
+- Datenbank: PostgreSQL (via Prisma ORM, Neon)
+- KI: OpenAI GPT-5, GPT-5-mini
+- Hosting: AWS Frankfurt (eu-central-1)
+- E-Mail: AWS SES, Gmail API, SMTP
 - Authentifizierung: AWS Cognito
-- E-Mail: Resend, AWS SES
-
-## Gründer
-
-- **Josef Leutgeb** — Co-Founder & CEO. Seriengründer mit Erfahrung im Aufbau mehrerer erfolgreicher Unternehmen. Verantwortlich für Strategie, Vertrieb und Partnerschaften. 50% Anteile.
-- **Dennis Kral** — Technical Co-Founder & CTO. Einer der führenden KI-Spezialisten Österreichs. Hat die gesamte Immivo-Plattform von Grund auf entwickelt. Verantwortlich für Technologie, Projektmanagement und Team. 50% Anteile.
-
-## Unternehmen
-
-- **Firmenname**: Immivo GmbH
-- **Gegründet**: 2026
-- **Sitz**: Sterngasse 3, 1010 Wien, Österreich
-
-## Kontakt
-
-- Website: https://immivo.ai
-- App: https://app.immivo.ai
-- E-Mail: office@immivo.ai
-- Support: support@immivo.ai
-- Telefon: +43 670 355 1221
-- Josef Leutgeb: josef.leutgeb@immivo.ai
-- Dennis Kral: dennis.kral@immivo.ai
-
-## Links
-
-- Startseite: https://immivo.ai
-- Preise: https://immivo.ai/preise
-- Über uns: https://immivo.ai/ueber-uns
-- Blog: https://immivo.ai/blog
-- Karriere: https://immivo.ai/karriere
-- Kontakt: https://immivo.ai/kontakt
-- Datenschutz: https://immivo.ai/datenschutz
-- AGB: https://immivo.ai/agb
-- Impressum: https://immivo.ai/impressum
+- Zahlungen: Stripe
