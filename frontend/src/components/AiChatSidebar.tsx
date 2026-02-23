@@ -251,18 +251,19 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   
   const abortControllerRef = useRef<AbortController | null>(null);
-  const isSubmittingRef = useRef(false); // atomic guard — no stale-closure issue unlike React state
+  const isSubmittingRef = useRef(false);
   const lastSentMessageRef = useRef<string>('');
-  const messagesRef = useRef<Message[]>([]); // mirrors messages state for sync reads in event handlers
+  const messagesRef = useRef<Message[]>([]);
   const [removingMsgId, setRemovingMsgId] = useState<string | null>(null);
+  const undoTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  // Cleanup AbortController on unmount
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
+      undoTimeoutsRef.current.forEach(t => clearTimeout(t));
     };
   }, []);
 
@@ -565,9 +566,12 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     e.preventDefault();
     if (!aiChatDraft.trim() && uploadedFiles.length === 0) return;
 
-    // Use a ref-based guard to prevent double-submission (avoids stale-closure issue with React state)
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
+
+    // Cancel any pending undo retries from a previous Stop press
+    undoTimeoutsRef.current.forEach(t => clearTimeout(t));
+    undoTimeoutsRef.current = [];
 
     const attachments = uploadedFiles.map(f => ({ name: f.name, type: f.type }));
     const userMsg: Message = { 
@@ -808,30 +812,64 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
   };
 
   const handleStop = () => {
+    // 1. Abort the network request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
     isSubmittingRef.current = false;
-    lastSentMessageRef.current = '';
     setIsLoading(false);
     setIsStreaming(false);
 
-    // The user message is already persisted server-side the moment the request
-    // arrives, so we must NOT pretend it was "unsent" (that caused duplicates
-    // when the user re-sent the restored draft).  Instead: keep the user
-    // message, discard action indicators and incomplete assistant messages.
-    // Partial responses with visible text are kept and marked done.
-    setMessages(prev => prev
-      .filter(m => !m.isAction)
-      .map(m => {
-        if (m.role === 'ASSISTANT' && m.status !== 'done') {
-          return m.content?.trim() ? { ...m, status: 'done' as const } : null;
-        }
-        return m;
-      })
-      .filter(Boolean) as Message[]
+    // 2. Restore draft to input field
+    if (lastSentMessageRef.current) {
+      setAiChatDraft(lastSentMessageRef.current);
+      lastSentMessageRef.current = '';
+    }
+
+    // 3. Remove incomplete assistant + action messages, animate user msg out
+    const currentMsgs = messagesRef.current;
+    const cleaned = currentMsgs.filter(m =>
+      !m.isAction && !(m.role === 'ASSISTANT' && m.status !== 'done')
     );
+    const lastUserMsg = [...cleaned].reverse().find(m => m.role === 'USER');
+    setMessages(cleaned);
+
+    if (lastUserMsg) {
+      setRemovingMsgId(lastUserMsg.id);
+      setTimeout(() => {
+        setMessages(p => p.filter(m => m.id !== lastUserMsg.id));
+        setRemovingMsgId(null);
+      }, 320);
+    }
+
+    // 4. Delete from database — the backend Lambda runs to completion even
+    //    after we abort, so we fire immediate + delayed retries to catch
+    //    messages the Lambda saves after our first delete call.
+    undoTimeoutsRef.current.forEach(t => clearTimeout(t));
+    undoTimeoutsRef.current = [];
+
+    const callUndo = async (cutoffTime?: string) => {
+      try {
+        const authHeaders = await getAuthHeaders();
+        const apiUrl = getApiUrl();
+        const r = await fetch(`${apiUrl}/chat/undo-last`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify(cutoffTime ? { cutoffTime } : {}),
+        });
+        return await r.json();
+      } catch { return null; }
+    };
+
+    callUndo().then(result => {
+      if (!result?.cutoffTime) return;
+      const ct = result.cutoffTime;
+      for (const delay of [4000, 10000, 20000, 35000]) {
+        const t = setTimeout(() => callUndo(ct), delay);
+        undoTimeoutsRef.current.push(t);
+      }
+    });
   };
 
   return (

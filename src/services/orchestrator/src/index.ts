@@ -3918,6 +3918,42 @@ app.get('/chat/history', authMiddleware, async (req, res) => {
   }
 });
 
+// Undo last sent message — deletes the most recent user message + any subsequent
+// assistant/system messages.  Accepts an optional cutoffTime for retry calls that
+// need to clean up messages the Lambda saved after the initial delete.
+app.post('/chat/undo-last', authMiddleware, async (req, res) => {
+  try {
+    const db = prisma || (await initializePrisma());
+    const currentUser = await db.user.findUnique({ where: { id: req.user!.sub } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { cutoffTime } = req.body || {};
+
+    if (cutoffTime) {
+      const deleted = await db.userChat.deleteMany({
+        where: { userId: currentUser.id, archived: false, createdAt: { gte: new Date(cutoffTime) } },
+      });
+      return res.json({ deleted: deleted.count });
+    }
+
+    const lastUserMsg = await db.userChat.findFirst({
+      where: { userId: currentUser.id, role: 'USER', archived: false },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!lastUserMsg) return res.json({ deleted: 0 });
+
+    const deleted = await db.userChat.deleteMany({
+      where: { userId: currentUser.id, archived: false, createdAt: { gte: lastUserMsg.createdAt } },
+    });
+
+    console.log(`🗑️ Chat undo: ${deleted.count} messages removed for user ${currentUser.id}`);
+    return res.json({ deleted: deleted.count, cutoffTime: lastUserMsg.createdAt.toISOString() });
+  } catch (error) {
+    console.error('Error in chat undo:', error);
+    res.status(500).json({ error: 'Failed to undo' });
+  }
+});
+
 // Neuen Chat starten (archiviert alten Chat)
 app.post('/chat/new', authMiddleware, async (req, res) => {
   try {
@@ -4260,10 +4296,6 @@ app.post('/chat/stream',
 
       console.log(`💬 Chat message from ${currentUser.email}: "${message.substring(0, 200)}${message.length > 200 ? '...' : ''}"${pageContext ? ` [page: ${pageContext}]` : ''}`);
 
-      await prisma.userChat.create({
-        data: { userId, role: 'USER', content: fullMessage || message }
-      });
-
       // Keepalive: Send heartbeat every 5s during tool execution to prevent API GW timeout
       let lastDataTime = Date.now();
       const heartbeatInterval = setInterval(() => {
@@ -4291,10 +4323,9 @@ app.post('/chat/stream',
       }
       console.log(`📡 SSE: ${chunkCount} chunks sent, total ${fullResponse.length} chars`);
 
-      // Save assistant message BEFORE ending the response
-      await prisma.userChat.create({
-        data: { userId, role: 'ASSISTANT', content: wrapAiResponse(fullResponse) }
-      });
+      // Save both messages together at the end so undo-last can reliably delete them
+      await prisma.userChat.create({ data: { userId, role: 'USER', content: fullMessage || message } });
+      await prisma.userChat.create({ data: { userId, role: 'ASSISTANT', content: wrapAiResponse(fullResponse) } });
       console.log(`💾 Chat gespeichert für User ${userId}`);
 
       // Send done signal with function call info
@@ -11544,7 +11575,6 @@ async function handleChatStream(event: any) {
     };
 
     console.log(`💬 [FnURL] ${currentUser.email}: "${message.substring(0, 200)}"${pageContext ? ` [${pageContext}]` : ''}`);
-    await db.userChat.create({ data: { userId, role: 'USER', content: message } });
 
     for await (const result of openai.chatStream(message, tenantId, recentHistory, [], currentUser.id, userContext)) {
       fullResponse += result.chunk;
@@ -11553,6 +11583,8 @@ async function handleChatStream(event: any) {
       write(result.toolsUsed ? { chunk: result.chunk, toolsUsed: result.toolsUsed } : { chunk: result.chunk });
     }
 
+    // Save both messages at the end so undo-last can reliably delete them
+    await db.userChat.create({ data: { userId, role: 'USER', content: message } });
     await db.userChat.create({ data: { userId, role: 'ASSISTANT', content: wrapAiResponse(fullResponse) } });
     write({ done: true, hadFunctionCalls, toolsUsed });
   } catch (err) {
