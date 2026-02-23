@@ -801,20 +801,30 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
       abortControllerRef.current = null;
     }
     isSubmittingRef.current = false;
-    lastSentMessageRef.current = '';
     setIsLoading(false);
     setIsStreaming(false);
 
-    // Keep user message and partial response visible — just mark them as done/interrupted
+    // Restore the sent message to the input field
+    if (lastSentMessageRef.current) {
+      setAiChatDraft(lastSentMessageRef.current);
+      lastSentMessageRef.current = '';
+    }
+
     setMessages(prev => {
-      return prev
-        .filter(m => !m.isAction)
-        .map(m => {
-          if (m.role === 'ASSISTANT' && (m.status === 'streaming' || m.status === 'thinking')) {
-            return { ...m, status: 'done' as const, content: m.content || '(Unterbrochen)' };
-          }
-          return m;
-        });
+      // Remove isAction + incomplete (thinking/streaming) assistant messages
+      const cleaned = prev.filter(m =>
+        !m.isAction && !(m.role === 'ASSISTANT' && m.status !== 'done')
+      );
+      // Animate the last USER message sliding out, then remove it
+      const lastUserMsg = [...cleaned].reverse().find(m => m.role === 'USER');
+      if (lastUserMsg) {
+        setRemovingMsgId(lastUserMsg.id);
+        setTimeout(() => {
+          setMessages(p => p.filter(m => m.id !== lastUserMsg.id));
+          setRemovingMsgId(null);
+        }, 320);
+      }
+      return cleaned;
     });
   };
 
