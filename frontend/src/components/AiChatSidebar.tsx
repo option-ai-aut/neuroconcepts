@@ -158,6 +158,13 @@ const TOOL_LABELS: Record<string, { label: string; icon: string }> = {
   get_company_info: { label: 'Firmendaten geladen', icon: '🏢' },
   semantic_search: { label: 'Suche läuft', icon: '🔍' },
   upload_documents_to_lead: { label: 'Dokument hochgeladen', icon: '📎' },
+
+  // Export
+  export_data: { label: 'Export erstellt', icon: '📥' },
+
+  // Email Signature
+  get_email_signature: { label: 'Signatur geladen', icon: '✍️' },
+  update_email_signature: { label: 'Signatur gespeichert', icon: '✍️' },
 };
 
 const getToolLabel = (tool: string): { label: string; icon: string } => {
@@ -1021,25 +1028,27 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                   const msgContent = msg.content || '';
                   if (!msgContent) return null;
 
-                  const imageUrlRegex = /(https?:\/\/[^\s]+?\.(png|jpg|jpeg|webp|gif)(\?[^\s]*)?)/gi;
-                  const downloadUrlRegex = /(https?:\/\/[^\s]+?\.(csv|xlsx)(\?[^\s]*)?)/gi;
-                  const hasImageUrls = imageUrlRegex.test(msgContent);
-                  const hasDownloadUrls = downloadUrlRegex.test(msgContent);
-                  
-                  if (!hasImageUrls && !hasDownloadUrls) {
-                    return <div className="whitespace-pre-wrap mivo-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(msgContent) }} />;
+                  // Normalize markdown links containing download/image URLs to bare URLs
+                  // e.g. [Download: file.csv](https://...csv) → https://...csv
+                  const normalized = msgContent.replace(
+                    /\[([^\]]*)\]\((https?:\/\/[^\s)]+?\.(csv|xlsx|png|jpg|jpeg|webp|gif)[^\s)]*)\)/gi,
+                    '$2'
+                  );
+
+                  const hasMediaUrls = /(https?:\/\/[^\s]+?\.(png|jpg|jpeg|webp|gif|csv|xlsx)(\?[^\s]*)?)/gi.test(normalized);
+
+                  if (!hasMediaUrls) {
+                    return <div className="whitespace-pre-wrap mivo-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(normalized) }} />;
                   }
-                  
+
                   const elements: React.ReactNode[] = [];
                   let lastIndex = 0;
-                  const content = msgContent;
-                  // Combined regex: images and download files
                   const regex = /(https?:\/\/[^\s]+?\.(png|jpg|jpeg|webp|gif|csv|xlsx)(\?[^\s]*)?)/gi;
                   let match;
-                  
-                  while ((match = regex.exec(content)) !== null) {
+
+                  while ((match = regex.exec(normalized)) !== null) {
                     if (match.index > lastIndex) {
-                      const textBefore = content.slice(lastIndex, match.index).trim();
+                      const textBefore = normalized.slice(lastIndex, match.index).trim();
                       if (textBefore) elements.push(<div key={`t-${lastIndex}`} className="whitespace-pre-wrap mivo-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(textBefore) }} />);
                     }
                     const url = match[0];
@@ -1054,13 +1063,13 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                           download={fname}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 my-2 px-3 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-xs text-gray-700 font-medium max-w-[220px]"
+                          className="inline-flex items-center gap-2.5 mt-2 mb-1 pl-3 pr-4 py-2 bg-gray-900 hover:bg-gray-700 active:bg-gray-800 text-white rounded-lg transition-colors shadow-sm cursor-pointer"
                         >
-                          <span className={`flex-shrink-0 w-7 h-7 rounded flex items-center justify-center text-white text-[10px] font-bold ${isXlsx ? 'bg-green-600' : 'bg-blue-600'}`}>
-                            {isXlsx ? 'XLS' : 'CSV'}
-                          </span>
-                          <span className="truncate">{fname}</span>
-                          <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                          <svg className="w-4 h-4 flex-shrink-0 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                          <div className="flex flex-col items-start leading-tight">
+                            <span className="text-[11px] font-semibold">{isXlsx ? 'Excel' : 'CSV'} herunterladen</span>
+                            <span className="text-[10px] text-white/60 font-normal">{fname}</span>
+                          </div>
                         </a>
                       );
                     } else {
@@ -1072,11 +1081,11 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                     }
                     lastIndex = regex.lastIndex;
                   }
-                  if (lastIndex < content.length) {
-                    const remaining = content.slice(lastIndex).trim();
+                  if (lastIndex < normalized.length) {
+                    const remaining = normalized.slice(lastIndex).trim();
                     if (remaining) elements.push(<div key={`t-${lastIndex}`} className="whitespace-pre-wrap mivo-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(remaining) }} />);
                   }
-                  
+
                   return <>{elements}</>;
                 })()}
                 {/* Streaming cursor */}

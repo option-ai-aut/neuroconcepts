@@ -82,7 +82,7 @@ export default function AdminCalendarPage() {
   useEffect(() => { fetchCalendars(); }, [fetchCalendars]);
 
   useEffect(() => {
-    const check = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth < 768);
+    const check = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth < 1024);
     check();
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);

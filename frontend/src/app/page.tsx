@@ -73,7 +73,7 @@ function BeforeAfterSlider({ active }: { active: boolean }) {
     const obs = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) {
         setInView(true);
-      } else if (window.innerWidth < 768) {
+      } else if (window.innerWidth < 1024) {
         setInView(false);
       }
     }, { threshold: 0.1 });
@@ -206,10 +206,12 @@ export default function LandingPage() {
   const [splashDone, setSplashDone] = useState(splashShownThisSession);
   const handleSplashComplete = useCallback(() => { splashShownThisSession = true; setSplashDone(true); }, []);
 
-  /* ── Mobile detection ── */
+  /* ── Mobile detection ──
+     Uses < 1024 so landscape phones (667–932px wide) also get the mobile
+     natural-scroll layout instead of the desktop snap-scroll sections.      */
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
+    const check = () => setIsMobile(window.innerWidth < 1024);
     check();
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
