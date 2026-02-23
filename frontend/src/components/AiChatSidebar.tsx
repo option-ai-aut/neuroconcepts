@@ -262,6 +262,32 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
   const sendTimeRef = useRef<string>('');
 
   useEffect(() => {
+    // On mount: check if a previous session left a pending undo in localStorage
+    // (happens when user reloads before our retry timeouts could fire).
+    const UNDO_KEY = 'mivo-pending-undo';
+    const pending = (() => { try { return JSON.parse(localStorage.getItem(UNDO_KEY) || 'null'); } catch { return null; } })();
+    if (pending?.cutoffTime && Date.now() - pending.storedAt < 90_000) {
+      const { cutoffTime } = pending;
+      const fireUndo = async () => {
+        try {
+          const authHeaders = await getAuthHeaders();
+          const apiUrl = getApiUrl();
+          await fetch(`${apiUrl}/chat/undo-last`, {
+            method: 'POST', headers: authHeaders,
+            body: JSON.stringify({ cutoffTime }),
+          });
+        } catch { /* ignore */ }
+      };
+      // Fire immediately + a few retries to catch slow Lambda saves
+      fireUndo();
+      const t1 = setTimeout(fireUndo, 8_000);
+      const t2 = setTimeout(fireUndo, 25_000);
+      const t3 = setTimeout(() => { fireUndo(); localStorage.removeItem(UNDO_KEY); }, 50_000);
+      undoTimeoutsRef.current.push(t1, t2, t3);
+    } else {
+      localStorage.removeItem(UNDO_KEY);
+    }
+
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -862,7 +888,12 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
 
     const cutoffTime = sendTimeRef.current
       ? new Date(new Date(sendTimeRef.current).getTime() - 3000).toISOString()
-      : new Date(Date.now() - 10000).toISOString(); // fallback: 10 s ago
+      : new Date(Date.now() - 10000).toISOString();
+
+    // Persist to localStorage so retries survive a page reload
+    try {
+      localStorage.setItem('mivo-pending-undo', JSON.stringify({ cutoffTime, storedAt: Date.now() }));
+    } catch { /* ignore quota errors */ }
 
     const callUndo = async () => {
       try {
@@ -873,12 +904,19 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           headers: authHeaders,
           body: JSON.stringify({ cutoffTime }),
         });
-      } catch { /* silently ignore — worst case user sees the message on reload */ }
+      } catch { /* ignore */ }
     };
 
-    callUndo(); // fire immediately
-    for (const delay of [3000, 8000, 18000, 35000]) {
-      const t = setTimeout(callUndo, delay);
+    callUndo();
+    const undoDelays = [3000, 8000, 18000, 35000];
+    for (const delay of undoDelays) {
+      const isLast = delay === undoDelays[undoDelays.length - 1];
+      const t = setTimeout(() => {
+        callUndo();
+        if (isLast) {
+          try { localStorage.removeItem('mivo-pending-undo'); } catch { /* ignore */ }
+        }
+      }, delay);
       undoTimeoutsRef.current.push(t);
     }
   };
