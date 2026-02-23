@@ -226,7 +226,8 @@ export default function TeamMembersPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Mitarbeiter</th>
@@ -297,14 +298,15 @@ export default function TeamMembersPage() {
                 })
               )}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       )}
 
       {/* Create Modal */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowCreate(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h3 className="font-semibold text-gray-900">Mitarbeiter hinzufügen</h3>
               <button onClick={() => setShowCreate(false)} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
@@ -377,7 +379,7 @@ export default function TeamMembersPage() {
       {/* Edit Modal */}
       {editingMember && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h3 className="font-semibold text-gray-900">Mitarbeiter bearbeiten</h3>
               <button onClick={() => setEditingMember(null)} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>

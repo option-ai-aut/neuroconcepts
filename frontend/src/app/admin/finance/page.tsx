@@ -229,7 +229,7 @@ export default function FinancePage() {
       {activeTab === 'overview' && summary && (
         <>
           {/* KPI Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <KpiCard
               label="Gesamtkosten"
               value={formatUsd(summary.totalCostUsd)}
@@ -327,7 +327,8 @@ export default function FinancePage() {
             {aiByModel.length === 0 ? (
               <div className="p-8 text-center text-gray-400 text-sm">Keine Daten</div>
             ) : (
-              <table className="w-full">
+              <div className="overflow-x-auto">
+                <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase">Modell</th>
@@ -360,7 +361,8 @@ export default function FinancePage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             )}
           </div>
 
@@ -396,7 +398,8 @@ export default function FinancePage() {
                 <h2 className="text-sm font-semibold text-gray-900">Aktuelle Preistabelle</h2>
                 <p className="text-[10px] text-gray-400 mt-0.5">Preise pro 1M Tokens in USD</p>
               </div>
-              <table className="w-full">
+              <div className="overflow-x-auto">
+                <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="text-left px-4 py-2 text-[11px] font-semibold text-gray-500 uppercase">Modell</th>
@@ -413,7 +416,8 @@ export default function FinancePage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             </div>
           )}
         </>
@@ -493,7 +497,8 @@ export default function FinancePage() {
             {tenantCosts.length === 0 ? (
               <div className="p-8 text-center text-gray-400 text-sm">Keine Daten</div>
             ) : (
-              <table className="w-full">
+              <div className="overflow-x-auto">
+                <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase">Tenant</th>
@@ -535,7 +540,8 @@ export default function FinancePage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             )}
           </div>
         </>

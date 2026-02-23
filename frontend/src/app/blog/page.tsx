@@ -109,7 +109,7 @@ export default function BlogPage() {
           ref={heroInView.ref}
           className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center transition-opacity duration-700 ${heroInView.isInView ? 'opacity-100' : 'opacity-0'}`}
         >
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-4 sm:mb-6">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 mb-4 sm:mb-6">
             Blog
           </h1>
           <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto px-4">
@@ -241,7 +241,7 @@ export default function BlogPage() {
                 <button
                   type="submit"
                   disabled={subscribeStatus === 'loading'}
-                  className="px-6 py-3 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto px-6 py-3 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
                 >
                   {subscribeStatus === 'loading' ? (
                     <>

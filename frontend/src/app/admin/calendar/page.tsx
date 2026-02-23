@@ -42,6 +42,7 @@ export default function AdminCalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendars, setCalendars] = useState<Record<string, CalEvent[]>>({});
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
   
   // View mode: 'mine' (mein Kalender), 'member' (einzelner Mitarbeiter), 'office' (alle = Office)
   const [viewMode, setViewMode] = useState<ViewMode>('mine');
@@ -80,9 +81,16 @@ export default function AdminCalendarPage() {
 
   useEffect(() => { fetchCalendars(); }, [fetchCalendars]);
 
+  useEffect(() => {
+    const check = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   const navigate = (dir: number) => {
     const d = new Date(currentDate);
-    d.setDate(d.getDate() + dir * 7);
+    d.setDate(d.getDate() + (isMobile ? dir : dir * 7));
     setCurrentDate(d);
   };
 
@@ -208,7 +216,10 @@ export default function AdminCalendarPage() {
         <div>
           <h1 className="text-xl font-bold text-gray-900">Kalender</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {weekStart.toLocaleDateString('de-DE', { day: '2-digit', month: 'long' })} – {weekEnd.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' })}
+            {isMobile
+              ? currentDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
+              : `${weekStart.toLocaleDateString('de-DE', { day: '2-digit', month: 'long' })} – ${weekEnd.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' })}`
+            }
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -277,24 +288,83 @@ export default function AdminCalendarPage() {
           <p className="text-sm text-gray-500">Lade Kalender...</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {/* Day Headers */}
-          <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-gray-100">
-            <div className="p-2" />
-            {days.map((d, i) => (
-              <div key={i} className={`p-2 text-center border-l border-gray-100 ${isToday(d) ? 'bg-blue-50' : ''}`}>
-                <p className="text-[10px] font-medium text-gray-400 uppercase">
-                  {d.toLocaleDateString('de-DE', { weekday: 'short' })}
-                </p>
-                <p className={`text-sm font-bold ${isToday(d) ? 'text-blue-600' : 'text-gray-900'}`}>
-                  {d.getDate()}
-                </p>
+        <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto overflow-y-hidden">
+          {isMobile ? (
+            /* Mobile: Day View */
+            <>
+              <div className="grid grid-cols-[60px_1fr] border-b border-gray-100">
+                <div className="p-2" />
+                <div className={`p-2 text-center border-l border-gray-100 ${isToday(currentDate) ? 'bg-blue-50' : ''}`}>
+                  <p className="text-[10px] font-medium text-gray-400 uppercase">
+                    {currentDate.toLocaleDateString('de-DE', { weekday: 'short' })}
+                  </p>
+                  <p className={`text-sm font-bold ${isToday(currentDate) ? 'text-blue-600' : 'text-gray-900'}`}>
+                    {currentDate.getDate()}
+                  </p>
+                </div>
               </div>
-            ))}
-          </div>
+              <div className="grid grid-cols-[60px_1fr] max-h-[500px] md:max-h-[700px] overflow-y-auto relative">
+                {hours.map((hour) => {
+                  const events = hour === hours[0] ? getEventsForDay(currentDate) : [];
+                  return (
+                    <div key={hour} className="contents">
+                      <div className="h-14 flex items-start justify-end pr-2 pt-0.5 text-[10px] text-gray-400 font-medium border-t border-gray-50">
+                        {`${hour.toString().padStart(2, '0')}:00`}
+                      </div>
+                      <div className={`h-14 border-l border-t border-gray-50 relative ${isToday(currentDate) ? 'bg-blue-50/30' : ''}`}>
+                        {hour === hours[0] && isToday(currentDate) && (
+                          <div className="absolute left-0 right-0 z-30 pointer-events-none" style={{ top: `${getNowLineTop()}px` }}>
+                            <div className="flex items-center">
+                              <div className="w-2 h-2 bg-red-500 rounded-full -ml-1" />
+                              <div className="flex-1 h-[2px] bg-red-500" />
+                            </div>
+                          </div>
+                        )}
+                        {hour === hours[0] && events.map((ev, evIdx) => {
+                          const { top, height } = getEventPosition(ev);
+                          const color = getTeamColor(ev.ownerEmail);
+                          return (
+                            <div
+                              key={ev.id || evIdx}
+                              className={`absolute left-0.5 right-0.5 ${color} bg-opacity-90 text-white rounded px-1 py-0.5 text-[10px] leading-tight overflow-hidden cursor-default z-10 hover:z-20 hover:shadow-md transition-shadow`}
+                              style={{ top: `${top}px`, height: `${Math.max(height, 18)}px` }}
+                              title={`${ev.subject}\n${new Date(ev.start).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} - ${new Date(ev.end).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}\n${ev.location || ''}`}
+                            >
+                              <span className="font-medium truncate block">{ev.subject}</span>
+                              {height > 25 && (
+                                <span className="truncate block opacity-80">
+                                  {new Date(ev.start).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            /* Tablet/Desktop: Week Grid */
+            <>
+              {/* Day Headers */}
+              <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-gray-100">
+                <div className="p-2" />
+                {days.map((d, i) => (
+                  <div key={i} className={`p-2 text-center border-l border-gray-100 ${isToday(d) ? 'bg-blue-50' : ''}`}>
+                    <p className="text-[10px] font-medium text-gray-400 uppercase">
+                      {d.toLocaleDateString('de-DE', { weekday: 'short' })}
+                    </p>
+                    <p className={`text-sm font-bold ${isToday(d) ? 'text-blue-600' : 'text-gray-900'}`}>
+                      {d.getDate()}
+                    </p>
+                  </div>
+                ))}
+              </div>
 
-          {/* Time Grid */}
-          <div className="grid grid-cols-[60px_repeat(7,1fr)] max-h-[700px] overflow-y-auto relative" ref={(el) => {
+              {/* Time Grid */}
+              <div className="grid grid-cols-[60px_repeat(7,1fr)] max-h-[500px] md:max-h-[700px] overflow-y-auto relative" ref={(el) => {
             // Auto-scroll to ~07:00 on mount
             if (el && !el.dataset.scrolled) {
               el.scrollTop = 7 * 56;
@@ -344,6 +414,8 @@ export default function AdminCalendarPage() {
               </div>
             ))}
           </div>
+            </>
+          )}
         </div>
       )}
 

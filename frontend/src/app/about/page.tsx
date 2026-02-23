@@ -51,7 +51,7 @@ export default function UeberUnsPage() {
             transition: 'opacity 0.7s ease, transform 0.7s ease',
           }}
         >
-          <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold mb-6 leading-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold mb-6 leading-tight">
             {t.rich('title', { bold: (chunks) => <><br /><span className="text-gray-400">{chunks}</span></> })}
           </h1>
           <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto leading-relaxed">
@@ -137,7 +137,7 @@ export default function UeberUnsPage() {
               }}
             >
               <div className="flex items-center gap-5 mb-6">
-                <div className="w-20 h-20 rounded-2xl bg-gray-900 text-white flex items-center justify-center font-bold text-2xl flex-shrink-0">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gray-900 text-white flex items-center justify-center font-bold text-2xl flex-shrink-0">
                   JL
                 </div>
                 <div>
@@ -167,7 +167,7 @@ export default function UeberUnsPage() {
               }}
             >
               <div className="flex items-center gap-5 mb-6">
-                <div className="w-20 h-20 rounded-2xl bg-gray-900 text-white flex items-center justify-center font-bold text-2xl flex-shrink-0">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gray-900 text-white flex items-center justify-center font-bold text-2xl flex-shrink-0">
                   DK
                 </div>
                 <div>

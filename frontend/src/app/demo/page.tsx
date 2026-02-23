@@ -477,7 +477,7 @@ export default function DemoPage() {
                 </div>
 
                 {/* Time slots */}
-                <div className="p-6 sm:p-8 min-w-[200px]">
+                <div className="p-6 sm:p-8 min-w-0 w-full lg:min-w-[200px]">
                   {selectedDate ? (
                     <>
                       <p className="text-sm font-semibold text-gray-700 mb-1">

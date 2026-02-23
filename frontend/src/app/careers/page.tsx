@@ -164,7 +164,7 @@ export default function KarrierePage() {
             transition: 'opacity 0.7s ease, transform 0.7s ease',
           }}
         >
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-4 sm:mb-6">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 mb-4 sm:mb-6">
             Karriere bei Immivo
           </h1>
           <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto px-4">
@@ -179,7 +179,7 @@ export default function KarrierePage() {
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900 text-center mb-8 sm:mb-12">
             Warum Immivo?
           </h2>
-          <div ref={benefitsRef.ref} className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
+          <div ref={benefitsRef.ref} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
             {BENEFITS.map((benefit, i) => (
               <div
                 key={i}
@@ -340,7 +340,7 @@ export default function KarrierePage() {
       {/* Application Modal */}
       {applyModalJob && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl max-w-[calc(100vw-2rem)] sm:max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
               <h3 className="text-lg font-bold text-gray-900 min-w-0 truncate pr-2">
                 Bewerbung: {applyModalJob.title}

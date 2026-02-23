@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { FileText, Plus, Search, Edit2, Trash2, Sparkles, Calendar, Eye, ImageIcon, ChevronDown, Pencil, Check } from 'lucide-react';
+import { FileText, Plus, Search, Edit2, Trash2, Sparkles, Calendar, Eye, ImageIcon, ChevronDown, Pencil, Check, Menu, X } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { getExposeTemplates, deleteExposeTemplate, createExposeTemplate, updateExposeTemplate, ExposeTemplate, API_ENDPOINTS, getProperties, Property, getImageUrl } from '@/lib/api';
 import { useGlobalState } from '@/context/GlobalStateContext';
@@ -40,6 +40,7 @@ export default function ExposesPage() {
   const t = useTranslations('exposes');
   const tCommon = useTranslations('common');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
@@ -572,9 +573,40 @@ export default function ExposesPage() {
 
   return (
     <div className="h-full flex flex-col relative">
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Mobile sidebar toggle */}
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="lg:hidden absolute top-4 left-4 z-20 p-2 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
+          aria-label="Menü öffnen"
+        >
+          <Menu className="w-5 h-5 text-gray-600" />
+        </button>
+
+        {/* Mobile backdrop */}
+        {sidebarOpen && (
+          <div
+            className="lg:hidden fixed inset-0 bg-black/40 z-20"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
         {/* Sidebar List */}
-        <div className="w-96 flex flex-col bg-white">
+        <div className={`w-96 flex flex-col bg-white shrink-0 transition-transform duration-300 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        } lg:translate-x-0 lg:relative fixed lg:static inset-y-0 left-0 z-30 lg:z-auto shadow-xl lg:shadow-none`}>
+          {/* Close button for mobile overlay */}
+          <div className="lg:hidden flex items-center justify-between p-4 border-b border-gray-100 shrink-0">
+            <span className="text-sm font-semibold text-gray-900">Vorlagen</span>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Schließen"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
           {/* Search */}
           <div className="p-4 flex gap-2">
             <div className="relative flex-1">
@@ -605,7 +637,7 @@ export default function ExposesPage() {
               filteredTemplates.map((template) => (
                 <button
                   key={template.id}
-                  onClick={() => setSelectedId(template.id)}
+                  onClick={() => { setSelectedId(template.id); setSidebarOpen(false); }}
                   className={`w-full text-left p-4 transition-colors flex flex-col gap-1 ${
                     selectedId === template.id 
                       ? 'bg-gray-100/80 rounded-r-lg' 

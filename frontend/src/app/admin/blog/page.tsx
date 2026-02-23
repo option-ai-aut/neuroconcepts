@@ -18,6 +18,8 @@ import {
   Trash2,
   Save,
   X,
+  ArrowLeft,
+  Menu,
 } from 'lucide-react';
 
 interface BlogPost {
@@ -89,6 +91,7 @@ export default function BlogEditorPage() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [listOpen, setListOpen] = useState(false);
 
   const editorRef = useRef<HTMLDivElement>(null);
   const slugManuallyEdited = useRef(false);
@@ -297,13 +300,47 @@ export default function BlogEditorPage() {
   };
 
   return (
-    <div className="h-full flex overflow-hidden bg-white dark:bg-gray-950">
-      {/* Blog List - Full Width */}
-      <div className={`flex flex-col shrink-0 transition-all duration-300 ${selectedId ? 'w-80 border-r border-gray-200 dark:border-gray-800' : 'flex-1'}`}>
+    <div className="h-full flex overflow-hidden bg-white dark:bg-gray-950 relative">
+      {/* Mobile: menu toggle when editor is shown */}
+      {selectedId && (
+        <button
+          onClick={() => setListOpen(true)}
+          className="lg:hidden fixed top-4 left-4 z-30 p-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          aria-label="Artikel-Liste öffnen"
+        >
+          <Menu className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+        </button>
+      )}
+
+      {/* Mobile backdrop for list overlay */}
+      {listOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/40 z-20"
+          onClick={() => setListOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Blog List - on mobile: overlay when listOpen & selectedId, full width when !selectedId */}
+      <div className={`flex flex-col shrink-0 transition-all duration-300 z-30 bg-white dark:bg-gray-950
+        ${selectedId ? 'w-80 border-r border-gray-200 dark:border-gray-800' : 'flex-1'}
+        ${selectedId ? `fixed lg:relative inset-y-0 left-0 ${listOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 max-w-[90vw] lg:max-w-none shadow-xl lg:shadow-none` : ''}
+      `}>
         <div className="p-4 flex items-center justify-between shrink-0">
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Blog</h1>
+          <div className="flex items-center gap-2">
+            {selectedId && (
+              <button
+                onClick={() => setListOpen(false)}
+                className="lg:hidden p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg -ml-1"
+                aria-label="Schließen"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Blog</h1>
+          </div>
           <button
-            onClick={handleNewPost}
+            onClick={() => { handleNewPost(); setListOpen(false); }}
             className="flex items-center gap-2 px-3 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 text-sm font-medium transition-colors"
           >
             <Plus className="w-4 h-4" />
@@ -326,7 +363,7 @@ export default function BlogEditorPage() {
               {posts.map((post) => (
                 <button
                   key={post.id}
-                  onClick={() => handleSelectPost(post.id)}
+                  onClick={() => { handleSelectPost(post.id); setListOpen(false); }}
                   className={`w-full text-left px-4 py-3 transition-colors ${
                     selectedId === post.id
                       ? 'bg-gray-100 dark:bg-gray-800'
@@ -360,8 +397,17 @@ export default function BlogEditorPage() {
       <div className="fixed inset-y-0 right-0 z-40 flex">
         <div className="w-screen max-w-2xl bg-white dark:bg-gray-950 shadow-2xl border-l border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 dark:border-gray-800 shrink-0">
-            <h3 className="font-semibold text-gray-900 dark:text-white text-sm">{isNew ? 'Neuer Artikel' : 'Artikel bearbeiten'}</h3>
-            <button onClick={() => setSelectedId(null)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSelectedId(null)}
+                className="lg:hidden p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg -ml-1"
+                aria-label="Zurück zur Liste"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <h3 className="font-semibold text-gray-900 dark:text-white text-sm">{isNew ? 'Neuer Artikel' : 'Artikel bearbeiten'}</h3>
+            </div>
+            <button onClick={() => setSelectedId(null)} className="hidden lg:block p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
               <X className="w-5 h-5" />
             </button>
           </div>

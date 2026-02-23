@@ -975,7 +975,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               }`}
             >
               {property.images && property.images.length > 0 ? (
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {property.images.map((img, idx) => (
                     <div key={idx} className="relative group aspect-square">
                       <img 
@@ -1045,7 +1045,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               }`}
             >
               {property.floorplans && property.floorplans.length > 0 ? (
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {property.floorplans.map((fp, idx) => (
                     <div key={idx} className="relative group aspect-square">
                       <img 

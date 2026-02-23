@@ -97,7 +97,7 @@ export default function OperationsPage() {
           <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
         </div>
       ) : health ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {Object.entries(health.services).map(([key, service]) => {
             const config = STATUS_CONFIG[service.status] || STATUS_CONFIG.info;
             const Icon = config.icon;

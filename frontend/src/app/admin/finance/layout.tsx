@@ -15,7 +15,7 @@ export default function FinanceLayout({ children }: { children: React.ReactNode 
   return (
     <div className="flex flex-col h-full">
       <div className="px-6 pt-6 pb-0">
-      <div className="flex gap-1 mb-0 bg-gray-100 rounded-lg p-1 w-fit">
+      <div className="flex gap-1 mb-0 bg-gray-100 rounded-lg p-1 w-fit overflow-x-auto">
         {tabs.map(tab => {
           const isActive = tab.href === '/admin/finance' 
             ? pathname === '/admin/finance' 

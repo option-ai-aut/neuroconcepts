@@ -16,6 +16,7 @@ import {
   Image as ImageIcon,
   Wand2,
   Save,
+  Menu,
 } from 'lucide-react';
 import useSWR from 'swr';
 import { useTranslations } from 'next-intl';
@@ -164,6 +165,7 @@ export default function ImageStudioPage() {
   const [elapsed, setElapsed] = useState(0);
   const [showSaveDropdown, setShowSaveDropdown] = useState(false);
   const [savedToProperty, setSavedToProperty] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const saveDropdownRef = useRef<HTMLDivElement>(null);
@@ -387,9 +389,40 @@ export default function ImageStudioPage() {
 
   // ── Unified Layout: Settings left, Image right ──
   return (
-    <div className="h-full flex bg-white">
+    <div className="h-full flex bg-white relative">
+      {/* Mobile sidebar toggle */}
+      <button
+        onClick={() => setSidebarOpen(true)}
+        className="lg:hidden absolute top-4 left-4 z-20 p-2 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
+        aria-label="Einstellungen öffnen"
+      >
+        <Menu className="w-5 h-5 text-gray-600" />
+      </button>
+
+      {/* Mobile backdrop */}
+      {sidebarOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/40 z-30"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* ── Left Sidebar: Settings ── */}
-      <div className="w-72 2xl:w-80 shrink-0 border-r border-gray-100 flex flex-col h-full overflow-y-auto">
+      <div className={`w-72 2xl:w-80 shrink-0 border-r border-gray-100 flex flex-col h-full overflow-y-auto bg-white transition-transform duration-300 z-40 ${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      } lg:translate-x-0 fixed lg:static inset-y-0 left-0 shadow-xl lg:shadow-none`}>
+        {/* Close button for mobile */}
+        <div className="lg:hidden flex items-center justify-between p-4 border-b border-gray-100 shrink-0">
+          <span className="text-sm font-semibold text-gray-900">Einstellungen</span>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label="Schließen"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
         <div className="p-4 2xl:p-5 space-y-5 flex-1">
           {/* Image Source */}
           <div>

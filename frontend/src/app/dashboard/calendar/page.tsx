@@ -374,7 +374,7 @@ export default function CalendarPage() {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 1024);
+    const check = () => setIsMobile(window.innerWidth < 768);
     check();
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
@@ -541,7 +541,7 @@ export default function CalendarPage() {
         </div>
         
         {/* View Switcher */}
-        <div className="flex gap-0.5 lg:gap-1 bg-gray-100 rounded-lg p-0.5 lg:p-1">
+        <div className="flex gap-1 sm:gap-1.5 lg:gap-1 bg-gray-100 rounded-lg p-1 lg:p-1">
           <button 
             onClick={() => setView('day')}
             className={`px-2 lg:px-3 py-1 lg:py-1.5 text-[10px] lg:text-xs font-medium rounded-md transition-colors ${view === 'day' ? 'text-gray-900 bg-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
@@ -550,7 +550,7 @@ export default function CalendarPage() {
           </button>
           <button 
             onClick={() => setView('week')}
-            className={`hidden lg:block px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${view === 'week' ? 'text-gray-900 bg-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+            className={`hidden md:block px-2 lg:px-3 py-1 lg:py-1.5 text-[10px] lg:text-xs font-medium rounded-md transition-colors ${view === 'week' ? 'text-gray-900 bg-white shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
           >
             {t('views.week')}
           </button>
@@ -765,7 +765,7 @@ export default function CalendarPage() {
             <div className="grid grid-cols-7 gap-0.5 lg:gap-2">
               {getMonthDays().map((day, i) => {
                 if (!day) {
-                  return <div key={`empty-${i}`} className="min-h-[48px] lg:min-h-[120px]"></div>;
+                  return <div key={`empty-${i}`} className="min-h-12 lg:min-h-[120px]"></div>;
                 }
                 
                 const dayEvents = getEventsForDay(day);
@@ -775,7 +775,7 @@ export default function CalendarPage() {
                 return (
                   <div 
                     key={day.toISOString()} 
-                    className={`min-h-[48px] lg:min-h-[120px] border border-gray-100 rounded lg:rounded-lg p-1 lg:p-2 ${isCurrentMonth ? 'bg-white' : 'bg-gray-50'}`}
+                    className={`min-h-12 lg:min-h-[120px] border border-gray-100 rounded lg:rounded-lg p-1.5 lg:p-2 ${isCurrentMonth ? 'bg-white' : 'bg-gray-50'}`}
                     onClick={() => {
                       if (dayEvents.length > 0 && window.innerWidth < 1024) {
                         setCurrentDate(day);

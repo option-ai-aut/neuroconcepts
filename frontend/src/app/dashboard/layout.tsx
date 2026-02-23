@@ -27,6 +27,9 @@ const MOBILE_ALLOWED_PREFIXES = [
   '/dashboard/crm',
   '/dashboard/calendar',
   '/dashboard/assistant',
+  '/dashboard/settings',
+  '/dashboard/exposes',
+  '/dashboard/image-studio',
 ];
 
 function isMobileAllowedRoute(pathname: string): boolean {
@@ -169,7 +172,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         {/* Top Header Bar */}
         <PageHeader />
         {/* Scrollable Content - extra bottom padding on mobile for nav bar */}
-        <main className={`flex-1 overflow-y-auto bg-white dark:bg-[#111111] overflow-x-hidden pb-16 lg:pb-0 transition-colors ${mobileMivoOpen ? 'overflow-hidden' : ''}`} style={{ overscrollBehavior: 'none' }}>
+        <main className={`flex-1 overflow-y-auto bg-white dark:bg-[#111111] overflow-x-hidden pb-16 lg:pb-0 transition-colors main-content-area ${mobileMivoOpen ? 'overflow-hidden' : ''}`} style={{ overscrollBehavior: 'none' }}>
           <MobileRouteGuard pathname={pathname}>
             {children}
           </MobileRouteGuard>

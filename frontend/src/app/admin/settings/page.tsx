@@ -43,25 +43,25 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-48px)]">
-      {/* Settings Nav */}
-      <div className="w-56 bg-white border-r border-gray-200 flex flex-col shrink-0">
-        <div className="px-4 py-3 border-b border-gray-100">
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-48px)]">
+      {/* Settings Nav - horizontal tabs on mobile, sidebar on lg */}
+      <div className="lg:w-56 bg-white border-b lg:border-b-0 lg:border-r border-gray-200 flex flex-col shrink-0">
+        <div className="hidden lg:block px-4 py-3 border-b border-gray-100">
           <h2 className="text-sm font-semibold text-gray-900">Einstellungen</h2>
           <p className="text-[10px] text-gray-400 mt-0.5">
             {settings?.environment === 'production' ? 'Production' : 'Development'}
           </p>
         </div>
-        <div className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
+        <div className="flex lg:flex-col overflow-x-auto lg:overflow-y-auto overflow-y-hidden py-2 px-2 lg:py-2 gap-1 lg:gap-0 lg:space-y-0.5">
           {SECTIONS.map((section) => (
             <button
               key={section.id}
               onClick={() => setActiveSection(section.id)}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors shrink-0 whitespace-nowrap ${
                 activeSection === section.id ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
-              <section.icon className={`w-4 h-4 ${activeSection === section.id ? 'text-blue-600' : 'text-gray-400'}`} />
+              <section.icon className={`w-4 h-4 shrink-0 ${activeSection === section.id ? 'text-blue-600' : 'text-gray-400'}`} />
               <span className="text-xs font-medium">{section.label}</span>
             </button>
           ))}

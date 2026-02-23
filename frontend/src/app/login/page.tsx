@@ -398,9 +398,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-white">
+    <div className="min-h-screen flex flex-col md:flex-row bg-white">
       {/* Left Side - Image/Brand */}
-      <div className="hidden lg:flex lg:w-1/2 sticky top-0 h-screen bg-black overflow-hidden">
+      <div className="hidden md:flex md:w-1/2 sticky top-0 h-screen bg-black overflow-hidden">
         <div className="absolute inset-0 bg-black z-10" />
         
         <style jsx>{`
@@ -626,7 +626,7 @@ export default function LoginPage() {
                     <select
                       value={dialCode}
                       onChange={(e) => setDialCode(e.target.value)}
-                      className="w-[76px] pl-3 pr-0 py-3 border border-gray-200 border-r-0 rounded-l-xl bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2210%22%20height%3D%226%22%20viewBox%3D%220%200%2010%206%22%3E%3Cpath%20d%3D%22M0%200l5%206%205-6z%22%20fill%3D%22%239ca3af%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_6px_center] bg-[length:10px_6px]"
+                      className="w-20 pl-3 pr-0 py-3 border border-gray-200 border-r-0 rounded-l-xl bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2210%22%20height%3D%226%22%20viewBox%3D%220%200%2010%206%22%3E%3Cpath%20d%3D%22M0%200l5%206%205-6z%22%20fill%3D%22%239ca3af%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_6px_center] bg-[length:10px_6px]"
                     >
                       {countries.map((c) => (
                         <option key={c.code} value={c.dialCode}>

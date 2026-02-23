@@ -137,7 +137,8 @@ export default function SalesPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Tenant</th>
@@ -207,7 +208,8 @@ export default function SalesPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       )}
 
@@ -216,7 +218,7 @@ export default function SalesPage() {
         <div className="fixed inset-0 z-50 flex justify-end" onClick={() => { setSelectedTenant(null); setLoadingDetail(false); }}>
           <div className="absolute inset-0 bg-black/30" />
           <div
-            className="relative bg-white w-full max-w-lg shadow-2xl overflow-y-auto animate-in slide-in-from-right"
+            className="relative bg-white max-w-lg w-full shadow-2xl overflow-y-auto animate-in slide-in-from-right"
             onClick={e => e.stopPropagation()}
           >
             {loadingDetail ? (
@@ -238,7 +240,7 @@ export default function SalesPage() {
 
                 {/* Stats */}
                 <div className="px-6 py-5">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="bg-gray-50 rounded-xl p-4">
                       <div className="flex items-center gap-2 text-gray-400 mb-1">
                         <Users className="w-4 h-4" />

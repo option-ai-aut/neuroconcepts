@@ -1124,6 +1124,25 @@ Date: {{date.today}}, {{date.year}}`,
       },
       required: ["templateId"]
     }
+  },
+  get_email_signature: {
+    name: "get_email_signature",
+    description: "Reads the current email signature and signature name of the user from settings.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {}
+    }
+  },
+  update_email_signature: {
+    name: "update_email_signature",
+    description: "Updates the user's email signature and/or signature name in the email settings. The signature supports HTML formatting. After calling this tool the settings page will auto-reload.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        emailSignature: { type: SchemaType.STRING, description: "The HTML email signature content" } as FunctionDeclarationSchema,
+        emailSignatureName: { type: SchemaType.STRING, description: "Optional name/label for the signature (e.g. 'Geschäftlich')" } as FunctionDeclarationSchema,
+      }
+    }
   }
 };
 
@@ -3689,6 +3708,40 @@ export class AiToolExecutor {
         });
 
         return { success: true, updated: Object.keys(updateData) };
+      }
+
+      case 'get_email_signature': {
+        if (!userId) throw new Error('User ID required');
+        const settings = await getPrisma().userSettings.findUnique({
+          where: { userId }
+        });
+        return {
+          emailSignature: (settings as any)?.emailSignature || null,
+          emailSignatureName: (settings as any)?.emailSignatureName || null,
+        };
+      }
+
+      case 'update_email_signature': {
+        if (!userId) throw new Error('User ID required');
+        const { emailSignature, emailSignatureName } = args;
+        if (emailSignature === undefined && emailSignatureName === undefined) {
+          throw new Error('At least one of emailSignature or emailSignatureName must be provided');
+        }
+        const updateData: any = {};
+        if (emailSignature !== undefined) updateData.emailSignature = emailSignature;
+        if (emailSignatureName !== undefined) updateData.emailSignatureName = emailSignatureName;
+
+        await getPrisma().userSettings.upsert({
+          where: { userId },
+          update: updateData,
+          create: { userId, ...updateData },
+        });
+
+        return {
+          success: true,
+          updated: Object.keys(updateData),
+          message: 'E-Mail Signatur wurde erfolgreich gespeichert.',
+        };
       }
 
       default:

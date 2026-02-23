@@ -215,6 +215,20 @@ export default function LandingPage() {
     return () => window.removeEventListener('resize', check);
   }, []);
 
+  /* ── Mobile "Stress Less" in-view detection ── */
+  const mobileStressRef = useRef<HTMLHeadingElement>(null);
+  const [mobileStressVisible, setMobileStressVisible] = useState(false);
+  useEffect(() => {
+    if (!isMobile) return;
+    const el = mobileStressRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) { setMobileStressVisible(true); io.disconnect(); }
+    }, { threshold: 0.3 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [isMobile]);
+
   /* ── Scroll Controller ── */
   const [activeIdx, setActiveIdx] = useState(0);
   const activeIdxRef = useRef(0);
@@ -686,7 +700,7 @@ export default function LandingPage() {
                     <span className="block text-sm sm:text-xl lg:text-2xl text-gray-400 uppercase tracking-[0.2em] mb-3 sm:mb-4">
                 {t('hero.title1')}
               </span>
-                    <span className="block text-[2.5rem] sm:text-7xl lg:text-[6.5rem] bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
+                    <span className="block text-[2rem] sm:text-[2.5rem] md:text-7xl lg:text-[6.5rem] bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
                 {t('hero.title2')}
               </span>
             </h1>
@@ -1162,18 +1176,27 @@ export default function LandingPage() {
           <Slide idx={9} active={activeIdx === 9} className="bg-white">
             {isMobile ? (
               /* Mobile: natural flow — no height constraint, no overflow clipping */
-              <div className="flex flex-col" style={{ paddingTop: '5rem', paddingBottom: '10px' }}>
-                {/* Stress Less text */}
-                <div className="flex items-center justify-center pointer-events-none py-10">
+              <div className="flex flex-col" style={{ paddingTop: '3rem', paddingBottom: '10px' }}>
+                {/* Stress Less text — same gradient fade + animation as desktop */}
+                <div className="flex items-center justify-center pointer-events-none py-8">
                   <h2
-                    className="text-[22vw] font-bold tracking-tighter leading-[0.85] text-center select-none"
-                    style={{ color: '#cacaca' }}
+                    ref={mobileStressRef}
+                    className="text-[20vw] font-bold tracking-tighter leading-[0.85] text-center select-none"
+                    style={{
+                      backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.07) 60%, transparent 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundClip: 'text',
+                      opacity: mobileStressVisible ? 1 : 0,
+                      transform: mobileStressVisible ? 'translateY(0)' : 'translateY(60px)',
+                      transition: 'opacity 1.8s cubic-bezier(0.16, 1, 0.3, 1), transform 2s cubic-bezier(0.16, 1, 0.3, 1)',
+                    }}
                   >
                     Stress Less
                   </h2>
-          </div>
+                </div>
                 {/* Footer */}
-                <div className="mx-auto w-full" style={{ maxWidth: 'calc(100vw - 20px)' }}>
+                <div className="mx-[10px]">
                   <PublicFooter bare />
                 </div>
               </div>
@@ -1206,9 +1229,9 @@ export default function LandingPage() {
                     transitionDelay: '300ms',
                   }}
                 >
-                  <div className="overflow-hidden mx-auto mb-[10px]" style={{ maxWidth: 'calc(100vw - 20px)' }}>
+                  <div className="overflow-hidden mx-[10px] mb-[10px]">
                     <PublicFooter bare />
-          </div>
+                  </div>
                 </div>
             </div>
             )}

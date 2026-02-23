@@ -541,7 +541,7 @@ export default function DashboardPage() {
   // ── Shared blocks ──────────────────────────────────────────────────────────
 
   const statsRow = (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
       <Link href="/dashboard/crm/leads" className="bg-gray-50 rounded-xl p-3 active:bg-gray-100 transition-colors text-center">
         <div className="text-xl font-bold text-gray-900">{stats.leads.total - stats.leads.byStatus.LOST - stats.leads.byStatus.BOOKED}</div>
         <div className="text-[10px] text-gray-500 mt-0.5 leading-tight">Aktive<br/>Leads</div>

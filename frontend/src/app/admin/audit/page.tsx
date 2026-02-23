@@ -65,7 +65,8 @@ export default function AuditPage() {
       ) : data ? (
         <>
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full">
+            <div className="overflow-x-auto">
+              <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="text-left px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Zeitpunkt</th>
@@ -109,14 +110,15 @@ export default function AuditPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
 
           {/* Detail Panel */}
           {selectedLog && (
             <div className="mt-4 bg-white rounded-xl border border-gray-200 p-4">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">Log Detail</h3>
-              <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
                   <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">User</p>
                   <p className="text-xs text-gray-700">{selectedLog.userEmail}</p>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
-  MessageSquare, Plus, Hash, Send, Loader2, X, Trash2, Pencil, Check, Users
+  MessageSquare, Plus, Hash, Send, Loader2, X, Trash2, Pencil, Check, Users, Menu
 } from 'lucide-react';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { getRuntimeConfig } from '@/components/EnvProvider';
@@ -57,6 +57,7 @@ export default function AdminChatPage() {
   const [creatingChannel, setCreatingChannel] = useState(false);
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
   const [editChannelName, setEditChannelName] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -177,18 +178,41 @@ export default function AdminChatPage() {
   };
 
   return (
-    <div className="h-full flex overflow-hidden bg-white">
+    <div className="h-full flex overflow-hidden bg-white relative">
+
+      {/* Mobile backdrop */}
+      {sidebarOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/40 z-30"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Channels Sidebar */}
-      <div className="w-56 flex flex-col border-r border-gray-200 shrink-0 bg-gray-50">
+      <div className={`w-56 flex flex-col border-r border-gray-200 shrink-0 bg-gray-50 transition-transform duration-300 z-40
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        lg:translate-x-0
+        fixed lg:static inset-y-0 left-0 shadow-xl lg:shadow-none
+      `}>
         <div className="p-3 flex items-center justify-between shrink-0 border-b border-gray-200">
           <h2 className="text-sm font-semibold text-gray-900">Channels</h2>
-          <button
-            onClick={() => setShowCreateChannel(true)}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded transition-colors"
+              aria-label="Schließen"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setShowCreateChannel(true)}
             className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded transition-colors"
             title="Neuer Channel"
           >
             <Plus className="w-4 h-4" />
           </button>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto py-1">
           {loading ? (
@@ -208,7 +232,7 @@ export default function AdminChatPage() {
                     ? 'bg-white shadow-sm text-gray-900'
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
-                onClick={() => setSelectedChannel(ch)}
+                onClick={() => { setSelectedChannel(ch); setSidebarOpen(false); }}
               >
                 <Hash className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                 <span className="flex-1 text-sm font-medium truncate">{ch.name}</span>
@@ -238,6 +262,13 @@ export default function AdminChatPage() {
           <>
             {/* Channel Header */}
             <div className="h-12 flex items-center gap-2 px-4 border-b border-gray-200 shrink-0">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-1.5 -ml-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                aria-label="Channels öffnen"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
               <Hash className="w-4 h-4 text-gray-400" />
               <span className="font-semibold text-sm text-gray-900">{selectedChannel.name}</span>
             </div>
@@ -297,6 +328,13 @@ export default function AdminChatPage() {
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden absolute top-3 left-3 z-20 p-2 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
+              aria-label="Channels öffnen"
+            >
+              <Menu className="w-5 h-5 text-gray-600" />
+            </button>
             <MessageSquare className="w-12 h-12 text-gray-300 mb-3" />
             <h3 className="text-base font-semibold text-gray-900 mb-1">Team Chat</h3>
             <p className="text-sm text-gray-500 max-w-xs">

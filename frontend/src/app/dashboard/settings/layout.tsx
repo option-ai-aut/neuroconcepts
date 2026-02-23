@@ -27,7 +27,7 @@ export default function SettingsLayout({
 
   return (
     <div className="h-full flex flex-col bg-white">
-      <div className="px-8 pt-2 pb-0 relative z-10 bg-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)]">
+      <div className="px-4 sm:px-6 lg:px-8 pt-2 pb-0 relative z-10 bg-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] overflow-x-auto">
         <nav className="-mb-px flex space-x-8" aria-label="Tabs">
           {visibleTabs.map((tab) => (
             <Link

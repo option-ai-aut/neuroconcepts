@@ -343,8 +343,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
         {/* Lead Pipeline */}
         {formData.status !== 'LOST' && (
-          <div className="mt-8 pt-6 border-t border-gray-100">
-            <div className="flex items-end gap-0">
+          <div className="mt-8 pt-6 border-t border-gray-100 overflow-x-auto">
+            <div className="flex items-end gap-0 flex-nowrap min-w-max">
               {LEAD_STAGES.map((stage, index) => {
                 const currentIndex = getCurrentStageIndex();
                 const isActive = index === currentIndex;
@@ -466,7 +466,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Kontaktdaten</h2>
             
-            <div className="grid grid-cols-5 gap-6 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-500 mb-2">Anrede</label>
                 <select

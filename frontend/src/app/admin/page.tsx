@@ -93,7 +93,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map((stat) => (
           <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-3">
@@ -108,7 +108,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Secondary Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Exposés', value: stats?.exposes ?? 0, icon: FileImage },
           { label: 'E-Mails', value: stats?.emails ?? 0, icon: Mail },
@@ -138,7 +138,7 @@ export default function AdminDashboard() {
               href={action.href}
               className="flex flex-col items-center gap-1.5 p-3 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all group"
             >
-              <action.icon className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
+              <action.icon className="w-6 h-6 sm:w-5 sm:h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
               <span className="text-[11px] font-medium text-gray-600 group-hover:text-gray-900 text-center leading-tight">{action.label}</span>
             </Link>
           ))}

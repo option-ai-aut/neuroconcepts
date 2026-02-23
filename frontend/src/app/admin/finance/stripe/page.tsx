@@ -200,7 +200,8 @@ export default function StripeFinancePage() {
           {customers.length === 0 ? (
             <div className="p-8 text-center text-gray-400 text-sm">Keine Kunden</div>
           ) : (
-            <table className="w-full">
+            <div className="overflow-x-auto">
+              <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase">E-Mail</th>
@@ -217,7 +218,8 @@ export default function StripeFinancePage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           )}
         </div>
       )}
@@ -231,7 +233,8 @@ export default function StripeFinancePage() {
           {subscriptions.length === 0 ? (
             <div className="p-8 text-center text-gray-400 text-sm">Keine aktiven Abos</div>
           ) : (
-            <table className="w-full">
+            <div className="overflow-x-auto">
+              <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase">Kunde</th>
@@ -256,7 +259,8 @@ export default function StripeFinancePage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           )}
         </div>
       )}
@@ -270,7 +274,8 @@ export default function StripeFinancePage() {
           {invoices.length === 0 ? (
             <div className="p-8 text-center text-gray-400 text-sm">Keine Rechnungen</div>
           ) : (
-            <table className="w-full">
+            <div className="overflow-x-auto">
+              <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase">Nummer</th>
@@ -298,7 +303,8 @@ export default function StripeFinancePage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           )}
         </div>
       )}
@@ -313,7 +319,8 @@ export default function StripeFinancePage() {
             {products.products.length === 0 ? (
               <div className="p-8 text-center text-gray-400 text-sm">Keine Produkte</div>
             ) : (
-              <table className="w-full">
+              <div className="overflow-x-auto">
+                <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase">Name</th>
@@ -328,7 +335,8 @@ export default function StripeFinancePage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             )}
           </div>
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -342,7 +350,8 @@ export default function StripeFinancePage() {
               </pre>
             </div>
             {products.prices.length > 0 && (
-              <table className="w-full">
+              <div className="overflow-x-auto">
+                <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase">Produkt</th>
@@ -361,7 +370,8 @@ export default function StripeFinancePage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             )}
           </div>
         </div>

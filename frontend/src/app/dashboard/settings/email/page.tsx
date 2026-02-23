@@ -6,9 +6,11 @@ import { fetchWithAuth } from '@/lib/api';
 import { useEnv } from '@/components/EnvProvider';
 import { Save, Eye, Code, Loader2, Sparkles, User, Mail, Phone, Building2, Globe, AlertCircle } from 'lucide-react';
 import useSWR from 'swr';
+import { useGlobalState } from '@/context/GlobalStateContext';
 
 export default function EmailSettingsPage() {
   const { apiUrl } = useEnv();
+  const { aiActionPerformed } = useGlobalState();
   const [signature, setSignature] = useState('');
   const [signatureName, setSignatureName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -35,6 +37,13 @@ export default function EmailSettingsPage() {
       setSignatureName(settings.emailSignatureName || '');
     }
   }, [settings]);
+
+  // Reload when Mivo performs an action (e.g. update_email_signature)
+  useEffect(() => {
+    if (aiActionPerformed) {
+      mutate();
+    }
+  }, [aiActionPerformed, mutate]);
 
   const handleSave = async () => {
     if (!apiUrl) return;

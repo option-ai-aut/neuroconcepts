@@ -115,7 +115,7 @@ export default function LeadsPage() {
         </button>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 border-b border-gray-200">
           <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>

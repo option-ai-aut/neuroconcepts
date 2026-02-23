@@ -368,6 +368,14 @@ html:has(.app-shell) body {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* Landscape phone: compact vertical spacing */
+@media (orientation: landscape) and (max-height: 500px) {
+  .landscape-compact-py { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+  .landscape-compact-gap { gap: 0.5rem; }
+  .mobile-bottom-nav { height: 2.75rem; }
+  .main-content-area { padding-bottom: 2.75rem; }
+}
+
 /* Prevent overscroll bounce on mobile — applied globally via body above */
 /* Scrollable content areas should use overscroll-behavior: contain */
 

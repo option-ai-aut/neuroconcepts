@@ -13,7 +13,7 @@ export default function PublicFooter({ bare = false }: { bare?: boolean }) {
   const footer = (
     <footer className="bg-[#111111] text-white py-8 md:py-16 rounded-2xl sm:rounded-3xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 md:gap-12 mb-8 md:mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 md:gap-12 mb-8 md:mb-12">
           <div className="col-span-2">
             <Link href="/" prefetch={false} className="inline-block mb-4 md:mb-6">
               <Image src="/logo-white.png" alt="Immivo" width={160} height={160} className="w-28 sm:w-36 h-auto" />
@@ -88,7 +88,7 @@ export default function PublicFooter({ bare = false }: { bare?: boolean }) {
   if (bare) return footer;
 
   return (
-    <div className="mx-auto mb-[10px]" style={{ maxWidth: 'calc(100vw - 20px)' }}>
+    <div className="mx-[10px] mb-[10px]">
       {footer}
     </div>
   );

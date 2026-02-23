@@ -197,7 +197,7 @@ export default function PreisePage() {
             transition: 'opacity 0.6s ease, transform 0.6s ease',
           }}
         >
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-4 sm:mb-6">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 mb-4 sm:mb-6">
             {t('title')}
           </h1>
           <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto mb-6">
@@ -247,7 +247,7 @@ export default function PreisePage() {
       {/* Pricing Cards */}
       <section className="py-8 sm:py-16">
         <div ref={cardsRef.ref} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
             {plans.map((plan, i) => (
               <div
                 key={plan.id}
