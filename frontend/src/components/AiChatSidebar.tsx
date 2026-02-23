@@ -244,6 +244,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   
   const abortControllerRef = useRef<AbortController | null>(null);
+  const isSubmittingRef = useRef(false); // atomic guard — no stale-closure issue unlike React state
   const lastSentMessageRef = useRef<string>('');
   const [removingMsgId, setRemovingMsgId] = useState<string | null>(null);
 
@@ -555,7 +556,9 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     e.preventDefault();
     if (!aiChatDraft.trim() && uploadedFiles.length === 0) return;
 
-    if (isStreaming || isLoading) return;
+    // Use a ref-based guard to prevent double-submission (avoids stale-closure issue with React state)
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
     const attachments = uploadedFiles.map(f => ({ name: f.name, type: f.type }));
     const userMsg: Message = { 
@@ -616,6 +619,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         if (data.actionsPerformed && data.actionsPerformed.length > 0) {
           triggerExposeRefresh();
         }
+        isSubmittingRef.current = false;
         setIsLoading(false);
         lastSentMessageRef.current = '';
       } else {
@@ -748,6 +752,8 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
               const words = fullText.split(/(\s+)/);
               let typed = '';
               for (let i = 0; i < words.length; i++) {
+                // Stop animation immediately if aborted
+                if (abortController.signal.aborted) break;
                 typed += words[i];
                 if (i % 3 === 2 || i === words.length - 1) {
                   const t = typed;
@@ -764,22 +770,20 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           }
         } finally {
           if (streamTimeout) clearTimeout(streamTimeout);
-          // Only clean up if NOT aborted — handleStop already handles the aborted case
+          isSubmittingRef.current = false;
           if (!abortController.signal.aborted) {
             setIsStreaming(false);
             setMessages(prev => prev.map(m => m.status === 'streaming' ? { ...m, status: 'done' as const } : m));
           }
         }
 
-        if (hadFunctionCalls) {
+        if (!abortController.signal.aborted && hadFunctionCalls) {
           notifyAiAction();
         }
       }
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        // handleStop already cleaned up state — nothing to do here
-        return;
-      }
+      isSubmittingRef.current = false;
+      if (error.name === 'AbortError') return;
       console.error('Chat error:', error);
       const errMsg = error instanceof Error && error.message === 'Failed to fetch'
         ? 'Verbindung zum Server fehlgeschlagen. Bitte prüfe deine Internetverbindung und versuche es erneut.'
@@ -791,34 +795,26 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
   };
 
   const handleStop = () => {
+    // Signal abort first so the async loop stops ASAP
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    isSubmittingRef.current = false;
+    lastSentMessageRef.current = '';
     setIsLoading(false);
     setIsStreaming(false);
 
-    // Restore the sent message to the input field
-    if (lastSentMessageRef.current) {
-      setAiChatDraft(lastSentMessageRef.current);
-      lastSentMessageRef.current = '';
-    }
-
+    // Keep user message and partial response visible — just mark them as done/interrupted
     setMessages(prev => {
-      // Remove isAction + incomplete (thinking/streaming) assistant messages immediately
-      const cleaned = prev.filter(m =>
-        !m.isAction && !(m.role === 'ASSISTANT' && m.status !== 'done')
-      );
-      // Find the last USER message and animate it out
-      const lastUserMsg = [...cleaned].reverse().find(m => m.role === 'USER');
-      if (lastUserMsg) {
-        setRemovingMsgId(lastUserMsg.id);
-        setTimeout(() => {
-          setMessages(p => p.filter(m => m.id !== lastUserMsg.id));
-          setRemovingMsgId(null);
-        }, 320);
-      }
-      return cleaned;
+      return prev
+        .filter(m => !m.isAction)
+        .map(m => {
+          if (m.role === 'ASSISTANT' && (m.status === 'streaming' || m.status === 'thinking')) {
+            return { ...m, status: 'done' as const, content: m.content || '(Unterbrochen)' };
+          }
+          return m;
+        });
     });
   };
 
