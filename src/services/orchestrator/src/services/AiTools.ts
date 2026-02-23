@@ -850,6 +850,18 @@ export const CRM_TOOLS = {
       }
     }
   },
+  export_data: {
+    name: "export_data",
+    description: "Exports CRM data (leads, properties, or both) as a downloadable CSV or Excel file. Returns a download link the user can click. Use when the user asks to export, download, or save data as a file.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        type: { type: SchemaType.STRING, description: "What to export: 'leads', 'properties', or 'all' (both in one Excel file with two sheets)" } as FunctionDeclarationSchema,
+        format: { type: SchemaType.STRING, description: "File format: 'csv' (only for leads or properties separately) or 'xlsx' (Excel, supports 'all'). Default: 'xlsx'" } as FunctionDeclarationSchema,
+      },
+      required: ["type"]
+    }
+  },
 };
 
 // Exposé Tools for Mivo - Full palette of block types
@@ -3755,6 +3767,178 @@ export class AiToolExecutor {
           success: true,
           updated: Object.keys(updateData),
           message: 'E-Mail Signatur wurde erfolgreich gespeichert.',
+        };
+      }
+
+      case 'export_data': {
+        const exportType = (args.type || 'leads').toLowerCase() as 'leads' | 'properties' | 'all';
+        const exportFormat = (args.format || 'xlsx').toLowerCase() as 'csv' | 'xlsx';
+        const useXlsx = exportFormat === 'xlsx' || exportType === 'all';
+
+        const mediaBucket = process.env.MEDIA_BUCKET_NAME || '';
+        const cdnUrl = process.env.MEDIA_CDN_URL || '';
+        const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'eu-central-1';
+
+        // ---- Build lead rows ----
+        const buildLeadRows = async () => {
+          const leads = await getPrisma().lead.findMany({
+            where: { tenantId },
+            include: { assignedTo: { select: { firstName: true, lastName: true, email: true } } },
+            orderBy: { createdAt: 'desc' },
+          });
+          return leads.map(l => ({
+            'ID': l.id,
+            'Status': l.status,
+            'Score': l.score ?? '',
+            'Anrede': l.salutation,
+            'Vorname': l.firstName ?? '',
+            'Nachname': l.lastName ?? '',
+            'E-Mail': l.email,
+            'Telefon': l.phone ?? '',
+            'Quelle': l.source,
+            'Quelle Details': l.sourceDetails ?? '',
+            'Budget Min (€)': l.budgetMin != null ? Number(l.budgetMin) : '',
+            'Budget Max (€)': l.budgetMax != null ? Number(l.budgetMax) : '',
+            'Immobilienart': l.preferredType ?? '',
+            'Wunschlage': l.preferredLocation ?? '',
+            'Mindest-Zimmer': l.minRooms ?? '',
+            'Mindest-Fläche (m²)': l.minArea ?? '',
+            'Zeitrahmen': l.timeFrame ?? '',
+            'Finanzierung': l.financingStatus,
+            'Eigenkapital': l.hasDownPayment ? 'Ja' : 'Nein',
+            'Zugewiesen an': l.assignedTo ? `${l.assignedTo.firstName || ''} ${l.assignedTo.lastName || ''}`.trim() || l.assignedTo.email : '',
+            'Notizen': l.notes ?? '',
+            'Erstellt am': l.createdAt.toISOString().slice(0, 10),
+            'Aktualisiert am': l.updatedAt.toISOString().slice(0, 10),
+          }));
+        };
+
+        // ---- Build property rows ----
+        const buildPropertyRows = async () => {
+          const props = await getPrisma().property.findMany({
+            where: { tenantId },
+            orderBy: { createdAt: 'desc' },
+          });
+          return props.map(p => ({
+            'ID': p.id,
+            'Status': p.status,
+            'Titel': p.title,
+            'Typ': p.propertyType,
+            'Vermarktungsart': p.marketingType,
+            'Straße': p.street ?? '',
+            'Hausnummer': p.houseNumber ?? '',
+            'PLZ': p.zipCode ?? '',
+            'Stadt': p.city ?? '',
+            'Bezirk': p.district ?? '',
+            'Bundesland': p.state ?? '',
+            'Land': p.country,
+            'Kaufpreis (€)': p.salePrice != null ? Number(p.salePrice) : '',
+            'Kaltmiete (€)': p.rentCold != null ? Number(p.rentCold) : '',
+            'Warmmiete (€)': p.rentWarm != null ? Number(p.rentWarm) : '',
+            'Nebenkosten (€)': p.additionalCosts != null ? Number(p.additionalCosts) : '',
+            'Kaution': p.deposit ?? '',
+            'Provision': p.commission ?? '',
+            'Wohnfläche (m²)': p.livingArea ?? '',
+            'Nutzfläche (m²)': p.usableArea ?? '',
+            'Grundstück (m²)': p.plotArea ?? '',
+            'Zimmer': p.rooms ?? '',
+            'Schlafzimmer': p.bedrooms ?? '',
+            'Badezimmer': p.bathrooms ?? '',
+            'Etage': p.floor ?? '',
+            'Baujahr': p.yearBuilt ?? '',
+            'Sanierungsjahr': p.yearRenovated ?? '',
+            'Zustand': p.condition ?? '',
+            'Heizung': p.heatingType ?? '',
+            'Energieklasse': p.energyEfficiencyClass ?? '',
+            'Energieverbrauch (kWh/m²a)': p.energyConsumption ?? '',
+            'Beschreibung': p.description ?? '',
+            'Erstellt am': p.createdAt.toISOString().slice(0, 10),
+            'Aktualisiert am': p.updatedAt.toISOString().slice(0, 10),
+          }));
+        };
+
+        // ---- Generate file buffer ----
+        let fileBuffer: Buffer;
+        let filename: string;
+        let contentType: string;
+
+        const timestamp = new Date().toISOString().slice(0, 10);
+
+        if (useXlsx) {
+          const XLSX = require('xlsx');
+          const wb = XLSX.utils.book_new();
+
+          if (exportType === 'leads' || exportType === 'all') {
+            const rows = await buildLeadRows();
+            const ws = XLSX.utils.json_to_sheet(rows);
+            XLSX.utils.book_append_sheet(wb, ws, 'Leads');
+          }
+          if (exportType === 'properties' || exportType === 'all') {
+            const rows = await buildPropertyRows();
+            const ws = XLSX.utils.json_to_sheet(rows);
+            XLSX.utils.book_append_sheet(wb, ws, 'Objekte');
+          }
+
+          const xlsxBuffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+          fileBuffer = Buffer.from(xlsxBuffer);
+          filename = exportType === 'all'
+            ? `immivo-export-${timestamp}.xlsx`
+            : exportType === 'leads'
+              ? `leads-${timestamp}.xlsx`
+              : `objekte-${timestamp}.xlsx`;
+          contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        } else {
+          // CSV
+          const rows = exportType === 'leads' ? await buildLeadRows() : await buildPropertyRows();
+          if (rows.length === 0) {
+            return exportType === 'leads'
+              ? 'Keine Leads gefunden.'
+              : 'Keine Objekte gefunden.';
+          }
+          const headers = Object.keys(rows[0]);
+          const csvLines = [
+            headers.join(';'),
+            ...rows.map(r => headers.map(h => {
+              const val = String((r as any)[h] ?? '');
+              return val.includes(';') || val.includes('"') || val.includes('\n')
+                ? `"${val.replace(/"/g, '""')}"`
+                : val;
+            }).join(';'))
+          ];
+          fileBuffer = Buffer.from('\uFEFF' + csvLines.join('\r\n'), 'utf-8'); // BOM for Excel compatibility
+          filename = exportType === 'leads'
+            ? `leads-${timestamp}.csv`
+            : `objekte-${timestamp}.csv`;
+          contentType = 'text/csv; charset=utf-8';
+        }
+
+        // ---- Upload to S3 ----
+        if (!mediaBucket) {
+          return 'Export konnte nicht gespeichert werden: MEDIA_BUCKET_NAME ist nicht konfiguriert.';
+        }
+
+        const s3Key = `exports/${tenantId}/${filename}`;
+        const AWS = require('aws-sdk');
+        const s3 = new AWS.S3();
+
+        await s3.putObject({
+          Bucket: mediaBucket,
+          Key: s3Key,
+          Body: fileBuffer,
+          ContentType: contentType,
+          ContentDisposition: `attachment; filename="${filename}"`,
+        }).promise();
+
+        const fileUrl = cdnUrl
+          ? `${cdnUrl}/${s3Key}`
+          : `https://${mediaBucket}.s3.${region}.amazonaws.com/${s3Key}`;
+
+        const typeLabel = exportType === 'all' ? 'Leads & Objekte' : exportType === 'leads' ? 'Leads' : 'Objekte';
+        return {
+          success: true,
+          downloadUrl: fileUrl,
+          filename,
+          message: `Export fertig! ${typeLabel} als ${filename.endsWith('.xlsx') ? 'Excel' : 'CSV'} exportiert.`,
         };
       }
 

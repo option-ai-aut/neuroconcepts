@@ -1016,16 +1016,19 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                   if (!msgContent) return null;
 
                   const imageUrlRegex = /(https?:\/\/[^\s]+?\.(png|jpg|jpeg|webp|gif)(\?[^\s]*)?)/gi;
+                  const downloadUrlRegex = /(https?:\/\/[^\s]+?\.(csv|xlsx)(\?[^\s]*)?)/gi;
                   const hasImageUrls = imageUrlRegex.test(msgContent);
+                  const hasDownloadUrls = downloadUrlRegex.test(msgContent);
                   
-                  if (!hasImageUrls) {
+                  if (!hasImageUrls && !hasDownloadUrls) {
                     return <div className="whitespace-pre-wrap mivo-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(msgContent) }} />;
                   }
                   
                   const elements: React.ReactNode[] = [];
                   let lastIndex = 0;
                   const content = msgContent;
-                  const regex = /(https?:\/\/[^\s]+?\.(png|jpg|jpeg|webp|gif)(\?[^\s]*)?)/gi;
+                  // Combined regex: images and download files
+                  const regex = /(https?:\/\/[^\s]+?\.(png|jpg|jpeg|webp|gif|csv|xlsx)(\?[^\s]*)?)/gi;
                   let match;
                   
                   while ((match = regex.exec(content)) !== null) {
@@ -1033,11 +1036,34 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                       const textBefore = content.slice(lastIndex, match.index).trim();
                       if (textBefore) elements.push(<div key={`t-${lastIndex}`} className="whitespace-pre-wrap mivo-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(textBefore) }} />);
                     }
-                    elements.push(
-                      <a key={`img-${match.index}`} href={match[0]} target="_blank" rel="noopener noreferrer" className="block my-2">
-                        <img src={match[0]} alt="Ergebnis" loading="lazy" className="rounded-lg max-w-full max-h-64 object-contain border border-gray-100" />
-                      </a>
-                    );
+                    const url = match[0];
+                    const ext = (match[2] || '').toLowerCase();
+                    if (ext === 'csv' || ext === 'xlsx') {
+                      const fname = url.split('/').pop()?.split('?')[0] || `export.${ext}`;
+                      const isXlsx = ext === 'xlsx';
+                      elements.push(
+                        <a
+                          key={`dl-${match.index}`}
+                          href={url}
+                          download={fname}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 my-2 px-3 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-xs text-gray-700 font-medium max-w-[220px]"
+                        >
+                          <span className={`flex-shrink-0 w-7 h-7 rounded flex items-center justify-center text-white text-[10px] font-bold ${isXlsx ? 'bg-green-600' : 'bg-blue-600'}`}>
+                            {isXlsx ? 'XLS' : 'CSV'}
+                          </span>
+                          <span className="truncate">{fname}</span>
+                          <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                        </a>
+                      );
+                    } else {
+                      elements.push(
+                        <a key={`img-${match.index}`} href={url} target="_blank" rel="noopener noreferrer" className="block my-2">
+                          <img src={url} alt="Ergebnis" loading="lazy" className="rounded-lg max-w-full max-h-64 object-contain border border-gray-100" />
+                        </a>
+                      );
+                    }
                     lastIndex = regex.lastIndex;
                   }
                   if (lastIndex < content.length) {

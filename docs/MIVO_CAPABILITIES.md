@@ -29,7 +29,7 @@ This reduces latency and cost for simple queries (e.g. smalltalk) while keeping 
 
 ## Vollständige Tool-Liste
 
-### 📋 LEADS & CRM (8 Tools)
+### 📋 LEADS & CRM (9 Tools)
 
 | Tool | Beschreibung | Beispiel |
 |------|--------------|----------|
@@ -41,6 +41,7 @@ This reduces latency and cost for simple queries (e.g. smalltalk) while keeping 
 | `delete_all_leads` | Alle Leads löschen | "Lösche alle Test-Leads" |
 | `get_lead_statistics` | Lead-Statistiken | "Wie ist unsere Conversion-Rate diesen Monat?" |
 | `search_contacts` | Kontakte durchsuchen | "Suche nach Kontakt Müller" |
+| `export_data` | Leads/Objekte als CSV oder Excel exportieren | "Exportiere alle Leads als Excel" |
 
 **Lead Scoring:** Lead data now includes scores (0–100) with factor breakdowns, visible to Mivo for prioritization and follow-up. **Lead Enrichment** adds completeness score (0–100%), duplicate flags, and normalized phone numbers. **Sentiment** from email messages (buying/risk signals) is stored as activity for context.
 
@@ -232,9 +233,9 @@ Datum:    {{date.today}}, {{date.year}}
 - ✅ Bild → Vision-Input (GPT sieht das Foto wirklich)
 - ✅ Datei-URLs persistent in Chat-History → 2 Nachrichten später noch nutzbar
 
-## Gesamt: 68 Tools
+## Gesamt: 69 Tools
 
-- ✅ **68 Tools aktiv** (alle E-Mail- und Kalender-Tools live)
+- ✅ **69 Tools aktiv** (alle E-Mail- und Kalender-Tools live)
 - 🎨 **1 Virtual Staging Tool** (Google Gemini)
 - ✨ **Server-seitige Datei-Verarbeitung** (docx, xlsx, pdf, pptx, txt, json, Bilder)
 - 🧠 **4 Gedächtnis-Tools** (Chatverlauf, Kontext, Memory)
