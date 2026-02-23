@@ -600,8 +600,15 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     isSubmittingRef.current = true;
 
     sendTimeRef.current = new Date().toISOString();
-    // Do NOT cancel undo retries here — they must continue deleting the
-    // previous aborted request's messages even while a new request runs.
+
+    // Pick up any pending undo from a previous Stop press (survives page reload)
+    const UNDO_KEY = 'mivo-pending-undo';
+    const pendingUndo = (() => { try { return JSON.parse(localStorage.getItem(UNDO_KEY) || 'null'); } catch { return null; } })();
+    const undoCutoffTime: string | null =
+      pendingUndo?.cutoffTime && (Date.now() - (pendingUndo.storedAt ?? 0) < 300_000)
+        ? pendingUndo.cutoffTime
+        : null;
+    // Keep localStorage entry — backend will clean the messages, retries can still fire
 
     const attachments = uploadedFiles.map(f => ({ name: f.name, type: f.type }));
     const userMsg: Message = { 
@@ -680,7 +687,8 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           formData.append('message', userMsg.content);
           const pageContext = getPageContext(pathname, activeExposeContext);
           if (pageContext) formData.append('pageContext', pageContext);
-          filesToUpload.forEach((f, idx) => {
+          if (undoCutoffTime) formData.append('undoCutoffTime', undoCutoffTime);
+          filesToUpload.forEach((f) => {
             formData.append('files', f.file);
           });
           
@@ -700,6 +708,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
             body: JSON.stringify({
               message: userMsg.content,
               pageContext: pageContext || undefined,
+              ...(undoCutoffTime ? { undoCutoffTime } : {}),
             }),
             signal: abortController.signal,
           });
@@ -819,7 +828,8 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           // handleStop fires just before setIsStreaming(true) was called.
           setIsStreaming(false);
           if (!abortController.signal.aborted) {
-            lastSentMessageRef.current = ''; // clear only on normal completion
+            lastSentMessageRef.current = '';
+            try { localStorage.removeItem('mivo-pending-undo'); } catch { /* ignore */ }
             setMessages(prev => prev.map(m => m.status === 'streaming' ? { ...m, status: 'done' as const } : m));
           }
         }

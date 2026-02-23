@@ -4111,6 +4111,7 @@ app.post('/chat/stream',
       // Handle both JSON and FormData
       const message = req.body.message || '';
       const pageContext = req.body.pageContext || '';
+      const undoCutoffTime: string | null = req.body.undoCutoffTime || null;
       const files = req.files as Express.Multer.File[] | undefined;
       
       // Get user from auth - CRITICAL: tenantId comes from authenticated user, not request!
@@ -4293,6 +4294,14 @@ app.post('/chat/stream',
           slogan: tenant.slogan || undefined,
         } : undefined,
       };
+
+      // Clean up any aborted previous request before loading history
+      if (undoCutoffTime) {
+        await prisma.userChat.deleteMany({
+          where: { userId, archived: false, createdAt: { gte: new Date(undoCutoffTime) } },
+        });
+        console.log(`🗑️ Pre-call undo for user ${userId} (cutoff: ${undoCutoffTime})`);
+      }
 
       console.log(`💬 Chat message from ${currentUser.email}: "${message.substring(0, 200)}${message.length > 200 ? '...' : ''}"${pageContext ? ` [page: ${pageContext}]` : ''}`);
       await prisma.userChat.create({ data: { userId, role: 'USER', content: fullMessage || message } });
@@ -11545,6 +11554,7 @@ async function handleChatStream(event: any) {
     const body = JSON.parse(rawBody || '{}');
     const message = body.message || '';
     const pageContext = body.pageContext || '';
+    const undoCutoffTime: string | null = body.undoCutoffTime || null;
 
     const db = prisma || (await initializePrisma());
     const currentUser = await db.user.findUnique({ where: { email: userPayload.email } });
@@ -11552,6 +11562,14 @@ async function handleChatStream(event: any) {
 
     const userId = currentUser.id;
     const tenantId = currentUser.tenantId;
+
+    // Clean up any aborted previous request before loading history
+    if (undoCutoffTime) {
+      await db.userChat.deleteMany({
+        where: { userId, archived: false, createdAt: { gte: new Date(undoCutoffTime) } },
+      });
+      console.log(`🗑️ [FnURL] Pre-call undo for user ${userId} (cutoff: ${undoCutoffTime})`);
+    }
 
     const costCheck = await AiCostService.checkCostCap(tenantId);
     if (costCheck.exceeded) {
