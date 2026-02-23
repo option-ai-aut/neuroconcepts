@@ -11570,6 +11570,11 @@ export const handler = async (event: any, context: any) => {
   const rawPath = event.requestContext?.http?.path || event.rawPath || event.path || '';
 
   if (isFunctionUrl && (method === 'POST' || method === 'OPTIONS') && rawPath === '/chat/stream') {
+    // Multipart/form-data (file uploads) must go through Express/multer — the FnURL handler only handles JSON
+    const contentType = (event.headers?.['content-type'] || event.headers?.['Content-Type'] || '').toLowerCase();
+    if (contentType.includes('multipart/form-data')) {
+      return serverlessHandler(event, context);
+    }
     return handleChatStream(event);
   }
 
