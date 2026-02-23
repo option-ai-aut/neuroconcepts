@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import DOMPurify from 'dompurify';
 import { useGlobalState } from '@/context/GlobalStateContext';
-import { X, Minus, Maximize2, Send, Paperclip, ChevronDown, ChevronUp, Bold, Italic, Underline, List, ListOrdered, Link2, Image, Trash2, FileText, Plus, User, Camera, Terminal } from 'lucide-react';
+import { X, Minus, Maximize2, Send, Paperclip, ChevronDown, ChevronUp, Bold, Italic, Underline, List, ListOrdered, Link2, Image, Trash2, FileText, Plus, User, Camera, Terminal, Upload, Building2, Users, FolderOpen, Check, Loader2, Settings } from 'lucide-react';
 import { createLead, createProperty, sendManualEmail, API_ENDPOINTS, fetchWithAuth, getApiUrl } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { mutate } from 'swr';
@@ -96,10 +96,24 @@ const textareaClass = "block w-full rounded-lg border border-gray-300 bg-white t
 const sectionTitleClass = "text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2";
 
 // Email Composer Component
+export interface AttachmentItem {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  data?: string;     // base64 for uploaded files
+  url?: string;      // S3/CDN URL for CRM files (backend fetches)
+  source: 'upload' | 'crm';
+  preview?: string;  // for image thumbnails
+}
+
+interface CrmLead { id: string; name: string; email: string; documents?: { id: string; name: string; url: string; type: string; size: number }[] }
+interface CrmProperty { id: string; address: string; title?: string; images?: { url: string; name?: string }[]; documents?: { id: string; name: string; url: string; type: string; size: number }[] }
+
 interface EmailComposerProps {
   emailFormData: any;
   updateEmailForm: (data: any) => void;
-  onSend: () => void;
+  onSend: (attachments: AttachmentItem[]) => void;
   onSaveDraft: () => void;
   onDiscard: () => void;
   loading: boolean;
@@ -111,6 +125,16 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
   const [showCc, setShowCc] = useState(!!emailFormData.cc);
   const [showBcc, setShowBcc] = useState(!!emailFormData.bcc);
   const [signature, setSignature] = useState<string | null>(null);
+  // Attachment state
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+  const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
+  const [attachPickerTab, setAttachPickerTab] = useState<'upload' | 'leads' | 'properties'>('upload');
+  const [dragOver, setDragOver] = useState(false);
+  const [crmLeads, setCrmLeads] = useState<CrmLead[]>([]);
+  const [crmProperties, setCrmProperties] = useState<CrmProperty[]>([]);
+  const [crmLoading, setCrmLoading] = useState(false);
+  const [expandedCrmItem, setExpandedCrmItem] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [signatureLoaded, setSignatureLoaded] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
@@ -266,6 +290,90 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
       document.execCommand('insertHTML', false, '<br><br>' + signature.replace(/\n/g, '<br>'));
       syncContent();
     }
+  };
+
+  // Load CRM data when CRM tab is opened
+  const loadCrmData = async (tab: 'leads' | 'properties') => {
+    if (!apiUrl) return;
+    setCrmLoading(true);
+    try {
+      if (tab === 'leads') {
+        const data = await fetchWithAuth(`${apiUrl}/leads?limit=50`);
+        setCrmLeads(data?.leads || data || []);
+      } else {
+        const data = await fetchWithAuth(`${apiUrl}/properties?limit=50`);
+        setCrmProperties(data?.properties || data || []);
+      }
+    } catch (e) {
+      console.warn('CRM load error:', e);
+    } finally {
+      setCrmLoading(false);
+    }
+  };
+
+  const handleAttachPickerTab = (tab: 'upload' | 'leads' | 'properties') => {
+    setAttachPickerTab(tab);
+    if (tab === 'leads' && crmLeads.length === 0) loadCrmData('leads');
+    if (tab === 'properties' && crmProperties.length === 0) loadCrmData('properties');
+  };
+
+  // Convert file to base64 attachment
+  const fileToAttachment = (file: File): Promise<AttachmentItem> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        const base64 = dataUrl.split(',')[1];
+        resolve({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          size: file.size,
+          data: base64,
+          source: 'upload',
+          preview: file.type.startsWith('image/') ? dataUrl : undefined,
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFilesSelected = async (files: FileList | File[]) => {
+    const arr = Array.from(files);
+    const converted = await Promise.all(arr.map(fileToAttachment));
+    setAttachments(prev => [...prev, ...converted]);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files.length > 0) {
+      await handleFilesSelected(e.dataTransfer.files);
+    }
+  };
+
+  const addCrmFile = (item: { name: string; url: string; type?: string; size?: number }) => {
+    const already = attachments.some(a => a.url === item.url);
+    if (already) {
+      setAttachments(prev => prev.filter(a => a.url !== item.url));
+      return;
+    }
+    setAttachments(prev => [...prev, {
+      id: `crm-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      name: item.name || 'Datei',
+      type: item.type || 'application/octet-stream',
+      size: item.size || 0,
+      url: item.url,
+      source: 'crm',
+    }]);
+  };
+
+  const removeAttachment = (id: string) => setAttachments(prev => prev.filter(a => a.id !== id));
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   return (
@@ -449,22 +557,47 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
             color: #9ca3af;
             pointer-events: none;
           }
-          #email-body ul, #email-body ol { padding-left: 24px; margin: 4px 0; }
-          #email-body li { margin: 2px 0; }
+          #email-body ul { list-style-type: disc; padding-left: 24px; margin: 4px 0; }
+          #email-body ol { list-style-type: decimal; padding-left: 24px; margin: 4px 0; }
+          #email-body li { margin: 2px 0; display: list-item; }
           #email-body a { color: #2563eb; text-decoration: underline; }
         `}</style>
       </div>
 
+      {/* Attachment chips */}
+      {attachments.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2 mb-1">
+          {attachments.map(att => (
+            <div key={att.id} className="flex items-center gap-1.5 px-2 py-1 bg-gray-100 rounded-lg text-xs text-gray-700 max-w-[200px]">
+              {att.preview ? (
+                <img src={att.preview} alt="" className="w-4 h-4 object-cover rounded" />
+              ) : (
+                <Paperclip className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              )}
+              <span className="truncate">{att.name}</span>
+              <span className="text-gray-400 shrink-0">({formatSize(att.size)})</span>
+              <button type="button" onClick={() => removeAttachment(att.id)} className="text-gray-400 hover:text-red-500 shrink-0 ml-0.5">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Actions */}
-      <div className="flex items-center justify-between pt-4 mt-4 border-t border-gray-100">
+      <div className="flex items-center justify-between pt-4 mt-2 border-t border-gray-100">
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            onClick={() => { setShowAttachmentPicker(true); setAttachPickerTab('upload'); }}
+            className={`p-2 rounded-lg transition-colors ${showAttachmentPicker ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
             title="Anhang hinzufügen"
           >
             <Paperclip className="w-5 h-5" />
           </button>
+          {attachments.length > 0 && (
+            <span className="text-xs text-gray-500">{attachments.length} Anhang{attachments.length > 1 ? 'änge' : ''}</span>
+          )}
         </div>
         
         <div className="flex items-center gap-2">
@@ -486,7 +619,7 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
           </button>
           <button
             type="button"
-            onClick={onSend}
+            onClick={() => onSend(attachments)}
             disabled={loading || !emailFormData.to}
             className="px-5 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
           >
@@ -495,6 +628,264 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
           </button>
         </div>
       </div>
+
+      {/* Attachment Picker Modal */}
+      {showAttachmentPicker && (
+        <div className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowAttachmentPicker(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                <Paperclip className="w-4 h-4 text-gray-500" />
+                Anhang hinzufügen
+              </h3>
+              <button onClick={() => setShowAttachmentPicker(false)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1 px-5 pt-3 pb-0 border-b border-gray-100">
+              {([
+                { id: 'upload' as const, label: 'Von PC hochladen', icon: Upload },
+                { id: 'leads' as const, label: 'Leads (CRM)', icon: Users },
+                { id: 'properties' as const, label: 'Objekte (CRM)', icon: Building2 },
+              ] as const).map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => handleAttachPickerTab(id)}
+                  className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors -mb-px ${
+                    attachPickerTab === id
+                      ? 'border-gray-900 text-gray-900 bg-white'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-5">
+              {/* ── Upload tab ── */}
+              {attachPickerTab === 'upload' && (
+                <div className="space-y-4">
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${
+                      dragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Upload className={`w-8 h-8 mx-auto mb-3 ${dragOver ? 'text-blue-500' : 'text-gray-300'}`} />
+                    <p className="text-sm font-medium text-gray-700">Dateien hier hineinziehen</p>
+                    <p className="text-xs text-gray-400 mt-1">oder klicken zum Auswählen</p>
+                    <p className="text-xs text-gray-400 mt-3">Bilder, PDFs, Word, Excel und mehr</p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => e.target.files && handleFilesSelected(e.target.files)}
+                    />
+                  </div>
+                  {attachments.filter(a => a.source === 'upload').length > 0 && (
+                    <div className="text-xs text-gray-500 font-medium">Ausgewählte Dateien:</div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Leads tab ── */}
+              {attachPickerTab === 'leads' && (
+                <div>
+                  {crmLoading ? (
+                    <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
+                  ) : crmLeads.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400">
+                      <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">Keine Leads gefunden</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {crmLeads.map(lead => {
+                        const docs = lead.documents || [];
+                        return (
+                          <div key={lead.id} className="border border-gray-100 rounded-xl overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedCrmItem(expandedCrmItem === lead.id ? null : lead.id)}
+                              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
+                                  {lead.name?.charAt(0)?.toUpperCase() || '?'}
+                                </div>
+                                <div className="text-left">
+                                  <div className="text-sm font-medium text-gray-900">{lead.name || 'Unbekannt'}</div>
+                                  <div className="text-xs text-gray-400">{lead.email}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400">{docs.length} Datei{docs.length !== 1 ? 'en' : ''}</span>
+                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedCrmItem === lead.id ? 'rotate-180' : ''}`} />
+                              </div>
+                            </button>
+                            {expandedCrmItem === lead.id && (
+                              <div className="border-t border-gray-100 bg-gray-50">
+                                {docs.length === 0 ? (
+                                  <p className="text-xs text-gray-400 px-4 py-3">Keine Dokumente vorhanden</p>
+                                ) : (
+                                  docs.map((doc) => {
+                                    const selected = attachments.some(a => a.url === doc.url);
+                                    return (
+                                      <button
+                                        key={doc.id}
+                                        type="button"
+                                        onClick={() => addCrmFile(doc)}
+                                        className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-100 transition-colors border-b last:border-b-0 border-gray-100 ${selected ? 'bg-blue-50' : ''}`}
+                                      >
+                                        <FileText className="w-4 h-4 text-gray-400 shrink-0" />
+                                        <span className="flex-1 text-sm text-left text-gray-700 truncate">{doc.name}</span>
+                                        <span className="text-xs text-gray-400">{formatSize(doc.size || 0)}</span>
+                                        {selected && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                                      </button>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Properties tab ── */}
+              {attachPickerTab === 'properties' && (
+                <div>
+                  {crmLoading ? (
+                    <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
+                  ) : crmProperties.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400">
+                      <Building2 className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">Keine Objekte gefunden</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {crmProperties.map(prop => {
+                        const images = prop.images || [];
+                        const docs = prop.documents || [];
+                        const total = images.length + docs.length;
+                        return (
+                          <div key={prop.id} className="border border-gray-100 rounded-xl overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedCrmItem(expandedCrmItem === prop.id ? null : prop.id)}
+                              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
+                                  <Building2 className="w-4 h-4 text-gray-400" />
+                                </div>
+                                <div className="text-left">
+                                  <div className="text-sm font-medium text-gray-900">{prop.title || prop.address}</div>
+                                  {prop.title && <div className="text-xs text-gray-400 truncate max-w-[200px]">{prop.address}</div>}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400">{total} Datei{total !== 1 ? 'en' : ''}</span>
+                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedCrmItem === prop.id ? 'rotate-180' : ''}`} />
+                              </div>
+                            </button>
+                            {expandedCrmItem === prop.id && (
+                              <div className="border-t border-gray-100 bg-gray-50">
+                                {total === 0 ? (
+                                  <p className="text-xs text-gray-400 px-4 py-3">Keine Dateien vorhanden</p>
+                                ) : (
+                                  <>
+                                    {images.length > 0 && (
+                                      <div className="p-3">
+                                        <div className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2 px-1">Bilder</div>
+                                        <div className="grid grid-cols-4 gap-2">
+                                          {images.map((img, idx) => {
+                                            const imgName = img.name || `Bild ${idx + 1}`;
+                                            const selected = attachments.some(a => a.url === img.url);
+                                            return (
+                                              <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => addCrmFile({ name: imgName, url: img.url, type: 'image/jpeg', size: 0 })}
+                                                className={`relative rounded-lg overflow-hidden aspect-square border-2 transition-colors ${selected ? 'border-blue-500' : 'border-transparent hover:border-gray-300'}`}
+                                              >
+                                                <img src={img.url} alt={imgName} className="w-full h-full object-cover" />
+                                                {selected && (
+                                                  <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
+                                                    <Check className="w-5 h-5 text-blue-600 drop-shadow" />
+                                                  </div>
+                                                )}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {docs.length > 0 && (
+                                      <div className="border-t border-gray-100">
+                                        <div className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2 pt-3 px-4">Dokumente</div>
+                                        {docs.map((doc) => {
+                                          const selected = attachments.some(a => a.url === doc.url);
+                                          return (
+                                            <button
+                                              key={doc.id}
+                                              type="button"
+                                              onClick={() => addCrmFile(doc)}
+                                              className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-100 transition-colors border-b last:border-b-0 border-gray-100 ${selected ? 'bg-blue-50' : ''}`}
+                                            >
+                                              <FileText className="w-4 h-4 text-gray-400 shrink-0" />
+                                              <span className="flex-1 text-sm text-left text-gray-700 truncate">{doc.name}</span>
+                                              <span className="text-xs text-gray-400">{formatSize(doc.size || 0)}</span>
+                                              {selected && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50">
+              <span className="text-xs text-gray-500">
+                {attachments.length > 0 ? `${attachments.length} Anhang${attachments.length > 1 ? 'änge' : ''} ausgewählt` : 'Keine Anhänge'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAttachmentPicker(false)}
+                className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                Fertig
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -528,12 +919,12 @@ export default function GlobalDrawer() {
   const [bugSubmitting, setBugSubmitting] = useState(false);
   const [bugSuccess, setBugSuccess] = useState(false);
   const [bugError, setBugError] = useState(false);
-  const [bugScreenshot, setBugScreenshot] = useState<string | null>(null);
+  const [bugImage, setBugImage] = useState<string | null>(null);
+  const [bugImageName, setBugImageName] = useState<string>('');
   const [bugConsoleLogs, setBugConsoleLogs] = useState<any[]>([]);
-  const [bugIncludeScreenshot, setBugIncludeScreenshot] = useState(true);
   const [bugIncludeLogs, setBugIncludeLogs] = useState(true);
   const [bugLogsExpanded, setBugLogsExpanded] = useState(false);
-  const [bugCapturing, setBugCapturing] = useState(false);
+  const bugImageInputRef = useRef<HTMLInputElement>(null);
   
   // Collapsible sections for Property form
   const [expandedSections, setExpandedSections] = useState({
@@ -558,72 +949,17 @@ export default function GlobalDrawer() {
     }
   }, [drawerOpen]);
 
-  // Capture screenshot + console logs when BUG_REPORT drawer opens
+  // Load console logs when BUG_REPORT drawer opens
   useEffect(() => {
     if (drawerOpen && drawerType === 'BUG_REPORT') {
-      setBugCapturing(true);
-      setBugScreenshot(null);
       setBugConsoleLogs([]);
-      setBugIncludeScreenshot(true);
       setBugIncludeLogs(true);
       setBugLogsExpanded(false);
-
-      // Capture console logs
+      setBugImage(null);
+      setBugImageName('');
       import('@/lib/consoleCapture').then(({ getConsoleLogs }) => {
         setBugConsoleLogs(getConsoleLogs());
       });
-
-      // Capture screenshot (with small delay so drawer doesn't appear in it)
-      const timer = setTimeout(async () => {
-        try {
-          // Try html2canvas first
-          try {
-            const html2canvas = (await import('html2canvas')).default;
-            const mainContent = document.querySelector('main') || document.body;
-            const canvas = await html2canvas(mainContent as HTMLElement, {
-              useCORS: true,
-              allowTaint: true,
-              scale: 0.75,
-              logging: false,
-              backgroundColor: '#ffffff',
-              removeContainer: true,
-              ignoreElements: (el: Element) => {
-                return el.getAttribute('data-drawer') === 'true' || 
-                       el.classList?.contains('fixed') ||
-                       el.tagName === 'IFRAME';
-              },
-            });
-            const dataUrl = canvas.toDataURL('image/png', 0.7);
-            if (dataUrl && dataUrl.length > 100) {
-              setBugScreenshot(dataUrl);
-            }
-          } catch {
-            // Fallback: try native browser API if available
-            if (typeof navigator !== 'undefined' && 'mediaDevices' in navigator) {
-              try {
-                const stream = await (navigator.mediaDevices as any).getDisplayMedia({ video: true });
-                const video = document.createElement('video');
-                video.srcObject = stream;
-                await video.play();
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                canvas.getContext('2d')?.drawImage(video, 0, 0);
-                stream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
-                setBugScreenshot(canvas.toDataURL('image/png', 0.7));
-              } catch {
-                console.warn('Screenshot fallback also failed');
-              }
-            }
-          }
-        } catch (err) {
-          console.error('Screenshot capture failed:', err);
-        } finally {
-          setBugCapturing(false);
-        }
-      }, 300);
-
-      return () => clearTimeout(timer);
     }
   }, [drawerOpen, drawerType]);
 
@@ -691,14 +1027,24 @@ export default function GlobalDrawer() {
     }
   };
 
-  const handleSendEmail = async (asDraft: boolean = false) => {
+  const handleSendEmail = async (asDraft: boolean = false, attachments: AttachmentItem[] = []) => {
     if (!emailFormData.to || !emailFormData.subject) {
       alert('Bitte Empfänger und Betreff eingeben');
       return;
     }
     setLoading(true);
     try {
-      const response = await fetchWithAuth(`${getApiUrl()}/emails/send`, {
+      // Build attachment payload
+      const attachmentPayload = attachments.map(a => ({
+        name: a.name,
+        type: a.type,
+        size: a.size,
+        data: a.data,       // base64 for uploaded files
+        url: a.url,         // URL for CRM files (backend fetches)
+        source: a.source,
+      }));
+
+      await fetchWithAuth(`${getApiUrl()}/emails/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -710,8 +1056,9 @@ export default function GlobalDrawer() {
           bodyHtml: emailFormData.bodyHtml || undefined,
           leadId: emailFormData.leadId || undefined,
           replyToEmailId: emailFormData.replyTo || undefined,
-          draftId: emailFormData.draftId || undefined, // Delete draft after sending
+          draftId: emailFormData.draftId || undefined,
           asDraft,
+          attachments: attachmentPayload.length > 0 ? attachmentPayload : undefined,
         }),
       });
       
@@ -743,14 +1090,15 @@ export default function GlobalDrawer() {
           title: bugTitle.trim(),
           description: bugDescription.trim(),
           page: typeof window !== 'undefined' ? window.location.pathname : null,
-          screenshot: bugIncludeScreenshot ? bugScreenshot : null,
+          screenshot: bugImage || null,
           consoleLogs: bugIncludeLogs && bugConsoleLogs.length > 0 ? JSON.stringify(bugConsoleLogs) : null,
         }),
       });
       setBugSuccess(true);
       setBugTitle('');
       setBugDescription('');
-      setBugScreenshot(null);
+      setBugImage(null);
+      setBugImageName('');
       setBugConsoleLogs([]);
       setTimeout(() => {
         setBugSuccess(false);
@@ -801,7 +1149,7 @@ export default function GlobalDrawer() {
         <EmailComposer
               emailFormData={emailFormData}
               updateEmailForm={updateEmailForm}
-              onSend={() => handleSendEmail(false)}
+              onSend={(atts) => handleSendEmail(false, atts)}
               onSaveDraft={() => handleSendEmail(true)}
               onDiscard={handleAnimatedClose}
               loading={loading}
@@ -1441,40 +1789,61 @@ export default function GlobalDrawer() {
                     />
                   </div>
 
-                  {/* Screenshot Toggle + Preview */}
-                  <div className="border border-gray-200 rounded-lg overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => setBugIncludeScreenshot(!bugIncludeScreenshot)}
-                      className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Camera className="w-3.5 h-3.5 text-gray-500" />
-                        <span className="text-xs font-medium text-gray-700">Screenshot mitsenden</span>
+                  {/* Image Upload */}
+                  <div>
+                    <label className={labelClass}>Bild anhängen (optional)</label>
+                    <input
+                      ref={bugImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                          setBugImage(ev.target?.result as string);
+                          setBugImageName(file.name);
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                    {bugImage ? (
+                      <div className="relative rounded-lg overflow-hidden border border-gray-200">
+                        <img
+                          src={bugImage}
+                          alt="Angehängtes Bild"
+                          className="w-full max-h-48 object-cover"
+                        />
+                        <div className="absolute top-2 right-2 flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => bugImageInputRef.current?.click()}
+                            className="px-2 py-1 text-[11px] font-medium bg-white/90 hover:bg-white text-gray-700 rounded-md shadow-sm transition-colors"
+                          >
+                            Ersetzen
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setBugImage(null); setBugImageName(''); }}
+                            className="p-1 bg-white/90 hover:bg-white text-gray-500 hover:text-red-500 rounded-md shadow-sm transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-200">
+                          <span className="text-[11px] text-gray-500 truncate block">{bugImageName}</span>
+                        </div>
                       </div>
-                      <div className={`w-8 h-[18px] rounded-full transition-colors relative ${bugIncludeScreenshot ? 'bg-red-500' : 'bg-gray-300'}`}>
-                        <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow transition-transform ${bugIncludeScreenshot ? 'translate-x-[16px]' : 'translate-x-[2px]'}`} />
-                      </div>
-                    </button>
-                    {bugIncludeScreenshot && (
-                      <div className="p-3 border-t border-gray-100">
-                        {bugCapturing ? (
-                          <div className="flex items-center gap-2 text-xs text-gray-400">
-                            <div className="w-3 h-3 border border-gray-300 border-t-gray-500 rounded-full animate-spin" />
-                            Screenshot wird erstellt...
-                          </div>
-                        ) : bugScreenshot ? (
-                          <img
-                            src={bugScreenshot}
-                            alt="Screenshot"
-                            className="w-full rounded border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={() => window.open(bugScreenshot!, '_blank')}
-                            title="Klicken zum Vergrößern"
-                          />
-                        ) : (
-                          <p className="text-xs text-gray-400">Screenshot konnte nicht erstellt werden.</p>
-                        )}
-                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => bugImageInputRef.current?.click()}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 border border-dashed border-gray-300 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-colors text-left"
+                      >
+                        <Image className="w-4 h-4 text-gray-400 shrink-0" />
+                        <span className="text-sm text-gray-500">Screenshot oder Bild auswählen...</span>
+                      </button>
                     )}
                   </div>
 

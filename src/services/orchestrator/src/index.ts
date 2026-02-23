@@ -7154,7 +7154,7 @@ app.post('/emails/send', authMiddleware, async (req: any, res) => {
     });
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { to, cc, bcc, subject, body, bodyHtml, leadId, replyToEmailId, asDraft, draftId } = req.body;
+    const { to, cc, bcc, subject, body, bodyHtml, leadId, replyToEmailId, asDraft, draftId, attachments: attachmentPayload } = req.body;
 
     if (!to || !subject) {
       return res.status(400).json({ error: 'Missing required fields: to, subject' });
@@ -7236,24 +7236,80 @@ app.post('/emails/send', authMiddleware, async (req: any, res) => {
         ? `"${senderName}" <${user.email}>`
         : user.email;
 
-      // Build email message (the blank line between headers and body is required by RFC 2822)
-      const emailLines = [
-        `From: ${fromHeader}`,
-        `To: ${to}`,
-        ...(cc ? [`Cc: ${cc}`] : []),
-        ...(bcc ? [`Bcc: ${bcc}`] : []),
-        `Subject: ${subject}`,
-        'MIME-Version: 1.0',
-        'Content-Type: text/html; charset=utf-8',
-        '',
-        finalHtml || finalBody.replace(/\n/g, '<br>')
-      ];
+      // Resolve attachments: base64 data (uploaded) or URL (CRM — fetch server-side)
+      type ResolvedAttachment = { name: string; type: string; data: string };
+      const resolvedAttachments: ResolvedAttachment[] = [];
+      if (Array.isArray(attachmentPayload) && attachmentPayload.length > 0) {
+        for (const att of attachmentPayload) {
+          try {
+            if (att.data) {
+              resolvedAttachments.push({ name: att.name || 'attachment', type: att.type || 'application/octet-stream', data: att.data });
+            } else if (att.url) {
+              const resp = await fetch(att.url);
+              if (resp.ok) {
+                const buf = await resp.arrayBuffer();
+                resolvedAttachments.push({
+                  name: att.name || 'attachment',
+                  type: att.type || resp.headers.get('content-type') || 'application/octet-stream',
+                  data: Buffer.from(buf).toString('base64'),
+                });
+              }
+            }
+          } catch (e) { console.warn('Attachment resolve error:', e); }
+        }
+      }
 
-      const rawMessage = Buffer.from(emailLines.join('\r\n'))
-        .toString('base64')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
+      // Build MIME message — multipart/mixed when there are attachments, otherwise simple HTML
+      let rawMessage: string;
+      if (resolvedAttachments.length > 0) {
+        const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const headers = [
+          `From: ${fromHeader}`,
+          `To: ${to}`,
+          ...(cc ? [`Cc: ${cc}`] : []),
+          ...(bcc ? [`Bcc: ${bcc}`] : []),
+          `Subject: ${subject}`,
+          'MIME-Version: 1.0',
+          `Content-Type: multipart/mixed; boundary="${boundary}"`,
+          '',
+        ].join('\r\n');
+
+        const htmlPart = [
+          `--${boundary}`,
+          'Content-Type: text/html; charset=utf-8',
+          'Content-Transfer-Encoding: quoted-printable',
+          '',
+          (finalHtml || finalBody.replace(/\n/g, '<br>')).replace(/=/g, '=3D'),
+          '',
+        ].join('\r\n');
+
+        const attParts = resolvedAttachments.map(att => [
+          `--${boundary}`,
+          `Content-Type: ${att.type}; name="${att.name}"`,
+          'Content-Transfer-Encoding: base64',
+          `Content-Disposition: attachment; filename="${att.name}"`,
+          '',
+          att.data,
+          '',
+        ].join('\r\n')).join('');
+
+        const mimeBody = `${headers}\r\n${htmlPart}${attParts}--${boundary}--`;
+        rawMessage = Buffer.from(mimeBody).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      } else {
+        // Simple HTML message (no attachments)
+        const emailLines = [
+          `From: ${fromHeader}`,
+          `To: ${to}`,
+          ...(cc ? [`Cc: ${cc}`] : []),
+          ...(bcc ? [`Bcc: ${bcc}`] : []),
+          `Subject: ${subject}`,
+          'MIME-Version: 1.0',
+          'Content-Type: text/html; charset=utf-8',
+          '',
+          finalHtml || finalBody.replace(/\n/g, '<br>'),
+        ];
+        rawMessage = Buffer.from(emailLines.join('\r\n')).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      }
 
       try {
         await gmail.users.messages.send({
@@ -7288,6 +7344,24 @@ app.post('/emails/send', authMiddleware, async (req: any, res) => {
         ? `"${smtpSenderName}" <${smtpConfig.from || user.email}>`
         : (smtpConfig.from || user.email);
 
+      // Resolve attachments for SMTP as well
+      const smtpAttachments: { filename: string; content: Buffer; contentType: string }[] = [];
+      if (Array.isArray(attachmentPayload) && attachmentPayload.length > 0) {
+        for (const att of attachmentPayload) {
+          try {
+            if (att.data) {
+              smtpAttachments.push({ filename: att.name || 'attachment', content: Buffer.from(att.data, 'base64'), contentType: att.type || 'application/octet-stream' });
+            } else if (att.url) {
+              const resp = await fetch(att.url);
+              if (resp.ok) {
+                const buf = await resp.arrayBuffer();
+                smtpAttachments.push({ filename: att.name || 'attachment', content: Buffer.from(buf), contentType: att.type || 'application/octet-stream' });
+              }
+            }
+          } catch (e) { console.warn('SMTP attachment resolve error:', e); }
+        }
+      }
+
       try {
         await transporter.sendMail({
           from: smtpFrom,
@@ -7297,6 +7371,7 @@ app.post('/emails/send', authMiddleware, async (req: any, res) => {
           subject,
           text: finalBody,
           html: finalHtml,
+          attachments: smtpAttachments.length > 0 ? smtpAttachments : undefined,
         });
         sendResult = { success: true, provider: 'smtp' };
       } catch (smtpError: any) {
@@ -7324,6 +7399,7 @@ app.post('/emails/send', authMiddleware, async (req: any, res) => {
           bodyHtml: finalHtml,
           folder: 'SENT',
           isRead: true,
+          hasAttachments: Array.isArray(attachmentPayload) && attachmentPayload.length > 0,
           provider: sendResult.provider === 'gmail' ? 'GMAIL' : 'SMTP',
           leadId: leadId || undefined,
           sentAt: new Date(),

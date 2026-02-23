@@ -230,6 +230,7 @@ export class OpenAIService {
     
     const allToolNames: string[] = [];
     let hadAnyFunctionCalls = false;
+    let anyContentYielded = false;
     let currentMessages = [...messages];
     const MAX_TOOL_ROUNDS = 4;
     let totalStreamInputTokens = 0;
@@ -264,6 +265,7 @@ export class OpenAIService {
 
           if (delta?.content) {
             roundContent += delta.content;
+            anyContentYielded = true;
             if (!isStreamingContent) {
               isStreamingContent = true;
             }
@@ -320,7 +322,9 @@ export class OpenAIService {
       }
     }
 
-    if (hadAnyFunctionCalls && currentMessages[currentMessages.length - 1]?.role === 'tool') {
+    // Final summary only when tool rounds completed but NO content was streamed yet
+    // (avoids double response: loop already streamed content in round N → skip summary)
+    if (hadAnyFunctionCalls && !anyContentYielded && currentMessages[currentMessages.length - 1]?.role === 'tool') {
       try {
         const finalStream = await this.client.chat.completions.create({
           model: MODEL,

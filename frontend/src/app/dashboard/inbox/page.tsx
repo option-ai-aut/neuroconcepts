@@ -607,16 +607,14 @@ export default function InboxPage() {
               );
             })}
           </nav>
-          {forwardingEmail && (
-            <div className="mx-3 mb-3 p-2.5 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex items-center gap-1.5 mb-1">
-                <LinkIcon className="w-3 h-3 text-gray-400" />
-                <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Weiterleitung</span>
-              </div>
-              <code className="text-[11px] text-gray-600 break-all leading-tight">{forwardingEmail}</code>
-            </div>
-          )}
-          <div className="p-4 border-t border-gray-200">
+          <div className="p-3 border-t border-gray-200 space-y-1.5">
+            <Link
+              href="/dashboard/settings/profile"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              <LinkIcon className="w-4 h-4 text-gray-400" />
+              Signatur-Einstellungen
+            </Link>
             <button onClick={handleSync} disabled={syncing}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg transition-colors">
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
