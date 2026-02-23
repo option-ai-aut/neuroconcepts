@@ -555,7 +555,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     e.preventDefault();
     if (!aiChatDraft.trim() && uploadedFiles.length === 0) return;
 
-    if (isStreaming) return;
+    if (isStreaming || isLoading) return;
 
     const attachments = uploadedFiles.map(f => ({ name: f.name, type: f.type }));
     const userMsg: Message = { 
@@ -665,6 +665,9 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
 
         if (!res.body) throw new Error('No response body');
 
+        // Bail out if stop was pressed before streaming started
+        if (abortController.signal.aborted) return;
+
         const assistantMsgId = mkId();
         setMessages(prev => [...prev, { id: assistantMsgId, role: 'ASSISTANT', content: '', status: 'thinking' }]);
         setIsLoading(false);
@@ -761,8 +764,11 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
           }
         } finally {
           if (streamTimeout) clearTimeout(streamTimeout);
-          setIsStreaming(false);
-          setMessages(prev => prev.map(m => m.status === 'streaming' ? { ...m, status: 'done' as const } : m));
+          // Only clean up if NOT aborted — handleStop already handles the aborted case
+          if (!abortController.signal.aborted) {
+            setIsStreaming(false);
+            setMessages(prev => prev.map(m => m.status === 'streaming' ? { ...m, status: 'done' as const } : m));
+          }
         }
 
         if (hadFunctionCalls) {
@@ -771,9 +777,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        setMessages(prev => prev.filter(m => !m.isAction));
-        setIsLoading(false);
-        setIsStreaming(false);
+        // handleStop already cleaned up state — nothing to do here
         return;
       }
       console.error('Chat error:', error);

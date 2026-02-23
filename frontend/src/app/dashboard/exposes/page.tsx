@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { FileText, Plus, Search, Edit2, Trash2, Sparkles, Calendar, Eye, ImageIcon, ChevronDown } from 'lucide-react';
+import { FileText, Plus, Search, Edit2, Trash2, Sparkles, Calendar, Eye, ImageIcon, ChevronDown, Pencil, Check } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { getExposeTemplates, deleteExposeTemplate, createExposeTemplate, updateExposeTemplate, ExposeTemplate, API_ENDPOINTS, getProperties, Property, getImageUrl } from '@/lib/api';
 import { useGlobalState } from '@/context/GlobalStateContext';
@@ -636,23 +636,37 @@ export default function ExposesPage() {
               <div className="px-6 py-4 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3 flex-1">
                   {isEditingName ? (
-                    <input
-                      ref={nameInputRef}
-                      type="text"
-                      value={editedName}
-                      onChange={(e) => setEditedName(e.target.value)}
-                      onBlur={handleNameSave}
-                      onKeyDown={handleNameKeyDown}
-                      className="text-xl font-bold text-gray-900 bg-transparent border-b-2 border-gray-300 focus:outline-none px-1"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={nameInputRef}
+                        type="text"
+                        value={editedName}
+                        onChange={(e) => setEditedName(e.target.value)}
+                        onBlur={handleNameSave}
+                        onKeyDown={handleNameKeyDown}
+                        className="text-xl font-bold text-gray-900 bg-transparent border-b-2 border-gray-400 focus:border-gray-700 focus:outline-none px-1"
+                      />
+                      <button
+                        onClick={handleNameSave}
+                        className="p-1 text-gray-500 hover:text-gray-900 transition-colors"
+                        title="Speichern"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                    </div>
                   ) : (
-                    <h2 
-                      onClick={handleNameClick}
-                      className="text-xl font-bold text-gray-900 cursor-pointer hover:text-blue-600 transition-colors px-1"
-                      title={t('renameTooltip')}
-                    >
-                      {selectedTemplate.name}
-                    </h2>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-bold text-gray-900 truncate max-w-[300px]">
+                        {selectedTemplate.name}
+                      </h2>
+                      <button
+                        onClick={handleNameClick}
+                        className="p-1 text-gray-400 hover:text-gray-700 transition-colors shrink-0"
+                        title={t('renameTooltip')}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
                   <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                     selectedTemplate.isDefault 
@@ -705,20 +719,23 @@ export default function ExposesPage() {
                     
                     {/* Preview Property Selector */}
                     <div className="flex items-center gap-2 ml-auto">
-                      <Eye className="w-3 h-3 text-gray-400 shrink-0" />
-                      <select
-                        value={previewProperty?.id || ''}
-                        onChange={(e) => {
-                          const prop = properties.find(p => p.id === e.target.value);
-                          setPreviewProperty(prop || null);
-                        }}
-                        className="text-xs border border-gray-200 rounded px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-500 max-w-[180px] truncate"
-                      >
-                        <option value="">{t('showVariables')}</option>
-                        {properties.map(p => (
-                          <option key={p.id} value={p.id}>{p.title}</option>
-                        ))}
-                      </select>
+                      <div className="relative flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg border border-gray-200 transition-colors cursor-pointer">
+                        <Eye className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                        <select
+                          value={previewProperty?.id || ''}
+                          onChange={(e) => {
+                            const prop = properties.find(p => p.id === e.target.value);
+                            setPreviewProperty(prop || null);
+                          }}
+                          className="text-xs bg-transparent text-gray-700 focus:outline-none cursor-pointer appearance-none max-w-[160px] font-medium"
+                        >
+                          <option value="">{t('showVariables')}</option>
+                          {properties.map(p => (
+                            <option key={p.id} value={p.id}>{p.title}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="w-3 h-3 text-gray-400 shrink-0 pointer-events-none" />
+                      </div>
                     </div>
                   </div>
                 </div>

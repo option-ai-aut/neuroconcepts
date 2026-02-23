@@ -9,7 +9,7 @@ import {
   Image, Type, LayoutGrid, MapPin, User, List, Zap,
   Home, DollarSign, Thermometer, Phone, Quote, MousePointer,
   Columns, Video, Eye, Upload, ImageIcon, FileImage, BarChart3,
-  SeparatorHorizontal, FileText as FilePlus, Palette, Pipette
+  SeparatorHorizontal, FileText as FilePlus, Palette, Pipette, Pencil, Check
 } from 'lucide-react';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { 
@@ -508,6 +508,9 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
   const [isClosing, setIsClosing] = useState(false);
   const [showFieldsSidebar, setShowFieldsSidebar] = useState(false);
   const [templateFieldFocused, setTemplateFieldFocused] = useState(false);
+  const [isRenamingInEditor, setIsRenamingInEditor] = useState(false);
+  const [editorRenameValue, setEditorRenameValue] = useState('');
+  const editorNameInputRef = useRef<HTMLInputElement>(null);
   const fieldsButtonRef = useRef<HTMLButtonElement>(null);
   const blockEditorRef = useRef<HTMLDivElement>(null);
   const [editorRect, setEditorRect] = useState<{ top: number; left: number; bottom: number } | null>(null);
@@ -2899,19 +2902,56 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
           setMinimized(!minimized);
         }}
       >
-        <div className="flex items-center space-x-3">
-          <div className="w-2 h-2 rounded-full bg-gray-800" />
+        <div className="flex items-center space-x-2 min-w-0">
+          <div className="w-2 h-2 rounded-full bg-gray-800 shrink-0" />
           {isTemplate && template ? (
-            <input
-              type="text"
-              value={template.name}
-              onChange={(e) => setTemplate({ ...template, name: e.target.value })}
-              onClick={(e) => e.stopPropagation()}
-              className="text-gray-900 font-semibold text-sm bg-transparent border-0 focus:ring-0 focus:outline-none p-0"
-              placeholder="Vorlagenname..."
-            />
+            isRenamingInEditor ? (
+              <div className="flex items-center gap-1 min-w-0" onClick={(e) => e.stopPropagation()}>
+                <input
+                  ref={editorNameInputRef}
+                  type="text"
+                  value={editorRenameValue}
+                  onChange={(e) => setEditorRenameValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      if (editorRenameValue.trim()) setTemplate({ ...template, name: editorRenameValue.trim() });
+                      setIsRenamingInEditor(false);
+                    } else if (e.key === 'Escape') {
+                      setIsRenamingInEditor(false);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (editorRenameValue.trim()) setTemplate({ ...template, name: editorRenameValue.trim() });
+                    setIsRenamingInEditor(false);
+                  }}
+                  className="text-gray-900 font-semibold text-sm bg-transparent border-b border-gray-400 focus:border-gray-700 focus:outline-none px-0 w-40"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); if (editorRenameValue.trim()) setTemplate({ ...template, name: editorRenameValue.trim() }); setIsRenamingInEditor(false); }}
+                  className="p-0.5 text-gray-500 hover:text-gray-900 transition-colors"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h3 className="text-gray-900 font-semibold text-sm truncate max-w-[180px]">
+                  {template.name}
+                </h3>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setEditorRenameValue(template.name); setIsRenamingInEditor(true); }}
+                  className="p-0.5 text-gray-400 hover:text-gray-700 transition-colors shrink-0"
+                  title="Umbenennen"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              </div>
+            )
           ) : (
-            <h3 className="text-gray-900 font-semibold text-sm">
+            <h3 className="text-gray-900 font-semibold text-sm truncate max-w-[200px]">
               {expose?.property?.title || 'Exposé bearbeiten'}
             </h3>
           )}

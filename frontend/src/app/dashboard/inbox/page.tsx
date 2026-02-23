@@ -609,7 +609,7 @@ export default function InboxPage() {
           </nav>
           <div className="p-3 border-t border-gray-200 space-y-1.5">
             <Link
-              href="/dashboard/settings/profile"
+              href="/dashboard/settings/email"
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
             >
               <LinkIcon className="w-4 h-4 text-gray-400" />
