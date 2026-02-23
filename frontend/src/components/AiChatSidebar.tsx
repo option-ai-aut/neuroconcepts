@@ -256,6 +256,8 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
   const messagesRef = useRef<Message[]>([]);
   const [removingMsgId, setRemovingMsgId] = useState<string | null>(null);
   const undoTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Timestamp of the last handleSubmit call — used as cutoff for undo-last
+  const sendTimeRef = useRef<string>('');
 
   useEffect(() => {
     return () => {
@@ -569,6 +571,9 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
 
+    // Record when this request was initiated (used by undo-last for cutoff)
+    sendTimeRef.current = new Date().toISOString();
+
     // Cancel any pending undo retries from a previous Stop press
     undoTimeoutsRef.current.forEach(t => clearTimeout(t));
     undoTimeoutsRef.current = [];
@@ -843,33 +848,36 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
       }, 320);
     }
 
-    // 4. Delete from database — the backend Lambda runs to completion even
-    //    after we abort, so we fire immediate + delayed retries to catch
-    //    messages the Lambda saves after our first delete call.
+    // 4. Delete from database.
+    //    Strategy: use the client-side sendTime as cutoff — this is known
+    //    immediately and doesn't depend on the first API call succeeding.
+    //    Subtract 3 s to cover server/client clock skew.
+    //    Fire immediately + retries so we catch messages the Lambda saves
+    //    after streaming completes (Lambda always runs to completion).
     undoTimeoutsRef.current.forEach(t => clearTimeout(t));
     undoTimeoutsRef.current = [];
 
-    const callUndo = async (cutoffTime?: string) => {
+    const cutoffTime = sendTimeRef.current
+      ? new Date(new Date(sendTimeRef.current).getTime() - 3000).toISOString()
+      : new Date(Date.now() - 10000).toISOString(); // fallback: 10 s ago
+
+    const callUndo = async () => {
       try {
         const authHeaders = await getAuthHeaders();
         const apiUrl = getApiUrl();
-        const r = await fetch(`${apiUrl}/chat/undo-last`, {
+        await fetch(`${apiUrl}/chat/undo-last`, {
           method: 'POST',
           headers: authHeaders,
-          body: JSON.stringify(cutoffTime ? { cutoffTime } : {}),
+          body: JSON.stringify({ cutoffTime }),
         });
-        return await r.json();
-      } catch { return null; }
+      } catch { /* silently ignore — worst case user sees the message on reload */ }
     };
 
-    callUndo().then(result => {
-      if (!result?.cutoffTime) return;
-      const ct = result.cutoffTime;
-      for (const delay of [4000, 10000, 20000, 35000]) {
-        const t = setTimeout(() => callUndo(ct), delay);
-        undoTimeoutsRef.current.push(t);
-      }
-    });
+    callUndo(); // fire immediately
+    for (const delay of [3000, 8000, 18000, 35000]) {
+      const t = setTimeout(callUndo, delay);
+      undoTimeoutsRef.current.push(t);
+    }
   };
 
   return (
