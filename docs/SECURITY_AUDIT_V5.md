@@ -128,7 +128,7 @@ Basis: vollständiges Neues Audit nach Implementierung aller v4-Fixes.
 
 **Problem:** Alle 3 CloudFront-Distributions verwendeten `TLS_V1_2_2021`.
 
-**Fix:** `TLS_V1_3_2022` auf Media-CDN, Frontend-CDN und API-CDN.
+**Fix:** `TLS_V1_3_2025` auf Media-CDN, Frontend-CDN und API-CDN.
 
 **Datei:** `infra/lib/infra-stack.ts` (3 Stellen)
 

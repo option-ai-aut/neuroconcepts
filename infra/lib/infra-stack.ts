@@ -546,7 +546,7 @@ export class ImmivoStack extends cdk.Stack {
       },
       httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
-      minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_3_2022,
+      minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_3_2025,
     });
 
     new route53.ARecord(this, 'MediaDnsRecord', {
@@ -615,7 +615,7 @@ export class ImmivoStack extends cdk.Stack {
         },
         httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
         priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
-        minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_3_2022,
+        minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_3_2025,
       });
 
       new route53.ARecord(this, 'FrontendDnsRecord', {
@@ -645,7 +645,7 @@ export class ImmivoStack extends cdk.Stack {
         },
         httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
         priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
-        minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_3_2022,
+        minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_3_2025,
       });
 
       new route53.ARecord(this, 'ApiDnsRecord', {
