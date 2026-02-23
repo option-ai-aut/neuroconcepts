@@ -42,6 +42,7 @@ const TOOL_CATEGORIES: Record<AgentCategory, string[]> = {
     'add_video_to_property', 'set_virtual_tour',
     'get_company_info', 'get_team_members',
     'send_team_message', 'get_team_channels', 'get_channel_messages',
+    'export_data',
   ],
   email: [
     'get_emails', 'get_email', 'draft_email', 'send_email', 'reply_to_email',
@@ -145,6 +146,9 @@ export class AgentRouter {
     // Image/file upload patterns → always CRM (not expose!)
     if (/\b(bild|bilder|foto|fotos|image|images|hochladen|upload|galerie|grundriss|floorplan)\b/i.test(m) && /\b(objekt|immobilie|property|wohnung|haus|büro|loft|hinzufüg|anfüg|add)\b/i.test(m)) return 'crm';
     
+    // Export patterns → always CRM (uses export_data tool)
+    if (/\b(export|exportier|csv|excel|xlsx|herunterladen|download|datei.*leads|leads.*datei|leads.*export|objekte.*export|export.*leads|export.*objekte)\b/i.test(m)) return 'crm';
+
     // CRM patterns (leads, properties, stats — the most common intent)
     if (/\b(lead|leads|kontakt|interessent|objekt|immobilie|wohnung|haus|grundstück|property|anlegen|erstell|lösch|aktualisier|statistik|dashboard|zuweisen|test.*objekt|test.*lead|bild.*hinzufüg|foto.*hinzufüg|hochladen)\b/i.test(m)) return 'crm';
     
