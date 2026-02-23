@@ -206,8 +206,21 @@ export class OpenAIService {
     }
     const streamContextStr = contextParts.length > 0 ? contextParts.join('\n') : '';
 
+    // Extract any file URLs mentioned in recent history (uploaded in a previous turn) as fallback
+    const historyUploadedUrls: string[] = [];
+    for (const h of validHistory) {
+      if (!h.content) continue;
+      const matches = [...String(h.content).matchAll(/\[HOCHGELADENE (?:BILDER|DATEI)[^\]]*\(([^)]+)\)/g)];
+      for (const m of matches) {
+        const url = m[1]?.trim();
+        if (url && url.startsWith('http')) historyUploadedUrls.push(url);
+      }
+    }
+    // Effective files: current request uploads take priority; fall back to URLs found in history
+    const effectiveUploadedFiles = uploadedFiles.length > 0 ? uploadedFiles : historyUploadedUrls;
+
     // Build user message — if images were uploaded, send them as vision content blocks
-    const imageUrls = uploadedFiles.filter(u => /\.(jpe?g|png|gif|webp)(\?|$)/i.test(u));
+    const imageUrls = (uploadedFiles.length > 0 ? uploadedFiles : []).filter(u => /\.(jpe?g|png|gif|webp)(\?|$)/i.test(u));
     const userMessageContent: OpenAI.Chat.ChatCompletionContentPart[] = imageUrls.length > 0
       ? [
           { type: 'text', text: message },
@@ -310,7 +323,7 @@ export class OpenAIService {
 
       if (roundToolCalls.length > 0) {
         hadAnyFunctionCalls = true;
-        const toolResults = await this.executeToolCalls(roundToolCalls, tenantId, uploadedFiles, userId);
+        const toolResults = await this.executeToolCalls(roundToolCalls, tenantId, effectiveUploadedFiles, userId);
         currentMessages.push({ role: 'assistant', content: roundContent || null, tool_calls: roundToolCalls } as any);
         currentMessages.push(...toolResults);
       } else {
@@ -442,6 +455,18 @@ export class OpenAIService {
   ): AsyncGenerator<{ chunk: string; hadFunctionCalls?: boolean; toolsUsed?: string[] }> {
     const streamStartTime = Date.now();
     const validHistory = history.filter(h => h.content != null && h.content !== '');
+
+    // Extract file URLs from previous turns as fallback for tool calls
+    const legacyHistoryUrls: string[] = [];
+    for (const h of validHistory) {
+      if (!h.content) continue;
+      const matches = [...String(h.content).matchAll(/\[HOCHGELADENE (?:BILDER|DATEI)[^\]]*\(([^)]+)\)/g)];
+      for (const m of matches) {
+        const url = m[1]?.trim();
+        if (url && url.startsWith('http')) legacyHistoryUrls.push(url);
+      }
+    }
+    const legacyEffectiveFiles = uploadedFiles.length > 0 ? uploadedFiles : legacyHistoryUrls;
     
     const contextParts: string[] = [];
     if (userContext) {
@@ -537,7 +562,7 @@ export class OpenAIService {
         
         yield { chunk: '', hadFunctionCalls: true, toolsUsed: allToolNames };
 
-        const toolResults = await this.executeToolCalls(roundToolCalls, tenantId, uploadedFiles, userId);
+        const toolResults = await this.executeToolCalls(roundToolCalls, tenantId, legacyEffectiveFiles, userId);
         currentMessages.push({ role: 'assistant', content: roundContent || null, tool_calls: roundToolCalls } as any);
         currentMessages.push(...toolResults);
       } else {

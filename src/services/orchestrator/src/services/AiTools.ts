@@ -386,23 +386,25 @@ export const CRM_TOOLS = {
   },
   upload_images_to_property: {
     name: "upload_images_to_property",
-    description: "Uploads images that were attached to the chat message to a specific property. Use this when the user sends images and asks to add them to a property. The images are automatically taken from the chat attachments.",
+    description: "Uploads images to a specific property. Images are taken from chat attachments of the current message. If the user uploaded images in a PREVIOUS message, extract their URLs from the [HOCHGELADENE BILDER: ...] context in the conversation and pass them via the imageUrls parameter.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         propertyId: { type: SchemaType.STRING, description: "ID of the property to upload images to" } as FunctionDeclarationSchema,
         isFloorplan: { type: SchemaType.BOOLEAN, description: "If true, uploads as floorplans instead of regular images. Default: false" } as FunctionDeclarationSchema,
+        imageUrls: { type: SchemaType.STRING, description: "Comma-separated list of image URLs from previous messages in the conversation context. Use this when the user uploaded images in an earlier message." } as FunctionDeclarationSchema,
       },
       required: ["propertyId"]
     }
   },
   upload_documents_to_lead: {
     name: "upload_documents_to_lead",
-    description: "Uploads files/documents/images that were attached to the chat message to a specific lead. Use this when the user sends files and asks to add them to a lead. The files are automatically taken from the chat attachments.",
+    description: "Uploads files/documents/images to a specific lead. Files are taken from chat attachments of the current message. If files were uploaded in a PREVIOUS message, extract their URLs from the conversation context and pass them via the fileUrls parameter.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         leadId: { type: SchemaType.STRING, description: "ID of the lead to upload documents to. Get this from get_leads first." } as FunctionDeclarationSchema,
+        fileUrls: { type: SchemaType.STRING, description: "Comma-separated list of file URLs from previous messages in the conversation context. Use this when the user uploaded files in an earlier message." } as FunctionDeclarationSchema,
       },
       required: ["leadId"]
     }
@@ -1591,9 +1593,15 @@ export class AiToolExecutor {
       }
 
       case 'upload_images_to_property': {
-        const { propertyId, isFloorplan = false, _uploadedFiles } = args;
+        const { propertyId, isFloorplan = false, _uploadedFiles, imageUrls: imageUrlsArg } = args;
         
-        if (!_uploadedFiles || _uploadedFiles.length === 0) {
+        // Accept URLs from: (1) current-message attachments, (2) URLs passed explicitly by AI from context
+        const extraUrls = imageUrlsArg
+          ? String(imageUrlsArg).split(',').map((u: string) => u.trim()).filter(Boolean)
+          : [];
+        const filesToUpload: string[] = [...(_uploadedFiles || []), ...extraUrls];
+        
+        if (filesToUpload.length === 0) {
           return 'Keine Bilder zum Hochladen gefunden. Bitte hänge zuerst Bilder an deine Nachricht an.';
         }
         
@@ -1609,7 +1617,7 @@ export class AiToolExecutor {
         // Add uploaded files to property
         const arrayField = isFloorplan ? 'floorplans' : 'images';
         const currentArray = isFloorplan ? property.floorplans : property.images;
-        const updatedArray = [...currentArray, ..._uploadedFiles];
+        const updatedArray = [...currentArray, ...filesToUpload];
         
         await getPrisma().property.update({
           where: { id: propertyId },
@@ -1617,13 +1625,19 @@ export class AiToolExecutor {
         });
         
         const typeLabel = isFloorplan ? 'Grundriss(e)' : 'Bild(er)';
-        return `${_uploadedFiles.length} ${typeLabel} wurden zum Objekt "${property.title}" hinzugefügt.`;
+        return `${filesToUpload.length} ${typeLabel} wurden zum Objekt "${property.title}" hinzugefügt.`;
       }
 
       case 'upload_documents_to_lead': {
-        const { leadId, _uploadedFiles } = args;
+        const { leadId, _uploadedFiles, fileUrls: fileUrlsArg } = args;
         
-        if (!_uploadedFiles || _uploadedFiles.length === 0) {
+        // Accept URLs from: (1) current-message attachments, (2) URLs passed explicitly by AI from context
+        const extraUrls = fileUrlsArg
+          ? String(fileUrlsArg).split(',').map((u: string) => u.trim()).filter(Boolean)
+          : [];
+        const filesToUpload: string[] = [...(_uploadedFiles || []), ...extraUrls];
+        
+        if (filesToUpload.length === 0) {
           return 'Keine Dateien zum Hochladen gefunden. Bitte hänge zuerst Dateien an deine Nachricht an.';
         }
         
@@ -1638,7 +1652,7 @@ export class AiToolExecutor {
         
         // Build document entries
         const existingDocs = (lead.documents as any[]) || [];
-        const newDocs = _uploadedFiles.map((url: string) => ({
+        const newDocs = filesToUpload.map((url: string) => ({
           id: `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           name: url.split('/').pop() || 'Dokument',
           url: url,
