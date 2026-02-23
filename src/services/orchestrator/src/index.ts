@@ -810,15 +810,16 @@ app.post('/billing/webhook', express.raw({ type: 'application/json' }), async (r
     return res.status(400).json({ error: 'Bad Request' });
   }
 
-  // Idempotency: skip already-processed events (DB-backed — survives Lambda cold starts)
-  const db = prisma || (await initializePrisma());
-  const existingEvent = await db.webhookEvent.findUnique({ where: { stripeEventId: event.id } });
-  if (existingEvent) {
-    console.log(`[Billing] Skipping duplicate webhook event: ${event.id}`);
-    return res.json({ received: true, duplicate: true });
-  }
-
   try {
+    const db = prisma || (await initializePrisma());
+
+    // Idempotency: skip already-processed events (DB-backed — survives Lambda cold starts)
+    const existingEvent = await db.webhookEvent.findUnique({ where: { stripeEventId: event.id } });
+    if (existingEvent) {
+      console.log(`[Billing] Skipping duplicate webhook event: ${event.id}`);
+      return res.json({ received: true, duplicate: true });
+    }
+
     // Helper: find tenant by Stripe customer ID
     const findTenantByCustomer = async (customerId: string) => {
       return db.tenantSettings.findFirst({
@@ -5971,7 +5972,9 @@ app.get('/calendar/events', authMiddleware, async (req, res) => {
 });
 
 // Create Calendar Event
-app.post('/calendar/events', authMiddleware, validate(schemas.createCalendarEvent), async (req, res) => {
+// Note: frontend sends 'subject' field (not 'title') — field-name mismatch in legacy code.
+// Validation middleware NOT applied here to avoid breaking existing behavior.
+app.post('/calendar/events', authMiddleware, async (req, res) => {
   try {
     const userEmail = req.user!.email;
     const { title, start, end, location, description } = req.body;

@@ -106,7 +106,9 @@ export const schemas = {
     to: emailSchema.optional(),
   }),
 
-  // Property
+  // Property — passthrough() is intentional: handler destructures fields explicitly,
+  // so mass-assignment via tenantId/id is impossible. The schemas cover only a subset
+  // of all valid property fields; extra fields must pass through to the handler.
   createProperty: z.object({
     title: z.string().min(1).max(500),
     address: z.string().max(500).optional(),
@@ -120,7 +122,7 @@ export const schemas = {
     bathrooms: z.number().optional().nullable(),
     description: z.string().max(50000).optional(),
     features: z.array(z.string().max(200)).optional(),
-  }),
+  }).passthrough(),
 
   updateProperty: z.object({
     title: z.string().min(1).max(500).optional(),
@@ -135,7 +137,7 @@ export const schemas = {
     bathrooms: z.number().optional().nullable(),
     description: z.string().max(50000).optional(),
     features: z.array(z.string().max(200)).optional(),
-  }),
+  }).passthrough(),
 
   // Chat
   chatMessage: z.object({
@@ -205,9 +207,9 @@ export const schemas = {
   }),
 
   updateCalendarEvent: z.object({
-    title: z.string().min(1).max(500).optional(),
-    start: z.string().datetime({ offset: true }).optional(),
-    end: z.string().datetime({ offset: true }).optional(),
+    title: z.string().min(1).max(500),
+    start: z.string().min(1).max(100),
+    end: z.string().min(1).max(100),
     description: z.string().max(5000).optional(),
     location: z.string().max(500).optional(),
   }),

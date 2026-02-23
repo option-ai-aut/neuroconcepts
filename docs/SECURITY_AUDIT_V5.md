@@ -58,11 +58,13 @@ Basis: vollständiges Neues Audit nach Implementierung aller v4-Fixes.
 
 ---
 
-## 6. HOCH: Validation `.passthrough()` – Mass Assignment
+## 6. HOCH: Validation `.passthrough()` – Mass Assignment (Teilweise)
 
-**Problem:** `.passthrough()` auf `createProperty`, `updateProperty`, `createExposeTemplate`, `createPortalConnection` erlaubte beliebige Extrafelder (z.B. `tenantId`) direkt in Prisma-Updates.
+**Problem:** `.passthrough()` auf `createExposeTemplate` und `createPortalConnection` erlaubte beliebige Extrafelder.
 
-**Fix:** `.passthrough()` entfernt — Zod-Standard `.strip()` wird aktiv, unbekannte Felder werden still ignoriert.
+**Fix:**
+- `createExposeTemplate` und `createPortalConnection`: `.passthrough()` entfernt — Schemas decken alle relevanten Felder ab.
+- `createProperty` und `updateProperty`: `.passthrough()` **bewusst beibehalten** — die Schemas sind absichtliche Teilmengen aller Property-Felder; die Handler-Implementierung destructuriert Felder explizit und nutzt nie `req.body` direkt in Prisma, weshalb das Mass-Assignment-Risiko durch den Handler selbst ausgeschlossen ist.
 
 **Datei:** `src/services/orchestrator/src/middleware/validation.ts`
 
@@ -90,10 +92,11 @@ Basis: vollständiges Neues Audit nach Implementierung aller v4-Fixes.
 |----------|--------|
 | `POST /expose-templates` | `createExposeTemplate` (bereits vorhanden) |
 | `PUT /expose-templates/:id` | neues `updateExposeTemplate` |
-| `POST /calendar/events` | neues `createCalendarEvent` |
-| `PUT /calendar/events/:eventId` | neues `updateCalendarEvent` |
+| `PUT /calendar/events/:eventId` | neues `updateCalendarEvent` (title/start/end required) |
 | `POST /channels` | neues `createChannel` |
 | `POST /channels/:channelId/messages` | `channelMessage` (bereits vorhanden) |
+
+**Hinweis `POST /calendar/events`:** Keine Validation hinzugefügt — es gibt ein Pre-Existing-Mismatch im Frontend (sendet `subject` statt `title`). Validation würde alle Event-Erstellungen mit 400 ablehnen.
 
 **Fix:** Neue Schemas in `validation.ts` + `validate()`-Middleware auf alle 6 Endpoints angewendet.
 

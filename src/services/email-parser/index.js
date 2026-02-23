@@ -169,8 +169,9 @@ async function processEmail(params) {
         ...(process.env.INTERNAL_API_SECRET ? { 'X-Internal-Secret': process.env.INTERNAL_API_SECRET } : {}),
     };
     const tryOrchestrator = async (url, label) => {
-        console.log(`📤 Sending to ${label}: ${url}/internal/ingest-lead`);
-        const response = await axios_1.default.post(`${url}/internal/ingest-lead`, payload, { timeout: 30000, headers });
+        const baseUrl = url.replace(/\/+$/, '');
+        console.log(`📤 Sending to ${label}: ${baseUrl}/internal/ingest-lead`);
+        const response = await axios_1.default.post(`${baseUrl}/internal/ingest-lead`, payload, { timeout: 30000, headers });
         console.log(`✅ ${label} response:`, JSON.stringify(response.data, null, 2));
         return response.data;
     };
