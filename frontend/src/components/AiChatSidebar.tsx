@@ -252,11 +252,13 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
   
   const abortControllerRef = useRef<AbortController | null>(null);
   const isSubmittingRef = useRef(false);
+  // Brief lock after Stop to prevent the button-swap double-submit:
+  // mousedown=Stop → React re-renders → mouseup lands on Send at same position
+  const justStoppedRef = useRef(false);
   const lastSentMessageRef = useRef<string>('');
   const messagesRef = useRef<Message[]>([]);
   const [removingMsgId, setRemovingMsgId] = useState<string | null>(null);
   const undoTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  // Timestamp of the last handleSubmit call — used as cutoff for undo-last
   const sendTimeRef = useRef<string>('');
 
   useEffect(() => {
@@ -568,15 +570,12 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     e.preventDefault();
     if (!aiChatDraft.trim() && uploadedFiles.length === 0) return;
 
-    if (isSubmittingRef.current) return;
+    if (isSubmittingRef.current || justStoppedRef.current) return;
     isSubmittingRef.current = true;
 
-    // Record when this request was initiated (used by undo-last for cutoff)
     sendTimeRef.current = new Date().toISOString();
-
-    // Cancel any pending undo retries from a previous Stop press
-    undoTimeoutsRef.current.forEach(t => clearTimeout(t));
-    undoTimeoutsRef.current = [];
+    // Do NOT cancel undo retries here — they must continue deleting the
+    // previous aborted request's messages even while a new request runs.
 
     const attachments = uploadedFiles.map(f => ({ name: f.name, type: f.type }));
     const userMsg: Message = { 
@@ -823,6 +822,10 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
       abortControllerRef.current = null;
     }
     isSubmittingRef.current = false;
+    // Lock submissions briefly — prevents the button-swap double-submit where
+    // mouseup after clicking Stop lands on the Send button that just appeared.
+    justStoppedRef.current = true;
+    setTimeout(() => { justStoppedRef.current = false; }, 600);
     setIsLoading(false);
     setIsStreaming(false);
 
