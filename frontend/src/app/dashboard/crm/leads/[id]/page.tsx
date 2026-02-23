@@ -3,7 +3,7 @@
 import { useEffect, useState, use, useRef } from 'react';
 import { getLead, Lead, sendDraftMessage, updateLead, sendManualEmail, deleteLead, uploadLeadDocuments, deleteLeadDocument, DocumentFile, getAuthHeaders } from '@/lib/api';
 import { useRouter } from 'next/navigation';
-import { Mail, Phone, User, Send, MessageSquare, FileText, ArrowLeft, MoreVertical, Calendar, Clock, ChevronDown, Plus, Trash2, Euro, Home, MapPin, Building, Activity, CheckCircle2, Edit3, FileCheck, Upload, Download, File, FileSpreadsheet, FileType, X, Users } from 'lucide-react';
+import { Mail, Phone, User, Send, MessageSquare, FileText, ArrowLeft, MoreVertical, Calendar, Clock, ChevronDown, Plus, Trash2, Euro, Home, MapPin, Building, Activity, CheckCircle2, Edit3, FileCheck, Upload, Download, File, FileSpreadsheet, FileType, X, Users, ExternalLink, InboxIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { getRuntimeConfig } from '@/components/EnvProvider';
@@ -344,7 +344,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         {/* Lead Pipeline */}
         {formData.status !== 'LOST' && (
           <div className="mt-8 pt-6 border-t border-gray-100 overflow-x-auto">
-            <div className="flex items-end gap-0 flex-nowrap min-w-max">
+            <div className="flex items-end gap-0 flex-nowrap min-w-max pb-3">
               {LEAD_STAGES.map((stage, index) => {
                 const currentIndex = getCurrentStageIndex();
                 const isActive = index === currentIndex;
@@ -838,6 +838,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 {activities.length > 0 ? (
                   activities.map((activity, index) => {
                     const isLast = index === activities.length - 1;
+                    const draftId = activity.metadata?.draftId as string | undefined;
                     
                     // Icon & Color based on type
                     let icon = <Activity className="w-4 h-4" />;
@@ -851,16 +852,19 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       iconBg = 'bg-blue-100 text-blue-600';
                     } else if (activity.type === 'EMAIL_SENT') {
                       icon = <Send className="w-4 h-4" />;
-                      iconBg = 'bg-gray-100 text-gray-600';
+                      iconBg = 'bg-blue-100 text-blue-600';
                     } else if (activity.type === 'EMAIL_RECEIVED') {
                       icon = <Mail className="w-4 h-4" />;
-                      iconBg = 'bg-gray-100 text-gray-600';
+                      iconBg = 'bg-indigo-100 text-indigo-600';
                     } else if (activity.type === 'NOTE_ADDED') {
                       icon = <FileText className="w-4 h-4" />;
                       iconBg = 'bg-yellow-100 text-yellow-600';
                     } else if (activity.type === 'FIELD_UPDATED') {
                       icon = <Edit3 className="w-4 h-4" />;
                       iconBg = 'bg-gray-100 text-gray-600';
+                    } else if (activity.type === 'PORTAL_INQUIRY' || activity.type === 'MIVO_QUERY') {
+                      icon = <InboxIcon className="w-4 h-4" />;
+                      iconBg = 'bg-purple-100 text-purple-600';
                     }
                     
                     return (
@@ -889,9 +893,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                           
                           {/* Email Content */}
                           {activity.content && (
-                            <p className="text-sm text-gray-700 mt-2 whitespace-pre-wrap">
-                              {activity.content}
-                            </p>
+                            <div className="mt-2 p-3 bg-gray-50 rounded-md border border-gray-100">
+                              <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                                {activity.content}
+                              </p>
+                            </div>
                           )}
                           
                           {/* Draft Actions */}
@@ -904,6 +910,23 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                                 <Send className="w-3 h-3 mr-1.5" />
                                 Senden
                               </button>
+                            </div>
+                          )}
+
+                          {/* Draft reply button — shown when this activity has an auto-created draft */}
+                          {draftId && (
+                            <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                              <span className="text-xs text-gray-500 flex items-center gap-1">
+                                <FileText className="w-3 h-3" />
+                                Antwort-Entwurf vorhanden
+                              </span>
+                              <Link
+                                href={`/dashboard/inbox?draft=${draftId}`}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-md hover:bg-gray-800 transition-colors"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                Entwurf öffnen
+                              </Link>
                             </div>
                           )}
                         </div>

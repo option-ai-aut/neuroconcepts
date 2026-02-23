@@ -2676,6 +2676,7 @@ app.get('/leads/:id/activities', authMiddleware, async (req, res) => {
         id: a.id,
         type: a.type,
         description: a.description,
+        metadata: a.metadata,
         createdAt: a.createdAt,
         source: 'activity'
       })),
@@ -9235,6 +9236,10 @@ app.post('/mivo/actions/:id/respond', authMiddleware, async (req: any, res) => {
           }
         });
       }
+    } else if ((action.type as string) === 'NEW_LEAD_REPLY') {
+      // For NEW_LEAD_REPLY: "edit_draft" or "skip" — just resolve the action
+      // Draft sending is handled by the frontend via the inbox
+      console.log(`📬 NEW_LEAD_REPLY resolved with: ${response} for action ${action.id}`);
     }
 
     // Resolve the action
@@ -9685,12 +9690,8 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
       // Still create a lead with minimal data
     }
 
-    // 4. Create the lead
+    // 4. Create the lead (email body is stored as Activity/Message — NOT in notes)
     const leadData = parseResult.leadData;
-    let leadNotes = leadData.message || parseResult.rawMessage || '';
-    if (parseResult.hasClickLink) {
-      leadNotes = `⚠️ Portal-Email erfordert Link-Klick. URL: ${parseResult.clickLinkUrl || 'nicht erkannt'}\n\n${leadNotes}`;
-    }
 
     const lead = await db.lead.create({
       data: {
@@ -9702,7 +9703,6 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
         source: 'PORTAL',
         sourceDetails: parseResult.portal,
         status: 'NEW',
-        notes: leadNotes || undefined,
       }
     });
 
@@ -9867,59 +9867,61 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
       }
     }
 
-    // 10. If no property matched, create MivoQuery for assignment
-    let mivoAction = null;
-    if (!matchedProperty && !parseResult.hasClickLink) {
-      const propertyOptions = await getPropertiesForSelection(tenantId);
-      const options = [
-        ...propertyOptions.map(p => ({ id: p.id, label: `${p.label} (${p.address})` })),
-        { id: 'none', label: 'Keinem Objekt zuordnen' }
-      ];
-
-      const targetUser = usersToNotify[0];
-      if (targetUser) {
-        mivoAction = await db.mivoPendingAction.create({
-          data: {
-            tenantId,
-            userId: targetUser,
-            leadId: lead.id,
-            type: 'ASSIGN_PROPERTY',
-            question: `Neuer Lead "${leadName}" via ${parseResult.portal}. Welchem Objekt soll ich die Anfrage zuordnen?`,
-            options,
-            allowCustom: false,
-            context: {
-              leadId: lead.id,
-              portal: parseResult.portal,
-              leadEmail: leadData.email,
-            }
-          }
+    // 10. Auto-create draft reply email (async, fire-and-forget — don't block response)
+    let autoDraftId: string | null = null;
+    const draftTargetUser = usersToNotify[0];
+    if (draftTargetUser && !parseResult.hasClickLink && leadData.email) {
+      try {
+        const draftUser = await db.user.findUnique({
+          where: { id: draftTargetUser },
+          include: { settings: true }
         });
-
-        await db.leadActivity.update({
-          where: { id: activity.id },
-          data: {
-            type: 'MIVO_QUERY',
-            mivoActionId: mivoAction.id,
-          }
-        });
-
-        console.log(`❓ MivoQuery created for property assignment: ${mivoAction.id}`);
-        
-        // Emit SSE event for pending action
-        try {
-          await db.realtimeEvent.create({
+        if (draftUser) {
+          const agentName = [draftUser.firstName, draftUser.lastName].filter(Boolean).join(' ') || draftUser.email;
+          const propertyInfo = matchedProperty ? `\n\nZu Ihrer Anfrage bezüglich "${matchedProperty.title}" stehe ich Ihnen gerne für weitere Fragen zur Verfügung.` : '';
+          const signature = draftUser.settings?.emailSignature ? `\n\n${draftUser.settings.emailSignature}` : `\n\nMit freundlichen Grüßen\n${agentName}`;
+          const draftBody = `Guten Tag ${[leadData.firstName, leadData.lastName].filter(Boolean).join(' ') || ''},\n\nvielen Dank für Ihre Anfrage via ${parseResult.portal}.${propertyInfo}\n\nIch melde mich schnellstmöglich bei Ihnen.${signature}`;
+          
+          const draft = await db.email.create({
             data: {
-              tenantId, userId: targetUser, type: 'PENDING_ACTION',
-              data: { actionId: mivoAction.id, actionType: 'ASSIGN_PROPERTY', leadId: lead.id, leadName },
+              tenantId,
+              from: draftUser.email,
+              fromName: agentName || undefined,
+              to: [leadData.email],
+              subject: `Re: ${subject || `Ihre Anfrage`}`,
+              bodyText: draftBody,
+              bodyHtml: draftBody.replace(/\n/g, '<br>'),
+              folder: 'DRAFTS',
+              isRead: true,
+              leadId: lead.id,
+              providerData: { aiGenerated: false, autoCreated: true, portal: parseResult.portal },
             }
           });
-        } catch (e: any) { console.warn('RealtimeEvent error:', e.message); }
+          autoDraftId = draft.id;
+          console.log(`📝 Auto-draft created: ${draft.id} for lead ${lead.id}`);
+
+          // Store draftId in the activity metadata
+          await db.leadActivity.update({
+            where: { id: activity.id },
+            data: {
+              metadata: {
+                ...(typeof activity.metadata === 'object' && activity.metadata !== null ? activity.metadata as Record<string, unknown> : {}),
+                draftId: draft.id,
+              } as any
+            }
+          });
+        }
+      } catch (draftErr: any) {
+        console.warn('Auto-draft creation failed:', draftErr.message);
       }
     }
 
-    // 11. If hasClickLink, create MivoQuery for link click
+    // 11. Create MivoPendingAction for ALL new leads
+    let mivoAction = null;
+    const targetUser = usersToNotify[0];
+
     if (parseResult.hasClickLink) {
-      const targetUser = usersToNotify[0];
+      // 11a. Link-click required action
       if (targetUser) {
         mivoAction = await db.mivoPendingAction.create({
           data: {
@@ -9948,13 +9950,101 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
         });
 
         console.log(`❓ MivoQuery created for link click: ${mivoAction.id}`);
-        
-        // Emit SSE event for link click required
         try {
           await db.realtimeEvent.create({
             data: {
               tenantId, userId: targetUser, type: 'PENDING_ACTION',
               data: { actionId: mivoAction.id, actionType: 'LINK_CLICK_REQUIRED', leadId: lead.id, leadName },
+            }
+          });
+        } catch (e: any) { console.warn('RealtimeEvent error:', e.message); }
+      }
+    } else if (!matchedProperty) {
+      // 11b. No property matched — ask user to assign property
+      const propertyOptions = await getPropertiesForSelection(tenantId);
+      const options = [
+        ...propertyOptions.map(p => ({ id: p.id, label: `${p.label} (${p.address})` })),
+        { id: 'none', label: 'Keinem Objekt zuordnen' }
+      ];
+
+      if (targetUser) {
+        mivoAction = await db.mivoPendingAction.create({
+          data: {
+            tenantId,
+            userId: targetUser,
+            leadId: lead.id,
+            type: 'ASSIGN_PROPERTY',
+            question: `Neuer Lead "${leadName}" via ${parseResult.portal}. Welchem Objekt soll ich die Anfrage zuordnen?`,
+            options,
+            allowCustom: false,
+            context: {
+              leadId: lead.id,
+              portal: parseResult.portal,
+              leadEmail: leadData.email,
+              draftId: autoDraftId,
+            }
+          }
+        });
+
+        await db.leadActivity.update({
+          where: { id: activity.id },
+          data: {
+            type: 'MIVO_QUERY',
+            mivoActionId: mivoAction.id,
+          }
+        });
+
+        console.log(`❓ MivoQuery created for property assignment: ${mivoAction.id}`);
+        try {
+          await db.realtimeEvent.create({
+            data: {
+              tenantId, userId: targetUser, type: 'PENDING_ACTION',
+              data: { actionId: mivoAction.id, actionType: 'ASSIGN_PROPERTY', leadId: lead.id, leadName },
+            }
+          });
+        } catch (e: any) { console.warn('RealtimeEvent error:', e.message); }
+      }
+    } else {
+      // 11c. Property matched — notify with draft reply option
+      if (targetUser) {
+        const propertyLabel = matchedProperty.title;
+        const draftHint = autoDraftId ? ' Ich habe bereits einen Antwort-Entwurf erstellt.' : '';
+        mivoAction = await db.mivoPendingAction.create({
+          data: {
+            tenantId,
+            userId: targetUser,
+            leadId: lead.id,
+            type: 'NEW_LEAD_REPLY' as any,
+            question: `Neuer Lead "${leadName}" via ${parseResult.portal} für "${propertyLabel}".${draftHint}`,
+            options: [
+              ...(autoDraftId ? [{ id: 'edit_draft', label: 'Entwurf öffnen & senden' }] : []),
+              { id: 'skip', label: 'Später kümmern' },
+            ],
+            allowCustom: false,
+            context: {
+              leadId: lead.id,
+              portal: parseResult.portal,
+              leadEmail: leadData.email,
+              propertyId: matchedProperty.id,
+              draftId: autoDraftId,
+            }
+          }
+        });
+
+        await db.leadActivity.update({
+          where: { id: activity.id },
+          data: {
+            type: 'MIVO_QUERY',
+            mivoActionId: mivoAction.id,
+          }
+        });
+
+        console.log(`📬 NEW_LEAD_REPLY action created: ${mivoAction.id}`);
+        try {
+          await db.realtimeEvent.create({
+            data: {
+              tenantId, userId: targetUser, type: 'PENDING_ACTION',
+              data: { actionId: mivoAction.id, actionType: 'NEW_LEAD_REPLY', leadId: lead.id, leadName, draftId: autoDraftId },
             }
           });
         } catch (e: any) { console.warn('RealtimeEvent error:', e.message); }

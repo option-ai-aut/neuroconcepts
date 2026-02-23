@@ -896,6 +896,7 @@ enum PendingActionType {
   ASSIGN_PROPERTY      // Ask user to assign lead to a property
   LINK_CLICK_REQUIRED  // Portal email requires manual link click
   CLARIFICATION        // General clarification needed
+  NEW_LEAD_REPLY       // New lead arrived, draft reply created
 }
 
 enum PendingActionStatus {

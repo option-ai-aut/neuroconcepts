@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Bot, Paperclip, FileText, RotateCcw, X, Image as ImageIcon, AlertCircle, Loader2, Square } from 'lucide-react';
+import { Send, Bot, Paperclip, FileText, RotateCcw, X, Image as ImageIcon, AlertCircle, Loader2, Square, Mail, ExternalLink, User } from 'lucide-react';
 import NextImage from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useGlobalState } from '@/context/GlobalStateContext';
@@ -61,6 +61,7 @@ interface MivoAction {
   allowCustom: boolean;
   status: string;
   createdAt: string;
+  context?: Record<string, any>;
 }
 
 // Human-readable tool names with icons
@@ -987,29 +988,76 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         {/* Pending Mivo Actions */}
         {pendingActions.length > 0 && (
           <div className="space-y-3 mb-4">
-            {pendingActions.map((action) => (
-              <div key={action.id} className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <div className="flex items-start gap-2 mb-2">
-                  <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-gray-800">{action.question}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {action.options?.map((option) => (
-                    <button
-                      key={option.id}
-                      onClick={() => handleRespondToAction(action.id, option.id)}
-                      disabled={respondingTo === action.id}
-                      className="px-3 py-1.5 text-xs font-medium bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-md transition-colors disabled:opacity-50 flex items-center gap-1"
+            {pendingActions.map((action) => {
+              const draftId = action.context?.draftId as string | undefined;
+              const leadId = action.leadId || action.context?.leadId as string | undefined;
+              const isNewLeadReply = action.type === 'NEW_LEAD_REPLY';
+
+              return (
+                <div key={action.id} className={`rounded-lg p-3 border ${isNewLeadReply ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'}`}>
+                  {/* Header */}
+                  <div className="flex items-start gap-2 mb-2">
+                    {isNewLeadReply
+                      ? <Mail className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                      : <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                    }
+                    <p className="text-sm text-gray-800">{action.question}</p>
+                  </div>
+
+                  {/* Draft hint for NEW_LEAD_REPLY */}
+                  {isNewLeadReply && draftId && (
+                    <a
+                      href={`/dashboard/inbox?draft=${draftId}`}
+                      className="flex items-center gap-1.5 text-xs text-blue-700 bg-blue-100 hover:bg-blue-200 px-3 py-1.5 rounded-md mb-2 transition-colors w-fit"
                     >
-                      {respondingTo === action.id && (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      )}
-                      {option.label}
-                    </button>
-                  ))}
+                      <ExternalLink className="w-3 h-3" />
+                      Antwort-Entwurf in Inbox öffnen
+                    </a>
+                  )}
+
+                  {/* Lead link */}
+                  {leadId && (
+                    <a
+                      href={`/dashboard/crm/leads/${leadId}`}
+                      className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 mb-2 transition-colors w-fit"
+                    >
+                      <User className="w-3 h-3" />
+                      Lead-Detailansicht
+                    </a>
+                  )}
+
+                  {/* Action buttons */}
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {action.options?.map((option) => {
+                      const isDraftButton = option.id === 'edit_draft' && draftId;
+                      if (isDraftButton) {
+                        return (
+                          <a
+                            key={option.id}
+                            href={`/dashboard/inbox?draft=${draftId}`}
+                            className="px-3 py-1.5 text-xs font-medium bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-md transition-colors flex items-center gap-1"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            {option.label}
+                          </a>
+                        );
+                      }
+                      return (
+                        <button
+                          key={option.id}
+                          onClick={() => handleRespondToAction(action.id, option.id)}
+                          disabled={respondingTo === action.id}
+                          className="px-3 py-1.5 text-xs font-medium bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-md transition-colors disabled:opacity-50 flex items-center gap-1"
+                        >
+                          {respondingTo === action.id && <Loader2 className="w-3 h-3 animate-spin" />}
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
