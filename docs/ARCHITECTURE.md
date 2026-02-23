@@ -117,7 +117,7 @@ Die Datenschicht nutzt **Prisma ORM** (`schema.prisma`). Aktuelle Models:
 
 *   **Funktion:** `applyPendingMigrations()` in `index.ts`
 *   **Ausfuehrung:** Automatisch beim Lambda Cold Start (und beim lokalen Server-Start)
-*   **Versionierung:** `MIGRATION_VERSION` (aktuell: 10) wird in `_MigrationMeta`-Tabelle gespeichert. Migrationen laufen nur wenn die Version aelter ist.
+*   **Versionierung:** `MIGRATION_VERSION` (aktuell: **15**) wird in `_MigrationMeta`-Tabelle gespeichert. Migrationen laufen nur wenn die Version aelter ist.
 *   **Sicherheit:** Alle SQL-Statements nutzen `IF NOT EXISTS`/`IF EXISTS` — idempotent und sicher bei mehrfacher Ausfuehrung.
 *   **Ablauf:**
     1. Lambda startet → `initializeApp()` → Prisma Client wird erstellt
@@ -155,7 +155,7 @@ When a new lead is created from email: (1) LeadEnrichmentService runs async (dup
 *   **Image Editing:** Google Gemini (gemini-2.5-flash-image) — Virtual Staging im KI-Bildstudio und direkt im Mivo-Chat via `virtual_staging`-Tool.
 *   **Multi-Agent Router (Phase 2.3):** `AgentRouter.ts` uses gpt-5-mini to classify user intent into categories (smalltalk, crm, email, calendar, expose, memory, multi). Smalltalk goes directly to gpt-5-mini with no tools (cost-optimized). Other categories receive filtered tool subsets for faster, more accurate responses. Email parsing/reading also uses gpt-5-mini; email response generation uses gpt-5.2.
 *   **pgvector RAG & semantic_search (Phase 2.2):** `EmbeddingService.ts` handles embedding generation via `text-embedding-3-small`, storage in the Embedding table, and cosine similarity search. New Mivo tool `semantic_search` enables natural language entity search across Properties and Leads.
-*   **63+ Tools:** Leads, Properties (inkl. aller Felder), Exposés, Templates, Team-Chat, Statistiken, Virtual Staging, Gedächtnis, `semantic_search` u.v.m.
+*   **68 Tools:** Leads, Properties (inkl. aller Felder), Exposés, Templates, Team-Chat, E-Mail inkl. Signatur-Verwaltung, Kalender, Statistiken, Virtual Staging, Gedächtnis, `semantic_search` u.v.m.
 *   **Pricing (OpenAI):** gpt-5.2 $1.75/$14 per 1M tokens (input/output), gpt-5-mini $0.25/$2 per 1M tokens.
 *   **Aufgaben:**
     *   **Intent Recognition:** Was will der Lead? (Besichtigung, Frage, Absage?)
@@ -173,7 +173,7 @@ When a new lead is created from email: (1) LeadEnrichmentService runs async (dup
 *   **E-Mail Outbound:**
     *   **Lead-Kommunikation (OAuth):** Gmail oder Outlook Mail über OAuth-Integration (White-Labeling über Makler-Domain).
     *   **System-E-Mails (Resend):** Benachrichtigungen, Erinnerungen, Eskalationen via Resend API (Absender: noreply@immivo.ai).
-*   **E-Mail Inbound:** AWS SES empfängt E-Mails (Portal-Weiterleitungen) → Email-Parser Lambda extrahiert Lead-Daten.
+*   **E-Mail Inbound:** AWS SES empfängt E-Mails an `@leads.immivo.ai` → S3 Bucket → Email-Parser Lambda (PROD) liest E-Mail, sendet an Orchestrator `/internal/ingest-lead`. Bei 404 (Tenant nicht in PROD-DB) automatischer Fallback auf TEST-Orchestrator. Mivo (gpt-5-mini) klassifiziert jede eingehende E-Mail (LEAD_INQUIRY / NEWSLETTER / INVOICE / NOTIFICATION / SPAM) und extrahiert Lead-Daten inkl. Portal-Erkennung.
 *   **E-Mail Postfächer:** AWS WorkMail (dennis.kral@immivo.ai, josef.leutgeb@immivo.ai, office@immivo.ai, support@immivo.ai).
 *   **Kalender:** AWS WorkMail Kalender via CalDAV (geplant: Google Meet Integration für Videocalls).
 *   **Medien:** AWS S3 für Bildupload (Objekt-Fotos, Grundrisse, Bug-Report-Screenshots), ausgeliefert via **CloudFront CDN** (`media.immivo.ai`).

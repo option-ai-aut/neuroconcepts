@@ -303,7 +303,7 @@ async function initializePrisma() {
 // Auto-migration: Apply missing columns/tables that exist in Prisma schema but not in DB
 // Each statement uses IF NOT EXISTS / IF EXISTS so it's safe to run multiple times
 // Version-gated: Only runs full migration set when version changes
-const MIGRATION_VERSION = 14; // Increment when adding new migrations
+const MIGRATION_VERSION = 15; // Increment when adding new migrations
 let _migrationsApplied = false;
 
 async function applyPendingMigrations(db: PrismaClient) {
@@ -507,6 +507,12 @@ async function applyPendingMigrations(db: PrismaClient) {
     `CREATE UNIQUE INDEX IF NOT EXISTS "WebhookEvent_stripeEventId_key" ON "WebhookEvent"("stripeEventId")`,
     `CREATE INDEX IF NOT EXISTS "WebhookEvent_stripeEventId_idx" ON "WebhookEvent"("stripeEventId")`,
     `CREATE INDEX IF NOT EXISTS "WebhookEvent_processedAt_idx" ON "WebhookEvent"("processedAt")`,
+    // 2026-02-23: v15 - Email signature on UserSettings + Email provider/attachments tracking
+    'ALTER TABLE "UserSettings" ADD COLUMN IF NOT EXISTS "emailSignature" TEXT',
+    'ALTER TABLE "UserSettings" ADD COLUMN IF NOT EXISTS "emailSignatureName" TEXT',
+    'ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "hasAttachments" BOOLEAN NOT NULL DEFAULT false',
+    `DO $$ BEGIN CREATE TYPE "EmailProvider" AS ENUM ('GMAIL', 'OUTLOOK', 'SMTP', 'OTHER'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    'ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "provider" "EmailProvider"',
   ];
   
   for (const sql of migrations) {

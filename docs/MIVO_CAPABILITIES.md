@@ -99,25 +99,27 @@ This reduces latency and cost for simple queries (e.g. smalltalk) while keeping 
 - Ergebnis-Bild wird **inline im Chat** angezeigt
 - Strikte Regel: Nur Möbel/Deko werden hinzugefügt — Wände, Türen, Fenster, Böden etc. bleiben unverändert
 
-### 📧 E-MAILS (6 Tools)
+### 📧 E-MAILS (8 Tools)
 
 | Tool | Beschreibung | Status | Beispiel |
 |------|--------------|--------|----------|
-| `get_emails` | E-Mails abrufen | 🚧 Coming Soon | "Zeig mir ungelesene E-Mails" |
-| `get_email` | Einzelne E-Mail | 🚧 Coming Soon | "Zeig mir E-Mail ABC-123" |
-| `draft_email` | E-Mail-Entwurf | 🚧 Coming Soon | "Erstelle einen Entwurf an max@test.de" |
-| `send_email` | E-Mail senden | 🚧 Coming Soon | "Sende E-Mail an max@test.de" |
-| `reply_to_email` | Auf E-Mail antworten | 🚧 Coming Soon | "Antworte auf E-Mail XYZ" |
+| `get_emails` | E-Mails abrufen | ✅ Aktiv | "Zeig mir ungelesene E-Mails" |
+| `get_email` | Einzelne E-Mail | ✅ Aktiv | "Zeig mir E-Mail ABC-123" |
+| `draft_email` | E-Mail-Entwurf | ✅ Aktiv | "Erstelle einen Entwurf an max@test.de" |
+| `send_email` | E-Mail senden | ✅ Aktiv | "Sende E-Mail an max@test.de" |
+| `reply_to_email` | Auf E-Mail antworten | ✅ Aktiv | "Antworte auf E-Mail XYZ" |
 | `get_email_templates` | E-Mail-Templates | ✅ Aktiv | "Zeig mir alle E-Mail-Vorlagen" |
+| `get_email_signature` | Aktuelle E-Mail-Signatur lesen | ✅ Aktiv | "Was ist meine aktuelle Signatur?" |
+| `update_email_signature` | E-Mail-Signatur setzen/aktualisieren | ✅ Aktiv | "Erstelle mir eine professionelle HTML-Signatur" |
 
 ### 📅 KALENDER (5 Tools)
 
 | Tool | Beschreibung | Status | Beispiel |
 |------|--------------|--------|----------|
-| `get_calendar_events` | Termine abrufen | 🚧 Coming Soon | "Was steht heute im Kalender?" |
-| `create_calendar_event` | Termin erstellen | 🚧 Coming Soon | "Erstelle Termin für Dienstag 14 Uhr" |
-| `update_calendar_event` | Termin ändern | 🚧 Coming Soon | "Verschiebe Termin ABC auf Mittwoch" |
-| `delete_calendar_event` | Termin löschen | 🚧 Coming Soon | "Lösche Termin XYZ" |
+| `get_calendar_events` | Termine abrufen | ✅ Aktiv | "Was steht heute im Kalender?" |
+| `create_calendar_event` | Termin erstellen | ✅ Aktiv | "Erstelle Termin für Dienstag 14 Uhr" |
+| `update_calendar_event` | Termin ändern | ✅ Aktiv | "Verschiebe Termin ABC auf Mittwoch" |
+| `delete_calendar_event` | Termin löschen | ✅ Aktiv | "Lösche Termin XYZ" |
 | `get_calendar_availability` | Verfügbarkeit prüfen | ✅ Aktiv | "Bin ich nächste Woche Dienstag frei?" |
 
 ### 📄 EXPOSÉS & TEMPLATES (17 Tools)
@@ -230,10 +232,9 @@ Datum:    {{date.today}}, {{date.year}}
 - ✅ Bild → Vision-Input (GPT sieht das Foto wirklich)
 - ✅ Datei-URLs persistent in Chat-History → 2 Nachrichten später noch nutzbar
 
-## Gesamt: 64+ Tools
+## Gesamt: 68 Tools
 
-- ✅ **53 Tools aktiv**
-- 🚧 **9 Tools in Entwicklung** (E-Mail & Kalender-Integration)
+- ✅ **68 Tools aktiv** (alle E-Mail- und Kalender-Tools live)
 - 🎨 **1 Virtual Staging Tool** (Google Gemini)
 - ✨ **Server-seitige Datei-Verarbeitung** (docx, xlsx, pdf, pptx, txt, json, Bilder)
 - 🧠 **4 Gedächtnis-Tools** (Chatverlauf, Kontext, Memory)
@@ -370,8 +371,8 @@ Bei kritischen Operationen (Löschen, E-Mail-Versand) fragt Mivo nach Bestätigu
 - ✅ OpenAI Vision für hochgeladene Bilder
 - ✅ Datei-Persistenz in Chat-History (Referenz nach mehreren Nachrichten)
 - ✅ Automatische Spracherkennung (antwortet in Sprache des Users)
-- 🚧 E-Mail-Integration (SMTP)
-- 🚧 Kalender-Integration (Google/Outlook)
+- ✅ E-Mail-Integration (Gmail, Outlook, SMTP) inkl. Signatur-Verwaltung
+- ✅ Kalender-Integration (Google Calendar, Outlook Calendar)
 
 ### Q2 2026
 - ✅ Predictive Analytics (Conversion-Wahrscheinlichkeit, optimale Kontaktzeit, Preis-Schätzung)
