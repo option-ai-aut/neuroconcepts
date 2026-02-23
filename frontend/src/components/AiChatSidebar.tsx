@@ -808,39 +808,30 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
   };
 
   const handleStop = () => {
-    // Signal abort first so the async loop stops ASAP
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
     isSubmittingRef.current = false;
+    lastSentMessageRef.current = '';
     setIsLoading(false);
     setIsStreaming(false);
 
-    // Restore the sent message to the input field
-    if (lastSentMessageRef.current) {
-      setAiChatDraft(lastSentMessageRef.current);
-      lastSentMessageRef.current = '';
-    }
-
-    // Read current messages synchronously via ref (avoids stale closure and
-    // keeps the setMessages updater pure — no side-effects inside it).
-    const currentMsgs = messagesRef.current;
-    const cleaned = currentMsgs.filter(m =>
-      !m.isAction && !(m.role === 'ASSISTANT' && m.status !== 'done')
+    // The user message is already persisted server-side the moment the request
+    // arrives, so we must NOT pretend it was "unsent" (that caused duplicates
+    // when the user re-sent the restored draft).  Instead: keep the user
+    // message, discard action indicators and incomplete assistant messages.
+    // Partial responses with visible text are kept and marked done.
+    setMessages(prev => prev
+      .filter(m => !m.isAction)
+      .map(m => {
+        if (m.role === 'ASSISTANT' && m.status !== 'done') {
+          return m.content?.trim() ? { ...m, status: 'done' as const } : null;
+        }
+        return m;
+      })
+      .filter(Boolean) as Message[]
     );
-    const lastUserMsg = [...cleaned].reverse().find(m => m.role === 'USER');
-
-    setMessages(cleaned); // pure update — React can call this as many times as it wants
-
-    // Animate the last USER message sliding out, then remove it
-    if (lastUserMsg) {
-      setRemovingMsgId(lastUserMsg.id);
-      setTimeout(() => {
-        setMessages(p => p.filter(m => m.id !== lastUserMsg.id));
-        setRemovingMsgId(null);
-      }, 320);
-    }
   };
 
   return (
