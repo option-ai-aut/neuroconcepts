@@ -7378,8 +7378,83 @@ app.post('/emails/send', authMiddleware, async (req: any, res) => {
         console.error('SMTP send error:', smtpError);
         sendResult = { success: false, error: smtpError.message };
       }
+    } else if (settings?.outlookMailConfig) {
+      // Send via Outlook (Microsoft Graph API)
+      const outlookCfg = settings.outlookMailConfig as any;
+      let outlookAccessToken = outlookCfg.accessToken;
+      let outlookRefreshToken = outlookCfg.refreshToken;
+
+      try { outlookAccessToken = encryptionService.decrypt(outlookAccessToken); } catch {}
+      try { outlookRefreshToken = encryptionService.decrypt(outlookRefreshToken); } catch {}
+
+      // Refresh token if expired (within 5 min buffer)
+      if (outlookCfg.expiryDate && Date.now() > outlookCfg.expiryDate - 5 * 60 * 1000) {
+        try {
+          const refreshed = await EmailService.refreshOutlookMailToken(outlookRefreshToken);
+          outlookAccessToken = refreshed.accessToken;
+          // Persist updated token
+          await db.tenantSettings.update({
+            where: { tenantId: user.tenantId },
+            data: {
+              outlookMailConfig: {
+                ...outlookCfg,
+                accessToken: encryptionService.encrypt(refreshed.accessToken),
+                expiryDate: refreshed.expiryDate,
+              } as any
+            }
+          });
+        } catch (refreshErr: any) {
+          console.error('Outlook token refresh failed:', refreshErr.message);
+          return res.status(401).json({ error: 'Outlook-Token abgelaufen. Bitte Outlook erneut verbinden.' });
+        }
+      }
+
+      try {
+        // Resolve attachments for Outlook Graph API
+        const graphAttachments: any[] = [];
+        if (Array.isArray(attachmentPayload) && attachmentPayload.length > 0) {
+          for (const att of attachmentPayload) {
+            try {
+              let b64 = att.data;
+              if (!b64 && att.url) {
+                const resp = await fetch(att.url);
+                if (resp.ok) b64 = Buffer.from(await resp.arrayBuffer()).toString('base64');
+              }
+              if (b64) {
+                graphAttachments.push({
+                  '@odata.type': '#microsoft.graph.fileAttachment',
+                  name: att.name || 'attachment',
+                  contentType: att.type || 'application/octet-stream',
+                  contentBytes: b64,
+                });
+              }
+            } catch (e) { console.warn('Outlook attachment resolve error:', e); }
+          }
+        }
+
+        const { Client } = require('@microsoft/microsoft-graph-client');
+        const graphClient = Client.init({ authProvider: (done: any) => done(null, outlookAccessToken) });
+
+        const message: any = {
+          message: {
+            subject,
+            body: { contentType: 'HTML', content: finalHtml || finalBody.replace(/\n/g, '<br>') },
+            toRecipients: (Array.isArray(to) ? to : [to]).map((addr: string) => ({ emailAddress: { address: addr } })),
+            ...(cc ? { ccRecipients: (Array.isArray(cc) ? cc : [cc]).map((addr: string) => ({ emailAddress: { address: addr } })) } : {}),
+            ...(bcc ? { bccRecipients: (Array.isArray(bcc) ? bcc : [bcc]).map((addr: string) => ({ emailAddress: { address: addr } })) } : {}),
+            ...(graphAttachments.length > 0 ? { attachments: graphAttachments } : {}),
+          },
+          saveToSentItems: false, // We save manually in our DB below
+        };
+
+        await graphClient.api('/me/sendMail').post(message);
+        sendResult = { success: true, provider: 'outlook' };
+      } catch (outlookError: any) {
+        console.error('Outlook send error:', outlookError);
+        sendResult = { success: false, error: outlookError.message };
+      }
     } else {
-      return res.status(400).json({ error: 'No email provider configured. Please connect Gmail or configure SMTP in settings.' });
+      return res.status(400).json({ error: 'Kein E-Mail-Anbieter konfiguriert. Bitte Gmail, Outlook oder SMTP verbinden.' });
     }
 
     if (sendResult.success) {
@@ -7400,7 +7475,7 @@ app.post('/emails/send', authMiddleware, async (req: any, res) => {
           folder: 'SENT',
           isRead: true,
           hasAttachments: Array.isArray(attachmentPayload) && attachmentPayload.length > 0,
-          provider: sendResult.provider === 'gmail' ? 'GMAIL' : 'SMTP',
+          provider: sendResult.provider === 'gmail' ? 'GMAIL' : sendResult.provider === 'outlook' ? 'OUTLOOK' : 'SMTP',
           leadId: leadId || undefined,
           sentAt: new Date(),
         }

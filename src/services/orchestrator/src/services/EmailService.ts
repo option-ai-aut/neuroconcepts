@@ -275,29 +275,41 @@ export class EmailService {
     };
   }
 
-  static async sendOutlookEmail(accessToken: string, to: string, subject: string, body: string, html?: string) {
+  static async sendOutlookEmail(
+    accessToken: string,
+    to: string,
+    subject: string,
+    body: string,
+    html?: string,
+    options?: { cc?: string; bcc?: string; attachments?: Array<{ filename: string; content: Buffer | string; contentType?: string }> }
+  ) {
     const client = Client.init({
       authProvider: (done) => {
         done(null, accessToken);
       }
     });
 
-    const message = {
+    const toList = to.split(',').map(a => ({ emailAddress: { address: a.trim() } }));
+    const ccList = options?.cc ? options.cc.split(',').map(a => ({ emailAddress: { address: a.trim() } })) : undefined;
+    const bccList = options?.bcc ? options.bcc.split(',').map(a => ({ emailAddress: { address: a.trim() } })) : undefined;
+
+    const graphAttachments = options?.attachments?.map(att => ({
+      '@odata.type': '#microsoft.graph.fileAttachment',
+      name: att.filename,
+      contentType: att.contentType || 'application/octet-stream',
+      contentBytes: Buffer.isBuffer(att.content) ? att.content.toString('base64') : Buffer.from(att.content as string).toString('base64'),
+    }));
+
+    const message: any = {
       message: {
-        subject: subject,
-        body: {
-          contentType: html ? 'HTML' : 'Text',
-          content: html || body
-        },
-        toRecipients: [
-          {
-            emailAddress: {
-              address: to
-            }
-          }
-        ]
+        subject,
+        body: { contentType: html ? 'HTML' : 'Text', content: html || body },
+        toRecipients: toList,
+        ...(ccList ? { ccRecipients: ccList } : {}),
+        ...(bccList ? { bccRecipients: bccList } : {}),
+        ...(graphAttachments && graphAttachments.length > 0 ? { attachments: graphAttachments } : {}),
       },
-      saveToSentItems: true
+      saveToSentItems: true,
     };
 
     await client.api('/me/sendMail').post(message);
