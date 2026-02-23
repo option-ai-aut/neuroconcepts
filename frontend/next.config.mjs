@@ -70,7 +70,7 @@ const nextConfig = {
               "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
-              "img-src 'self' data: blob: https://*.immivo.ai https://*.amazonaws.com https://*.wikimedia.org https://*.googleapis.com",
+              "img-src 'self' data: blob: https: https://*.immivo.ai https://*.amazonaws.com https://*.wikimedia.org https://*.googleapis.com",
               "media-src 'self' https://*.immivo.ai",
               `connect-src 'self' https://*.immivo.ai https://*.amazonaws.com https://*.on.aws https://cognito-idp.eu-central-1.amazonaws.com${devConnectSrc}`,
               "frame-src 'self'",

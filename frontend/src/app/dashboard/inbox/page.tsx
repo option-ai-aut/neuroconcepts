@@ -126,7 +126,7 @@ function EmailBodyViewer({ email, onContentClick }: { email: Email; onContentCli
     `;
 
     doc.open();
-    doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${baseStyles}</style></head><body>${content}</body></html>`);
+    doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src https: data: cid:; font-src https: data:;"><style>${baseStyles}</style></head><body>${content}</body></html>`);
     doc.close();
 
     const checkHeight = () => {

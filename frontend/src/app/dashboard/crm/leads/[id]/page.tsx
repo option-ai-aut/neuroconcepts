@@ -147,7 +147,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       await updateLead(id, data);
       // Reload activities after update
       const config = getRuntimeConfig();
-      const res = await fetch(`${config.apiUrl}/leads/${id}/activities`);
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${config.apiUrl}/leads/${id}/activities`, { headers });
       if (res.ok) {
         const activitiesData = await res.json();
         setActivities(activitiesData);

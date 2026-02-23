@@ -76,7 +76,7 @@ function EmailBodyViewer({ email }: { email: AdminEmail }) {
     `;
 
     doc.open();
-    doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>${baseStyles}</style></head><body>${content}</body></html>`);
+    doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src https: data: cid:; font-src https: data:;"><style>${baseStyles}</style></head><body>${content}</body></html>`);
     doc.close();
 
     const checkHeight = () => {
