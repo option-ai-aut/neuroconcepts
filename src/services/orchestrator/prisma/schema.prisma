@@ -1298,3 +1298,14 @@ model AdminChatMessage {
 
   @@index([channelId, createdAt])
 }
+
+// --- Stripe Webhook Idempotency ---
+
+model WebhookEvent {
+  id            String   @id @default(uuid())
+  stripeEventId String   @unique
+  processedAt   DateTime @default(now())
+
+  @@index([stripeEventId])
+  @@index([processedAt])
+}

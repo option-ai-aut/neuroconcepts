@@ -140,36 +140,48 @@ interface ProcessEmailParams {
 }
 
 /**
- * Send email data to Orchestrator for processing
+ * Send email data to Orchestrator for processing.
+ * Tries primary URL first; on 404 (tenant not found) falls back to FALLBACK_ORCHESTRATOR_URL.
  */
 async function processEmail(params: ProcessEmailParams) {
   const { to, from, subject, text, html, orchestratorUrl, rawEmailKey } = params;
+  const fallbackUrl = process.env.FALLBACK_ORCHESTRATOR_URL;
 
-  console.log(`📤 Sending email to Orchestrator: ${orchestratorUrl}/internal/ingest-lead`);
+  const payload = { recipientEmail: to, from, subject, text, html, rawEmailKey };
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(process.env.INTERNAL_API_SECRET ? { 'X-Internal-Secret': process.env.INTERNAL_API_SECRET } : {}),
+  };
+
+  const tryOrchestrator = async (url: string, label: string) => {
+    const baseUrl = url.replace(/\/+$/, '');
+    console.log(`📤 Sending to ${label}: ${baseUrl}/internal/ingest-lead`);
+    const response = await axios.post(`${baseUrl}/internal/ingest-lead`, payload, { timeout: 30000, headers });
+    console.log(`✅ ${label} response:`, JSON.stringify(response.data, null, 2));
+    return response.data;
+  };
 
   try {
-    const response = await axios.post(`${orchestratorUrl}/internal/ingest-lead`, {
-      recipientEmail: to,
-      from,
-      subject,
-      text,
-      html,
-      rawEmailKey,
-    }, {
-      timeout: 30000,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(process.env.INTERNAL_API_SECRET ? { 'X-Internal-Secret': process.env.INTERNAL_API_SECRET } : {}),
-      }
-    });
-
-    console.log(`✅ Orchestrator response:`, JSON.stringify(response.data, null, 2));
-    
-    return response.data;
+    return await tryOrchestrator(orchestratorUrl, 'Orchestrator');
   } catch (error: any) {
+    const status = error.response?.status;
+    // 404 = tenant not found in this env → try fallback (e.g. test env)
+    if ((status === 404 || status === 400) && fallbackUrl) {
+      console.log(`⚠️ Tenant not found in primary (${status}), trying fallback orchestrator...`);
+      try {
+        return await tryOrchestrator(fallbackUrl, 'Fallback Orchestrator');
+      } catch (fallbackError: any) {
+        console.error('❌ Fallback orchestrator also failed:', fallbackError.message);
+        if (fallbackError.response) {
+          console.error('Fallback status:', fallbackError.response.status);
+          console.error('Fallback data:', fallbackError.response.data);
+        }
+        throw fallbackError;
+      }
+    }
     console.error('❌ Failed to send to Orchestrator:', error.message);
     if (error.response) {
-      console.error('Response status:', error.response.status);
+      console.error('Response status:', status);
       console.error('Response data:', error.response.data);
     }
     throw error;

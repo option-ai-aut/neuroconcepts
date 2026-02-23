@@ -46,7 +46,7 @@ Hat sich `schema.prisma` geändert? Wenn ja:
 
 - [ ] Ist jede neue Tabelle in `ensureAdminTables` abgedeckt?
 - [ ] Ist jede neue Spalte in `applyPendingMigrations` als `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` enthalten?
-- [ ] Wurde `MIGRATION_VERSION` erhöht (z.B. von 13 auf 14)?
+- [ ] Wurde `MIGRATION_VERSION` erhöht? (aktuell: **14**, nach v5-Audit — `WebhookEvent`-Tabelle)
 
 > **Faustregel**: Neue Tabellen → `ensureAdminTables` in `index.ts`. Neue Spalten auf bestehenden Tabellen → `applyPendingMigrations` in `index.ts` + `MIGRATION_VERSION` erhöhen.
 
@@ -246,3 +246,7 @@ Das lokale Frontend verbindet sich automatisch mit `localhost:3001` (via `NODE_E
 ### Post-Deploy Step schlägt fehl: `curl: (22) The requested URL returned error: 403`
 **Ursache**: ADMIN_SECRET konnte nicht aus Secrets Manager geladen werden (IAM-Rechte fehlen für Deploy-Role).  
 **Fix**: Sicherstellen dass `AWS_DEPLOY_ROLE_ARN` IAM-Recht `secretsmanager:GetSecretValue` auf `Immivo-App-Secret-*` hat.
+
+### Stripe-Webhook wird doppelt verarbeitet
+**Ursache**: `WebhookEvent`-Tabelle noch nicht migriert (MIGRATION_VERSION 14 noch nicht angewendet).  
+**Fix**: `POST /admin/migrate` mit `force:true` aufrufen (passiert automatisch im Deploy-Pipeline).

@@ -303,7 +303,7 @@ async function initializePrisma() {
 // Auto-migration: Apply missing columns/tables that exist in Prisma schema but not in DB
 // Each statement uses IF NOT EXISTS / IF EXISTS so it's safe to run multiple times
 // Version-gated: Only runs full migration set when version changes
-const MIGRATION_VERSION = 13; // Increment when adding new migrations
+const MIGRATION_VERSION = 14; // Increment when adding new migrations
 let _migrationsApplied = false;
 
 async function applyPendingMigrations(db: PrismaClient) {
@@ -497,6 +497,16 @@ async function applyPendingMigrations(db: PrismaClient) {
     `CREATE UNIQUE INDEX IF NOT EXISTS "TenantSettings_inboundLeadEmail_key" ON "TenantSettings"("inboundLeadEmail")`,
     // Unique index for LeadActivity.mivoActionId
     `CREATE UNIQUE INDEX IF NOT EXISTS "LeadActivity_mivoActionId_key" ON "LeadActivity"("mivoActionId")`,
+    // 2026-02-19: v14 - Stripe Webhook Idempotency (DB-backed, survives Lambda cold starts)
+    `CREATE TABLE IF NOT EXISTS "WebhookEvent" (
+      "id" TEXT NOT NULL DEFAULT gen_random_uuid()::text,
+      "stripeEventId" TEXT NOT NULL,
+      "processedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "WebhookEvent_pkey" PRIMARY KEY ("id")
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "WebhookEvent_stripeEventId_key" ON "WebhookEvent"("stripeEventId")`,
+    `CREATE INDEX IF NOT EXISTS "WebhookEvent_stripeEventId_idx" ON "WebhookEvent"("stripeEventId")`,
+    `CREATE INDEX IF NOT EXISTS "WebhookEvent_processedAt_idx" ON "WebhookEvent"("processedAt")`,
   ];
   
   for (const sql of migrations) {
@@ -693,9 +703,10 @@ const allowedOrigins = [
 
 const isProduction = process.env.STAGE === 'prod';
 
-// OAuth callbacks are browser-navigated GET redirects (from Google/Microsoft)
-// and therefore never carry an Origin header — they must bypass the CORS check.
-const OAUTH_CALLBACK_PATHS = [
+// These paths never carry an Origin header and must bypass the CORS check:
+// - OAuth callbacks: browser-navigated GET redirects from Google/Microsoft
+// - Internal endpoints: server-to-server calls (Lambda → Orchestrator), protected by X-Internal-Secret
+const CORS_BYPASS_PATHS = [
   '/email/gmail/callback',
   '/email/outlook/callback',
   '/calendar/google/callback',
@@ -723,7 +734,8 @@ const corsMiddleware = cors({
 });
 
 app.use((req, res, next) => {
-  if (OAUTH_CALLBACK_PATHS.includes(req.path)) {
+  // Bypass CORS for OAuth callbacks and internal server-to-server endpoints
+  if (CORS_BYPASS_PATHS.includes(req.path) || req.path.startsWith('/internal/')) {
     return next();
   }
   corsMiddleware(req, res, next);
@@ -776,9 +788,6 @@ setInterval(() => {
 }, 120_000);
 
 // ─── Stripe Webhook (RAW body — must be before express.json) ──────────────────
-// In-memory set for webhook event idempotency (prevents duplicate processing)
-const processedWebhookEvents = new Set<string>();
-const WEBHOOK_DEDUP_TTL = 300_000; // 5 minutes
 
 app.post('/billing/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'] as string;
@@ -801,17 +810,15 @@ app.post('/billing/webhook', express.raw({ type: 'application/json' }), async (r
     return res.status(400).json({ error: 'Bad Request' });
   }
 
-  // Idempotency: skip already-processed events
-  if (processedWebhookEvents.has(event.id)) {
+  // Idempotency: skip already-processed events (DB-backed — survives Lambda cold starts)
+  const db = prisma || (await initializePrisma());
+  const existingEvent = await db.webhookEvent.findUnique({ where: { stripeEventId: event.id } });
+  if (existingEvent) {
     console.log(`[Billing] Skipping duplicate webhook event: ${event.id}`);
     return res.json({ received: true, duplicate: true });
   }
-  processedWebhookEvents.add(event.id);
-  setTimeout(() => processedWebhookEvents.delete(event.id), WEBHOOK_DEDUP_TTL);
 
   try {
-    const db = prisma || (await initializePrisma());
-
     // Helper: find tenant by Stripe customer ID
     const findTenantByCustomer = async (customerId: string) => {
       return db.tenantSettings.findFirst({
@@ -948,6 +955,9 @@ app.post('/billing/webhook', express.raw({ type: 'application/json' }), async (r
       default:
         console.log(`[Billing] Unhandled event type: ${event.type}`);
     }
+
+    // Persist processed event ID for idempotency (survives Lambda cold starts)
+    await db.webhookEvent.create({ data: { stripeEventId: event.id } });
 
     res.json({ received: true });
   } catch (error) {
@@ -1391,6 +1401,7 @@ const publicCalendarBusyLimit = createRateLimit('calBusy', 20, 60_000, 'ip');
 const publicBookDemoLimit = createRateLimit('bookDemo', 3, 60_000, 'ip');
 const uploadLimit = createRateLimit('upload', 20, 60_000, 'user');
 const searchLimit = createRateLimit('search', 30, 60_000, 'user');
+const sseStreamLimit = createRateLimit('sseStream', 10, 60_000, 'user');
 
 // GET /billing/subscription — current plan info
 app.get('/billing/subscription', authMiddleware, billingRateLimitMiddleware, async (req: any, res) => {
@@ -3469,7 +3480,7 @@ app.get('/expose-templates/:id', authMiddleware, async (req, res) => {
 });
 
 // POST /expose-templates - Create new template
-app.post('/expose-templates', authMiddleware, async (req, res) => {
+app.post('/expose-templates', authMiddleware, validate(schemas.createExposeTemplate), async (req, res) => {
   try {
     const { name, blocks, theme, isDefault } = req.body;
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
@@ -3492,7 +3503,7 @@ app.post('/expose-templates', authMiddleware, async (req, res) => {
 });
 
 // PUT /expose-templates/:id - Update template
-app.put('/expose-templates/:id', authMiddleware, async (req, res) => {
+app.put('/expose-templates/:id', authMiddleware, validate(schemas.updateExposeTemplate), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, blocks, theme, customColors, isDefault } = req.body;
@@ -4429,7 +4440,7 @@ async function ensureDefaultChannel(tenantId: string, tenantName: string) {
 }
 
 // Create Channel (Admin only for PUBLIC channels)
-app.post('/channels', authMiddleware, async (req, res) => {
+app.post('/channels', authMiddleware, validate(schemas.createChannel), async (req, res) => {
   try {
     const { name, description, type, members } = req.body;
     const currentUser = await prisma.user.findUnique({
@@ -4725,7 +4736,7 @@ app.post('/channels/upload', authMiddleware, upload.array('files', 5), async (re
 });
 
 // Send Message (with mentions parsing)
-app.post('/channels/:channelId/messages', authMiddleware, async (req, res) => {
+app.post('/channels/:channelId/messages', authMiddleware, validate(schemas.channelMessage), async (req, res) => {
   try {
     const { channelId } = req.params;
     const { content } = req.body;
@@ -5021,17 +5032,18 @@ app.get('/portals', authMiddleware, async (req, res) => {
 // GET /portal-connections - Get portal connections (tenant or user level)
 app.get('/portal-connections', authMiddleware, async (req, res) => {
   try {
-    const { tenantId, userId } = req.query;
-    
-    if (!tenantId && !userId) {
-      return res.status(400).json({ error: 'tenantId or userId required' });
-    }
-    
-    const where: any = {};
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    // SECURITY: Always scope to current user's tenant; optionally further filter by userId
+    const { userId } = req.query;
+    const where: any = { tenantId: currentUser.tenantId };
     if (userId) {
+      // Users may only filter by their own userId; admins can filter by any userId in tenant
+      if (String(userId) !== currentUser.id && currentUser.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Zugriff verweigert' });
+      }
       where.userId = String(userId);
-    } else if (tenantId) {
-      where.tenantId = String(tenantId);
     }
     
     const connections = await prisma.portalConnection.findMany({
@@ -5189,11 +5201,12 @@ app.delete('/portal-connections/:id', authMiddleware, async (req, res) => {
 // GET /portal-connections/effective - Get effective connection for user (with hierarchy)
 app.get('/portal-connections/effective', authMiddleware, async (req, res) => {
   try {
-    const { userId, tenantId } = req.query;
-    
-    if (!userId || !tenantId) {
-      return res.status(400).json({ error: 'userId and tenantId required' });
-    }
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    // SECURITY: Always use authenticated user's own IDs, ignore query parameters
+    const userId = currentUser.id;
+    const tenantId = currentUser.tenantId;
     
     // Get all portals
     const portals = await prisma.portal.findMany({
@@ -5204,7 +5217,7 @@ app.get('/portal-connections/effective', authMiddleware, async (req, res) => {
     // For each portal, determine effective connection
     const effectiveConnections = await Promise.all(
       portals.map(async (portal) => {
-        const result = await getPortalConnection(portal.id, String(userId), String(tenantId));
+        const result = await getPortalConnection(portal.id, userId, tenantId);
         return {
           portal,
           connection: result?.connection || null,
@@ -5270,8 +5283,17 @@ app.post('/portal-connections/:id/test', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     
-    const connection = await prisma.portalConnection.findUnique({
-      where: { id },
+    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
+    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
+
+    const connection = await prisma.portalConnection.findFirst({
+      where: {
+        id,
+        OR: [
+          { tenantId: currentUser.tenantId },
+          { userId: currentUser.id }
+        ]
+      },
       include: { portal: true }
     });
     
@@ -5949,14 +5971,10 @@ app.get('/calendar/events', authMiddleware, async (req, res) => {
 });
 
 // Create Calendar Event
-app.post('/calendar/events', authMiddleware, async (req, res) => {
+app.post('/calendar/events', authMiddleware, validate(schemas.createCalendarEvent), async (req, res) => {
   try {
     const userEmail = req.user!.email;
     const { title, start, end, location, description } = req.body;
-
-    if (!title || !start || !end) {
-      return res.status(400).json({ error: 'title, start, and end are required' });
-    }
 
     // Get user's tenantId from database
     const user = await prisma.user.findUnique({
@@ -6038,15 +6056,11 @@ app.post('/calendar/events', authMiddleware, async (req, res) => {
 });
 
 // Update Calendar Event
-app.put('/calendar/events/:eventId', authMiddleware, async (req, res) => {
+app.put('/calendar/events/:eventId', authMiddleware, validate(schemas.updateCalendarEvent), async (req, res) => {
   try {
     const userEmail = req.user!.email;
     const { eventId } = req.params;
     const { title, start, end, location, description } = req.body;
-
-    if (!title || !start || !end) {
-      return res.status(400).json({ error: 'title, start, and end are required' });
-    }
 
     const user = await prisma.user.findUnique({
       where: { email: userEmail },
@@ -9510,6 +9524,30 @@ app.post('/internal/scheduler/escalation', async (req, res) => {
 import { classifyAndParseEmail, type EmailClassification } from './services/EmailParserService';
 import { matchProperty, getPropertiesForSelection } from './services/PropertyMatchingService';
 
+// Rate limit store for email ingestion (per-tenant and per-sender)
+const emailIngestLimits: Record<string, { count: number; resetTime: number }> = {};
+const EMAIL_INGEST_MAX_PER_TENANT = 60;   // max 60 emails per hour per tenant
+const EMAIL_INGEST_MAX_PER_SENDER = 5;    // max 5 emails per hour from same sender to same tenant
+const EMAIL_INGEST_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+function checkEmailIngestLimit(key: string, max: number): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const entry = emailIngestLimits[key];
+  if (!entry || now > entry.resetTime) {
+    emailIngestLimits[key] = { count: 1, resetTime: now + EMAIL_INGEST_WINDOW_MS };
+    return { allowed: true, remaining: max - 1 };
+  }
+  if (entry.count >= max) {
+    return { allowed: false, remaining: 0 };
+  }
+  entry.count++;
+  return { allowed: true, remaining: max - entry.count };
+}
+
+// Deduplication: reject identical sender+subject within 5 minutes
+const recentEmails: Map<string, number> = new Map();
+const DEDUP_WINDOW_MS = 5 * 60 * 1000;
+
 app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
   try {
     const db = await initializePrisma();
@@ -9522,6 +9560,37 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
     if (!emailPrefix) {
       console.log('⚠️ No recipient email prefix');
       return res.status(400).json({ error: 'Invalid recipient email' });
+    }
+
+    // --- Rate Limiting & Dedup ---
+    const senderNorm = (from || '').toLowerCase().trim();
+    const tenantKey = `tenant:${emailPrefix}`;
+    const senderKey = `sender:${emailPrefix}:${senderNorm}`;
+
+    const tenantCheck = checkEmailIngestLimit(tenantKey, EMAIL_INGEST_MAX_PER_TENANT);
+    if (!tenantCheck.allowed) {
+      console.warn(`🛑 Email rate limit hit for tenant ${emailPrefix} (${EMAIL_INGEST_MAX_PER_TENANT}/h)`);
+      return res.status(429).json({ error: 'Too many emails — rate limit exceeded' });
+    }
+
+    const senderCheck = checkEmailIngestLimit(senderKey, EMAIL_INGEST_MAX_PER_SENDER);
+    if (!senderCheck.allowed) {
+      console.warn(`🛑 Email rate limit hit for sender ${senderNorm} → ${emailPrefix} (${EMAIL_INGEST_MAX_PER_SENDER}/h)`);
+      return res.status(429).json({ error: 'Too many emails from this sender' });
+    }
+
+    const bodySnippet = (text || '').trim().slice(0, 200).toLowerCase();
+    const dedupKey = `${emailPrefix}:${senderNorm}:${(subject || '').trim().toLowerCase()}:${bodySnippet}`;
+    const lastSeen = recentEmails.get(dedupKey);
+    if (lastSeen && Date.now() - lastSeen < DEDUP_WINDOW_MS) {
+      console.log(`⏭️ Duplicate email skipped: ${senderNorm} → ${emailPrefix}, subject: "${subject}"`);
+      return res.json({ success: true, skipped: true, reason: 'duplicate' });
+    }
+    recentEmails.set(dedupKey, Date.now());
+    // Cleanup old dedup entries periodically
+    if (recentEmails.size > 500) {
+      const cutoff = Date.now() - DEDUP_WINDOW_MS;
+      for (const [k, t] of recentEmails) { if (t < cutoff) recentEmails.delete(k); }
     }
 
     const tenantSettings = await db.tenantSettings.findFirst({
@@ -10555,7 +10624,7 @@ app.post('/calendar/events/sync-to-office', authMiddleware, async (req: any, res
 // Realtime Events via Server-Sent Events (SSE) — No Polling!
 // ═══════════════════════════════════════════════════════════════════
 
-app.get('/events/stream', authMiddleware, async (req: any, res) => {
+app.get('/events/stream', authMiddleware, sseStreamLimit, async (req: any, res) => {
   try {
     const db = prisma || (await initializePrisma());
     const currentUser = await db.user.findUnique({ where: { id: req.user!.sub } });
@@ -11025,7 +11094,7 @@ app.get('/admin/finance/aws-costs', adminAuthMiddleware, async (req, res) => {
       ? 'Fehlende IAM-Berechtigung (ce:GetCostAndUsage)'
       : error.name === 'OptInRequired'
       ? 'Cost Explorer muss im AWS-Konto aktiviert werden'
-      : error.message || 'Unbekannter Fehler';
+      : 'Fehler beim Abrufen der AWS-Kostendaten';
     // Return 200 with error field so frontend can display gracefully
     res.json({
       totalCostCents: 0,

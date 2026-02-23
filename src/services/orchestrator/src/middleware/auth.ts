@@ -1,5 +1,6 @@
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { Request, Response, NextFunction } from "express";
+import { timingSafeEqual } from "crypto";
 
 // Extend Express Request type
 declare global {
@@ -70,7 +71,10 @@ export const verifyInternalSecret = (req: Request, res: Response, next: NextFunc
     console.error('INTERNAL_API_SECRET not configured');
     return res.status(500).json({ error: 'Internal auth not configured' });
   }
-  if (!secret || secret !== expected) {
+  const secretStr = Array.isArray(secret) ? secret[0] : String(secret ?? '');
+  const secretBuf = Buffer.from(secretStr);
+  const expectedBuf = Buffer.from(expected);
+  if (!secret || secretBuf.length !== expectedBuf.length || !timingSafeEqual(secretBuf, expectedBuf)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   next();

@@ -151,7 +151,9 @@ export class EmbeddingService {
     const queryEmbedding = await this.generateEmbedding(query, tenantId);
     const vectorStr = `[${queryEmbedding.join(',')}]`;
 
-    const typeFilter = entityType !== 'all' ? `AND "entityType" = '${entityType}'` : '';
+    const ALLOWED_ENTITY_TYPES = ['property', 'lead'];
+    const safeType = ALLOWED_ENTITY_TYPES.includes(entityType) ? entityType : null;
+    const typeFilter = safeType ? `AND "entityType" = '${safeType}'` : '';
 
     const results: any[] = await prisma.$queryRawUnsafe(`
       SELECT 

@@ -138,7 +138,7 @@ export class ImmivoStack extends cdk.Stack {
       effect: cdk.aws_iam.Effect.ALLOW,
       principals: [new cdk.aws_iam.ServicePrincipal('cognito-idp.amazonaws.com')],
       actions: ['kms:CreateGrant', 'kms:Encrypt'],
-      resources: ['*'],
+      resources: [cognitoEmailKmsKey.keyArn],
     }));
 
     // Custom Email Sender Lambda — decrypts code + sends branded email via Resend
@@ -546,7 +546,7 @@ export class ImmivoStack extends cdk.Stack {
       },
       httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
-      minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+      minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_3_2022,
     });
 
     new route53.ARecord(this, 'MediaDnsRecord', {
@@ -615,7 +615,7 @@ export class ImmivoStack extends cdk.Stack {
         },
         httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
         priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
-        minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+        minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_3_2022,
       });
 
       new route53.ARecord(this, 'FrontendDnsRecord', {
@@ -645,7 +645,7 @@ export class ImmivoStack extends cdk.Stack {
         },
         httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
         priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
-        minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+        minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_3_2022,
       });
 
       new route53.ARecord(this, 'ApiDnsRecord', {
@@ -736,7 +736,7 @@ export class ImmivoStack extends cdk.Stack {
     });
 
     // --- 9. CloudTrail (Audit Logging) ---
-    if (props.stageName === 'prod') {
+    if (['test', 'prod'].includes(props.stageName)) {
       const trailBucket = new s3.Bucket(this, 'CloudTrailBucket', {
         encryption: s3.BucketEncryption.S3_MANAGED,
         blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,

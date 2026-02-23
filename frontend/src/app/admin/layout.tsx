@@ -13,6 +13,7 @@ import {
   Shield, Bell, Search, Command, Mail, Inbox,
   Newspaper, Briefcase, Megaphone, Menu, X
 } from 'lucide-react';
+import { safeRedirect } from '@/lib/safeRedirect';
 import { useRuntimeConfig } from '@/components/RuntimeConfigProvider';
 
 const NAV_SECTIONS = [
@@ -145,7 +146,7 @@ function AdminSidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: (
         <button
           onClick={async () => {
             await signOut();
-            window.location.href = '/admin/login';
+            safeRedirect('/admin/login');
           }}
           className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] text-gray-500 hover:text-white hover:bg-gray-800/50 rounded-lg transition-all"
         >
@@ -227,7 +228,7 @@ function AdminTopBar({ onMenuToggle }: { onMenuToggle: () => void }) {
         <button
           onClick={async () => {
             await signOut();
-            window.location.href = '/admin/login';
+            safeRedirect('/admin/login');
           }}
           className="p-1.5 sm:p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
           title="Abmelden"

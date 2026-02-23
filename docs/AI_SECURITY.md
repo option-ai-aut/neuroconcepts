@@ -83,7 +83,8 @@ const expose = await prisma.expose.findFirst({
 **Problem:** User könnte die KI spammen oder Kosten in die Höhe treiben.
 
 **Lösung:**
-- ✅ Chat/Stream: 50 Requests pro Minute pro User
+- ✅ Chat/Stream (`/chat/stream`): 50 req/min pro User
+- ✅ SSE-Stream (`/events/stream`): 10 req/min pro User (neu: v5)
 - ✅ Mivo generate-signature, generate-text: 20 req/min
 - ✅ Search: 30 req/min, Uploads (Images/Documents): 20 req/min
 - ✅ Öffentliche Endpoints (contact, newsletter, jobs/apply, calendar): 3–20 req/min pro IP
@@ -92,8 +93,9 @@ const expose = await prisma.expose.findFirst({
 **Implementierung:**
 ```typescript
 AiSafetyMiddleware.rateLimit(50, 60000) // Chat 50 req/min
-uploadLimit // 20 req/min für properties/images, properties/documents, leads/documents
-searchLimit // 30 req/min für /search
+sseStreamLimit  // 10 req/min für /events/stream
+uploadLimit     // 20 req/min für properties/images, properties/documents, leads/documents
+searchLimit     // 30 req/min für /search
 ```
 
 **Response bei Limit:**
@@ -323,7 +325,7 @@ Bei Sicherheitsvorfällen:
 ### Regeln für Credentials
 
 - ✅ Alle Secrets in `.env`-Dateien — niemals hardcoded in Code
-- ✅ `INTERNAL_API_SECRET` — für interne Service-Calls (Email-Parser → Orchestrator); in AWS Secrets Manager + Orchestrator `.env`/`.env.local`
+- ✅ `INTERNAL_API_SECRET` — für interne Service-Calls (Email-Parser → Orchestrator); in AWS Secrets Manager + Orchestrator `.env`/`.env.local`; Vergleich via `crypto.timingSafeEqual` (v5)
 - ✅ `.env`, `*.env`, `*.log` sind in `.gitignore` eingetragen
 - ✅ `telegram-agent/.env` enthält Telegram-Token und Cursor API Key (nur lokal)
 - ✅ `telegram-agent/com.immivo.telegram-agent.plist` lädt Secrets via `source .env` — keine hardcoded Werte

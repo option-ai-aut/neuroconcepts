@@ -120,7 +120,7 @@ export const schemas = {
     bathrooms: z.number().optional().nullable(),
     description: z.string().max(50000).optional(),
     features: z.array(z.string().max(200)).optional(),
-  }).passthrough(),
+  }),
 
   updateProperty: z.object({
     title: z.string().min(1).max(500).optional(),
@@ -135,7 +135,7 @@ export const schemas = {
     bathrooms: z.number().optional().nullable(),
     description: z.string().max(50000).optional(),
     features: z.array(z.string().max(200)).optional(),
-  }).passthrough(),
+  }),
 
   // Chat
   chatMessage: z.object({
@@ -155,14 +155,14 @@ export const schemas = {
     description: z.string().max(5000).optional(),
     theme: z.string().max(50).optional(),
     blocks: z.array(z.any()).optional(),
-  }).passthrough(),
+  }),
 
   // Portal connection
   createPortalConnection: z.object({
     portalId: z.string(),
     connectionType: z.string().max(50),
     credentials: z.record(z.string(), z.any()).optional(),
-  }).passthrough(),
+  }),
 
   // Admin DB migrate
   adminMigrate: z.object({
@@ -182,5 +182,41 @@ export const schemas = {
   billingCheckout: z.object({
     plan: z.enum(['solo', 'team']),
     billingCycle: z.enum(['monthly', 'yearly']).optional().default('monthly'),
+  }),
+
+  // Expose template update
+  updateExposeTemplate: z.object({
+    name: z.string().min(1).max(200).optional(),
+    description: z.string().max(5000).optional(),
+    theme: z.string().max(50).optional(),
+    customColors: z.record(z.string(), z.string().max(50)).optional(),
+    blocks: z.array(z.any()).optional(),
+  }),
+
+  // Calendar event
+  createCalendarEvent: z.object({
+    title: z.string().min(1).max(500),
+    start: z.string().datetime({ offset: true }),
+    end: z.string().datetime({ offset: true }),
+    description: z.string().max(5000).optional(),
+    location: z.string().max(500).optional(),
+    leadId: z.string().uuid().optional(),
+    propertyId: z.string().uuid().optional(),
+  }),
+
+  updateCalendarEvent: z.object({
+    title: z.string().min(1).max(500).optional(),
+    start: z.string().datetime({ offset: true }).optional(),
+    end: z.string().datetime({ offset: true }).optional(),
+    description: z.string().max(5000).optional(),
+    location: z.string().max(500).optional(),
+  }),
+
+  // Channel
+  createChannel: z.object({
+    name: z.string().min(1).max(200),
+    description: z.string().max(1000).optional(),
+    type: z.enum(['TEAM', 'PROPERTY', 'LEAD', 'GENERAL']).optional(),
+    memberIds: z.array(z.string()).optional(),
   }),
 };

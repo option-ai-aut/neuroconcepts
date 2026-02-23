@@ -6,6 +6,7 @@ import { User, Mail, Plus, Trash2, Shield, Eye, EyeOff, Key, Loader2, Download, 
 import { getMe, getSeats, inviteSeat, deleteSeat, getAuthHeaders } from '@/lib/api';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 import { updatePassword, signOut, fetchAuthSession } from 'aws-amplify/auth';
+import { safeRedirect } from '@/lib/safeRedirect';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import useSWR from 'swr';
 
@@ -168,7 +169,7 @@ export default function ProfileSettingsPage() {
       
       // Sign out and redirect
       await signOut();
-      window.location.href = '/';
+      safeRedirect('/');
     } catch (error: any) {
       console.error('Delete error:', error);
       alert(error.message || t('messages.saveProfileError'));
@@ -202,7 +203,7 @@ export default function ProfileSettingsPage() {
       
       // Force sign out so user must re-login with new password
       await signOut();
-      window.location.href = '/login';
+      safeRedirect('/login');
     } catch (error: any) {
       console.error('Password change error:', error);
       if (error.name === 'NotAuthorizedException') {

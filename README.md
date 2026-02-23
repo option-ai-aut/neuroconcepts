@@ -40,7 +40,7 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 - **Cache & Queue:** In-Memory Cache (Redis-kompatibel) und Job-Queue (SQS-kompatibel) mit Retry/Backoff
 - **A/B Testing:** In-Memory Framework mit gewichteten Varianten, Z-Test Signifikanz
 - **Full-Text Search:** PostgreSQL tsvector/tsquery mit deutscher Stemming
-- **DB Migrations:** Versionsbasiertes In-App-System (`applyPendingMigrations`, v10), laeuft automatisch auf Lambda Cold Start
+- **DB Migrations:** Versionsbasiertes In-App-System (`applyPendingMigrations`, v14), laeuft automatisch auf Lambda Cold Start
 - **Features:** Semantische Suche, Multi-Language, Context-Awareness, Follow-Up Automatisierung
 
 ### Integrations
@@ -146,7 +146,8 @@ Immivo AI ist eine B2B-SaaS-Plattform für Immobilienunternehmen (2–5 Mio. €
 - **Datenhaltung:** Konform mit österreichischen und EU-Rechtsvorgaben (DSGVO).
 - **Isolation:** Logische Mandantentrennung (Multi-Tenancy).
 - **Transparenz:** Mivo-Nachrichten sind im Dashboard klar gekennzeichnet.
-- **Audit (Feb 2026):** Sicherheitsaudit v4 umgesetzt — IDOR-Schutz, interne Endpoint-Auth, Rate-Limits, XSS-Escaping, CSP, SHA-Pinning. Details: `docs/SECURITY_AUDIT_V4.md`.
+- **Audit v4 (Feb 2026):** IDOR-Schutz, interne Endpoint-Auth, Rate-Limits, XSS-Escaping, CSP, SHA-Pinning. Details: `docs/SECURITY_AUDIT_V4.md`.
+- **Audit v5 (Feb 2026):** SQL-Injection-Whitelist, IDOR portal-connections, Email-Header-Injection, timingSafeEqual, KMS-Policy, Mass-Assignment-Schutz, Webhook-Idempotency (DB), TLS 1.3, CloudTrail Test-Stage. Details: `docs/SECURITY_AUDIT_V5.md`.
 
 ## 📞 Support
 

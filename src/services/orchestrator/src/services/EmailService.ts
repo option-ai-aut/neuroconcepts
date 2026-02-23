@@ -289,7 +289,12 @@ export class EmailService {
       }
     });
 
-    const toList = to.split(',').map(a => ({ emailAddress: { address: a.trim() } }));
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const toList = to.split(',')
+      .map(a => a.trim())
+      .filter(a => emailRegex.test(a))
+      .map(a => ({ emailAddress: { address: a } }));
+    if (toList.length === 0) throw new Error('No valid recipient email addresses provided');
     const ccList = options?.cc ? options.cc.split(',').map(a => ({ emailAddress: { address: a.trim() } })) : undefined;
     const bccList = options?.bcc ? options.bcc.split(',').map(a => ({ emailAddress: { address: a.trim() } })) : undefined;
 
@@ -405,7 +410,11 @@ export class EmailService {
       attachments?: Array<{ filename: string; content: Buffer | string; contentType?: string }>;
     }
   ): Promise<SendEmailResult> {
-    const { to, subject, body, html, attachments } = params;
+    const safeSubject = params.subject.replace(/[\r\n]/g, ' ');
+    const safeTo = params.to.replace(/[\r\n]/g, '');
+    const { body, html, attachments } = params;
+    const to = safeTo;
+    const subject = safeSubject;
 
     // Try Gmail first
     if (config.gmailConfig?.accessToken && config.gmailConfig?.refreshToken) {
