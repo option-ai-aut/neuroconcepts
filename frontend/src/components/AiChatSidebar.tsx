@@ -253,6 +253,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
   const abortControllerRef = useRef<AbortController | null>(null);
   const isSubmittingRef = useRef(false); // atomic guard — no stale-closure issue unlike React state
   const lastSentMessageRef = useRef<string>('');
+  const messagesRef = useRef<Message[]>([]); // mirrors messages state for sync reads in event handlers
   const [removingMsgId, setRemovingMsgId] = useState<string | null>(null);
 
   // Cleanup AbortController on unmount
@@ -455,6 +456,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
   }, []);
 
   useEffect(() => {
+    messagesRef.current = messages;
     if (isNearBottomRef.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
@@ -683,7 +685,8 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         setMessages(prev => [...prev, { id: assistantMsgId, role: 'ASSISTANT', content: '', status: 'thinking' }]);
         setIsLoading(false);
         setIsStreaming(true);
-        lastSentMessageRef.current = '';
+        // NOTE: lastSentMessageRef is cleared only in the finally block on success,
+        // so handleStop can always restore the user's text even during streaming.
 
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -778,8 +781,11 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
         } finally {
           if (streamTimeout) clearTimeout(streamTimeout);
           isSubmittingRef.current = false;
+          // Always reset streaming state — prevents isStreaming getting stuck when
+          // handleStop fires just before setIsStreaming(true) was called.
+          setIsStreaming(false);
           if (!abortController.signal.aborted) {
-            setIsStreaming(false);
+            lastSentMessageRef.current = ''; // clear only on normal completion
             setMessages(prev => prev.map(m => m.status === 'streaming' ? { ...m, status: 'done' as const } : m));
           }
         }
@@ -817,22 +823,24 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
       lastSentMessageRef.current = '';
     }
 
-    setMessages(prev => {
-      // Remove isAction + incomplete (thinking/streaming) assistant messages
-      const cleaned = prev.filter(m =>
-        !m.isAction && !(m.role === 'ASSISTANT' && m.status !== 'done')
-      );
-      // Animate the last USER message sliding out, then remove it
-      const lastUserMsg = [...cleaned].reverse().find(m => m.role === 'USER');
-      if (lastUserMsg) {
-        setRemovingMsgId(lastUserMsg.id);
-        setTimeout(() => {
-          setMessages(p => p.filter(m => m.id !== lastUserMsg.id));
-          setRemovingMsgId(null);
-        }, 320);
-      }
-      return cleaned;
-    });
+    // Read current messages synchronously via ref (avoids stale closure and
+    // keeps the setMessages updater pure — no side-effects inside it).
+    const currentMsgs = messagesRef.current;
+    const cleaned = currentMsgs.filter(m =>
+      !m.isAction && !(m.role === 'ASSISTANT' && m.status !== 'done')
+    );
+    const lastUserMsg = [...cleaned].reverse().find(m => m.role === 'USER');
+
+    setMessages(cleaned); // pure update — React can call this as many times as it wants
+
+    // Animate the last USER message sliding out, then remove it
+    if (lastUserMsg) {
+      setRemovingMsgId(lastUserMsg.id);
+      setTimeout(() => {
+        setMessages(p => p.filter(m => m.id !== lastUserMsg.id));
+        setRemovingMsgId(null);
+      }, 320);
+    }
   };
 
   return (
@@ -1061,8 +1069,6 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                           key={`dl-${match.index}`}
                           href={url}
                           download={fname}
-                          target="_blank"
-                          rel="noopener noreferrer"
                           className="inline-flex items-center gap-2.5 mt-2 mb-1 pl-3 pr-4 py-2 bg-gray-900 hover:bg-gray-700 active:bg-gray-800 text-white rounded-lg transition-colors shadow-sm cursor-pointer"
                         >
                           <svg className="w-4 h-4 flex-shrink-0 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
