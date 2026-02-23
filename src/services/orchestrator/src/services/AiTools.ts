@@ -852,7 +852,7 @@ export const CRM_TOOLS = {
   },
   export_data: {
     name: "export_data",
-    description: "Exports CRM data (leads, properties, or both) as a downloadable CSV or Excel file. Returns a download link the user can click. Use when the user asks to export, download, or save data as a file.",
+    description: "Exports CRM data (leads, properties, or both) as a downloadable CSV or Excel file. ALWAYS use this tool when the user asks for CSV, Excel, or a file export — NEVER output data as inline text or code blocks. Returns a download URL shown as a button.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
