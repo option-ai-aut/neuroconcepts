@@ -55,6 +55,7 @@ interface LeadActivity {
   };
   jarvisAction?: {
     id: string;
+    type: string;
     status: string;
     question: string;
     options?: Array<{ id: string; label: string }>;
