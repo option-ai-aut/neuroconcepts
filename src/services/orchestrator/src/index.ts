@@ -304,7 +304,7 @@ async function initializePrisma() {
 // Auto-migration: Apply missing columns/tables that exist in Prisma schema but not in DB
 // Each statement uses IF NOT EXISTS / IF EXISTS so it's safe to run multiple times
 // Version-gated: Only runs full migration set when version changes
-const MIGRATION_VERSION = 15; // Increment when adding new migrations
+const MIGRATION_VERSION = 16; // Increment when adding new migrations
 let _migrationsApplied = false;
 
 async function applyPendingMigrations(db: PrismaClient) {
@@ -503,6 +503,11 @@ async function applyPendingMigrations(db: PrismaClient) {
     `ALTER TYPE "EmailProvider" ADD VALUE IF NOT EXISTS 'OTHER'`,
     // v15: STANDARD role for AdminStaff
     `ALTER TYPE "AdminRole" ADD VALUE IF NOT EXISTS 'STANDARD'`,
+    // v16: additional roles + per-user extra page grants
+    `ALTER TYPE "AdminRole" ADD VALUE IF NOT EXISTS 'FINANCE'`,
+    `ALTER TYPE "AdminRole" ADD VALUE IF NOT EXISTS 'MARKETING'`,
+    `ALTER TYPE "AdminRole" ADD VALUE IF NOT EXISTS 'SALES'`,
+    `ALTER TABLE "AdminStaff" ADD COLUMN IF NOT EXISTS "extraPages" TEXT[] DEFAULT '{}'`,
     // v14: Ensure Email table has correct indexes
     `CREATE INDEX IF NOT EXISTS "Email_tenantId_folder_receivedAt_idx" ON "Email"("tenantId", "folder", "receivedAt")`,
     `CREATE INDEX IF NOT EXISTS "Email_leadId_idx" ON "Email"("leadId")`,
@@ -7924,9 +7929,15 @@ app.post('/admin/platform/tenants', adminAuthMiddleware, async (req, res) => {
 });
 
 // --- Admin: Delete Tenant ---
-app.delete('/admin/platform/tenants/:id', adminAuthMiddleware, async (req, res) => {
+app.delete('/admin/platform/tenants/:id', adminAuthMiddleware, async (req: any, res) => {
   try {
+    // SUPER_ADMIN only — most destructive operation
     const db = await initializePrisma();
+    const callerEmail = (req.user?.email as string || '').toLowerCase();
+    const caller = await db.adminStaff.findUnique({ where: { email: callerEmail } });
+    if (!caller || caller.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ error: 'Nur Super Admins können Tenants löschen.' });
+    }
     await db.tenant.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (error: any) {
@@ -8151,7 +8162,7 @@ async function ensureAdminStaff(db: any) {
   }
 }
 
-// Get current admin's own profile (role, email, etc.)
+// Get current admin's own profile (role, email, extraPages, etc.)
 app.get('/admin/team/me', adminAuthMiddleware, async (req: any, res) => {
   try {
     const db = await initializePrisma();
@@ -8160,12 +8171,18 @@ app.get('/admin/team/me', adminAuthMiddleware, async (req: any, res) => {
 
     let staff = await db.adminStaff.findUnique({ where: { email } });
     if (!staff) {
-      // Auto-create with STANDARD role for unknown admins
       staff = await db.adminStaff.create({
-        data: { email, role: 'STANDARD' as any },
+        data: { email, role: 'STANDARD' as any, extraPages: [] },
       });
     }
-    res.json({ id: staff.id, email: staff.email, firstName: staff.firstName, lastName: staff.lastName, role: staff.role });
+    res.json({
+      id: staff.id,
+      email: staff.email,
+      firstName: staff.firstName,
+      lastName: staff.lastName,
+      role: staff.role,
+      extraPages: (staff as any).extraPages || [],
+    });
   } catch (error: any) {
     res.status(500).json({ error: 'Internal Server Error' });
   }
@@ -8281,11 +8298,21 @@ app.post('/admin/team/members', adminAuthMiddleware, async (req: any, res) => {
   }
 });
 
-// Update team member
-app.patch('/admin/team/members/:id', adminAuthMiddleware, async (req, res) => {
+// Update team member (role + extra page grants)
+app.patch('/admin/team/members/:id', adminAuthMiddleware, async (req: any, res) => {
   try {
     const db = await initializePrisma();
-    const { firstName, lastName, phone, role } = req.body;
+    const { firstName, lastName, phone, role, extraPages } = req.body;
+
+    // Only SUPER_ADMIN can promote/demote SUPER_ADMIN role
+    if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
+      const callerEmail = (req.user?.email as string || '').toLowerCase();
+      const caller = await db.adminStaff.findUnique({ where: { email: callerEmail } });
+      if (role === 'SUPER_ADMIN' && caller?.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ error: 'Nur Super Admins können andere Super Admins ernennen' });
+      }
+    }
+
     const member = await db.adminStaff.update({
       where: { id: req.params.id },
       data: {
@@ -8293,6 +8320,7 @@ app.patch('/admin/team/members/:id', adminAuthMiddleware, async (req, res) => {
         ...(lastName !== undefined ? { lastName } : {}),
         ...(phone !== undefined ? { phone } : {}),
         ...(role !== undefined ? { role } : {}),
+        ...(extraPages !== undefined ? { extraPages } : {}),
       },
     });
     res.json(member);
@@ -10314,8 +10342,11 @@ function getAllowedMailboxes(callerEmail: string, role: string): string[] {
     case 'SUPER_ADMIN':
     case 'ADMIN':
     case 'SUPPORT':
+    case 'SALES':
       // Can see own + all shared mailboxes
       return [...new Set([...own, ...SHARED_MAILBOXES])];
+    case 'FINANCE':
+    case 'MARKETING':
     case 'STANDARD':
     default:
       // Only own mailbox
