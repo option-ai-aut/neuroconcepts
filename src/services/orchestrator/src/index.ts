@@ -9597,6 +9597,21 @@ function checkEmailIngestLimit(key: string, max: number): { allowed: boolean; re
   return { allowed: true, remaining: max - entry.count };
 }
 
+// TEMPORARY: one-time migration endpoint — remove after use
+app.post('/internal/run-migration-20260225', async (req, res) => {
+  const secret = req.headers['x-internal-secret'];
+  if (secret !== process.env.INTERNAL_API_SECRET) return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const db = await initializePrisma();
+    await db.$executeRawUnsafe(`ALTER TYPE "EmailFolder" ADD VALUE IF NOT EXISTS 'FORWARDING'`);
+    await db.$executeRawUnsafe(`ALTER TYPE "EmailProvider" ADD VALUE IF NOT EXISTS 'OTHER'`);
+    await db.$executeRawUnsafe(`ALTER TYPE "PendingActionType" ADD VALUE IF NOT EXISTS 'NEW_LEAD_REPLY'`);
+    res.json({ success: true, message: 'Migration applied: FORWARDING, OTHER, NEW_LEAD_REPLY' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Deduplication: reject identical sender+subject within 5 minutes
 const recentEmails: Map<string, number> = new Map();
 const DEDUP_WINDOW_MS = 5 * 60 * 1000;
