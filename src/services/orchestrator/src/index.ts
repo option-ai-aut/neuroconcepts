@@ -304,7 +304,7 @@ async function initializePrisma() {
 // Auto-migration: Apply missing columns/tables that exist in Prisma schema but not in DB
 // Each statement uses IF NOT EXISTS / IF EXISTS so it's safe to run multiple times
 // Version-gated: Only runs full migration set when version changes
-const MIGRATION_VERSION = 13; // Increment when adding new migrations
+const MIGRATION_VERSION = 14; // Increment when adding new migrations
 let _migrationsApplied = false;
 
 async function applyPendingMigrations(db: PrismaClient) {
@@ -498,6 +498,12 @@ async function applyPendingMigrations(db: PrismaClient) {
     `CREATE UNIQUE INDEX IF NOT EXISTS "TenantSettings_inboundLeadEmail_key" ON "TenantSettings"("inboundLeadEmail")`,
     // Unique index for LeadActivity.jarvisActionId
     `CREATE UNIQUE INDEX IF NOT EXISTS "LeadActivity_jarvisActionId_key" ON "LeadActivity"("jarvisActionId")`,
+    // v14: Add FORWARDING and OTHER to Email enums (20260220100000_add_forwarding_email_folder)
+    `ALTER TYPE "EmailFolder" ADD VALUE IF NOT EXISTS 'FORWARDING'`,
+    `ALTER TYPE "EmailProvider" ADD VALUE IF NOT EXISTS 'OTHER'`,
+    // v14: Ensure Email table has correct indexes
+    `CREATE INDEX IF NOT EXISTS "Email_tenantId_folder_receivedAt_idx" ON "Email"("tenantId", "folder", "receivedAt")`,
+    `CREATE INDEX IF NOT EXISTS "Email_leadId_idx" ON "Email"("leadId")`,
   ];
   
   for (const sql of migrations) {
@@ -9533,6 +9539,38 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
         status: 'SENT',
       }
     });
+
+    // 7b. Also store as Email record in FORWARDING folder so it appears in the user inbox
+    try {
+      const emailBody = leadData.message || `${text || ''}`.substring(0, 10000);
+      await db.email.create({
+        data: {
+          tenantId,
+          from: from || leadData.email || '',
+          fromName: [leadData.firstName, leadData.lastName].filter(Boolean).join(' ') || undefined,
+          to: [],
+          cc: [],
+          bcc: [],
+          subject: subject || `Neue Anfrage via ${parseResult.portal}`,
+          bodyText: emailBody || undefined,
+          bodyHtml: emailBody?.includes('<') ? emailBody : undefined,
+          folder: 'FORWARDING' as any,
+          isRead: false,
+          leadId: lead.id,
+          provider: 'OTHER' as any,
+          providerData: {
+            source: 'portal',
+            portal: parseResult.portal,
+            leadId: lead.id,
+            leadName,
+          },
+          receivedAt: new Date(),
+        }
+      });
+    } catch (emailErr: any) {
+      // Non-fatal — log but don't fail lead processing
+      console.warn('Could not create Email record for portal inquiry:', emailErr.message);
+    }
 
     // 8. Determine who to notify
     let usersToNotify: string[] = [];
