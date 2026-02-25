@@ -303,7 +303,7 @@ async function initializePrisma() {
 // Auto-migration: Apply missing columns/tables that exist in Prisma schema but not in DB
 // Each statement uses IF NOT EXISTS / IF EXISTS so it's safe to run multiple times
 // Version-gated: Only runs full migration set when version changes
-const MIGRATION_VERSION = 15; // Increment when adding new migrations
+const MIGRATION_VERSION = 16; // Increment when adding new migrations
 let _migrationsApplied = false;
 
 async function applyPendingMigrations(db: PrismaClient) {
@@ -513,6 +513,10 @@ async function applyPendingMigrations(db: PrismaClient) {
     'ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "hasAttachments" BOOLEAN NOT NULL DEFAULT false',
     `DO $$ BEGIN CREATE TYPE "EmailProvider" AS ENUM ('GMAIL', 'OUTLOOK', 'SMTP', 'OTHER'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
     'ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "provider" "EmailProvider"',
+    // 2026-02-25: v16 - Add missing enum values (FORWARDING, OTHER, NEW_LEAD_REPLY)
+    `ALTER TYPE "EmailFolder" ADD VALUE IF NOT EXISTS 'FORWARDING'`,
+    `ALTER TYPE "EmailProvider" ADD VALUE IF NOT EXISTS 'OTHER'`,
+    `ALTER TYPE "PendingActionType" ADD VALUE IF NOT EXISTS 'NEW_LEAD_REPLY'`,
   ];
   
   for (const sql of migrations) {
@@ -9596,21 +9600,6 @@ function checkEmailIngestLimit(key: string, max: number): { allowed: boolean; re
   entry.count++;
   return { allowed: true, remaining: max - entry.count };
 }
-
-// TEMPORARY: one-time migration endpoint — remove after use
-app.post('/internal/run-migration-20260225', async (req, res) => {
-  const secret = req.headers['x-internal-secret'];
-  if (secret !== process.env.INTERNAL_API_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  try {
-    const db = await initializePrisma();
-    await db.$executeRawUnsafe(`ALTER TYPE "EmailFolder" ADD VALUE IF NOT EXISTS 'FORWARDING'`);
-    await db.$executeRawUnsafe(`ALTER TYPE "EmailProvider" ADD VALUE IF NOT EXISTS 'OTHER'`);
-    await db.$executeRawUnsafe(`ALTER TYPE "PendingActionType" ADD VALUE IF NOT EXISTS 'NEW_LEAD_REPLY'`);
-    res.json({ success: true, message: 'Migration applied: FORWARDING, OTHER, NEW_LEAD_REPLY' });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // Deduplication: reject identical sender+subject within 5 minutes
 const recentEmails: Map<string, number> = new Map();
