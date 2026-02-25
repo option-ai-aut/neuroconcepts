@@ -5,9 +5,9 @@ import {
   RefreshCw, Search, Mail, Inbox, Send, FileText, Trash2,
   Reply, Forward,
   Paperclip, Plus, AlertCircle, Loader2,
-  ArrowLeft, Menu, X
+  ArrowLeft, Menu, X, Repeat, ExternalLink
 } from 'lucide-react';
-import { getAdminEmails, markAdminEmailRead, getAdminUnreadCounts, sendAdminEmail, AdminEmail } from '@/lib/adminApi';
+import { getAdminEmails, markAdminEmailRead, getAdminUnreadCounts, sendAdminEmail, backfillPortalEmails, AdminEmail } from '@/lib/adminApi';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import DOMPurify from 'dompurify';
 
@@ -37,6 +37,7 @@ const SHARED_MAILBOXES = [
 
 const FOLDERS = [
   { id: 'INBOX', label: 'Posteingang', icon: Inbox },
+  { id: 'FORWARDING', label: 'Portal Anfragen', icon: Repeat },
   { id: 'SENT', label: 'Gesendet', icon: Send },
   { id: 'DRAFTS', label: 'Entwürfe', icon: FileText },
   { id: 'TRASH', label: 'Papierkorb', icon: Trash2 },
@@ -136,11 +137,15 @@ export default function AdminInboxPage() {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [compose, setCompose] = useState<ComposeState>(defaultCompose);
 
+  const [backfilling, setBackfilling] = useState(false);
+
   const fetchEmails = useCallback(async () => {
     setLoading(true);
     setLoadError('');
     try {
-      const data = await getAdminEmails(activeMailbox, selectedFolder, searchQuery || undefined);
+      // FORWARDING folder reads from DB (all portal inquiries), mailbox is irrelevant
+      const mailboxParam = selectedFolder === 'FORWARDING' ? '' : activeMailbox;
+      const data = await getAdminEmails(mailboxParam, selectedFolder, searchQuery || undefined);
       setEmails(data.emails || []);
       if (data.error) setLoadError(data.error);
     } catch (err: any) {
@@ -151,6 +156,19 @@ export default function AdminInboxPage() {
       setLoading(false);
     }
   }, [activeMailbox, selectedFolder, searchQuery]);
+
+  const handleBackfill = async () => {
+    setBackfilling(true);
+    try {
+      const result = await backfillPortalEmails();
+      alert(`Backfill abgeschlossen: ${result.created} neue E-Mails erstellt, ${result.skipped} übersprungen.`);
+      fetchEmails();
+    } catch (err: any) {
+      alert('Backfill fehlgeschlagen: ' + err.message);
+    } finally {
+      setBackfilling(false);
+    }
+  };
 
   useEffect(() => { fetchEmails(); }, [fetchEmails]);
 
@@ -273,9 +291,14 @@ export default function AdminInboxPage() {
           <div className="text-xs text-gray-400 truncate leading-relaxed mt-0.5">
             {getPreview(email)}
           </div>
-          {email.hasAttachments && (
+          {(email.hasAttachments || email.leadId) && (
             <div className="flex items-center gap-2 mt-1.5">
-              <Paperclip className="w-3 h-3 text-gray-400" />
+              {email.hasAttachments && <Paperclip className="w-3 h-3 text-gray-400" />}
+              {email.leadId && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[10px] rounded font-medium">
+                  Lead: {email.leadName || 'anzeigen'}
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -382,12 +405,19 @@ export default function AdminInboxPage() {
             })}
           </nav>
 
-          <div className="p-3 border-t border-gray-200">
+          <div className="p-3 border-t border-gray-200 flex flex-col gap-2">
             <button onClick={fetchEmails} disabled={loading}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg transition-colors">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               {loading ? 'Laden...' : 'Aktualisieren'}
             </button>
+            {selectedFolder === 'FORWARDING' && (
+              <button onClick={handleBackfill} disabled={backfilling}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-200">
+                {backfilling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Repeat className="w-4 h-4" />}
+                {backfilling ? 'Läuft...' : 'Alte Emails nachladen'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -450,7 +480,13 @@ export default function AdminInboxPage() {
               <div className="flex-1 overflow-y-auto bg-white">
                 <EmailBodyViewer email={selectedEmail} />
               </div>
-              <div className="px-5 py-3 border-t border-gray-100 flex gap-2 bg-white">
+              <div className="px-5 py-3 border-t border-gray-100 flex gap-2 bg-white flex-wrap">
+                {selectedEmail.leadId && (
+                  <a href={`/dashboard/crm/leads/${selectedEmail.leadId}`} target="_blank" rel="noreferrer"
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-100 transition-colors">
+                    <ExternalLink className="w-4 h-4" /> Lead öffnen
+                  </a>
+                )}
                 <button onClick={() => openReply(selectedEmail)}
                   className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors">
                   <Reply className="w-4 h-4" /> Antworten

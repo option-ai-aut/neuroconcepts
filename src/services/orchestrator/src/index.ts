@@ -10284,20 +10284,60 @@ app.put('/admin/contacts/:id', adminAuthMiddleware, async (req, res) => {
 
 app.get('/admin/emails', adminAuthMiddleware, async (req, res) => {
   try {
+    const folder = (req.query.folder as string) || 'INBOX';
+    const search = req.query.search as string | undefined;
+
+    // FORWARDING folder: always read from DB (portal inquiry emails), no WorkMail needed
+    if (folder === 'FORWARDING') {
+      const db = await initializePrisma();
+      const where: any = { folder: 'FORWARDING' };
+      if (search) {
+        where.OR = [
+          { subject: { contains: search, mode: 'insensitive' } },
+          { from: { contains: search, mode: 'insensitive' } },
+          { fromName: { contains: search, mode: 'insensitive' } },
+        ];
+      }
+      const dbEmails = await db.email.findMany({
+        where,
+        orderBy: { receivedAt: 'desc' },
+        take: 200,
+        include: { lead: { select: { id: true, firstName: true, lastName: true } } },
+      });
+      return res.json({
+        emails: dbEmails.map((e: any) => ({
+          id: e.id,
+          from: e.from,
+          fromName: e.fromName || '',
+          to: e.to || [],
+          cc: e.cc || [],
+          subject: e.subject || '(Kein Betreff)',
+          bodyHtml: e.bodyHtml || null,
+          bodyText: e.bodyText || null,
+          isRead: e.isRead,
+          hasAttachments: false,
+          receivedAt: e.receivedAt?.toISOString() || e.createdAt?.toISOString(),
+          folder: 'FORWARDING',
+          leadId: e.leadId,
+          leadName: e.lead ? [e.lead.firstName, e.lead.lastName].filter(Boolean).join(' ') : null,
+          providerData: e.providerData,
+        })),
+        total: dbEmails.length,
+      });
+    }
+
     const { getEmails, hasAnyCredentials, getMailboxCredentials } = await import('./services/WorkMailEmailService');
 
     if (!hasAnyCredentials()) {
-      return res.json({ emails: [], total: 0, error: 'WorkMail not configured. Set WORKMAIL_CREDENTIALS in Secrets Manager.' });
+      return res.json({ emails: [], total: 0, error: 'WorkMail nicht konfiguriert. Bitte WORKMAIL_CREDENTIALS in Secrets Manager setzen.' });
     }
 
     const mailbox = (req.query.mailbox as string) || process.env.WORKMAIL_EMAIL || '';
-    const folder = (req.query.folder as string) || 'INBOX';
-    const search = req.query.search as string | undefined;
     const limit = parseInt(req.query.limit as string) || 50;
 
     const creds = getMailboxCredentials(mailbox);
     if (!creds) {
-      return res.json({ emails: [], total: 0, error: `Keine Zugangsdaten für ${mailbox}. Bitte WORKMAIL_CREDENTIALS in Secrets Manager konfigurieren.` });
+      return res.json({ emails: [], total: 0, error: `Keine Zugangsdaten für ${mailbox}.` });
     }
 
     const result = await getEmails(creds, mailbox, folder as any, limit, search);
@@ -10310,6 +10350,75 @@ app.get('/admin/emails', adminAuthMiddleware, async (req, res) => {
   } catch (error: any) {
     console.error('Admin emails error:', error);
     res.json({ emails: [], total: 0, error: error?.message || 'Fehler beim Laden der E-Mails' });
+  }
+});
+
+// Backfill old portal inquiry Message records as Email records in FORWARDING folder
+app.post('/admin/backfill-portal-emails', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+
+    // Find all PORTAL_INQUIRY and JARVIS_QUERY activities which represent incoming portal leads
+    const activities = await db.leadActivity.findMany({
+      where: { type: { in: ['PORTAL_INQUIRY', 'JARVIS_QUERY'] } },
+      include: { lead: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let created = 0;
+    let skipped = 0;
+
+    for (const activity of activities) {
+      const leadId = activity.leadId;
+      if (!leadId || !activity.tenantId) { skipped++; continue; }
+
+      // Check if Email record already exists for this lead in FORWARDING
+      const existing = await db.email.findFirst({ where: { leadId, folder: 'FORWARDING' } });
+      if (existing) { skipped++; continue; }
+
+      const meta = activity.metadata as any;
+      const from = meta?.originalEmail?.from || activity.lead?.email || '';
+      const subject = meta?.originalEmail?.subject || `Portal Anfrage`;
+      const bodyFromMeta = meta?.originalEmail?.body || meta?.emailBody || '';
+
+      // Try to get message content from the conversation
+      const message = await db.message.findFirst({
+        where: { leadId, role: 'USER' },
+        orderBy: { createdAt: 'asc' },
+      });
+      const bodyText = bodyFromMeta || message?.content || activity.description || '';
+
+      try {
+        await db.email.create({
+          data: {
+            tenantId: activity.tenantId,
+            from,
+            fromName: activity.lead ? [activity.lead.firstName, activity.lead.lastName].filter(Boolean).join(' ') || undefined : undefined,
+            to: [],
+            cc: [],
+            bcc: [],
+            subject,
+            bodyText: bodyText ? bodyText.substring(0, 10000) : undefined,
+            folder: 'FORWARDING' as any,
+            isRead: true,
+            leadId,
+            provider: 'OTHER' as any,
+            providerData: { source: 'backfill', activityId: activity.id },
+            receivedAt: activity.createdAt,
+          },
+        });
+        created++;
+      } catch (createErr: any) {
+        console.warn(`Backfill skip leadId=${leadId}:`, createErr.message);
+        skipped++;
+      }
+    }
+
+    console.log(`📧 Backfill complete: ${created} created, ${skipped} skipped`);
+    res.json({ success: true, created, skipped, total: activities.length });
+  } catch (error: any) {
+    console.error('Backfill portal emails error:', error);
+    res.status(500).json({ error: error?.message || 'Backfill failed' });
   }
 });
 

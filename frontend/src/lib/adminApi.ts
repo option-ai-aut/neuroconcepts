@@ -187,7 +187,39 @@ export interface AdminEmail {
   hasAttachments: boolean;
   receivedAt: string;
   folder: string;
+  leadId?: string;
+  leadName?: string | null;
+  providerData?: Record<string, any>;
 }
+
+export interface DemoBooking {
+  id: string;
+  name: string;
+  email: string;
+  company: string | null;
+  message: string | null;
+  start: string;
+  end: string;
+  eventId: string | null;
+  status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
+  adminNotes: string | null;
+  createdAt: string;
+}
+
+export interface DemoBookingsResponse {
+  bookings: DemoBooking[];
+  counts: Record<string, number>;
+  total: number;
+}
+
+export const getAdminDemoBookings = (status?: string) =>
+  adminFetch<DemoBookingsResponse>(`/admin/platform/demo-bookings${status && status !== 'ALL' ? `?status=${status}` : ''}`);
+
+export const updateAdminDemoBooking = (id: string, data: { status?: string; adminNotes?: string }) =>
+  adminFetch<DemoBooking>(`/admin/platform/demo-bookings/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+
+export const backfillPortalEmails = () =>
+  adminFetch<{ success: boolean; created: number; skipped: number; total: number }>('/admin/backfill-portal-emails', { method: 'POST' });
 
 export interface AdminEmailsResponse {
   emails: AdminEmail[];

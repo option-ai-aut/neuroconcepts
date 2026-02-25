@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, RefreshCw, Clock, User, Plus, X, Loader2 } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, RefreshCw, Clock, User, Plus, X, Loader2, Video } from 'lucide-react';
 import { getRuntimeConfig } from '@/components/EnvProvider';
 import { fetchAuthSession } from 'aws-amplify/auth';
+import { getAdminDemoBookings, DemoBooking } from '@/lib/adminApi';
 
 const TEAM_MEMBERS = [
   { email: 'dennis.kral@immivo.ai', name: 'Dennis Kral', color: 'bg-blue-500', textColor: 'text-blue-600' },
@@ -41,6 +42,7 @@ type ViewMode = 'mine' | 'member' | 'office';
 export default function AdminCalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendars, setCalendars] = useState<Record<string, CalEvent[]>>({});
+  const [demoBookings, setDemoBookings] = useState<DemoBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   
@@ -65,13 +67,17 @@ export default function AdminCalendarPage() {
   const fetchCalendars = useCallback(async () => {
     setLoading(true);
     try {
-      // Always fetch all calendars including office@
+      // Fetch WorkMail calendars + demo bookings from DB in parallel
       const allEmails = [...TEAM_MEMBERS.map(t => t.email), 'office@immivo.ai'];
       const emails = allEmails.join(',');
-      const data = await adminFetch(
-        `/admin/platform/calendars?emails=${emails}&start=${weekStart.toISOString()}&end=${weekEnd.toISOString()}`
-      );
-      setCalendars(data.calendars || {});
+
+      const [calData, demoData] = await Promise.allSettled([
+        adminFetch(`/admin/platform/calendars?emails=${emails}&start=${weekStart.toISOString()}&end=${weekEnd.toISOString()}`),
+        getAdminDemoBookings(),
+      ]);
+
+      if (calData.status === 'fulfilled') setCalendars((calData.value as any).calendars || {});
+      if (demoData.status === 'fulfilled') setDemoBookings((demoData.value as any).bookings || []);
     } catch (err) {
       console.error('Failed to load calendars:', err);
     } finally {
@@ -102,25 +108,39 @@ export default function AdminCalendarPage() {
 
   const hours = Array.from({ length: 24 }, (_, i) => i); // 00:00 - 23:00
 
+  // Convert demo bookings to CalEvent format
+  const demoCalEvents: CalEvent[] = demoBookings
+    .filter(d => d.status !== 'CANCELLED')
+    .map(d => ({
+      id: `demo-${d.id}`,
+      subject: `📞 Demo: ${d.name}${d.company ? ` (${d.company})` : ''}`,
+      start: d.start,
+      end: d.end,
+      location: 'Google Meet',
+      organizer: d.email,
+    }));
+
   // Determine which events to show based on view mode
   const getVisibleEvents = (): Record<string, CalEvent[]> => {
+    const demoKey = 'demo-bookings';
     switch (viewMode) {
       case 'mine':
-        // Show my calendar + office@ calendar
         return {
           [TEAM_MEMBERS[0].email]: calendars[TEAM_MEMBERS[0].email] || [],
           'office@immivo.ai': calendars['office@immivo.ai'] || [],
+          [demoKey]: demoCalEvents,
         };
       case 'member':
         return {
           [selectedMember]: calendars[selectedMember] || [],
           'office@immivo.ai': calendars['office@immivo.ai'] || [],
+          [demoKey]: demoCalEvents,
         };
       case 'office':
-        // Show all calendars — office@ has everything
         return {
           'office@immivo.ai': calendars['office@immivo.ai'] || [],
           ...TEAM_MEMBERS.reduce((acc, m) => ({ ...acc, [m.email]: calendars[m.email] || [] }), {}),
+          [demoKey]: demoCalEvents,
         };
     }
   };
@@ -158,8 +178,11 @@ export default function AdminCalendarPage() {
     const member = TEAM_MEMBERS.find(t => t.email === email);
     if (member) return member.color;
     if (email === 'office@immivo.ai') return 'bg-amber-500';
+    if (email === 'demo-bookings') return 'bg-purple-600';
     return 'bg-gray-400';
   };
+
+  const isDemoEvent = (id: string) => id.startsWith('demo-');
 
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -264,7 +287,7 @@ export default function AdminCalendarPage() {
         </div>
 
         {/* Individual member toggles */}
-        <div className="flex items-center gap-1.5 ml-2">
+        <div className="flex items-center gap-1.5 ml-2 flex-wrap">
           {TEAM_MEMBERS.map((member) => (
             <button
               key={member.email}
@@ -279,6 +302,13 @@ export default function AdminCalendarPage() {
               {member.name.split(' ')[0]}
             </button>
           ))}
+          {demoBookings.filter(d => d.status !== 'CANCELLED').length > 0 && (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border bg-purple-50 border-purple-200 text-purple-700">
+              <span className="w-2 h-2 rounded-full bg-purple-600" />
+              <Video className="w-3 h-3" />
+              Demo Calls ({demoBookings.filter(d => d.status !== 'CANCELLED').length})
+            </span>
+          )}
         </div>
       </div>
 
