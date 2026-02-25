@@ -303,7 +303,69 @@ async function initializePrisma() {
 
 // Auto-migration: Apply missing columns/tables that exist in Prisma schema but not in DB
 // Each statement uses IF NOT EXISTS / IF EXISTS so it's safe to run multiple times
-// Version-gated: Only runs full migration set when version changes
+// ── WorkMail credential helpers ─────────────────────────────────────────────
+
+/** Generates a strong random password suitable for WorkMail (16 chars). */
+function generateSecurePassword(): string {
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lower = 'abcdefghijklmnopqrstuvwxyz';
+  const digits = '0123456789';
+  const special = '!@#$%&*';
+  const crypto = require('crypto');
+  const rand = (charset: string) => charset[crypto.randomInt(charset.length)];
+  // Guarantee at least one of each class
+  const chars = [rand(upper), rand(lower), rand(digits), rand(special)];
+  const all = upper + lower + digits + special;
+  for (let i = chars.length; i < 16; i++) chars.push(rand(all));
+  // Shuffle
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join('');
+}
+
+/**
+ * Adds or updates a mailbox email→password entry in the WORKMAIL_CREDENTIALS
+ * JSON stored in AWS Secrets Manager (APP_SECRET_ARN).
+ * Pass password=null to remove the entry (e.g. when deleting a member).
+ */
+async function upsertWorkmailCredential(email: string, password: string | null): Promise<void> {
+  const secretArn = process.env.APP_SECRET_ARN;
+  if (!secretArn) { console.warn('[WorkMail] APP_SECRET_ARN not set, cannot auto-update credentials'); return; }
+  try {
+    const sm = new AWS.SecretsManager();
+    const existing = await sm.getSecretValue({ SecretId: secretArn }).promise();
+    const secretObj = existing.SecretString ? JSON.parse(existing.SecretString) : {};
+
+    // Parse current WORKMAIL_CREDENTIALS (may be missing or invalid)
+    let credsMap: Record<string, string> = {};
+    if (secretObj.WORKMAIL_CREDENTIALS) {
+      try { credsMap = JSON.parse(secretObj.WORKMAIL_CREDENTIALS); } catch {}
+    }
+
+    if (password === null) {
+      delete credsMap[email];
+    } else {
+      credsMap[email] = password;
+    }
+
+    secretObj.WORKMAIL_CREDENTIALS = JSON.stringify(credsMap);
+
+    await sm.putSecretValue({
+      SecretId: secretArn,
+      SecretString: JSON.stringify(secretObj),
+    }).promise();
+
+    // Update in-process env var immediately so next request sees it
+    process.env.WORKMAIL_CREDENTIALS = JSON.stringify(credsMap);
+    console.log(`[WorkMail] Credentials ${password ? 'upserted' : 'removed'} for ${email}`);
+  } catch (err: any) {
+    console.error('[WorkMail] Failed to update Secrets Manager:', err.message);
+  }
+}
+
+// ── Version-gated migrations ─────────────────────────────────────────────────
 const MIGRATION_VERSION = 16; // Increment when adding new migrations
 let _migrationsApplied = false;
 
@@ -8260,17 +8322,18 @@ app.post('/admin/team/members', adminAuthMiddleware, async (req: any, res) => {
       try {
         const workmail = new AWS.WorkMail({ region: 'eu-west-1' });
         const orgId = 'm-86d4b51a0bb44c66bccc44c92bfed800';
-        
-        // Create user in WorkMail
+
+        // Generate a strong random password for this mailbox
+        const newMailboxPassword = generateSecurePassword();
+
         const displayName = [firstName, lastName].filter(Boolean).join(' ') || email.split('@')[0];
         const wmUser = await workmail.createUser({
           OrganizationId: orgId,
           Name: email.split('@')[0],
           DisplayName: displayName,
-          Password: 'Immivo2026!Temp', // Temporary password
+          Password: newMailboxPassword,
         }).promise();
-        
-        // Register the user for mail (assigns mailbox)
+
         if (wmUser.UserId) {
           await workmail.registerToWorkMail({
             OrganizationId: orgId,
@@ -8279,6 +8342,9 @@ app.post('/admin/team/members', adminAuthMiddleware, async (req: any, res) => {
           }).promise();
           workmailCreated = true;
           console.log('Created WorkMail mailbox:', email);
+
+          // Automatically store the new mailbox password in Secrets Manager
+          await upsertWorkmailCredential(email.toLowerCase().trim(), newMailboxPassword);
         }
       } catch (wmErr: any) {
         console.error('WorkMail creation failed:', wmErr.message);
@@ -8336,8 +8402,14 @@ app.delete('/admin/team/members/:id', adminAuthMiddleware, async (req, res) => {
     const member = await db.adminStaff.findUnique({ where: { id: req.params.id } });
     if (!member) return res.status(404).json({ error: 'Nicht gefunden' });
     if (member.role === 'SUPER_ADMIN') return res.status(403).json({ error: 'Super Admins können nicht gelöscht werden' });
-    
+
     await db.adminStaff.delete({ where: { id: req.params.id } });
+
+    // Remove their WorkMail credentials from Secrets Manager automatically
+    if (member.email.toLowerCase().includes('@immivo.ai')) {
+      await upsertWorkmailCredential(member.email.toLowerCase(), null);
+    }
+
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: 'Internal Server Error' });
