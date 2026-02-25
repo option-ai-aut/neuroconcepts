@@ -304,7 +304,7 @@ async function initializePrisma() {
 // Auto-migration: Apply missing columns/tables that exist in Prisma schema but not in DB
 // Each statement uses IF NOT EXISTS / IF EXISTS so it's safe to run multiple times
 // Version-gated: Only runs full migration set when version changes
-const MIGRATION_VERSION = 14; // Increment when adding new migrations
+const MIGRATION_VERSION = 15; // Increment when adding new migrations
 let _migrationsApplied = false;
 
 async function applyPendingMigrations(db: PrismaClient) {
@@ -501,6 +501,8 @@ async function applyPendingMigrations(db: PrismaClient) {
     // v14: Add FORWARDING and OTHER to Email enums (20260220100000_add_forwarding_email_folder)
     `ALTER TYPE "EmailFolder" ADD VALUE IF NOT EXISTS 'FORWARDING'`,
     `ALTER TYPE "EmailProvider" ADD VALUE IF NOT EXISTS 'OTHER'`,
+    // v15: STANDARD role for AdminStaff
+    `ALTER TYPE "AdminRole" ADD VALUE IF NOT EXISTS 'STANDARD'`,
     // v14: Ensure Email table has correct indexes
     `CREATE INDEX IF NOT EXISTS "Email_tenantId_folder_receivedAt_idx" ON "Email"("tenantId", "folder", "receivedAt")`,
     `CREATE INDEX IF NOT EXISTS "Email_leadId_idx" ON "Email"("leadId")`,
@@ -8149,6 +8151,26 @@ async function ensureAdminStaff(db: any) {
   }
 }
 
+// Get current admin's own profile (role, email, etc.)
+app.get('/admin/team/me', adminAuthMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const email = (req.user?.email as string || '').toLowerCase();
+    if (!email) return res.status(400).json({ error: 'No email in token' });
+
+    let staff = await db.adminStaff.findUnique({ where: { email } });
+    if (!staff) {
+      // Auto-create with STANDARD role for unknown admins
+      staff = await db.adminStaff.create({
+        data: { email, role: 'STANDARD' as any },
+      });
+    }
+    res.json({ id: staff.id, email: staff.email, firstName: staff.firstName, lastName: staff.lastName, role: staff.role });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 // List all Immivo team members
 app.get('/admin/team/members', adminAuthMiddleware, async (_req, res) => {
   try {
@@ -10282,7 +10304,40 @@ app.put('/admin/contacts/:id', adminAuthMiddleware, async (req, res) => {
 // Admin: WorkMail Email Endpoints
 // ═══════════════════════════════════════════════════════════════════
 
-app.get('/admin/emails', adminAuthMiddleware, async (req, res) => {
+// Shared mailboxes (non-personal)
+const SHARED_MAILBOXES = ['office@immivo.ai', 'support@immivo.ai'];
+
+/** Returns which mailboxes a given AdminRole is allowed to access */
+function getAllowedMailboxes(callerEmail: string, role: string): string[] {
+  const own = callerEmail ? [callerEmail] : [];
+  switch (role) {
+    case 'SUPER_ADMIN':
+    case 'ADMIN':
+    case 'SUPPORT':
+      // Can see own + all shared mailboxes
+      return [...new Set([...own, ...SHARED_MAILBOXES])];
+    case 'STANDARD':
+    default:
+      // Only own mailbox
+      return own;
+  }
+}
+
+// Returns the allowed mailboxes for the current admin
+app.get('/admin/emails/allowed-mailboxes', adminAuthMiddleware, async (req: any, res) => {
+  try {
+    const db = await initializePrisma();
+    const email = (req.user?.email as string || '').toLowerCase();
+    const staff = await db.adminStaff.findUnique({ where: { email } });
+    const role = staff?.role || 'STANDARD';
+    const allowed = getAllowedMailboxes(email, role);
+    res.json({ mailboxes: allowed, role, email });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+app.get('/admin/emails', adminAuthMiddleware, async (req: any, res) => {
   try {
     const folder = (req.query.folder as string) || 'INBOX';
     const search = req.query.search as string | undefined;
@@ -10334,6 +10389,18 @@ app.get('/admin/emails', adminAuthMiddleware, async (req, res) => {
 
     const mailbox = (req.query.mailbox as string) || process.env.WORKMAIL_EMAIL || '';
     const limit = parseInt(req.query.limit as string) || 50;
+
+    // Role-based access control: verify the caller may access this mailbox
+    const callerEmail = (req.user?.email as string || '').toLowerCase();
+    if (callerEmail && mailbox) {
+      const db = await initializePrisma();
+      const staff = await db.adminStaff.findUnique({ where: { email: callerEmail } });
+      const role = staff?.role || 'STANDARD';
+      const allowed = getAllowedMailboxes(callerEmail, role);
+      if (!allowed.includes(mailbox.toLowerCase())) {
+        return res.status(403).json({ emails: [], total: 0, error: `Kein Zugriff auf Postfach ${mailbox}. Deine Rolle (${role}) erlaubt nur: ${allowed.join(', ')}` });
+      }
+    }
 
     const creds = getMailboxCredentials(mailbox);
     if (!creds) {

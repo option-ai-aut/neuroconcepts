@@ -37,11 +37,12 @@ interface TeamMember {
   createdAt: string;
 }
 
-const ROLE_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
-  SUPER_ADMIN: { label: 'Super Admin', color: 'bg-red-50 text-red-700 border-red-200', icon: Shield },
-  ADMIN: { label: 'Admin', color: 'bg-gray-100 text-gray-700 border-gray-200', icon: ShieldCheck },
-  SUPPORT: { label: 'Support', color: 'bg-purple-50 text-purple-700 border-purple-200', icon: HeadphonesIcon },
-  AGENT: { label: 'Agent', color: 'bg-blue-50 text-blue-700 border-blue-200', icon: UserCheck },
+const ROLE_CONFIG: Record<string, { label: string; color: string; icon: any; description: string }> = {
+  SUPER_ADMIN: { label: 'Super Admin', color: 'bg-red-50 text-red-700 border-red-200', icon: Shield, description: 'Voller Zugriff auf alle Systeme' },
+  ADMIN: { label: 'Admin', color: 'bg-gray-100 text-gray-700 border-gray-200', icon: ShieldCheck, description: 'Voller Zugriff inkl. geteilter Postfächer' },
+  SUPPORT: { label: 'Support', color: 'bg-purple-50 text-purple-700 border-purple-200', icon: HeadphonesIcon, description: 'Zugriff auf office@ und support@ Postfach' },
+  STANDARD: { label: 'Standard', color: 'bg-blue-50 text-blue-700 border-blue-200', icon: UserCheck, description: 'Nur eigenes Postfach sichtbar' },
+  AGENT: { label: 'Agent (Tenant)', color: 'bg-gray-50 text-gray-600 border-gray-100', icon: UserCheck, description: 'Kunden-Nutzer (kein Admin-Zugriff)' },
 };
 
 export default function TeamMembersPage() {
@@ -340,9 +341,10 @@ export default function TeamMembersPage() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">Rolle</label>
                 <select value={newRole} onChange={(e) => setNewRole(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                  <option value="SUPER_ADMIN">Super Admin</option>
-                  <option value="ADMIN">Admin</option>
-                  <option value="SUPPORT">Support</option>
+                  <option value="SUPER_ADMIN">Super Admin – Voller Zugriff</option>
+                  <option value="ADMIN">Admin – Alle Postfächer</option>
+                  <option value="SUPPORT">Support – office@ + support@</option>
+                  <option value="STANDARD">Standard – Nur eigenes Postfach</option>
                 </select>
               </div>
               {/* WorkMail Email Creation Toggle */}
@@ -406,10 +408,14 @@ export default function TeamMembersPage() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">Rolle</label>
                 <select value={editRole} onChange={(e) => setEditRole(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                  <option value="SUPER_ADMIN">Super Admin</option>
-                  <option value="ADMIN">Admin</option>
-                  <option value="SUPPORT">Support</option>
+                  <option value="SUPER_ADMIN">Super Admin – Voller Zugriff</option>
+                  <option value="ADMIN">Admin – Alle Postfächer</option>
+                  <option value="SUPPORT">Support – office@ + support@</option>
+                  <option value="STANDARD">Standard – Nur eigenes Postfach</option>
                 </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  {ROLE_CONFIG[editRole]?.description}
+                </p>
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">

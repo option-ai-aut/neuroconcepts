@@ -10,6 +10,7 @@ import {
 import { getAdminEmails, markAdminEmailRead, getAdminUnreadCounts, sendAdminEmail, backfillPortalEmails, AdminEmail } from '@/lib/adminApi';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import DOMPurify from 'dompurify';
+import { getRuntimeConfig } from '@/components/EnvProvider';
 
 function sanitizeEmailHtml(html: string): string {
   return DOMPurify.sanitize(html, {
@@ -30,10 +31,16 @@ function sanitizeEmailHtml(html: string): string {
   });
 }
 
-const SHARED_MAILBOXES = [
-  { email: 'office@immivo.ai', label: 'Office', shortLabel: 'Office', color: 'bg-gray-900' },
-  { email: 'support@immivo.ai', label: 'Support', shortLabel: 'Support', color: 'bg-amber-600' },
-];
+const SHARED_MAILBOX_CONFIG: Record<string, { label: string; shortLabel: string; color: string }> = {
+  'office@immivo.ai':  { label: 'Office',   shortLabel: 'Office',   color: 'bg-gray-900' },
+  'support@immivo.ai': { label: 'Support',  shortLabel: 'Support',  color: 'bg-amber-600' },
+};
+
+function buildMailboxEntry(email: string) {
+  const cfg = SHARED_MAILBOX_CONFIG[email.toLowerCase()];
+  if (cfg) return { email: email.toLowerCase(), ...cfg };
+  return { email: email.toLowerCase(), label: 'Mein Postfach', shortLabel: 'Mein', color: 'bg-blue-600' };
+}
 
 const FOLDERS = [
   { id: 'INBOX', label: 'Posteingang', icon: Inbox },
@@ -111,20 +118,47 @@ interface ComposeState {
 const defaultCompose: ComposeState = { open: false, to: '', cc: '', subject: '', body: '', sending: false, error: '' };
 
 export default function AdminInboxPage() {
-  const [mailboxes, setMailboxes] = useState(SHARED_MAILBOXES as { email: string; label: string; shortLabel: string; color: string }[]);
-  const [activeMailbox, setActiveMailbox] = useState(SHARED_MAILBOXES[0].email);
+  const [mailboxes, setMailboxes] = useState<{ email: string; label: string; shortLabel: string; color: string }[]>([]);
+  const [activeMailbox, setActiveMailbox] = useState('');
+  const [adminRole, setAdminRole] = useState<string>('');
 
-  // Detect the logged-in admin's own @immivo.ai mailbox and prepend it
+  // Load allowed mailboxes from API (role-based)
   useEffect(() => {
-    fetchAuthSession().then(session => {
-      const payload = session.tokens?.idToken?.payload;
-      const userEmail = (payload?.email as string || '').toLowerCase();
-      if (userEmail.endsWith('@immivo.ai')) {
-        const myBox = { email: userEmail, label: 'Mein Postfach', shortLabel: 'Mein', color: 'bg-blue-600' };
-        setMailboxes([myBox, ...SHARED_MAILBOXES]);
-        setActiveMailbox(userEmail);
+    const load = async () => {
+      try {
+        const session = await fetchAuthSession();
+        const token = session.tokens?.idToken?.toString();
+        const apiUrl = (getRuntimeConfig().apiUrl || process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+        const res = await fetch(`${apiUrl}/admin/emails/allowed-mailboxes`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const boxes = (data.mailboxes as string[]).map(buildMailboxEntry);
+          // Own mailbox first, then shared
+          const email = (data.email as string || '').toLowerCase();
+          const sorted = [
+            ...boxes.filter(b => b.email === email),
+            ...boxes.filter(b => b.email !== email),
+          ];
+          setMailboxes(sorted);
+          setActiveMailbox(sorted[0]?.email || '');
+          setAdminRole(data.role || 'STANDARD');
+        }
+      } catch (err) {
+        console.error('Failed to load allowed mailboxes:', err);
+        // Fallback: show only own mailbox from token
+        try {
+          const session = await fetchAuthSession();
+          const email = (session.tokens?.idToken?.payload?.email as string || '').toLowerCase();
+          if (email) {
+            setMailboxes([buildMailboxEntry(email)]);
+            setActiveMailbox(email);
+          }
+        } catch {}
       }
-    }).catch(() => {})
+    };
+    load();
   }, []);
   const [selectedFolder, setSelectedFolder] = useState('INBOX');
   const [selectedEmail, setSelectedEmail] = useState<AdminEmail | null>(null);
@@ -365,7 +399,22 @@ export default function AdminInboxPage() {
           </div>
           {/* Mailbox Selector */}
           <div className="p-3 border-b border-gray-200">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Postfach</p>
+            <div className="flex items-center justify-between mb-2 px-1">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Postfach</p>
+              {adminRole && (
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                  adminRole === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-700' :
+                  adminRole === 'ADMIN' ? 'bg-gray-900 text-white' :
+                  adminRole === 'SUPPORT' ? 'bg-amber-100 text-amber-700' :
+                  'bg-gray-100 text-gray-500'
+                }`}>{adminRole.replace('_', ' ')}</span>
+              )}
+            </div>
+            {mailboxes.length === 0 && (
+              <div className="flex items-center gap-2 px-3 py-2 text-xs text-gray-400">
+                <Loader2 className="w-3 h-3 animate-spin" /> Lade Postfächer...
+              </div>
+            )}
             {mailboxes.map((mb) => (
               <button
                 key={mb.email}
