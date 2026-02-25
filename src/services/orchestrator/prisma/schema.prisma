@@ -1258,15 +1258,16 @@ model RealtimeEvent {
 // ═══════════════════════════════════════════════════════════════
 
 model AdminStaff {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  firstName String?
-  lastName  String?
-  phone     String?
-  role      AdminRole @default(ADMIN)
-  avatarUrl String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id         String    @id @default(uuid())
+  email      String    @unique
+  firstName  String?
+  lastName   String?
+  phone      String?
+  role       AdminRole @default(ADMIN)
+  avatarUrl  String?
+  extraPages String[]  @default([])
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   chatMessages AdminChatMessage[]
 }
@@ -1275,6 +1276,10 @@ enum AdminRole {
   SUPER_ADMIN
   ADMIN
   SUPPORT
+  STANDARD
+  FINANCE
+  MARKETING
+  SALES
 }
 
 // --- Admin Team Chat (separate from tenant Channel/ChannelMessage) ---

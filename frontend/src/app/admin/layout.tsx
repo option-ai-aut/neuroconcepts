@@ -122,9 +122,11 @@ function AdminSidebar({
     return pathname.startsWith(href);
   };
 
-  const role = profile?.role ?? 'STANDARD';
+  // While profile is loading (null), default to SUPER_ADMIN so all nav items are visible
+  // The real role is applied as soon as the API responds
+  const role = profile?.role ?? 'SUPER_ADMIN';
   const extraPages = profile?.extraPages ?? [];
-  const roleMeta = ROLE_META[role] ?? ROLE_META.STANDARD;
+  const roleMeta = ROLE_META[role] ?? ROLE_META.ADMIN;
 
   // Filter sections: only show items the user can access; hide empty sections
   const visibleSections = NAV_SECTIONS.map(section => ({

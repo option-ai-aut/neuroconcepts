@@ -8233,8 +8233,9 @@ app.get('/admin/team/me', adminAuthMiddleware, async (req: any, res) => {
 
     let staff = await db.adminStaff.findUnique({ where: { email } });
     if (!staff) {
+      // Auto-create with ADMIN role (anyone who can log in here is at least an admin)
       staff = await db.adminStaff.create({
-        data: { email, role: 'STANDARD' as any, extraPages: [] },
+        data: { email, role: 'ADMIN', extraPages: [] },
       });
     }
     res.json({
@@ -8243,10 +8244,11 @@ app.get('/admin/team/me', adminAuthMiddleware, async (req: any, res) => {
       firstName: staff.firstName,
       lastName: staff.lastName,
       role: staff.role,
-      extraPages: (staff as any).extraPages || [],
+      extraPages: staff.extraPages || [],
     });
   } catch (error: any) {
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('admin/team/me error:', error);
+    res.status(500).json({ error: 'Internal Server Error', detail: error?.message });
   }
 });
 
@@ -8386,7 +8388,7 @@ app.patch('/admin/team/members/:id', adminAuthMiddleware, async (req: any, res) 
         ...(lastName !== undefined ? { lastName } : {}),
         ...(phone !== undefined ? { phone } : {}),
         ...(role !== undefined ? { role } : {}),
-        ...(extraPages !== undefined ? { extraPages } : {}),
+        ...(extraPages !== undefined ? { extraPages: extraPages as string[] } : {}),
       },
     });
     res.json(member);
