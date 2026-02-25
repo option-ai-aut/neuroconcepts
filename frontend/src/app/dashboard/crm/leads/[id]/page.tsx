@@ -3,7 +3,7 @@
 import { useEffect, useState, use, useRef } from 'react';
 import { getLead, Lead, sendDraftMessage, updateLead, sendManualEmail, deleteLead, uploadLeadDocuments, deleteLeadDocument, DocumentFile, getAuthHeaders } from '@/lib/api';
 import { useRouter } from 'next/navigation';
-import { Mail, Phone, User, Send, MessageSquare, FileText, ArrowLeft, MoreVertical, Calendar, Clock, ChevronDown, Plus, Trash2, Euro, Home, MapPin, Building, Activity, CheckCircle2, Edit3, FileCheck, Upload, Download, File, FileSpreadsheet, FileType, X, Users, ExternalLink, InboxIcon } from 'lucide-react';
+import { Mail, Phone, User, Send, MessageSquare, FileText, ArrowLeft, MoreVertical, Calendar, Clock, ChevronDown, Plus, Trash2, Euro, Home, MapPin, Building, Activity, CheckCircle2, Edit3, FileCheck, Upload, Download, File, FileSpreadsheet, FileType, X, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useGlobalState } from '@/context/GlobalStateContext';
 import { getRuntimeConfig } from '@/components/EnvProvider';
@@ -147,8 +147,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       await updateLead(id, data);
       // Reload activities after update
       const config = getRuntimeConfig();
-      const headers = await getAuthHeaders();
-      const res = await fetch(`${config.apiUrl}/leads/${id}/activities`, { headers });
+      const res = await fetch(`${config.apiUrl}/leads/${id}/activities`);
       if (res.ok) {
         const activitiesData = await res.json();
         setActivities(activitiesData);
@@ -342,83 +341,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         </div>
         </div>
 
-        {/* Lead Pipeline */}
-        {formData.status !== 'LOST' && (
-          <div className="mt-8 pt-6 border-t border-gray-100 overflow-x-auto">
-            <div className="flex items-end gap-0 flex-nowrap min-w-max pb-3">
-              {LEAD_STAGES.map((stage, index) => {
-                const currentIndex = getCurrentStageIndex();
-                const isActive = index === currentIndex;
-                const isCompleted = index < currentIndex;
-
-                // Get stage-specific colors
-                const getBarColor = () => {
-                  if (isCompleted) return 'bg-green-500';
-                  if (!isActive) return 'bg-gray-200';
-                  switch (stage.color) {
-                    case 'blue': return 'bg-blue-500';
-                    case 'yellow': return 'bg-yellow-500';
-                    case 'purple': return 'bg-gray-400';
-                    case 'indigo': return 'bg-gray-800';
-                    case 'green': return 'bg-green-500';
-                    default: return 'bg-gray-400';
-                  }
-                };
-
-                const getDotColor = () => {
-                  if (isCompleted) return 'bg-green-500 border-green-500';
-                  if (!isActive) return 'bg-white border-gray-300 group-hover:border-gray-400';
-                  switch (stage.color) {
-                    case 'blue': return 'bg-blue-500 border-blue-500';
-                    case 'yellow': return 'bg-yellow-500 border-yellow-500';
-                    case 'purple': return 'bg-gray-400 border-gray-400';
-                    case 'indigo': return 'bg-gray-800 border-gray-800';
-                    case 'green': return 'bg-green-500 border-green-500';
-                    default: return 'bg-gray-400 border-gray-400';
-                  }
-                };
-
-                return (
-                  <button
-                    key={stage.id}
-                    onClick={() => handleStageClick(stage.id)}
-                    className="flex-1 relative group"
-                  >
-                    {/* Label above */}
-                    <div className={`text-xs font-medium mb-4 text-center transition-colors ${
-                      isActive ? 'text-gray-900 font-semibold' :
-                      isCompleted ? 'text-green-600' :
-                      'text-gray-400'
-                    }`}>
-                      {stage.label}
-                    </div>
-                    {/* Progress bar - full width, no gaps */}
-                    <div className={`h-1.5 transition-all ${getBarColor()} ${
-                      index === 0 ? 'rounded-l-full' : ''
-                    } ${
-                      index === LEAD_STAGES.length - 1 ? 'rounded-r-full' : ''
-                    }`} />
-                    {/* Dot indicator centered on bar */}
-                    <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-4 h-4 rounded-full border-2 transition-all flex items-center justify-center ${getDotColor()}`}>
-                      {isCompleted && (
-                        <CheckCircle2 className="w-3 h-3 text-white" />
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {formData.status === 'LOST' && (
-          <div className="mt-6 pt-6 border-t border-gray-100">
-            <div className="flex items-center gap-2 text-gray-500">
-              <X className="w-4 h-4" />
-              <span className="text-sm">Lead wurde als verloren markiert</span>
-            </div>
-          </div>
-        )}
         
         {/* Assigned Property & Users */}
         {assignedProperty && (
@@ -461,13 +383,79 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-8 pb-8">
-        <div className="max-w-6xl space-y-12 pt-12">
-          
+        <div className="max-w-6xl space-y-12 pt-8">
+
+          {/* Lead Pipeline — above Kontaktdaten */}
+          {formData.status !== 'LOST' && (
+            <div>
+              <div className="flex items-end gap-0">
+                {LEAD_STAGES.map((stage, index) => {
+                  const currentIndex = getCurrentStageIndex();
+                  const isActive = index === currentIndex;
+                  const isCompleted = index < currentIndex;
+
+                  const getBarColor = () => {
+                    if (isCompleted) return 'bg-green-500';
+                    if (!isActive) return 'bg-gray-200';
+                    switch (stage.color) {
+                      case 'blue': return 'bg-blue-500';
+                      case 'yellow': return 'bg-yellow-500';
+                      case 'green': return 'bg-green-500';
+                      default: return 'bg-gray-400';
+                    }
+                  };
+
+                  const getDotColor = () => {
+                    if (isCompleted) return 'bg-green-500 border-green-500';
+                    if (!isActive) return 'bg-white border-gray-300 group-hover:border-gray-400';
+                    switch (stage.color) {
+                      case 'blue': return 'bg-blue-500 border-blue-500';
+                      case 'yellow': return 'bg-yellow-500 border-yellow-500';
+                      case 'green': return 'bg-green-500 border-green-500';
+                      default: return 'bg-gray-400 border-gray-400';
+                    }
+                  };
+
+                  return (
+                    <button
+                      key={stage.id}
+                      onClick={() => handleStageClick(stage.id)}
+                      className="flex-1 relative group"
+                    >
+                      <div className={`text-xs font-medium mb-4 text-center transition-colors ${
+                        isActive ? 'text-gray-900 font-semibold' :
+                        isCompleted ? 'text-green-600' :
+                        'text-gray-400'
+                      }`}>
+                        {stage.label}
+                      </div>
+                      <div className={`h-1.5 transition-all ${getBarColor()} ${
+                        index === 0 ? 'rounded-l-full' : ''
+                      } ${
+                        index === LEAD_STAGES.length - 1 ? 'rounded-r-full' : ''
+                      }`} />
+                      <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-4 h-4 rounded-full border-2 transition-all flex items-center justify-center ${getDotColor()}`}>
+                        {isCompleted && <CheckCircle2 className="w-3 h-3 text-white" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {formData.status === 'LOST' && (
+            <div className="flex items-center gap-2 text-gray-500 py-2">
+              <X className="w-4 h-4" />
+              <span className="text-sm">Lead wurde als verloren markiert</span>
+            </div>
+          )}
+
           {/* Kontaktdaten */}
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Kontaktdaten</h2>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-6">
+            <div className="grid grid-cols-5 gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-500 mb-2">Anrede</label>
                 <select
@@ -839,7 +827,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 {activities.length > 0 ? (
                   activities.map((activity, index) => {
                     const isLast = index === activities.length - 1;
-                    const draftId = activity.metadata?.draftId as string | undefined;
                     
                     // Icon & Color based on type
                     let icon = <Activity className="w-4 h-4" />;
@@ -853,19 +840,16 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                       iconBg = 'bg-blue-100 text-blue-600';
                     } else if (activity.type === 'EMAIL_SENT') {
                       icon = <Send className="w-4 h-4" />;
-                      iconBg = 'bg-blue-100 text-blue-600';
+                      iconBg = 'bg-gray-100 text-gray-600';
                     } else if (activity.type === 'EMAIL_RECEIVED') {
                       icon = <Mail className="w-4 h-4" />;
-                      iconBg = 'bg-indigo-100 text-indigo-600';
+                      iconBg = 'bg-gray-100 text-gray-600';
                     } else if (activity.type === 'NOTE_ADDED') {
                       icon = <FileText className="w-4 h-4" />;
                       iconBg = 'bg-yellow-100 text-yellow-600';
                     } else if (activity.type === 'FIELD_UPDATED') {
                       icon = <Edit3 className="w-4 h-4" />;
                       iconBg = 'bg-gray-100 text-gray-600';
-                    } else if (activity.type === 'PORTAL_INQUIRY' || activity.type === 'MIVO_QUERY') {
-                      icon = <InboxIcon className="w-4 h-4" />;
-                      iconBg = 'bg-purple-100 text-purple-600';
                     }
                     
                     return (
@@ -894,11 +878,9 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                           
                           {/* Email Content */}
                           {activity.content && (
-                            <div className="mt-2 p-3 bg-gray-50 rounded-md border border-gray-100">
-                              <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-                                {activity.content}
-                              </p>
-                            </div>
+                            <p className="text-sm text-gray-700 mt-2 whitespace-pre-wrap">
+                              {activity.content}
+                            </p>
                           )}
                           
                           {/* Draft Actions */}
@@ -911,23 +893,6 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                                 <Send className="w-3 h-3 mr-1.5" />
                                 Senden
                               </button>
-                            </div>
-                          )}
-
-                          {/* Draft reply button — shown when this activity has an auto-created draft */}
-                          {draftId && (
-                            <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-                              <span className="text-xs text-gray-500 flex items-center gap-1">
-                                <FileText className="w-3 h-3" />
-                                Antwort-Entwurf vorhanden
-                              </span>
-                              <Link
-                                href={`/dashboard/inbox?draft=${draftId}`}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded-md hover:bg-gray-800 transition-colors"
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                                Entwurf öffnen
-                              </Link>
                             </div>
                           )}
                         </div>

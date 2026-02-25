@@ -42,7 +42,7 @@ export default function NotificationBell() {
   const { data, mutate } = useSWR<{ notifications: Notification[]; unreadCount: number }>(
     `${apiUrl}/notifications?limit=20`,
     (url: string) => fetchWithAuth(url),
-    { refreshInterval: 0 } // No polling! SSE pushes updates
+    { refreshInterval: 30_000 } // Polling every 30s as fallback (SSE can be delayed on API Gateway)
   );
 
   // Re-fetch when SSE event arrives

@@ -27,7 +27,7 @@ import { encryptionService } from './services/EncryptionService';
 import { ConversationMemory, setPrismaClient as setConversationPrisma } from './services/ConversationMemory';
 import { CalendarService } from './services/CalendarService';
 import { setPrismaClient as setAiToolsPrisma, setReplacePlaceholders as setAiToolsReplacePlaceholders } from './services/AiTools';
-import { setMivoActionPrisma } from './services/MivoActionService';
+import { setJarvisActionPrisma } from './services/JarvisActionService';
 import { setEmailResponsePrisma } from './services/EmailResponseHandler';
 import { setEmailSyncPrisma } from './services/EmailSyncService';
 import { setPropertyMatchingPrisma } from './services/PropertyMatchingService';
@@ -210,7 +210,7 @@ function injectPrismaIntoServices(client: PrismaClient) {
   setTemplatePrisma(client);
   setConversationPrisma(client);
   setAiToolsPrisma(client);
-  setMivoActionPrisma(client);
+  setJarvisActionPrisma(client);
   setEmailResponsePrisma(client);
   setEmailSyncPrisma(client);
   setPropertyMatchingPrisma(client);
@@ -304,7 +304,7 @@ async function initializePrisma() {
 // Auto-migration: Apply missing columns/tables that exist in Prisma schema but not in DB
 // Each statement uses IF NOT EXISTS / IF EXISTS so it's safe to run multiple times
 // Version-gated: Only runs full migration set when version changes
-const MIGRATION_VERSION = 16; // Increment when adding new migrations
+const MIGRATION_VERSION = 13; // Increment when adding new migrations
 let _migrationsApplied = false;
 
 async function applyPendingMigrations(db: PrismaClient) {
@@ -341,7 +341,7 @@ async function applyPendingMigrations(db: PrismaClient) {
     'ALTER TABLE "ChannelMember" ADD COLUMN IF NOT EXISTS "role" "ChannelRole" NOT NULL DEFAULT \'MEMBER\'',
     'ALTER TABLE "ChannelMember" ADD COLUMN IF NOT EXISTS "joinedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP',
     // ChannelMessage fixes
-    'ALTER TABLE "ChannelMessage" ADD COLUMN IF NOT EXISTS "isMivo" BOOLEAN NOT NULL DEFAULT false',
+    'ALTER TABLE "ChannelMessage" ADD COLUMN IF NOT EXISTS "isJarvis" BOOLEAN NOT NULL DEFAULT false',
     'ALTER TABLE "ChannelMessage" ADD COLUMN IF NOT EXISTS "mentions" JSONB',
     'ALTER TABLE "ChannelMessage" ADD COLUMN IF NOT EXISTS "editedAt" TIMESTAMP(3)',
     // 2026-02-12: AI Usage & Cost Tracking
@@ -441,7 +441,7 @@ async function applyPendingMigrations(db: PrismaClient) {
     `DROP TRIGGER IF EXISTS lead_search_trigger ON "Lead"`,
     `CREATE TRIGGER lead_search_trigger BEFORE INSERT OR UPDATE ON "Lead"
      FOR EACH ROW EXECUTE FUNCTION lead_search_update()`,
-    // 2026-02-15: Tenant Company Profile (for Mivo context)
+    // 2026-02-15: Tenant Company Profile (for Jarvis context)
     'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "description" TEXT',
     'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "phone" TEXT',
     'ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "email" TEXT',
@@ -466,9 +466,9 @@ async function applyPendingMigrations(db: PrismaClient) {
     // Lead documents + alternate emails
     'ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "documents" JSONB',
     'ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "alternateEmails" JSONB',
-    // LeadActivity property + mivo links
+    // LeadActivity property + jarvis links
     'ALTER TABLE "LeadActivity" ADD COLUMN IF NOT EXISTS "propertyId" TEXT',
-    'ALTER TABLE "LeadActivity" ADD COLUMN IF NOT EXISTS "mivoActionId" TEXT',
+    'ALTER TABLE "LeadActivity" ADD COLUMN IF NOT EXISTS "jarvisActionId" TEXT',
     // Property address fields
     'ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "street" TEXT',
     'ALTER TABLE "Property" ADD COLUMN IF NOT EXISTS "houseNumber" TEXT',
@@ -496,35 +496,8 @@ async function applyPendingMigrations(db: PrismaClient) {
     `ALTER TABLE "PropertyAssignment" ADD CONSTRAINT "PropertyAssignment_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE`,
     // Unique index for inboundLeadEmail
     `CREATE UNIQUE INDEX IF NOT EXISTS "TenantSettings_inboundLeadEmail_key" ON "TenantSettings"("inboundLeadEmail")`,
-    // Unique index for LeadActivity.mivoActionId
-    `CREATE UNIQUE INDEX IF NOT EXISTS "LeadActivity_mivoActionId_key" ON "LeadActivity"("mivoActionId")`,
-    // 2026-02-19: v14 - Stripe Webhook Idempotency (DB-backed, survives Lambda cold starts)
-    `CREATE TABLE IF NOT EXISTS "WebhookEvent" (
-      "id" TEXT NOT NULL DEFAULT gen_random_uuid()::text,
-      "stripeEventId" TEXT NOT NULL,
-      "processedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "WebhookEvent_pkey" PRIMARY KEY ("id")
-    )`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS "WebhookEvent_stripeEventId_key" ON "WebhookEvent"("stripeEventId")`,
-    `CREATE INDEX IF NOT EXISTS "WebhookEvent_stripeEventId_idx" ON "WebhookEvent"("stripeEventId")`,
-    `CREATE INDEX IF NOT EXISTS "WebhookEvent_processedAt_idx" ON "WebhookEvent"("processedAt")`,
-    // 2026-02-23: v15 - Email signature on UserSettings + Email provider/attachments tracking
-    'ALTER TABLE "UserSettings" ADD COLUMN IF NOT EXISTS "emailSignature" TEXT',
-    'ALTER TABLE "UserSettings" ADD COLUMN IF NOT EXISTS "emailSignatureName" TEXT',
-    'ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "hasAttachments" BOOLEAN NOT NULL DEFAULT false',
-    `DO $$ BEGIN CREATE TYPE "EmailProvider" AS ENUM ('GMAIL', 'OUTLOOK', 'SMTP', 'OTHER'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
-    'ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "provider" "EmailProvider"',
-    // 2026-02-25: v16 - Add missing enum values
-    `ALTER TYPE "EmailFolder" ADD VALUE IF NOT EXISTS 'FORWARDING'`,
-    `ALTER TYPE "EmailProvider" ADD VALUE IF NOT EXISTS 'OTHER'`,
-    `ALTER TYPE "PendingActionType" ADD VALUE IF NOT EXISTS 'NEW_LEAD_REPLY'`,
-    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'PORTAL_INQUIRY'`,
-    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'EXPOSE_SENT'`,
-    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'VIEWING_SCHEDULED'`,
-    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'VIEWING_DONE'`,
-    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'MIVO_QUERY'`,
-    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'LINK_CLICK_REQUIRED'`,
-    `ALTER TABLE "LeadActivity" ADD COLUMN IF NOT EXISTS "metadata" JSONB`,
+    // Unique index for LeadActivity.jarvisActionId
+    `CREATE UNIQUE INDEX IF NOT EXISTS "LeadActivity_jarvisActionId_key" ON "LeadActivity"("jarvisActionId")`,
   ];
   
   for (const sql of migrations) {
@@ -721,10 +694,9 @@ const allowedOrigins = [
 
 const isProduction = process.env.STAGE === 'prod';
 
-// These paths never carry an Origin header and must bypass the CORS check:
-// - OAuth callbacks: browser-navigated GET redirects from Google/Microsoft
-// - Internal endpoints: server-to-server calls (Lambda → Orchestrator), protected by X-Internal-Secret
-const CORS_BYPASS_PATHS = [
+// OAuth callbacks are browser-navigated GET redirects (from Google/Microsoft)
+// and therefore never carry an Origin header — they must bypass the CORS check.
+const OAUTH_CALLBACK_PATHS = [
   '/email/gmail/callback',
   '/email/outlook/callback',
   '/calendar/google/callback',
@@ -752,8 +724,7 @@ const corsMiddleware = cors({
 });
 
 app.use((req, res, next) => {
-  // Bypass CORS for OAuth callbacks and internal server-to-server endpoints
-  if (CORS_BYPASS_PATHS.includes(req.path) || req.path.startsWith('/internal/')) {
+  if (OAUTH_CALLBACK_PATHS.includes(req.path)) {
     return next();
   }
   corsMiddleware(req, res, next);
@@ -806,6 +777,9 @@ setInterval(() => {
 }, 120_000);
 
 // ─── Stripe Webhook (RAW body — must be before express.json) ──────────────────
+// In-memory set for webhook event idempotency (prevents duplicate processing)
+const processedWebhookEvents = new Set<string>();
+const WEBHOOK_DEDUP_TTL = 300_000; // 5 minutes
 
 app.post('/billing/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'] as string;
@@ -828,15 +802,16 @@ app.post('/billing/webhook', express.raw({ type: 'application/json' }), async (r
     return res.status(400).json({ error: 'Bad Request' });
   }
 
+  // Idempotency: skip already-processed events
+  if (processedWebhookEvents.has(event.id)) {
+    console.log(`[Billing] Skipping duplicate webhook event: ${event.id}`);
+    return res.json({ received: true, duplicate: true });
+  }
+  processedWebhookEvents.add(event.id);
+  setTimeout(() => processedWebhookEvents.delete(event.id), WEBHOOK_DEDUP_TTL);
+
   try {
     const db = prisma || (await initializePrisma());
-
-    // Idempotency: skip already-processed events (DB-backed — survives Lambda cold starts)
-    const existingEvent = await db.webhookEvent.findUnique({ where: { stripeEventId: event.id } });
-    if (existingEvent) {
-      console.log(`[Billing] Skipping duplicate webhook event: ${event.id}`);
-      return res.json({ received: true, duplicate: true });
-    }
 
     // Helper: find tenant by Stripe customer ID
     const findTenantByCustomer = async (customerId: string) => {
@@ -974,9 +949,6 @@ app.post('/billing/webhook', express.raw({ type: 'application/json' }), async (r
       default:
         console.log(`[Billing] Unhandled event type: ${event.type}`);
     }
-
-    // Persist processed event ID for idempotency (survives Lambda cold starts)
-    await db.webhookEvent.create({ data: { stripeEventId: event.id } });
 
     res.json({ received: true });
   } catch (error) {
@@ -1420,7 +1392,6 @@ const publicCalendarBusyLimit = createRateLimit('calBusy', 20, 60_000, 'ip');
 const publicBookDemoLimit = createRateLimit('bookDemo', 3, 60_000, 'ip');
 const uploadLimit = createRateLimit('upload', 20, 60_000, 'user');
 const searchLimit = createRateLimit('search', 30, 60_000, 'user');
-const sseStreamLimit = createRateLimit('sseStream', 10, 60_000, 'user');
 
 // GET /billing/subscription — current plan info
 app.get('/billing/subscription', authMiddleware, billingRateLimitMiddleware, async (req: any, res) => {
@@ -2123,7 +2094,7 @@ app.delete('/account', authMiddleware, async (req, res) => {
       await tx.propertyAssignment.deleteMany({ where: { userId: user.id } });
       
       // 7. Resolve/cancel pending actions
-      await tx.mivoPendingAction.updateMany({
+      await tx.jarvisPendingAction.updateMany({
         where: { userId: user.id, status: 'PENDING' },
         data: { status: 'CANCELLED', resolvedAt: new Date(), resolution: 'Account gelöscht' }
       });
@@ -2688,7 +2659,6 @@ app.get('/leads/:id/activities', authMiddleware, async (req, res) => {
         id: a.id,
         type: a.type,
         description: a.description,
-        metadata: a.metadata,
         createdAt: a.createdAt,
         source: 'activity'
       })),
@@ -3330,7 +3300,7 @@ app.post('/leads', authMiddleware, validate(schemas.createLead), async (req, res
       console.log(`📝 Draft message created for lead: ${lead.id}`);
     }
 
-    // 5. Handle Auto-Reply or Mivo Question
+    // 5. Handle Auto-Reply or Jarvis Question
     const assignedUserId = assignedToId || currentUser.id;
     
     if (tenantSettings?.autoReplyEnabled && emailDraft && property) {
@@ -3354,10 +3324,10 @@ app.post('/leads', authMiddleware, validate(schemas.createLead), async (req, res
         }
       });
     } else if (emailDraft && property) {
-      // Auto-Reply is disabled - ask Mivo to confirm
+      // Auto-Reply is disabled - ask Jarvis to confirm
       const leadName = [firstName, lastName].filter(Boolean).join(' ') || email;
       
-      await MivoActionService.createPendingAction({
+      await JarvisActionService.createPendingAction({
         tenantId,
         userId: assignedUserId,
         leadId: lead.id,
@@ -3370,7 +3340,7 @@ app.post('/leads', authMiddleware, validate(schemas.createLead), async (req, res
         }
       });
       
-      console.log(`❓ Mivo question created for lead ${lead.id}`);
+      console.log(`❓ Jarvis question created for lead ${lead.id}`);
     }
 
     // 6. Notify assigned agent about new lead
@@ -3386,7 +3356,7 @@ app.post('/leads', authMiddleware, validate(schemas.createLead), async (req, res
       id: lead.id, 
       message: 'Lead processed',
       autoReplyScheduled: tenantSettings?.autoReplyEnabled && !!emailDraft,
-      mivoQuestionCreated: !tenantSettings?.autoReplyEnabled && !!emailDraft
+      jarvisQuestionCreated: !tenantSettings?.autoReplyEnabled && !!emailDraft
     });
 
     // Generate lead embedding + score async (fire-and-forget)
@@ -3500,7 +3470,7 @@ app.get('/expose-templates/:id', authMiddleware, async (req, res) => {
 });
 
 // POST /expose-templates - Create new template
-app.post('/expose-templates', authMiddleware, validate(schemas.createExposeTemplate), async (req, res) => {
+app.post('/expose-templates', authMiddleware, async (req, res) => {
   try {
     const { name, blocks, theme, isDefault } = req.body;
     const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
@@ -3523,7 +3493,7 @@ app.post('/expose-templates', authMiddleware, validate(schemas.createExposeTempl
 });
 
 // PUT /expose-templates/:id - Update template
-app.put('/expose-templates/:id', authMiddleware, validate(schemas.updateExposeTemplate), async (req, res) => {
+app.put('/expose-templates/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, blocks, theme, customColors, isDefault } = req.body;
@@ -3913,7 +3883,7 @@ app.get('/chat/history', authMiddleware, async (req, res) => {
     if (totalCount > MAX_HISTORY) {
       formattedHistory.push({
         role: 'SYSTEM',
-        content: `[${totalCount - MAX_HISTORY} ältere Nachrichten wurden archiviert. Mivo erinnert sich an den Kontext.]`
+        content: `[${totalCount - MAX_HISTORY} ältere Nachrichten wurden archiviert. Jarvis erinnert sich an den Kontext.]`
       });
     }
 
@@ -3928,42 +3898,6 @@ app.get('/chat/history', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error fetching chat history:', error);
     res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-
-// Undo last sent message — deletes the most recent user message + any subsequent
-// assistant/system messages.  Accepts an optional cutoffTime for retry calls that
-// need to clean up messages the Lambda saved after the initial delete.
-app.post('/chat/undo-last', authMiddleware, async (req, res) => {
-  try {
-    const db = prisma || (await initializePrisma());
-    const currentUser = await db.user.findUnique({ where: { id: req.user!.sub } });
-    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
-
-    const { cutoffTime } = req.body || {};
-
-    if (cutoffTime) {
-      const deleted = await db.userChat.deleteMany({
-        where: { userId: currentUser.id, archived: false, createdAt: { gte: new Date(cutoffTime) } },
-      });
-      return res.json({ deleted: deleted.count });
-    }
-
-    const lastUserMsg = await db.userChat.findFirst({
-      where: { userId: currentUser.id, role: 'USER', archived: false },
-      orderBy: { createdAt: 'desc' },
-    });
-    if (!lastUserMsg) return res.json({ deleted: 0 });
-
-    const deleted = await db.userChat.deleteMany({
-      where: { userId: currentUser.id, archived: false, createdAt: { gte: lastUserMsg.createdAt } },
-    });
-
-    console.log(`🗑️ Chat undo: ${deleted.count} messages removed for user ${currentUser.id}`);
-    return res.json({ deleted: deleted.count, cutoffTime: lastUserMsg.createdAt.toISOString() });
-  } catch (error) {
-    console.error('Error in chat undo:', error);
-    res.status(500).json({ error: 'Failed to undo' });
   }
 });
 
@@ -3996,7 +3930,7 @@ app.post('/chat/new', authMiddleware, async (req, res) => {
 });
 
 // Generate email signature with AI
-app.post('/mivo/generate-signature', authMiddleware, AiSafetyMiddleware.rateLimit(20, 60000), async (req, res) => {
+app.post('/jarvis/generate-signature', authMiddleware, AiSafetyMiddleware.rateLimit(20, 60000), async (req, res) => {
   try {
     const { name, email, phone, company, website } = req.body;
     
@@ -4124,7 +4058,6 @@ app.post('/chat/stream',
       // Handle both JSON and FormData
       const message = req.body.message || '';
       const pageContext = req.body.pageContext || '';
-      const undoCutoffTime: string | null = req.body.undoCutoffTime || null;
       const files = req.files as Express.Multer.File[] | undefined;
       
       // Get user from auth - CRITICAL: tenantId comes from authenticated user, not request!
@@ -4308,16 +4241,11 @@ app.post('/chat/stream',
         } : undefined,
       };
 
-      // Clean up any aborted previous request before loading history
-      if (undoCutoffTime) {
-        await prisma.userChat.deleteMany({
-          where: { userId, archived: false, createdAt: { gte: new Date(undoCutoffTime) } },
-        });
-        console.log(`🗑️ Pre-call undo for user ${userId} (cutoff: ${undoCutoffTime})`);
-      }
-
       console.log(`💬 Chat message from ${currentUser.email}: "${message.substring(0, 200)}${message.length > 200 ? '...' : ''}"${pageContext ? ` [page: ${pageContext}]` : ''}`);
-      await prisma.userChat.create({ data: { userId, role: 'USER', content: fullMessage || message } });
+
+      await prisma.userChat.create({
+        data: { userId, role: 'USER', content: fullMessage || message }
+      });
 
       // Keepalive: Send heartbeat every 5s during tool execution to prevent API GW timeout
       let lastDataTime = Date.now();
@@ -4346,7 +4274,10 @@ app.post('/chat/stream',
       }
       console.log(`📡 SSE: ${chunkCount} chunks sent, total ${fullResponse.length} chars`);
 
-      await prisma.userChat.create({ data: { userId, role: 'ASSISTANT', content: wrapAiResponse(fullResponse) } });
+      // Save assistant message BEFORE ending the response
+      await prisma.userChat.create({
+        data: { userId, role: 'ASSISTANT', content: wrapAiResponse(fullResponse) }
+      });
       console.log(`💾 Chat gespeichert für User ${userId}`);
 
       // Send done signal with function call info
@@ -4363,7 +4294,7 @@ app.post('/chat/stream',
   }
 );
 
-// Exposé-specific Chat with Mivo (full tool access)
+// Exposé-specific Chat with Jarvis (full tool access)
 app.post('/exposes/:id/chat',
   authMiddleware,
   AiSafetyMiddleware.rateLimit(50, 60000),
@@ -4401,7 +4332,7 @@ app.post('/exposes/:id/chat',
   }
 );
 
-// Template-specific Chat with Mivo (full tool access)
+// Template-specific Chat with Jarvis (full tool access)
 app.post('/templates/:id/chat',
   authMiddleware,
   AiSafetyMiddleware.rateLimit(50, 60000),
@@ -4499,7 +4430,7 @@ async function ensureDefaultChannel(tenantId: string, tenantName: string) {
 }
 
 // Create Channel (Admin only for PUBLIC channels)
-app.post('/channels', authMiddleware, validate(schemas.createChannel), async (req, res) => {
+app.post('/channels', authMiddleware, async (req, res) => {
   try {
     const { name, description, type, members } = req.body;
     const currentUser = await prisma.user.findUnique({
@@ -4795,7 +4726,7 @@ app.post('/channels/upload', authMiddleware, upload.array('files', 5), async (re
 });
 
 // Send Message (with mentions parsing)
-app.post('/channels/:channelId/messages', authMiddleware, validate(schemas.channelMessage), async (req, res) => {
+app.post('/channels/:channelId/messages', authMiddleware, async (req, res) => {
   try {
     const { channelId } = req.params;
     const { content } = req.body;
@@ -4832,7 +4763,7 @@ app.post('/channels/:channelId/messages', authMiddleware, validate(schemas.chann
         userId: currentUser.id,
         content,
         mentions: mentions.length > 0 ? mentions : undefined,
-        isMivo: false
+        isJarvis: false
       },
       include: {
         user: {
@@ -4841,13 +4772,13 @@ app.post('/channels/:channelId/messages', authMiddleware, validate(schemas.chann
       }
     });
 
-    // Respond immediately — then handle @mivo in the background
+    // Respond immediately — then handle @jarvis in the background
     res.json(message);
 
-    // Check if @mivo was mentioned (as @[Mivo](mivo), plain @mivo, or @Mivo)
-    const mivoMentioned = /(@\[Mivo\]\([^)]*\)|@mivo\b)/i.test(content);
-    if (mivoMentioned) {
-      // Fire-and-forget: generate Mivo response asynchronously
+    // Check if @jarvis was mentioned (as @[Jarvis](jarvis), plain @jarvis, or @Jarvis)
+    const jarvisMentioned = /(@\[Jarvis\]\([^)]*\)|@jarvis\b)/i.test(content);
+    if (jarvisMentioned) {
+      // Fire-and-forget: generate Jarvis response asynchronously
       (async () => {
         try {
           // Fetch recent channel messages for context (last 20)
@@ -4861,16 +4792,16 @@ app.post('/channels/:channelId/messages', authMiddleware, validate(schemas.chann
           });
 
           const history = recentMessages.reverse().map(m => ({
-            role: m.isMivo ? 'assistant' : 'user',
-            content: `${m.isMivo ? 'Mivo' : `${m.user.firstName || ''} ${m.user.lastName || ''}`.trim()}: ${m.content}`,
+            role: m.isJarvis ? 'assistant' : 'user',
+            content: `${m.isJarvis ? 'Jarvis' : `${m.user.firstName || ''} ${m.user.lastName || ''}`.trim()}: ${m.content}`,
           }));
 
-          // Strip all forms of @mivo mention from the actual question
-          const cleanContent = content.replace(/@\[Mivo\]\([^)]*\)/gi, '').replace(/@mivo\b/gi, '').trim();
+          // Strip all forms of @jarvis mention from the actual question
+          const cleanContent = content.replace(/@\[Jarvis\]\([^)]*\)/gi, '').replace(/@jarvis\b/gi, '').trim();
 
           const openai = new OpenAIService();
-          const mivoResponse = await openai.chat(
-            `Du bist Mivo, der KI-Assistent im Team Chat. Antworte wie TARS aus Interstellar — kurz, prägnant, mit einem Hauch trockenem Humor. Keine Semikolons (;), keine Floskeln, keine Emojis. Deutsch, du-Form, locker und menschlich. Beantworte die Frage basierend auf dem Kontext der bisherigen Unterhaltung.\n\nFrage von ${currentUser.firstName || ''} ${currentUser.lastName || ''}: ${cleanContent}`,
+          const jarvisResponse = await openai.chat(
+            `Du bist Jarvis, der KI-Assistent im Team Chat. Antworte wie TARS aus Interstellar — kurz, prägnant, mit einem Hauch trockenem Humor. Keine Semikolons (;), keine Floskeln, keine Emojis. Deutsch, du-Form, locker und menschlich. Beantworte die Frage basierend auf dem Kontext der bisherigen Unterhaltung.\n\nFrage von ${currentUser.firstName || ''} ${currentUser.lastName || ''}: ${cleanContent}`,
             currentUser.tenantId,
             history,
             {
@@ -4880,17 +4811,17 @@ app.post('/channels/:channelId/messages', authMiddleware, validate(schemas.chann
             }
           );
 
-          // Save Mivo response as a channel message
+          // Save Jarvis response as a channel message
           await prisma.channelMessage.create({
             data: {
               channelId,
-              userId: currentUser.id, // Use the invoking user's ID (Mivo doesn't have its own)
-              content: mivoResponse,
-              isMivo: true,
+              userId: currentUser.id, // Use the invoking user's ID (Jarvis doesn't have its own)
+              content: jarvisResponse,
+              isJarvis: true,
             }
           });
         } catch (err) {
-          console.error('Mivo team chat response error:', err);
+          console.error('Jarvis team chat response error:', err);
         }
       })();
     }
@@ -5008,7 +4939,7 @@ async function cleanupOldData() {
     });
 
     // 4. Delete resolved/cancelled pending actions older than 90 days
-    const actionsResult = await prisma.mivoPendingAction.deleteMany({
+    const actionsResult = await prisma.jarvisPendingAction.deleteMany({
       where: {
         status: { in: ['RESOLVED', 'CANCELLED'] },
         createdAt: { lt: ninetyDaysAgo }
@@ -5091,18 +5022,17 @@ app.get('/portals', authMiddleware, async (req, res) => {
 // GET /portal-connections - Get portal connections (tenant or user level)
 app.get('/portal-connections', authMiddleware, async (req, res) => {
   try {
-    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
-    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
-
-    // SECURITY: Always scope to current user's tenant; optionally further filter by userId
-    const { userId } = req.query;
-    const where: any = { tenantId: currentUser.tenantId };
+    const { tenantId, userId } = req.query;
+    
+    if (!tenantId && !userId) {
+      return res.status(400).json({ error: 'tenantId or userId required' });
+    }
+    
+    const where: any = {};
     if (userId) {
-      // Users may only filter by their own userId; admins can filter by any userId in tenant
-      if (String(userId) !== currentUser.id && currentUser.role !== 'ADMIN') {
-        return res.status(403).json({ error: 'Zugriff verweigert' });
-      }
       where.userId = String(userId);
+    } else if (tenantId) {
+      where.tenantId = String(tenantId);
     }
     
     const connections = await prisma.portalConnection.findMany({
@@ -5260,12 +5190,11 @@ app.delete('/portal-connections/:id', authMiddleware, async (req, res) => {
 // GET /portal-connections/effective - Get effective connection for user (with hierarchy)
 app.get('/portal-connections/effective', authMiddleware, async (req, res) => {
   try {
-    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
-    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
-
-    // SECURITY: Always use authenticated user's own IDs, ignore query parameters
-    const userId = currentUser.id;
-    const tenantId = currentUser.tenantId;
+    const { userId, tenantId } = req.query;
+    
+    if (!userId || !tenantId) {
+      return res.status(400).json({ error: 'userId and tenantId required' });
+    }
     
     // Get all portals
     const portals = await prisma.portal.findMany({
@@ -5276,7 +5205,7 @@ app.get('/portal-connections/effective', authMiddleware, async (req, res) => {
     // For each portal, determine effective connection
     const effectiveConnections = await Promise.all(
       portals.map(async (portal) => {
-        const result = await getPortalConnection(portal.id, userId, tenantId);
+        const result = await getPortalConnection(portal.id, String(userId), String(tenantId));
         return {
           portal,
           connection: result?.connection || null,
@@ -5342,17 +5271,8 @@ app.post('/portal-connections/:id/test', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     
-    const currentUser = await prisma.user.findUnique({ where: { email: req.user!.email } });
-    if (!currentUser) return res.status(401).json({ error: 'Unauthorized' });
-
-    const connection = await prisma.portalConnection.findFirst({
-      where: {
-        id,
-        OR: [
-          { tenantId: currentUser.tenantId },
-          { userId: currentUser.id }
-        ]
-      },
+    const connection = await prisma.portalConnection.findUnique({
+      where: { id },
       include: { portal: true }
     });
     
@@ -6030,12 +5950,14 @@ app.get('/calendar/events', authMiddleware, async (req, res) => {
 });
 
 // Create Calendar Event
-// Note: frontend sends 'subject' field (not 'title') — field-name mismatch in legacy code.
-// Validation middleware NOT applied here to avoid breaking existing behavior.
 app.post('/calendar/events', authMiddleware, async (req, res) => {
   try {
     const userEmail = req.user!.email;
     const { title, start, end, location, description } = req.body;
+
+    if (!title || !start || !end) {
+      return res.status(400).json({ error: 'title, start, and end are required' });
+    }
 
     // Get user's tenantId from database
     const user = await prisma.user.findUnique({
@@ -6117,11 +6039,15 @@ app.post('/calendar/events', authMiddleware, async (req, res) => {
 });
 
 // Update Calendar Event
-app.put('/calendar/events/:eventId', authMiddleware, validate(schemas.updateCalendarEvent), async (req, res) => {
+app.put('/calendar/events/:eventId', authMiddleware, async (req, res) => {
   try {
     const userEmail = req.user!.email;
     const { eventId } = req.params;
     const { title, start, end, location, description } = req.body;
+
+    if (!title || !start || !end) {
+      return res.status(400).json({ error: 'title, start, and end are required' });
+    }
 
     const user = await prisma.user.findUnique({
       where: { email: userEmail },
@@ -7229,7 +7155,7 @@ app.post('/emails/send', authMiddleware, async (req: any, res) => {
     });
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { to, cc, bcc, subject, body, bodyHtml, leadId, replyToEmailId, asDraft, draftId, attachments: attachmentPayload } = req.body;
+    const { to, cc, bcc, subject, body, bodyHtml, leadId, replyToEmailId, asDraft, draftId } = req.body;
 
     if (!to || !subject) {
       return res.status(400).json({ error: 'Missing required fields: to, subject' });
@@ -7311,80 +7237,24 @@ app.post('/emails/send', authMiddleware, async (req: any, res) => {
         ? `"${senderName}" <${user.email}>`
         : user.email;
 
-      // Resolve attachments: base64 data (uploaded) or URL (CRM — fetch server-side)
-      type ResolvedAttachment = { name: string; type: string; data: string };
-      const resolvedAttachments: ResolvedAttachment[] = [];
-      if (Array.isArray(attachmentPayload) && attachmentPayload.length > 0) {
-        for (const att of attachmentPayload) {
-          try {
-            if (att.data) {
-              resolvedAttachments.push({ name: att.name || 'attachment', type: att.type || 'application/octet-stream', data: att.data });
-            } else if (att.url) {
-              const resp = await fetch(att.url);
-              if (resp.ok) {
-                const buf = await resp.arrayBuffer();
-                resolvedAttachments.push({
-                  name: att.name || 'attachment',
-                  type: att.type || resp.headers.get('content-type') || 'application/octet-stream',
-                  data: Buffer.from(buf).toString('base64'),
-                });
-              }
-            }
-          } catch (e) { console.warn('Attachment resolve error:', e); }
-        }
-      }
+      // Build email message (the blank line between headers and body is required by RFC 2822)
+      const emailLines = [
+        `From: ${fromHeader}`,
+        `To: ${to}`,
+        ...(cc ? [`Cc: ${cc}`] : []),
+        ...(bcc ? [`Bcc: ${bcc}`] : []),
+        `Subject: ${subject}`,
+        'MIME-Version: 1.0',
+        'Content-Type: text/html; charset=utf-8',
+        '',
+        finalHtml || finalBody.replace(/\n/g, '<br>')
+      ];
 
-      // Build MIME message — multipart/mixed when there are attachments, otherwise simple HTML
-      let rawMessage: string;
-      if (resolvedAttachments.length > 0) {
-        const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-        const headers = [
-          `From: ${fromHeader}`,
-          `To: ${to}`,
-          ...(cc ? [`Cc: ${cc}`] : []),
-          ...(bcc ? [`Bcc: ${bcc}`] : []),
-          `Subject: ${subject}`,
-          'MIME-Version: 1.0',
-          `Content-Type: multipart/mixed; boundary="${boundary}"`,
-          '',
-        ].join('\r\n');
-
-        const htmlPart = [
-          `--${boundary}`,
-          'Content-Type: text/html; charset=utf-8',
-          'Content-Transfer-Encoding: quoted-printable',
-          '',
-          (finalHtml || finalBody.replace(/\n/g, '<br>')).replace(/=/g, '=3D'),
-          '',
-        ].join('\r\n');
-
-        const attParts = resolvedAttachments.map(att => [
-          `--${boundary}`,
-          `Content-Type: ${att.type}; name="${att.name}"`,
-          'Content-Transfer-Encoding: base64',
-          `Content-Disposition: attachment; filename="${att.name}"`,
-          '',
-          att.data,
-          '',
-        ].join('\r\n')).join('');
-
-        const mimeBody = `${headers}\r\n${htmlPart}${attParts}--${boundary}--`;
-        rawMessage = Buffer.from(mimeBody).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-      } else {
-        // Simple HTML message (no attachments)
-        const emailLines = [
-          `From: ${fromHeader}`,
-          `To: ${to}`,
-          ...(cc ? [`Cc: ${cc}`] : []),
-          ...(bcc ? [`Bcc: ${bcc}`] : []),
-          `Subject: ${subject}`,
-          'MIME-Version: 1.0',
-          'Content-Type: text/html; charset=utf-8',
-          '',
-          finalHtml || finalBody.replace(/\n/g, '<br>'),
-        ];
-        rawMessage = Buffer.from(emailLines.join('\r\n')).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-      }
+      const rawMessage = Buffer.from(emailLines.join('\r\n'))
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
 
       try {
         await gmail.users.messages.send({
@@ -7419,24 +7289,6 @@ app.post('/emails/send', authMiddleware, async (req: any, res) => {
         ? `"${smtpSenderName}" <${smtpConfig.from || user.email}>`
         : (smtpConfig.from || user.email);
 
-      // Resolve attachments for SMTP as well
-      const smtpAttachments: { filename: string; content: Buffer; contentType: string }[] = [];
-      if (Array.isArray(attachmentPayload) && attachmentPayload.length > 0) {
-        for (const att of attachmentPayload) {
-          try {
-            if (att.data) {
-              smtpAttachments.push({ filename: att.name || 'attachment', content: Buffer.from(att.data, 'base64'), contentType: att.type || 'application/octet-stream' });
-            } else if (att.url) {
-              const resp = await fetch(att.url);
-              if (resp.ok) {
-                const buf = await resp.arrayBuffer();
-                smtpAttachments.push({ filename: att.name || 'attachment', content: Buffer.from(buf), contentType: att.type || 'application/octet-stream' });
-              }
-            }
-          } catch (e) { console.warn('SMTP attachment resolve error:', e); }
-        }
-      }
-
       try {
         await transporter.sendMail({
           from: smtpFrom,
@@ -7446,90 +7298,14 @@ app.post('/emails/send', authMiddleware, async (req: any, res) => {
           subject,
           text: finalBody,
           html: finalHtml,
-          attachments: smtpAttachments.length > 0 ? smtpAttachments : undefined,
         });
         sendResult = { success: true, provider: 'smtp' };
       } catch (smtpError: any) {
         console.error('SMTP send error:', smtpError);
         sendResult = { success: false, error: smtpError.message };
       }
-    } else if (settings?.outlookMailConfig) {
-      // Send via Outlook (Microsoft Graph API)
-      const outlookCfg = settings.outlookMailConfig as any;
-      let outlookAccessToken = outlookCfg.accessToken;
-      let outlookRefreshToken = outlookCfg.refreshToken;
-
-      try { outlookAccessToken = encryptionService.decrypt(outlookAccessToken); } catch {}
-      try { outlookRefreshToken = encryptionService.decrypt(outlookRefreshToken); } catch {}
-
-      // Refresh token if expired (within 5 min buffer)
-      if (outlookCfg.expiryDate && Date.now() > outlookCfg.expiryDate - 5 * 60 * 1000) {
-        try {
-          const refreshed = await EmailService.refreshOutlookMailToken(outlookRefreshToken);
-          outlookAccessToken = refreshed.accessToken;
-          // Persist updated token
-          await db.tenantSettings.update({
-            where: { tenantId: user.tenantId },
-            data: {
-              outlookMailConfig: {
-                ...outlookCfg,
-                accessToken: encryptionService.encrypt(refreshed.accessToken),
-                expiryDate: refreshed.expiryDate,
-              } as any
-            }
-          });
-        } catch (refreshErr: any) {
-          console.error('Outlook token refresh failed:', refreshErr.message);
-          return res.status(401).json({ error: 'Outlook-Token abgelaufen. Bitte Outlook erneut verbinden.' });
-        }
-      }
-
-      try {
-        // Resolve attachments for Outlook Graph API
-        const graphAttachments: any[] = [];
-        if (Array.isArray(attachmentPayload) && attachmentPayload.length > 0) {
-          for (const att of attachmentPayload) {
-            try {
-              let b64 = att.data;
-              if (!b64 && att.url) {
-                const resp = await fetch(att.url);
-                if (resp.ok) b64 = Buffer.from(await resp.arrayBuffer()).toString('base64');
-              }
-              if (b64) {
-                graphAttachments.push({
-                  '@odata.type': '#microsoft.graph.fileAttachment',
-                  name: att.name || 'attachment',
-                  contentType: att.type || 'application/octet-stream',
-                  contentBytes: b64,
-                });
-              }
-            } catch (e) { console.warn('Outlook attachment resolve error:', e); }
-          }
-        }
-
-        const { Client } = require('@microsoft/microsoft-graph-client');
-        const graphClient = Client.init({ authProvider: (done: any) => done(null, outlookAccessToken) });
-
-        const message: any = {
-          message: {
-            subject,
-            body: { contentType: 'HTML', content: finalHtml || finalBody.replace(/\n/g, '<br>') },
-            toRecipients: (Array.isArray(to) ? to : [to]).map((addr: string) => ({ emailAddress: { address: addr } })),
-            ...(cc ? { ccRecipients: (Array.isArray(cc) ? cc : [cc]).map((addr: string) => ({ emailAddress: { address: addr } })) } : {}),
-            ...(bcc ? { bccRecipients: (Array.isArray(bcc) ? bcc : [bcc]).map((addr: string) => ({ emailAddress: { address: addr } })) } : {}),
-            ...(graphAttachments.length > 0 ? { attachments: graphAttachments } : {}),
-          },
-          saveToSentItems: false, // We save manually in our DB below
-        };
-
-        await graphClient.api('/me/sendMail').post(message);
-        sendResult = { success: true, provider: 'outlook' };
-      } catch (outlookError: any) {
-        console.error('Outlook send error:', outlookError);
-        sendResult = { success: false, error: outlookError.message };
-      }
     } else {
-      return res.status(400).json({ error: 'Kein E-Mail-Anbieter konfiguriert. Bitte Gmail, Outlook oder SMTP verbinden.' });
+      return res.status(400).json({ error: 'No email provider configured. Please connect Gmail or configure SMTP in settings.' });
     }
 
     if (sendResult.success) {
@@ -7549,8 +7325,7 @@ app.post('/emails/send', authMiddleware, async (req: any, res) => {
           bodyHtml: finalHtml,
           folder: 'SENT',
           isRead: true,
-          hasAttachments: Array.isArray(attachmentPayload) && attachmentPayload.length > 0,
-          provider: sendResult.provider === 'gmail' ? 'GMAIL' : sendResult.provider === 'outlook' ? 'OUTLOOK' : 'SMTP',
+          provider: sendResult.provider === 'gmail' ? 'GMAIL' : 'SMTP',
           leadId: leadId || undefined,
           sentAt: new Date(),
         }
@@ -7684,7 +7459,7 @@ app.post('/emails/incoming', verifyInternalSecret, async (req, res) => {
 // ============================================
 
 import NotificationService from './services/NotificationService';
-import MivoActionService from './services/MivoActionService';
+import JarvisActionService from './services/JarvisActionService';
 import SchedulerService from './services/SchedulerService';
 
 // Get notifications for current user
@@ -7786,7 +7561,7 @@ app.get('/activities', authMiddleware, async (req: any, res) => {
         description: true,
         metadata: true,
         propertyId: true,
-        mivoActionId: true,
+        jarvisActionId: true,
         createdBy: true,
         createdAt: true,
         lead: {
@@ -7795,7 +7570,7 @@ app.get('/activities', authMiddleware, async (req: any, res) => {
         property: {
           select: { id: true, title: true, address: true }
         },
-        mivoAction: {
+        jarvisAction: {
           select: { id: true, status: true, question: true, options: true, allowCustom: true }
         }
       },
@@ -8281,22 +8056,22 @@ async function ensureAdminTables(db: any) {
       created++;
     }
 
-    // --- MivoPendingAction ---
-    if (!existing.has('MivoPendingAction')) {
-      console.log('🔧 Creating MivoPendingAction table...');
+    // --- JarvisPendingAction ---
+    if (!existing.has('JarvisPendingAction')) {
+      console.log('🔧 Creating JarvisPendingAction table...');
       await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "PendingActionType" AS ENUM ('SEND_EXPOSE','SCHEDULE_VIEWING','ANSWER_QUESTION','ESCALATION','ASSIGN_PROPERTY','LINK_CLICK_REQUIRED','CLARIFICATION'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
       await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "PendingActionStatus" AS ENUM ('PENDING','REMINDED','ESCALATED','RESOLVED','CANCELLED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
-      await db.$executeRawUnsafe(`CREATE TABLE "MivoPendingAction" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "tenantId" TEXT NOT NULL, "userId" TEXT NOT NULL, "leadId" TEXT, "propertyId" TEXT, "type" "PendingActionType" NOT NULL, "question" TEXT NOT NULL, "context" JSONB, "options" JSONB, "allowCustom" BOOLEAN NOT NULL DEFAULT true, "status" "PendingActionStatus" NOT NULL DEFAULT 'PENDING', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "reminderSentAt" TIMESTAMP(3), "escalatedAt" TIMESTAMP(3), "resolvedAt" TIMESTAMP(3), "resolution" TEXT, "scheduledReminderId" TEXT, "scheduledEscalationId" TEXT, CONSTRAINT "MivoPendingAction_pkey" PRIMARY KEY ("id"))`);
-      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "MivoPendingAction_tenantId_status_idx" ON "MivoPendingAction"("tenantId","status")`);
-      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "MivoPendingAction_userId_status_idx" ON "MivoPendingAction"("userId","status")`);
-      await db.$executeRawUnsafe(`ALTER TABLE "MivoPendingAction" ADD CONSTRAINT "MivoPendingAction_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE`).catch(() => {});
+      await db.$executeRawUnsafe(`CREATE TABLE "JarvisPendingAction" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "tenantId" TEXT NOT NULL, "userId" TEXT NOT NULL, "leadId" TEXT, "propertyId" TEXT, "type" "PendingActionType" NOT NULL, "question" TEXT NOT NULL, "context" JSONB, "options" JSONB, "allowCustom" BOOLEAN NOT NULL DEFAULT true, "status" "PendingActionStatus" NOT NULL DEFAULT 'PENDING', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "reminderSentAt" TIMESTAMP(3), "escalatedAt" TIMESTAMP(3), "resolvedAt" TIMESTAMP(3), "resolution" TEXT, "scheduledReminderId" TEXT, "scheduledEscalationId" TEXT, CONSTRAINT "JarvisPendingAction_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "JarvisPendingAction_tenantId_status_idx" ON "JarvisPendingAction"("tenantId","status")`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "JarvisPendingAction_userId_status_idx" ON "JarvisPendingAction"("userId","status")`);
+      await db.$executeRawUnsafe(`ALTER TABLE "JarvisPendingAction" ADD CONSTRAINT "JarvisPendingAction_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE`).catch(() => {});
       created++;
     }
 
     // --- Notification ---
     if (!existing.has('Notification')) {
       console.log('🔧 Creating Notification table...');
-      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "NotificationType" AS ENUM ('MIVO_QUESTION','NEW_LEAD','LEAD_RESPONSE','REMINDER','ESCALATION','SYSTEM'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "NotificationType" AS ENUM ('JARVIS_QUESTION','NEW_LEAD','LEAD_RESPONSE','REMINDER','ESCALATION','SYSTEM'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
       await db.$executeRawUnsafe(`CREATE TABLE "Notification" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "tenantId" TEXT NOT NULL, "userId" TEXT NOT NULL, "type" "NotificationType" NOT NULL, "title" TEXT NOT NULL, "message" TEXT NOT NULL, "metadata" JSONB, "read" BOOLEAN NOT NULL DEFAULT false, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "Notification_pkey" PRIMARY KEY ("id"))`);
       await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Notification_tenantId_userId_read_idx" ON "Notification"("tenantId","userId","read")`);
       await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "Notification_userId_createdAt_idx" ON "Notification"("userId","createdAt")`);
@@ -9129,14 +8904,14 @@ app.patch('/admin/platform/bug-reports/:id', adminAuthMiddleware, async (req, re
 });
 
 // ============================================
-// Mivo Pending Actions API
+// Jarvis Pending Actions API
 // ============================================
 
 // Get pending actions for current user
-app.get('/mivo/actions', authMiddleware, async (req: any, res) => {
+app.get('/jarvis/actions', authMiddleware, async (req: any, res) => {
   try {
     const userId = req.user.sub;
-    const actions = await MivoActionService.getPendingActionsForUser(userId);
+    const actions = await JarvisActionService.getPendingActionsForUser(userId);
     res.json({ actions });
   } catch (error: any) {
     console.error('Error fetching pending actions:', error);
@@ -9145,7 +8920,7 @@ app.get('/mivo/actions', authMiddleware, async (req: any, res) => {
 });
 
 // Get all pending actions for tenant (admin only)
-app.get('/mivo/actions/all', authMiddleware, async (req: any, res) => {
+app.get('/jarvis/actions/all', authMiddleware, async (req: any, res) => {
   try {
     const db = await initializePrisma();
     const userId = req.user.sub;
@@ -9155,7 +8930,7 @@ app.get('/mivo/actions/all', authMiddleware, async (req: any, res) => {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    const actions = await MivoActionService.getPendingActionsForTenant(user.tenantId);
+    const actions = await JarvisActionService.getPendingActionsForTenant(user.tenantId);
     res.json({ actions });
   } catch (error: any) {
     console.error('Error fetching all pending actions:', error);
@@ -9164,7 +8939,7 @@ app.get('/mivo/actions/all', authMiddleware, async (req: any, res) => {
 });
 
 // Resolve a pending action
-app.post('/mivo/actions/:id/resolve', authMiddleware, async (req: any, res) => {
+app.post('/jarvis/actions/:id/resolve', authMiddleware, async (req: any, res) => {
   try {
     const db = await initializePrisma();
     const userId = req.user.sub;
@@ -9176,7 +8951,7 @@ app.post('/mivo/actions/:id/resolve', authMiddleware, async (req: any, res) => {
     }
 
     // Verify user owns this action or is admin
-    const action = await db.mivoPendingAction.findUnique({ where: { id } });
+    const action = await db.jarvisPendingAction.findUnique({ where: { id } });
     if (!action) {
       return res.status(404).json({ error: 'Action not found' });
     }
@@ -9189,7 +8964,7 @@ app.post('/mivo/actions/:id/resolve', authMiddleware, async (req: any, res) => {
     // Cancel any pending schedules
     await SchedulerService.cancelActionSchedules(id);
 
-    const resolved = await MivoActionService.resolveAction(id, resolution, userId);
+    const resolved = await JarvisActionService.resolveAction(id, resolution, userId);
     res.json({ success: true, action: resolved });
   } catch (error: any) {
     console.error('Error resolving action:', error);
@@ -9198,7 +8973,7 @@ app.post('/mivo/actions/:id/resolve', authMiddleware, async (req: any, res) => {
 });
 
 // Respond to a pending action (simplified version of resolve)
-app.post('/mivo/actions/:id/respond', authMiddleware, async (req: any, res) => {
+app.post('/jarvis/actions/:id/respond', authMiddleware, async (req: any, res) => {
   try {
     const db = await initializePrisma();
     const userEmail = req.user!.email;
@@ -9215,7 +8990,7 @@ app.post('/mivo/actions/:id/respond', authMiddleware, async (req: any, res) => {
     }
 
     // Get the action
-    const action = await db.mivoPendingAction.findUnique({ 
+    const action = await db.jarvisPendingAction.findUnique({ 
       where: { id },
       include: { activity: true }
     });
@@ -9248,14 +9023,10 @@ app.post('/mivo/actions/:id/respond', authMiddleware, async (req: any, res) => {
           }
         });
       }
-    } else if ((action.type as string) === 'NEW_LEAD_REPLY') {
-      // For NEW_LEAD_REPLY: "edit_draft" or "skip" — just resolve the action
-      // Draft sending is handled by the frontend via the inbox
-      console.log(`📬 NEW_LEAD_REPLY resolved with: ${response} for action ${action.id}`);
     }
 
     // Resolve the action
-    const resolved = await db.mivoPendingAction.update({
+    const resolved = await db.jarvisPendingAction.update({
       where: { id },
       data: {
         status: 'RESOLVED',
@@ -9285,7 +9056,7 @@ app.post('/mivo/actions/:id/respond', authMiddleware, async (req: any, res) => {
 });
 
 // Cancel a pending action
-app.post('/mivo/actions/:id/cancel', authMiddleware, async (req: any, res) => {
+app.post('/jarvis/actions/:id/cancel', authMiddleware, async (req: any, res) => {
   try {
     const db = await initializePrisma();
     const userId = req.user.sub;
@@ -9293,7 +9064,7 @@ app.post('/mivo/actions/:id/cancel', authMiddleware, async (req: any, res) => {
     const { reason } = req.body;
 
     // Verify user owns this action or is admin
-    const action = await db.mivoPendingAction.findUnique({ where: { id } });
+    const action = await db.jarvisPendingAction.findUnique({ where: { id } });
     if (!action) {
       return res.status(404).json({ error: 'Action not found' });
     }
@@ -9306,7 +9077,7 @@ app.post('/mivo/actions/:id/cancel', authMiddleware, async (req: any, res) => {
     // Cancel any pending schedules
     await SchedulerService.cancelActionSchedules(id);
 
-    const cancelled = await MivoActionService.cancelAction(id, reason);
+    const cancelled = await JarvisActionService.cancelAction(id, reason);
     res.json({ success: true, action: cancelled });
   } catch (error: any) {
     console.error('Error cancelling action:', error);
@@ -9441,13 +9212,13 @@ app.post('/internal/scheduler/auto-reply', async (req, res) => {
     if (!EmailService.hasEmailProvider(emailConfig)) {
       console.log(`⚠️ No email provider configured for tenant ${tenantId}`);
       
-      // Create Mivo action to notify admin
+      // Create Jarvis action to notify admin
       const admin = await db.user.findFirst({
         where: { tenantId, role: { in: ['ADMIN', 'SUPER_ADMIN'] } }
       });
       
       if (admin) {
-        await MivoActionService.createPendingAction({
+        await JarvisActionService.createPendingAction({
           tenantId,
           userId: admin.id,
           leadId,
@@ -9523,7 +9294,7 @@ app.post('/internal/scheduler/auto-reply', async (req, res) => {
       
       // Notify assigned agent about the failure
       if (lead.assignedToId) {
-        await MivoActionService.createPendingAction({
+        await JarvisActionService.createPendingAction({
           tenantId,
           userId: lead.assignedToId,
           leadId,
@@ -9562,7 +9333,7 @@ app.post('/internal/scheduler/follow-up', async (req, res) => {
 app.post('/internal/scheduler/reminder', async (req, res) => {
   try {
     const { actionId } = req.body;
-    await MivoActionService.sendReminder(actionId);
+    await JarvisActionService.sendReminder(actionId);
     res.json({ success: true });
   } catch (error: any) {
     console.error('Reminder error:', error);
@@ -9574,7 +9345,7 @@ app.post('/internal/scheduler/reminder', async (req, res) => {
 app.post('/internal/scheduler/escalation', async (req, res) => {
   try {
     const { actionId } = req.body;
-    await MivoActionService.escalateAction(actionId);
+    await JarvisActionService.escalateAction(actionId);
     res.json({ success: true });
   } catch (error: any) {
     console.error('Escalation error:', error);
@@ -9588,30 +9359,6 @@ app.post('/internal/scheduler/escalation', async (req, res) => {
 
 import { classifyAndParseEmail, type EmailClassification } from './services/EmailParserService';
 import { matchProperty, getPropertiesForSelection } from './services/PropertyMatchingService';
-
-// Rate limit store for email ingestion (per-tenant and per-sender)
-const emailIngestLimits: Record<string, { count: number; resetTime: number }> = {};
-const EMAIL_INGEST_MAX_PER_TENANT = 60;   // max 60 emails per hour per tenant
-const EMAIL_INGEST_MAX_PER_SENDER = 5;    // max 5 emails per hour from same sender to same tenant
-const EMAIL_INGEST_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-
-function checkEmailIngestLimit(key: string, max: number): { allowed: boolean; remaining: number } {
-  const now = Date.now();
-  const entry = emailIngestLimits[key];
-  if (!entry || now > entry.resetTime) {
-    emailIngestLimits[key] = { count: 1, resetTime: now + EMAIL_INGEST_WINDOW_MS };
-    return { allowed: true, remaining: max - 1 };
-  }
-  if (entry.count >= max) {
-    return { allowed: false, remaining: 0 };
-  }
-  entry.count++;
-  return { allowed: true, remaining: max - entry.count };
-}
-
-// Deduplication: reject identical sender+subject within 5 minutes
-const recentEmails: Map<string, number> = new Map();
-const DEDUP_WINDOW_MS = 5 * 60 * 1000;
 
 app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
   try {
@@ -9627,37 +9374,6 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
       return res.status(400).json({ error: 'Invalid recipient email' });
     }
 
-    // --- Rate Limiting & Dedup ---
-    const senderNorm = (from || '').toLowerCase().trim();
-    const tenantKey = `tenant:${emailPrefix}`;
-    const senderKey = `sender:${emailPrefix}:${senderNorm}`;
-
-    const tenantCheck = checkEmailIngestLimit(tenantKey, EMAIL_INGEST_MAX_PER_TENANT);
-    if (!tenantCheck.allowed) {
-      console.warn(`🛑 Email rate limit hit for tenant ${emailPrefix} (${EMAIL_INGEST_MAX_PER_TENANT}/h)`);
-      return res.status(429).json({ error: 'Too many emails — rate limit exceeded' });
-    }
-
-    const senderCheck = checkEmailIngestLimit(senderKey, EMAIL_INGEST_MAX_PER_SENDER);
-    if (!senderCheck.allowed) {
-      console.warn(`🛑 Email rate limit hit for sender ${senderNorm} → ${emailPrefix} (${EMAIL_INGEST_MAX_PER_SENDER}/h)`);
-      return res.status(429).json({ error: 'Too many emails from this sender' });
-    }
-
-    const bodySnippet = (text || '').trim().slice(0, 200).toLowerCase();
-    const dedupKey = `${emailPrefix}:${senderNorm}:${(subject || '').trim().toLowerCase()}:${bodySnippet}`;
-    const lastSeen = recentEmails.get(dedupKey);
-    if (lastSeen && Date.now() - lastSeen < DEDUP_WINDOW_MS) {
-      console.log(`⏭️ Duplicate email skipped: ${senderNorm} → ${emailPrefix}, subject: "${subject}"`);
-      return res.json({ success: true, skipped: true, reason: 'duplicate' });
-    }
-    recentEmails.set(dedupKey, Date.now());
-    // Cleanup old dedup entries periodically
-    if (recentEmails.size > 500) {
-      const cutoff = Date.now() - DEDUP_WINDOW_MS;
-      for (const [k, t] of recentEmails) { if (t < cutoff) recentEmails.delete(k); }
-    }
-
     const tenantSettings = await db.tenantSettings.findFirst({
       where: { inboundLeadEmail: emailPrefix },
       include: { tenant: true }
@@ -9671,8 +9387,8 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
     const tenantId = tenantSettings.tenantId;
     console.log(`✅ Tenant identified: ${tenantSettings.tenant.name} (${tenantId})`);
 
-    // 2. Mivo classifies & parses the email (ALL emails, not just portal ones)
-    console.log('🤖 Mivo classifying email...');
+    // 2. Jarvis classifies & parses the email (ALL emails, not just portal ones)
+    console.log('🤖 Jarvis classifying email...');
     const parseResult = await classifyAndParseEmail({ from, subject, text, html });
 
     console.log(`📋 Classification: ${parseResult.classification} (${parseResult.classificationReason})`);
@@ -9702,8 +9418,12 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
       // Still create a lead with minimal data
     }
 
-    // 4. Create the lead (email body is stored as Activity/Message — NOT in notes)
+    // 4. Create the lead
     const leadData = parseResult.leadData;
+    let leadNotes = leadData.message || parseResult.rawMessage || '';
+    if (parseResult.hasClickLink) {
+      leadNotes = `⚠️ Portal-Email erfordert Link-Klick. URL: ${parseResult.clickLinkUrl || 'nicht erkannt'}\n\n${leadNotes}`;
+    }
 
     const lead = await db.lead.create({
       data: {
@@ -9715,6 +9435,7 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
         source: 'PORTAL',
         sourceDetails: parseResult.portal,
         status: 'NEW',
+        notes: leadNotes || undefined,
       }
     });
 
@@ -9798,7 +9519,7 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
           hasClickLink: parseResult.hasClickLink,
           clickLinkUrl: parseResult.clickLinkUrl,
           propertyRef: parseResult.propertyRef ? JSON.parse(JSON.stringify(parseResult.propertyRef)) : null,
-          originalEmail: { from, subject },
+          originalEmail: { from, subject, body: (leadData.message || '').substring(0, 2000) },
         } as any
       }
     });
@@ -9829,7 +9550,7 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
     }
 
     // 9. Create notifications
-    const notificationType = parseResult.hasClickLink ? 'MIVO_QUESTION' : 'NEW_LEAD';
+    const notificationType = parseResult.hasClickLink ? 'JARVIS_QUESTION' : 'NEW_LEAD';
     const leadName = [leadData.firstName, leadData.lastName].filter(Boolean).join(' ') || leadData.email || 'Unbekannt';
     const notificationTitle = parseResult.hasClickLink
       ? `Neue Portal-Anfrage - Link-Klick erforderlich`
@@ -9879,63 +9600,64 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
       }
     }
 
-    // 10. Auto-create draft reply email (async, fire-and-forget — don't block response)
-    let autoDraftId: string | null = null;
-    const draftTargetUser = usersToNotify[0];
-    if (draftTargetUser && !parseResult.hasClickLink && leadData.email) {
-      try {
-        const draftUser = await db.user.findUnique({
-          where: { id: draftTargetUser },
-          include: { settings: true }
-        });
-        if (draftUser) {
-          const agentName = [draftUser.firstName, draftUser.lastName].filter(Boolean).join(' ') || draftUser.email;
-          const propertyInfo = matchedProperty ? `\n\nZu Ihrer Anfrage bezüglich "${matchedProperty.title}" stehe ich Ihnen gerne für weitere Fragen zur Verfügung.` : '';
-          const signature = draftUser.settings?.emailSignature ? `\n\n${draftUser.settings.emailSignature}` : `\n\nMit freundlichen Grüßen\n${agentName}`;
-          const draftBody = `Guten Tag ${[leadData.firstName, leadData.lastName].filter(Boolean).join(' ') || ''},\n\nvielen Dank für Ihre Anfrage via ${parseResult.portal}.${propertyInfo}\n\nIch melde mich schnellstmöglich bei Ihnen.${signature}`;
-          
-          const draft = await db.email.create({
-            data: {
-              tenantId,
-              from: draftUser.email,
-              fromName: agentName || undefined,
-              to: [leadData.email],
-              subject: `Re: ${subject || `Ihre Anfrage`}`,
-              bodyText: draftBody,
-              bodyHtml: draftBody.replace(/\n/g, '<br>'),
-              folder: 'DRAFTS',
-              isRead: true,
-              leadId: lead.id,
-              providerData: { aiGenerated: false, autoCreated: true, portal: parseResult.portal },
-            }
-          });
-          autoDraftId = draft.id;
-          console.log(`📝 Auto-draft created: ${draft.id} for lead ${lead.id}`);
+    // 10. If no property matched, create JarvisQuery for assignment
+    let jarvisAction = null;
+    if (!matchedProperty && !parseResult.hasClickLink) {
+      const propertyOptions = await getPropertiesForSelection(tenantId);
+      const options = [
+        ...propertyOptions.map(p => ({ id: p.id, label: `${p.label} (${p.address})` })),
+        { id: 'none', label: 'Keinem Objekt zuordnen' }
+      ];
 
-          // Store draftId in the activity metadata
-          await db.leadActivity.update({
-            where: { id: activity.id },
+      const targetUser = usersToNotify[0];
+      if (targetUser) {
+        jarvisAction = await db.jarvisPendingAction.create({
+          data: {
+            tenantId,
+            userId: targetUser,
+            leadId: lead.id,
+            type: 'ASSIGN_PROPERTY',
+            question: `Neuer Lead "${leadName}" via ${parseResult.portal}. Welchem Objekt soll ich die Anfrage zuordnen?`,
+            options,
+            allowCustom: false,
+            context: {
+              leadId: lead.id,
+              portal: parseResult.portal,
+              leadEmail: leadData.email,
+              emailBody: (leadData.message || '').substring(0, 2000),
+              emailSubject: (parseResult as any).subject || '',
+              leadName,
+            }
+          }
+        });
+
+        await db.leadActivity.update({
+          where: { id: activity.id },
+          data: {
+            type: 'JARVIS_QUERY',
+            jarvisActionId: jarvisAction.id,
+          }
+        });
+
+        console.log(`❓ JarvisQuery created for property assignment: ${jarvisAction.id}`);
+        
+        // Emit SSE event for pending action
+        try {
+          await db.realtimeEvent.create({
             data: {
-              metadata: {
-                ...(typeof activity.metadata === 'object' && activity.metadata !== null ? activity.metadata as Record<string, unknown> : {}),
-                draftId: draft.id,
-              } as any
+              tenantId, userId: targetUser, type: 'PENDING_ACTION',
+              data: { actionId: jarvisAction.id, actionType: 'ASSIGN_PROPERTY', leadId: lead.id, leadName },
             }
           });
-        }
-      } catch (draftErr: any) {
-        console.warn('Auto-draft creation failed:', draftErr.message);
+        } catch (e: any) { console.warn('RealtimeEvent error:', e.message); }
       }
     }
 
-    // 11. Create MivoPendingAction for ALL new leads
-    let mivoAction = null;
-    const targetUser = usersToNotify[0];
-
+    // 11. If hasClickLink, create JarvisQuery for link click
     if (parseResult.hasClickLink) {
-      // 11a. Link-click required action
+      const targetUser = usersToNotify[0];
       if (targetUser) {
-        mivoAction = await db.mivoPendingAction.create({
+        jarvisAction = await db.jarvisPendingAction.create({
           data: {
             tenantId,
             userId: targetUser,
@@ -9958,105 +9680,17 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
 
         await db.leadActivity.update({
           where: { id: activity.id },
-          data: { mivoActionId: mivoAction.id }
+          data: { jarvisActionId: jarvisAction.id }
         });
 
-        console.log(`❓ MivoQuery created for link click: ${mivoAction.id}`);
+        console.log(`❓ JarvisQuery created for link click: ${jarvisAction.id}`);
+        
+        // Emit SSE event for link click required
         try {
           await db.realtimeEvent.create({
             data: {
               tenantId, userId: targetUser, type: 'PENDING_ACTION',
-              data: { actionId: mivoAction.id, actionType: 'LINK_CLICK_REQUIRED', leadId: lead.id, leadName },
-            }
-          });
-        } catch (e: any) { console.warn('RealtimeEvent error:', e.message); }
-      }
-    } else if (!matchedProperty) {
-      // 11b. No property matched — ask user to assign property
-      const propertyOptions = await getPropertiesForSelection(tenantId);
-      const options = [
-        ...propertyOptions.map(p => ({ id: p.id, label: `${p.label} (${p.address})` })),
-        { id: 'none', label: 'Keinem Objekt zuordnen' }
-      ];
-
-      if (targetUser) {
-        mivoAction = await db.mivoPendingAction.create({
-          data: {
-            tenantId,
-            userId: targetUser,
-            leadId: lead.id,
-            type: 'ASSIGN_PROPERTY',
-            question: `Neuer Lead "${leadName}" via ${parseResult.portal}. Welchem Objekt soll ich die Anfrage zuordnen?`,
-            options,
-            allowCustom: false,
-            context: {
-              leadId: lead.id,
-              portal: parseResult.portal,
-              leadEmail: leadData.email,
-              draftId: autoDraftId,
-            }
-          }
-        });
-
-        await db.leadActivity.update({
-          where: { id: activity.id },
-          data: {
-            type: 'MIVO_QUERY',
-            mivoActionId: mivoAction.id,
-          }
-        });
-
-        console.log(`❓ MivoQuery created for property assignment: ${mivoAction.id}`);
-        try {
-          await db.realtimeEvent.create({
-            data: {
-              tenantId, userId: targetUser, type: 'PENDING_ACTION',
-              data: { actionId: mivoAction.id, actionType: 'ASSIGN_PROPERTY', leadId: lead.id, leadName },
-            }
-          });
-        } catch (e: any) { console.warn('RealtimeEvent error:', e.message); }
-      }
-    } else {
-      // 11c. Property matched — notify with draft reply option
-      if (targetUser) {
-        const propertyLabel = matchedProperty.title;
-        const draftHint = autoDraftId ? ' Ich habe bereits einen Antwort-Entwurf erstellt.' : '';
-        mivoAction = await db.mivoPendingAction.create({
-          data: {
-            tenantId,
-            userId: targetUser,
-            leadId: lead.id,
-            type: 'NEW_LEAD_REPLY' as any,
-            question: `Neuer Lead "${leadName}" via ${parseResult.portal} für "${propertyLabel}".${draftHint}`,
-            options: [
-              ...(autoDraftId ? [{ id: 'edit_draft', label: 'Entwurf öffnen & senden' }] : []),
-              { id: 'skip', label: 'Später kümmern' },
-            ],
-            allowCustom: false,
-            context: {
-              leadId: lead.id,
-              portal: parseResult.portal,
-              leadEmail: leadData.email,
-              propertyId: matchedProperty.id,
-              draftId: autoDraftId,
-            }
-          }
-        });
-
-        await db.leadActivity.update({
-          where: { id: activity.id },
-          data: {
-            type: 'MIVO_QUERY',
-            mivoActionId: mivoAction.id,
-          }
-        });
-
-        console.log(`📬 NEW_LEAD_REPLY action created: ${mivoAction.id}`);
-        try {
-          await db.realtimeEvent.create({
-            data: {
-              tenantId, userId: targetUser, type: 'PENDING_ACTION',
-              data: { actionId: mivoAction.id, actionType: 'NEW_LEAD_REPLY', leadId: lead.id, leadName, draftId: autoDraftId },
+              data: { actionId: jarvisAction.id, actionType: 'LINK_CLICK_REQUIRED', leadId: lead.id, leadName },
             }
           });
         } catch (e: any) { console.warn('RealtimeEvent error:', e.message); }
@@ -10069,7 +9703,7 @@ app.post('/internal/ingest-lead', verifyInternalSecret, async (req, res) => {
       leadCreated: true,
       leadId: lead.id,
       propertyId: matchedProperty?.id,
-      mivoActionId: mivoAction?.id,
+      jarvisActionId: jarvisAction?.id,
       notifiedUsers: usersToNotify.length,
       parseResult: {
         portal: parseResult.portal,
@@ -10805,7 +10439,7 @@ app.post('/calendar/events/sync-to-office', authMiddleware, async (req: any, res
 // Realtime Events via Server-Sent Events (SSE) — No Polling!
 // ═══════════════════════════════════════════════════════════════════
 
-app.get('/events/stream', authMiddleware, sseStreamLimit, async (req: any, res) => {
+app.get('/events/stream', authMiddleware, async (req: any, res) => {
   try {
     const db = prisma || (await initializePrisma());
     const currentUser = await db.user.findUnique({ where: { id: req.user!.sub } });
@@ -11032,7 +10666,7 @@ app.get('/admin/fine-tuning/export', adminAuthMiddleware, async (req, res) => {
       for (const example of trainingExamples) {
         const line = JSON.stringify({
           messages: [
-            { role: 'system', content: 'Du bist Mivo, der KI-Assistent von Immivo — ein Immobilien-CRM. Sei natürlich, kurz, auf Deutsch.' },
+            { role: 'system', content: 'Du bist Jarvis, der KI-Assistent von Immivo — ein Immobilien-CRM. Sei natürlich, kurz, auf Deutsch.' },
             { role: 'user', content: example.user },
             { role: 'assistant', content: example.assistant },
           ]
@@ -11132,7 +10766,7 @@ app.get('/admin/finance/summary', adminAuthMiddleware, async (req, res) => {
         ? 'Fehlende IAM-Berechtigung (ce:GetCostAndUsage)'
         : awsErr.name === 'OptInRequired'
         ? 'Cost Explorer muss im AWS-Konto aktiviert werden'
-        : 'Fehler beim Abrufen der AWS-Kostendaten';
+        : awsErr.message || 'Unbekannter Fehler';
       awsCosts = { totalCents: 0, byService: {}, error: `Cost Explorer: ${errorDetail}` };
     }
     
@@ -11275,7 +10909,7 @@ app.get('/admin/finance/aws-costs', adminAuthMiddleware, async (req, res) => {
       ? 'Fehlende IAM-Berechtigung (ce:GetCostAndUsage)'
       : error.name === 'OptInRequired'
       ? 'Cost Explorer muss im AWS-Konto aktiviert werden'
-      : 'Fehler beim Abrufen der AWS-Kostendaten';
+      : error.message || 'Unbekannter Fehler';
     // Return 200 with error field so frontend can display gracefully
     res.json({
       totalCostCents: 0,
@@ -11687,7 +11321,6 @@ async function handleChatStream(event: any) {
     const body = JSON.parse(rawBody || '{}');
     const message = body.message || '';
     const pageContext = body.pageContext || '';
-    const undoCutoffTime: string | null = body.undoCutoffTime || null;
 
     const db = prisma || (await initializePrisma());
     const currentUser = await db.user.findUnique({ where: { email: userPayload.email } });
@@ -11695,14 +11328,6 @@ async function handleChatStream(event: any) {
 
     const userId = currentUser.id;
     const tenantId = currentUser.tenantId;
-
-    // Clean up any aborted previous request before loading history
-    if (undoCutoffTime) {
-      await db.userChat.deleteMany({
-        where: { userId, archived: false, createdAt: { gte: new Date(undoCutoffTime) } },
-      });
-      console.log(`🗑️ [FnURL] Pre-call undo for user ${userId} (cutoff: ${undoCutoffTime})`);
-    }
 
     const costCheck = await AiCostService.checkCostCap(tenantId);
     if (costCheck.exceeded) {
@@ -11751,11 +11376,6 @@ export const handler = async (event: any, context: any) => {
   const rawPath = event.requestContext?.http?.path || event.rawPath || event.path || '';
 
   if (isFunctionUrl && (method === 'POST' || method === 'OPTIONS') && rawPath === '/chat/stream') {
-    // Multipart/form-data (file uploads) must go through Express/multer — the FnURL handler only handles JSON
-    const contentType = (event.headers?.['content-type'] || event.headers?.['Content-Type'] || '').toLowerCase();
-    if (contentType.includes('multipart/form-data')) {
-      return serverlessHandler(event, context);
-    }
     return handleChatStream(event);
   }
 
