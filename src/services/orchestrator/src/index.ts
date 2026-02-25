@@ -513,10 +513,17 @@ async function applyPendingMigrations(db: PrismaClient) {
     'ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "hasAttachments" BOOLEAN NOT NULL DEFAULT false',
     `DO $$ BEGIN CREATE TYPE "EmailProvider" AS ENUM ('GMAIL', 'OUTLOOK', 'SMTP', 'OTHER'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
     'ALTER TABLE "Email" ADD COLUMN IF NOT EXISTS "provider" "EmailProvider"',
-    // 2026-02-25: v16 - Add missing enum values (FORWARDING, OTHER, NEW_LEAD_REPLY)
+    // 2026-02-25: v16 - Add missing enum values
     `ALTER TYPE "EmailFolder" ADD VALUE IF NOT EXISTS 'FORWARDING'`,
     `ALTER TYPE "EmailProvider" ADD VALUE IF NOT EXISTS 'OTHER'`,
     `ALTER TYPE "PendingActionType" ADD VALUE IF NOT EXISTS 'NEW_LEAD_REPLY'`,
+    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'PORTAL_INQUIRY'`,
+    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'EXPOSE_SENT'`,
+    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'VIEWING_SCHEDULED'`,
+    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'VIEWING_DONE'`,
+    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'MIVO_QUERY'`,
+    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'LINK_CLICK_REQUIRED'`,
+    `ALTER TABLE "LeadActivity" ADD COLUMN IF NOT EXISTS "metadata" JSONB`,
   ];
   
   for (const sql of migrations) {
