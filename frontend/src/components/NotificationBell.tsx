@@ -105,23 +105,22 @@ export default function NotificationBell() {
     const meta = notification.metadata;
     const leadId = meta?.leadId;
     const propertyId = meta?.propertyId;
-    const actionId = meta?.actionId;
 
     switch (notification.type) {
       case 'NEW_LEAD':
       case 'LEAD_RESPONSE':
-        if (leadId) return `/dashboard/leads/${leadId}`;
-        return '/dashboard/leads';
-      case 'MIVO_QUESTION':
+        if (leadId) return `/dashboard/crm/leads/${leadId}`;
+        return '/dashboard/crm/leads';
+      case 'JARVIS_QUESTION':
       case 'ESCALATION':
-        if (leadId) return `/dashboard/leads/${leadId}`;
+        if (leadId) return `/dashboard/crm/leads/${leadId}`;
         return '/dashboard/activities';
       case 'REMINDER':
-        if (leadId) return `/dashboard/leads/${leadId}`;
+        if (leadId) return `/dashboard/crm/leads/${leadId}`;
         return '/dashboard/activities';
       default:
-        if (leadId) return `/dashboard/leads/${leadId}`;
-        if (propertyId) return `/dashboard/properties/${propertyId}`;
+        if (leadId) return `/dashboard/crm/leads/${leadId}`;
+        if (propertyId) return `/dashboard/crm/properties/${propertyId}`;
         return '/dashboard/activities';
     }
   };
