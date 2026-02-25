@@ -1,0 +1,1312 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+//
+// HINWEIS: Nicht alle DB-Objekte sind hier definiert!
+// Folgende werden per Raw-SQL in applyPendingMigrations() (index.ts) verwaltet,
+// da Prisma die PostgreSQL-Typen nicht nativ unterstuetzt:
+//
+//   - "Embedding" Tabelle       → pgvector vector(1536), abgefragt via $queryRaw
+//   - "Property.searchVector"   → tsvector, auto-gefuellt via DB-Trigger
+//   - "Lead.searchVector"       → tsvector, auto-gefuellt via DB-Trigger
+//   - pgvector Extension        → CREATE EXTENSION IF NOT EXISTS vector
+//   - Full-Text-Search Trigger  → property_search_update(), lead_search_update()
+//
+// Siehe auch: docs/ARCHITECTURE.md → "Datenbank-Migrationen"
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Multi-Tenancy Core ---
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Company Profile (used by Mivo for context)
+  description   String?  // Kurzbeschreibung des Unternehmens
+  phone         String?  // Haupttelefonnummer
+  email         String?  // Kontakt-E-Mail
+  website       String?  // Website-URL
+  logoUrl       String?  // Logo-URL
+  services      String[] // Angebotene Dienstleistungen (z.B. "Verkauf", "Vermietung", "Bewertung")
+  regions       String[] // Taetigkeitsgebiete (z.B. "Wien", "Niederösterreich")
+  slogan        String?  // Firmenslogan / USP
+  foundedYear   Int?     // Gruendungsjahr
+  teamSize      Int?     // Teamgroesse
+
+  // Relations
+  users           User[]
+  leads           Lead[]
+  properties      Property[]
+  emailTemplates  EmailTemplate[] @relation("TenantEmailTemplates")
+  exposeTemplates ExposeTemplate[] @relation("TenantExposeTemplates")
+  settings        TenantSettings?
+  channels        Channel[]
+  aiAuditLogs     AiAuditLog[] @relation("TenantAiAuditLogs")
+  portalConnections PortalConnection[]
+}
+
+model TenantSettings {
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  // Configuration
+  smtpConfig    Json? // { host, port, user, pass, from }
+  stripeConfig  Json? // { customerId, subscriptionId }
+  aiPersonality Json? // { tone: "professional", language: "de" }
+  
+  // Calendar Integration (Tokens must be encrypted!)
+  googleCalendarConfig Json? // { accessToken, refreshToken, expiryDate, email }
+  outlookCalendarConfig Json? // { accessToken, refreshToken, expiryDate, email }
+  calendarShareTeam Boolean @default(true)
+  
+  // Email Integration (Tokens must be encrypted!)
+  gmailConfig Json? // { accessToken, refreshToken, expiryDate, email }
+  outlookMailConfig Json? // { accessToken, refreshToken, expiryDate, email }
+  
+  // Auto-Reply Settings
+  autoReplyEnabled Boolean @default(false) // If true, Mivo sends emails automatically
+  autoReplyDelay   Int     @default(5)     // Minutes to wait before auto-sending
+  
+  // KI-Hinweis bei Auto-Reply
+  aiDisclosureEnabled Boolean @default(true) // If true, add AI disclosure to auto-reply emails
+  
+  // AI Cost Cap — monthly limit per tenant (in US cents, default 2000 = $20)
+  aiCostCapCentsUsd Float @default(2000)
+  
+  // Lead Ingestion - Email address for receiving portal leads
+  // e.g. "f7k2m9" -> f7k2m9@leads.immivo.ai
+  inboundLeadEmail String? @unique
+}
+
+model User {
+  id        String @id @default(uuid())
+  email     String @unique
+  firstName String?
+  lastName  String?
+  name      String? // Deprecated, keep for backward compatibility
+  phone     String?
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  role      Role   @default(AGENT)
+
+  // Address fields
+  street     String?
+  postalCode String?
+  city       String?
+  country    String?
+
+  // Relations
+  leads    Lead[] // Leads assigned to this agent
+  chats    UserChat[]
+  channelMemberships ChannelMember[]
+  channelMessages    ChannelMessage[]
+  aiAuditLogs AiAuditLog[]
+  conversationSummaries ConversationSummary[]
+  portalConnections PortalConnection[]
+  settings  UserSettings?
+  notifications Notification[]
+  pendingActions MivoPendingAction[]
+  assignedProperties PropertyAssignment[]
+
+  // Presence tracking
+  lastSeenAt DateTime?
+
+  // OpenAI Assistants API - persistent thread per user
+  assistantThreadId String?
+
+  @@index([tenantId])
+  @@index([email])
+}
+
+// --- User Settings (per-agent preferences) ---
+
+model UserSettings {
+  id       String @id @default(uuid())
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id])
+  
+  // Viewing Preferences (for calendar/appointment scheduling)
+  viewingHoursEnabled Boolean @default(false)
+  viewingHoursStart   String? // "09:00"
+  viewingHoursEnd     String? // "12:00"
+  viewingDays         Json?   // ["MO", "TU", "WE", "TH", "FR"]
+  viewingDuration     Int     @default(30) // Minutes per viewing
+  viewingBuffer       Int     @default(15) // Buffer between appointments
+  
+  // Notification Preferences
+  emailNotifications  Boolean @default(true)
+  
+  // Email Signature (HTML)
+  emailSignature      String? @db.Text // Full HTML signature
+  emailSignatureName  String? // Display name for signature selection
+  
+  // Language preference (per-seat, not per-tenant)
+  locale              String  @default("de") // "de", "en", etc.
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  AGENT
+}
+
+// --- CRM Core ---
+
+model Lead {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  // Contact Info
+  salutation  Salutation @default(NONE)
+  formalAddress Boolean @default(true) // true = "Sie", false = "Du"
+  email     String
+  firstName String?
+  lastName  String?
+  phone     String?
+  
+  // Buyer Preferences (for matching with properties)
+  budgetMin       Decimal?
+  budgetMax       Decimal?
+  preferredType   PropertyType? // Wohnung, Haus, etc.
+  preferredLocation String? // PLZ oder Stadt
+  minRooms        Float?
+  minArea         Float?
+  timeFrame       LeadTimeFrame? // Wann will der Kunde kaufen/mieten?
+  
+  // Financing (for qualification)
+  financingStatus FinancingStatus @default(NOT_CLARIFIED)
+  hasDownPayment  Boolean @default(false)
+  
+  // Lead Source (for marketing ROI)
+  source          LeadSource @default(WEBSITE)
+  sourceDetails   String? // z.B. "ImmoScout24" oder "Google Ads"
+  
+  // Internal
+  notes     String?   @db.Text
+
+  // AI Lead Score (0-100)
+  score     Int?
+  scoreFactors Json? // { timeFrame: 20, financing: 30, ... } breakdown
+
+  // Status
+  status    LeadStatus @default(NEW)
+  
+  // Assignment
+  assignedToId String?
+  assignedTo   User?   @relation(fields: [assignedToId], references: [id])
+
+  // Context
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id])
+
+  // Conversation History
+  messages  Message[]
+  activities LeadActivity[]
+  
+  // Documents (Führerschein, Pass, Mietverträge, etc.) - stored as JSON array
+  documents   Json?    // Array of { name: string, url: string, type: string, uploadedAt: string }
+  
+  // Alternate emails (for matching responses from different email addresses)
+  alternateEmails Json? // ["other@email.com"] - for responses from different addresses
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, email, propertyId]) // Prevent duplicates per property
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, assignedToId])
+  @@index([assignedToId])
+  @@index([propertyId])
+}
+
+model LeadActivity {
+  id        String   @id @default(uuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  type      ActivityType
+  description String // "Status geändert: Neu → Kontaktiert"
+  metadata  Json? // Zusätzliche Daten (z.B. alte/neue Werte)
+  
+  // Optional: Which property does this activity relate to?
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id])
+  
+  // Link to MivoAction (for displaying buttons in activities)
+  mivoActionId String? @unique
+  mivoAction   MivoPendingAction? @relation(fields: [mivoActionId], references: [id])
+  
+  createdBy String? // User ID
+  createdAt DateTime @default(now())
+  
+  @@index([leadId, createdAt])
+  @@index([propertyId])
+}
+
+enum ActivityType {
+  LEAD_CREATED
+  STATUS_CHANGED
+  FIELD_UPDATED
+  EMAIL_SENT
+  EMAIL_RECEIVED
+  NOTE_ADDED
+  PROPERTY_ASSIGNED
+  PORTAL_INQUIRY       // New inquiry from portal
+  EXPOSE_SENT          // Expose was sent
+  VIEWING_SCHEDULED    // Viewing appointment scheduled
+  VIEWING_DONE         // Viewing completed
+  MIVO_QUERY         // Mivo is asking a question
+  LINK_CLICK_REQUIRED  // Portal email requires link click
+}
+
+enum LeadTimeFrame {
+  IMMEDIATE       // Sofort
+  THREE_MONTHS    // 1-3 Monate
+  SIX_MONTHS      // 3-6 Monate
+  TWELVE_MONTHS   // 6-12 Monate
+  LONGTERM        // >12 Monate
+}
+
+enum FinancingStatus {
+  NOT_CLARIFIED   // Noch nicht geklärt
+  PRE_QUALIFIED   // Vorqualifiziert
+  APPROVED        // Genehmigt
+  CASH_BUYER      // Barzahler
+}
+
+enum LeadSource {
+  WEBSITE         // Eigene Website
+  PORTAL          // Immobilienportal
+  REFERRAL        // Empfehlung
+  SOCIAL_MEDIA    // Social Media
+  COLD_CALL       // Kaltakquise
+  EVENT           // Veranstaltung
+  OTHER           // Sonstiges
+}
+
+enum Salutation {
+  NONE            // Keine Anrede
+  MR              // Herr
+  MS              // Frau
+  DIVERSE         // Divers
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  CONVERSATION
+  BOOKED
+  LOST
+}
+
+model Property {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  // Basic Info (keep old fields for backward compatibility)
+  title       String
+  address     String // Legacy: full address string
+  price       Decimal? // Legacy: now salePrice or rentCold
+  rooms       Int? // Legacy: now rooms (Float)
+  area        Float? // Legacy: now livingArea
+  description String? @db.Text
+  
+  // Detailed Address Fields
+  street        String?
+  houseNumber   String?
+  apartmentNumber String? // Türnummer
+  staircase     String? // Stiege
+  block         String? // Block/Gebäude
+  floor         Int?
+  zipCode       String?
+  city          String?
+  district      String? // Bezirk/Stadtteil
+  state         String? // Bundesland/Provinz
+  country       String @default("Deutschland")
+  
+  // Type & Marketing
+  propertyType PropertyType @default(APARTMENT)
+  marketingType MarketingType @default(SALE)
+  
+  // Price (dynamic)
+  salePrice     Decimal?
+  rentCold      Decimal?
+  rentWarm      Decimal?
+  additionalCosts Decimal?
+  deposit       String?
+  commission    String?
+  
+  // Areas & Rooms (extended)
+  livingArea    Float?
+  usableArea    Float?
+  plotArea      Float?
+  bedrooms      Int?
+  bathrooms     Int?
+  
+  // Building Info
+  yearBuilt     Int?
+  yearRenovated Int?
+  condition     PropertyCondition?
+  buildingType  BuildingType?
+  totalFloors   Int?
+  
+  // Heating
+  heatingType   String? // z.B. Fernwärme, Gas, Öl, Wärmepumpe, Pellets, etc.
+  
+  // Energy Certificate (GEG §87)
+  energyCertificateType EnergyCertificateType?
+  energyEfficiencyClass EnergyEfficiencyClass?
+  energyConsumption     Float?
+  primaryEnergySource   String?
+  energyCertificateValidUntil DateTime?
+  
+  // Features (JSON)
+  features    Json?
+  
+  // Descriptions (extended)
+  locationDescription String? @db.Text
+  equipmentDescription String? @db.Text
+  
+  // AI Context
+  aiFacts     String? @db.Text
+  
+  // Media
+  images      String[]
+  floorplans  String[]
+  videos      String[]
+  virtualTour String?
+  
+  // Documents (PDFs, Word, Excel, etc.) - stored as JSON array with name and url
+  documents   Json?    // Array of { name: string, url: string, type: string, uploadedAt: string }
+  
+  // Status
+  status      PropertyStatus @default(ACTIVE)
+  priority    PropertyPriority @default(MEDIUM)
+  
+  // Portal Publishing
+  publishedPortals String[] // Array of portal IDs where this property is published
+  lastSyncedAt     DateTime?
+  
+  // Auto-Exposé: Selected template for automatic expose generation when leads come in
+  defaultExposeTemplateId String?
+  defaultExposeTemplate   ExposeTemplate? @relation(fields: [defaultExposeTemplateId], references: [id])
+  
+  // Relations
+  leads       Lead[]
+  exposes     Expose[]
+  activities  LeadActivity[]
+  
+  // Assigned users (multiple agents can be assigned to one property)
+  assignedUsers PropertyAssignment[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, propertyType])
+  @@index([tenantId, marketingType])
+}
+
+// Many-to-Many: Property <-> User (multiple agents per property)
+model PropertyAssignment {
+  id         String   @id @default(uuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt  DateTime @default(now())
+  
+  @@unique([propertyId, userId])
+  @@index([propertyId])
+  @@index([userId])
+}
+
+enum PropertyType {
+  APARTMENT
+  HOUSE
+  COMMERCIAL
+  LAND
+  GARAGE
+  OTHER
+}
+
+enum MarketingType {
+  SALE
+  RENT
+  LEASE
+}
+
+enum PropertyCondition {
+  FIRST_OCCUPANCY
+  NEW
+  RENOVATED
+  REFURBISHED
+  WELL_MAINTAINED
+  MODERNIZED
+  NEEDS_RENOVATION
+}
+
+enum BuildingType {
+  NEW_BUILDING
+  OLD_BUILDING
+  MONUMENT
+}
+
+enum EnergyCertificateType {
+  DEMAND
+  CONSUMPTION
+}
+
+enum EnergyEfficiencyClass {
+  A_PLUS
+  A
+  B
+  C
+  D
+  E
+  F
+  G
+  H
+}
+
+enum PropertyStatus {
+  ACTIVE
+  RESERVED
+  SOLD
+  RENTED
+  ARCHIVED
+}
+
+enum PropertyPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  role      MessageRole // SYSTEM, USER, ASSISTANT
+  content   String
+  status    MessageStatus @default(SENT) // Default to SENT for backward compatibility, but AI drafts will be DRAFT
+  
+  createdAt DateTime @default(now())
+}
+
+enum MessageRole {
+  SYSTEM
+  USER
+  ASSISTANT
+}
+
+enum MessageStatus {
+  DRAFT
+  SENT
+  FAILED
+}
+
+model UserChat {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  role      MessageRole
+  content   String
+  archived  Boolean  @default(false) // Archiviert nach "Neu starten"
+  createdAt DateTime @default(now())
+  
+  @@index([userId, archived, createdAt])
+}
+
+// --- Team Chat ---
+
+model Channel {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  name        String   // "General", "Sales", or "DM-User1-User2"
+  description String?
+  type        ChannelType
+  isDefault   Boolean  @default(false) // Auto-created company channel
+  
+  messages  ChannelMessage[]
+  members   ChannelMember[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([tenantId])
+}
+
+enum ChannelType {
+  PUBLIC
+  PRIVATE
+  DM
+}
+
+model ChannelMember {
+  id        String   @id @default(uuid())
+  channelId String
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  role      ChannelRole @default(MEMBER)
+  
+  joinedAt  DateTime @default(now())
+  
+  @@unique([channelId, userId])
+}
+
+enum ChannelRole {
+  ADMIN
+  MEMBER
+}
+
+model ChannelMessage {
+  id        String   @id @default(uuid())
+  channelId String
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  content   String   @db.Text
+  isMivo  Boolean  @default(false) // Sent by Mivo AI
+  
+  // Mentions (stored as JSON array of user IDs)
+  mentions  Json?    // ["userId1", "userId2"]
+  
+  // Edit tracking
+  editedAt  DateTime?
+  
+  createdAt DateTime @default(now())
+  
+  @@index([channelId, createdAt])
+}
+
+// --- Orchestrator & Templates ---
+
+model EmailTemplate {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation("TenantEmailTemplates", fields: [tenantId], references: [id])
+  
+  name      String   // "Exposé Default", "Follow-up 1"
+  subject   String   // "Ihr Exposé für {{property.title}}"
+  body      String   // HTML/Markdown with placeholders
+  
+  // AI Configuration
+  aiPrompt  String?  // "Rewrite this to be very polite"
+  variables Json?    // List of used variables: ["lead.firstName", "property.price"]
+  
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// --- Exposé System ---
+
+model ExposeTemplate {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation("TenantExposeTemplates", fields: [tenantId], references: [id])
+  
+  name      String   // "Modern Minimalist", "Klassisch Elegant"
+  blocks    Json     // Array of ExposeBlock with placeholders
+  
+  // Styling
+  theme        String   @default("default") // "default", "modern", "classic", "luxury"
+  customColors Json?    // Array of custom hex color strings e.g. ["#FF5733", "#4F46E5"]
+  
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Instances created from this template
+  exposes   Expose[]
+  
+  // Properties using this as default template
+  defaultForProperties Property[]
+}
+
+model Expose {
+  id          String   @id @default(uuid())
+  tenantId    String
+  
+  // Relations
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+  
+  // Template reference (optional - to detect updates)
+  templateId  String?
+  template    ExposeTemplate? @relation(fields: [templateId], references: [id])
+  createdFromTemplateAt DateTime? // When was this generated from template
+  
+  // Content (concrete data, no placeholders)
+  blocks       Json     // Array of ExposeBlock with real data
+  theme        String   @default("default")
+  customColors Json?    // Array of custom hex color strings
+  
+  // Status
+  status      ExposeStatus @default(DRAFT)
+  
+  // Generated PDF
+  pdfUrl      String?  // S3 URL to generated PDF
+  pdfGeneratedAt DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum ExposeStatus {
+  DRAFT
+  PUBLISHED
+}
+
+// --- AI Safety & Audit ---
+
+model AiAuditLog {
+  id        String   @id @default(uuid())
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  tenantId  String
+  tenant    Tenant   @relation("TenantAiAuditLogs", fields: [tenantId], references: [id])
+  
+  endpoint  String   // "/chat", "/exposes/:id/chat"
+  message   String   @db.Text
+  response  String?  @db.Text
+  
+  // Safety flags
+  flagged   Boolean  @default(false)
+  flagReason String? // "prompt_injection", "forbidden_keyword", etc.
+  
+  // Metadata
+  ipAddress String?
+  userAgent String?
+  
+  createdAt DateTime @default(now())
+  
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model ConversationSummary {
+  id           String   @id @default(uuid())
+  
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  
+  summary      String   @db.Text
+  messageCount Int      // How many messages were summarized
+  
+  createdAt    DateTime @default(now())
+  
+  @@index([userId, createdAt])
+}
+
+// --- Portal Integration ---
+
+model Portal {
+  id          String   @id @default(uuid())
+  
+  // Portal Info
+  name        String   // z.B. "Immowelt", "Willhaben"
+  slug        String   @unique // z.B. "immowelt", "willhaben"
+  country     String   // "DE", "AT", "CH"
+  logoUrl     String?
+  websiteUrl  String?
+  
+  // Connection Type
+  connectionType PortalConnectionType @default(OPENIMMO_FTP)
+  
+  // Default FTP Settings (can be overridden per tenant)
+  defaultFtpHost String?
+  defaultFtpPort Int @default(21)
+  
+  // Status
+  isActive    Boolean @default(true)
+  isPremium   Boolean @default(false) // Requires paid subscription
+  
+  // Relations
+  connections PortalConnection[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model PortalConnection {
+  id          String   @id @default(uuid())
+  
+  // Hierarchical: Either Tenant-Level (firm) OR User-Level (personal)
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  
+  portalId    String
+  portal      Portal   @relation(fields: [portalId], references: [id])
+  
+  // FTP/SFTP Credentials (encrypted in production!)
+  ftpHost     String?
+  ftpPort     Int @default(21)
+  ftpUsername String?
+  ftpPassword String? // TODO: Encrypt!
+  ftpPath     String? // Remote directory
+  useSftp     Boolean @default(false)
+  
+  // REST API Credentials (for portals like ImmobilienScout24)
+  apiKey      String? // API Key
+  apiSecret   String? // API Secret (encrypted)
+  apiEndpoint String? // Optional custom API endpoint
+  
+  // Portal-specific ID
+  providerId  String? // Anbieternummer/Kundennummer beim Portal
+  
+  // Status
+  isEnabled   Boolean @default(true)
+  lastSyncAt  DateTime?
+  lastSyncStatus PortalSyncStatus?
+  lastSyncError String?
+  
+  // Auto-Sync Settings
+  autoSyncEnabled Boolean @default(false)
+  autoSyncInterval Int @default(24) // Hours
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  syncLogs    PortalSyncLog[]
+  
+  @@unique([tenantId, portalId])
+  @@unique([userId, portalId])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model PortalSyncLog {
+  id              String   @id @default(uuid())
+  
+  connectionId    String
+  connection      PortalConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  
+  // Sync Details
+  status          PortalSyncStatus
+  propertiesTotal Int @default(0)
+  propertiesSynced Int @default(0)
+  propertiesFailed Int @default(0)
+  
+  errorMessage    String? @db.Text
+  
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  
+  @@index([connectionId, startedAt])
+}
+
+enum PortalConnectionType {
+  OPENIMMO_FTP    // Standard DE/AT: OpenImmo XML via FTP
+  OPENIMMO_SFTP   // OpenImmo XML via SFTP
+  REST_API        // Direct REST API (z.B. ImmoScout24 DE, Flatfox CH)
+  IDX             // Standard CH: IDX 3.01 (Homegate, ImmoScout24 CH, Comparis, Newhome, ImmoStreet)
+  SOAP_API        // SOAP API
+  CSV_FTP         // CSV via FTP
+}
+
+enum PortalSyncStatus {
+  PENDING
+  IN_PROGRESS
+  SUCCESS
+  PARTIAL_SUCCESS
+  FAILED
+}
+
+// --- Mivo Automation System ---
+
+model MivoPendingAction {
+  id          String   @id @default(uuid())
+  tenantId    String
+  
+  userId      String   // Assigned agent
+  user        User     @relation(fields: [userId], references: [id])
+  
+  leadId      String?
+  propertyId  String?  // Related property (if any)
+  
+  type        PendingActionType
+  question    String   // What Mivo is asking
+  context     Json?    // Additional context data
+  
+  // Button options for user to choose from
+  // e.g. [{ id: "prop-1", label: "Musterstr. 1" }, { id: "none", label: "Keinem zuordnen" }]
+  options     Json?
+  allowCustom Boolean  @default(true)  // Allow free-text response?
+  
+  status      PendingActionStatus @default(PENDING)
+  
+  createdAt   DateTime @default(now())
+  reminderSentAt DateTime?
+  escalatedAt    DateTime?
+  resolvedAt     DateTime?
+  resolution     String?  // User's response
+  
+  // Scheduled Events (for EventBridge)
+  scheduledReminderId   String?
+  scheduledEscalationId String?
+  
+  // Link back to activity (for sync)
+  activity    LeadActivity?
+  
+  @@index([tenantId, userId, status])
+  @@index([status, createdAt])
+}
+
+enum PendingActionType {
+  SEND_EXPOSE
+  SCHEDULE_VIEWING
+  ANSWER_QUESTION
+  ESCALATION
+  ASSIGN_PROPERTY      // Ask user to assign lead to a property
+  LINK_CLICK_REQUIRED  // Portal email requires manual link click
+  CLARIFICATION        // General clarification needed
+  NEW_LEAD_REPLY       // New lead arrived, draft reply created
+}
+
+enum PendingActionStatus {
+  PENDING
+  REMINDED
+  ESCALATED
+  RESOLVED
+  CANCELLED
+}
+
+// --- Notification System ---
+
+model Notification {
+  id        String   @id @default(uuid())
+  tenantId  String
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  type      NotificationType
+  title     String
+  message   String   @db.Text
+  metadata  Json?    // { leadId, propertyId, actionId }
+  
+  read      Boolean  @default(false)
+  
+  createdAt DateTime @default(now())
+  
+  @@index([tenantId, userId, read])
+  @@index([userId, createdAt])
+}
+
+enum NotificationType {
+  MIVO_QUESTION
+  NEW_LEAD
+  LEAD_RESPONSE
+  REMINDER
+  ESCALATION
+  SYSTEM
+}
+
+// --- Email System (local storage for inbox) ---
+
+model Email {
+  id          String   @id @default(uuid())
+  tenantId    String
+  
+  // Email Data
+  messageId   String?  // Provider Message-ID for sync
+  threadId    String?  // For thread grouping
+  inReplyTo   String?  // Message-ID this is replying to
+  
+  from        String
+  fromName    String?
+  to          String[] // Array of recipients
+  cc          String[]
+  bcc         String[]
+  subject     String
+  bodyHtml    String?  @db.Text
+  bodyText    String?  @db.Text
+  
+  // Metadata
+  folder      EmailFolder @default(INBOX)
+  isRead      Boolean  @default(false)
+  isStarred   Boolean  @default(false)
+  hasAttachments Boolean @default(false)
+  attachments Json?    // [{ name, url, size, type }]
+  
+  // Lead Association (auto-linked)
+  leadId      String?
+  
+  // Provider Info
+  provider    EmailProvider?
+  providerData Json?   // Provider-specific data
+  
+  // Timestamps
+  sentAt      DateTime?
+  receivedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([tenantId, folder, receivedAt])
+  @@index([tenantId, leadId])
+  @@index([tenantId, from])
+  @@index([threadId])
+}
+
+enum EmailFolder {
+  INBOX
+  SENT
+  DRAFTS
+  TRASH
+  SPAM
+  FORWARDING
+}
+
+enum EmailProvider {
+  GMAIL
+  OUTLOOK
+  SMTP
+  OTHER
+}
+
+// --- Bug Reports ---
+
+model BugReport {
+  id          String   @id @default(uuid())
+  tenantId    String
+  userId      String
+  userEmail   String
+  userName    String?
+  tenantName  String?
+
+  title       String
+  description String   @db.Text
+  page        String?  // URL/route where the bug was reported
+  screenshotUrl String? // S3 URL of the screenshot
+  consoleLogs String? @db.Text // JSON string of console log entries
+
+  status      BugReportStatus @default(OPEN)
+  priority    BugReportPriority @default(MEDIUM)
+  adminNotes  String? @db.Text
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([tenantId])
+}
+
+enum BugReportStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  WONT_FIX
+}
+
+enum BugReportPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// --- Demo Bookings ---
+
+model DemoBooking {
+  id        String   @id @default(uuid())
+  name      String
+  email     String
+  company   String?
+  message   String?  @db.Text
+  start     DateTime
+  end       DateTime
+  eventId   String?
+  status    DemoBookingStatus @default(PENDING)
+  adminNotes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([email])
+}
+
+enum DemoBookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+// --- Blog ---
+
+model BlogPost {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  title       String
+  excerpt     String?  @db.Text
+  content     String   @db.Text
+  coverImage  String?
+  author      String   @default("Immivo Team")
+  category    String?
+  tags        Json?    // string[]
+  published   Boolean  @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([published, publishedAt])
+  @@index([slug])
+}
+
+// --- Newsletter ---
+
+model NewsletterSubscriber {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String?
+  confirmed    Boolean  @default(false)
+  confirmToken String?
+  unsubscribed Boolean  @default(false)
+  source       String?  // "website", "blog", "manual"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([email])
+  @@index([confirmed, unsubscribed])
+}
+
+model NewsletterCampaign {
+  id          String   @id @default(uuid())
+  subject     String
+  content     String   @db.Text
+  previewText String?
+  sentAt      DateTime?
+  sentCount   Int      @default(0)
+  status      NewsletterStatus @default(DRAFT)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+}
+
+enum NewsletterStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+}
+
+// --- Career / Jobs ---
+
+model JobPosting {
+  id           String   @id @default(uuid())
+  title        String
+  department   String?
+  location     String?
+  type         JobType  @default(FULL_TIME)
+  remote       Boolean  @default(false)
+  description  String   @db.Text
+  requirements String?  @db.Text
+  benefits     String?  @db.Text
+  salary       String?
+  published    Boolean  @default(false)
+  publishedAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  applications JobApplication[]
+
+  @@index([published, publishedAt])
+}
+
+model JobApplication {
+  id          String   @id @default(uuid())
+  jobId       String
+  job         JobPosting @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  firstName   String
+  lastName    String
+  email       String
+  phone       String?
+  coverLetter String?  @db.Text
+  resumeUrl   String?
+  status      ApplicationStatus @default(NEW)
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([jobId, status])
+  @@index([email])
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+}
+
+enum ApplicationStatus {
+  NEW
+  REVIEWING
+  INTERVIEW
+  OFFER
+  HIRED
+  REJECTED
+}
+
+// --- Contact Form ---
+
+model ContactSubmission {
+  id        String   @id @default(uuid())
+  firstName String
+  lastName  String
+  email     String
+  subject   String
+  message   String   @db.Text
+  status    ContactStatus @default(NEW)
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+}
+
+enum ContactStatus {
+  NEW
+  READ
+  REPLIED
+  ARCHIVED
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AI Usage & Cost Tracking
+// ═══════════════════════════════════════════════════════════════
+
+model AiUsageLog {
+  id            String   @id @default(uuid())
+  tenantId      String?  // null = system/admin level usage
+  userId        String?
+  provider      String   // "openai" | "gemini"
+  model         String   // "gpt-5", "gpt-5-mini", "gemini-2.5-flash-image"
+  endpoint      String   // "chat", "chat-stream", "email-parse", "email-response", "memory", "expose", "virtual-staging", "signature", "team-chat"
+  inputTokens   Int      @default(0)
+  outputTokens  Int      @default(0)
+  totalTokens   Int      @default(0)
+  costCentsUsd  Float    @default(0) // Cost in US cents for precision
+  durationMs    Int      @default(0)
+  metadata      Json?    // Extra info (e.g. image size for Gemini)
+  createdAt     DateTime @default(now())
+  
+  @@index([tenantId, createdAt])
+  @@index([provider, createdAt])
+  @@index([createdAt])
+  @@index([model, createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Realtime Event System (SSE push to frontend)
+// ═══════════════════════════════════════════════════════════════
+
+model RealtimeEvent {
+  id        String   @id @default(uuid())
+  tenantId  String
+  userId    String?  // null = broadcast to all tenant users
+  type      String   // NEW_LEAD, PROPERTY_MATCHED, PENDING_ACTION, NOTIFICATION, ACTIVITY
+  data      Json     // Event-specific payload
+  createdAt DateTime @default(now())
+  
+  @@index([tenantId, createdAt])
+  @@index([tenantId, userId, createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Admin Staff (Immivo internal team - completely separate from User/Tenant)
+// ═══════════════════════════════════════════════════════════════
+
+model AdminStaff {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  firstName String?
+  lastName  String?
+  phone     String?
+  role      AdminRole @default(ADMIN)
+  avatarUrl String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  chatMessages AdminChatMessage[]
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  SUPPORT
+}
+
+// --- Admin Team Chat (separate from tenant Channel/ChannelMessage) ---
+
+model AdminChannel {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages AdminChatMessage[]
+}
+
+model AdminChatMessage {
+  id        String       @id @default(uuid())
+  channelId String
+  channel   AdminChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  staffId   String
+  staff     AdminStaff   @relation(fields: [staffId], references: [id])
+  content   String       @db.Text
+  createdAt DateTime     @default(now())
+
+  @@index([channelId, createdAt])
+}
+
+// --- Stripe Webhook Idempotency ---
+
+model WebhookEvent {
+  id            String   @id @default(uuid())
+  stripeEventId String   @unique
+  processedAt   DateTime @default(now())
+
+  @@index([stripeEventId])
+  @@index([processedAt])
+}

@@ -1,0 +1,145 @@
+{
+  "version": "48.0.0",
+  "files": {
+    "7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200": {
+      "displayName": "Immivo-Prod/Custom::VpcRestrictDefaultSGCustomResourceProvider Code",
+      "source": {
+        "path": "asset.7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "463090596988-eu-central-1-860c548b": {
+          "bucketName": "cdk-hnb659fds-assets-463090596988-eu-central-1",
+          "objectKey": "7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200.zip",
+          "region": "eu-central-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::463090596988:role/cdk-hnb659fds-file-publishing-role-463090596988-eu-central-1"
+        }
+      }
+    },
+    "618e00fc5df27b7edab44d5517b91ad2da8cba71dd93bfc27b6b02c4002050ec": {
+      "displayName": "CustomEmailSenderLambda/Code",
+      "source": {
+        "path": "asset.618e00fc5df27b7edab44d5517b91ad2da8cba71dd93bfc27b6b02c4002050ec",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "463090596988-eu-central-1-b65e4d1f": {
+          "bucketName": "cdk-hnb659fds-assets-463090596988-eu-central-1",
+          "objectKey": "618e00fc5df27b7edab44d5517b91ad2da8cba71dd93bfc27b6b02c4002050ec.zip",
+          "region": "eu-central-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::463090596988:role/cdk-hnb659fds-file-publishing-role-463090596988-eu-central-1"
+        }
+      }
+    },
+    "a1c4457a6e947fde5b64310ee5ecab001785864e1725f2414a4dcb88b1f724d8": {
+      "displayName": "OrchestratorLambda/Code",
+      "source": {
+        "path": "asset.a1c4457a6e947fde5b64310ee5ecab001785864e1725f2414a4dcb88b1f724d8",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "463090596988-eu-central-1-dac860ea": {
+          "bucketName": "cdk-hnb659fds-assets-463090596988-eu-central-1",
+          "objectKey": "a1c4457a6e947fde5b64310ee5ecab001785864e1725f2414a4dcb88b1f724d8.zip",
+          "region": "eu-central-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::463090596988:role/cdk-hnb659fds-file-publishing-role-463090596988-eu-central-1"
+        }
+      }
+    },
+    "e43faa84e807b82a1b6ab4c0369726145445dec663b40a48de4b82bc1b38488a": {
+      "displayName": "EmailProcessor/Code",
+      "source": {
+        "path": "asset.e43faa84e807b82a1b6ab4c0369726145445dec663b40a48de4b82bc1b38488a",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "463090596988-eu-central-1-e98f8c49": {
+          "bucketName": "cdk-hnb659fds-assets-463090596988-eu-central-1",
+          "objectKey": "e43faa84e807b82a1b6ab4c0369726145445dec663b40a48de4b82bc1b38488a.zip",
+          "region": "eu-central-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::463090596988:role/cdk-hnb659fds-file-publishing-role-463090596988-eu-central-1"
+        }
+      }
+    },
+    "0cfdecad2260a3a84ad0c2d08a77e03c9d25e26c7b52f26b1e1faf97aef92f18": {
+      "displayName": "LandingVideoDeploy/AwsCliLayer/Code",
+      "source": {
+        "path": "asset.0cfdecad2260a3a84ad0c2d08a77e03c9d25e26c7b52f26b1e1faf97aef92f18.zip",
+        "packaging": "file"
+      },
+      "destinations": {
+        "463090596988-eu-central-1-7f2f7a89": {
+          "bucketName": "cdk-hnb659fds-assets-463090596988-eu-central-1",
+          "objectKey": "0cfdecad2260a3a84ad0c2d08a77e03c9d25e26c7b52f26b1e1faf97aef92f18.zip",
+          "region": "eu-central-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::463090596988:role/cdk-hnb659fds-file-publishing-role-463090596988-eu-central-1"
+        }
+      }
+    },
+    "3423a042b818e31c1e34a19d6689ab2e5f9b70fcbe9e71df66f241b20a200bd9": {
+      "displayName": "Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C2048MiB2048MiB/Code",
+      "source": {
+        "path": "asset.3423a042b818e31c1e34a19d6689ab2e5f9b70fcbe9e71df66f241b20a200bd9",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "463090596988-eu-central-1-a823f434": {
+          "bucketName": "cdk-hnb659fds-assets-463090596988-eu-central-1",
+          "objectKey": "3423a042b818e31c1e34a19d6689ab2e5f9b70fcbe9e71df66f241b20a200bd9.zip",
+          "region": "eu-central-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::463090596988:role/cdk-hnb659fds-file-publishing-role-463090596988-eu-central-1"
+        }
+      }
+    },
+    "38c3cbfae814645b1dd770cf8dcfc133fb8e7fa320a09e9a17fd69a1f5e60979": {
+      "displayName": "LandingVideoDeploy/Asset1",
+      "source": {
+        "path": "asset.38c3cbfae814645b1dd770cf8dcfc133fb8e7fa320a09e9a17fd69a1f5e60979",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "463090596988-eu-central-1-90c0e8a6": {
+          "bucketName": "cdk-hnb659fds-assets-463090596988-eu-central-1",
+          "objectKey": "38c3cbfae814645b1dd770cf8dcfc133fb8e7fa320a09e9a17fd69a1f5e60979.zip",
+          "region": "eu-central-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::463090596988:role/cdk-hnb659fds-file-publishing-role-463090596988-eu-central-1"
+        }
+      }
+    },
+    "339dadeb2e80ba2d93cabf0601cdb6fa921e7f1e7bd37c5671c5fe4e7da3c971": {
+      "displayName": "Immivo-Prod Template",
+      "source": {
+        "path": "Immivo-Prod.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "463090596988-eu-central-1-78cd5aa1": {
+          "bucketName": "cdk-hnb659fds-assets-463090596988-eu-central-1",
+          "objectKey": "339dadeb2e80ba2d93cabf0601cdb6fa921e7f1e7bd37c5671c5fe4e7da3c971.json",
+          "region": "eu-central-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::463090596988:role/cdk-hnb659fds-file-publishing-role-463090596988-eu-central-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {
+    "f396e6e3cc3c20430d5af83f72d6392ef02ca35a1a3d6e9ffdc91a29c8eef27c": {
+      "displayName": "FrontendLambda/AssetImage",
+      "source": {
+        "directory": "asset.f396e6e3cc3c20430d5af83f72d6392ef02ca35a1a3d6e9ffdc91a29c8eef27c",
+        "dockerBuildArgs": {
+          "NEXT_PUBLIC_AWS_REGION": "eu-central-1",
+          "NEXT_PUBLIC_MEDIA_CDN_URL": "https://media.immivo.ai"
+        }
+      },
+      "destinations": {
+        "463090596988-eu-central-1-19f0845d": {
+          "repositoryName": "cdk-hnb659fds-container-assets-463090596988-eu-central-1",
+          "imageTag": "f396e6e3cc3c20430d5af83f72d6392ef02ca35a1a3d6e9ffdc91a29c8eef27c",
+          "region": "eu-central-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::463090596988:role/cdk-hnb659fds-image-publishing-role-463090596988-eu-central-1"
+        }
+      }
+    }
+  }
+}

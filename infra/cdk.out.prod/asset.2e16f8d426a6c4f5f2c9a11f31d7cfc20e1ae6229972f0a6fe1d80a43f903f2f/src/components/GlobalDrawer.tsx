@@ -1,0 +1,2002 @@
+'use client';
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import DOMPurify from 'dompurify';
+import { useGlobalState } from '@/context/GlobalStateContext';
+import { X, Minus, Maximize2, Send, Paperclip, ChevronDown, ChevronUp, Bold, Italic, Underline, List, ListOrdered, Link2, Image, Trash2, FileText, Plus, User, Camera, Terminal, Upload, Building2, Users, FolderOpen, Check, Loader2, Settings } from 'lucide-react';
+import { createLead, createProperty, sendManualEmail, API_ENDPOINTS, fetchWithAuth, getApiUrl } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+import { mutate } from 'swr';
+import { useEnv } from '@/components/EnvProvider';
+import { useTranslations } from 'next-intl';
+
+const SALUTATION_OPTIONS = [
+  { value: 'NONE', label: 'Keine Anrede' },
+  { value: 'MR', label: 'Herr' },
+  { value: 'MS', label: 'Frau' },
+  { value: 'DIVERSE', label: 'Divers' },
+];
+
+const SOURCE_OPTIONS = [
+  { value: 'WEBSITE', label: 'Website' },
+  { value: 'PORTAL', label: 'Immobilienportal' },
+  { value: 'REFERRAL', label: 'Empfehlung' },
+  { value: 'SOCIAL_MEDIA', label: 'Social Media' },
+  { value: 'COLD_CALL', label: 'Kaltakquise' },
+  { value: 'EVENT', label: 'Veranstaltung' },
+  { value: 'OTHER', label: 'Sonstiges' },
+];
+
+const PROPERTY_TYPE_OPTIONS = [
+  { value: 'APARTMENT', label: 'Wohnung' },
+  { value: 'HOUSE', label: 'Haus' },
+  { value: 'COMMERCIAL', label: 'Gewerbe' },
+  { value: 'LAND', label: 'Grundstück' },
+  { value: 'GARAGE', label: 'Garage/Stellplatz' },
+  { value: 'OTHER', label: 'Sonstiges' },
+];
+
+const STATUS_OPTIONS = [
+  { value: 'ACTIVE', label: 'Aktiv' },
+  { value: 'RESERVED', label: 'Reserviert' },
+  { value: 'SOLD', label: 'Verkauft' },
+  { value: 'RENTED', label: 'Vermietet' },
+  { value: 'INACTIVE', label: 'Inaktiv' },
+];
+
+const CONDITION_OPTIONS = [
+  { value: '', label: 'Bitte wählen' },
+  { value: 'FIRST_OCCUPANCY', label: 'Erstbezug' },
+  { value: 'NEW', label: 'Neuwertig' },
+  { value: 'RENOVATED', label: 'Renoviert' },
+  { value: 'REFURBISHED', label: 'Saniert' },
+  { value: 'WELL_MAINTAINED', label: 'Gepflegt' },
+  { value: 'MODERNIZED', label: 'Modernisiert' },
+  { value: 'NEEDS_RENOVATION', label: 'Renovierungsbedürftig' },
+];
+
+const ENERGY_CERT_TYPE_OPTIONS = [
+  { value: '', label: 'Bitte wählen' },
+  { value: 'DEMAND', label: 'Bedarfsausweis' },
+  { value: 'CONSUMPTION', label: 'Verbrauchsausweis' },
+];
+
+const ENERGY_CLASS_OPTIONS = [
+  { value: '', label: 'Bitte wählen' },
+  { value: 'A_PLUS', label: 'A+' },
+  { value: 'A', label: 'A' },
+  { value: 'B', label: 'B' },
+  { value: 'C', label: 'C' },
+  { value: 'D', label: 'D' },
+  { value: 'E', label: 'E' },
+  { value: 'F', label: 'F' },
+  { value: 'G', label: 'G' },
+  { value: 'H', label: 'H' },
+];
+
+const COUNTRY_OPTIONS = [
+  { value: 'Deutschland', label: 'Deutschland' },
+  { value: 'Österreich', label: 'Österreich' },
+  { value: 'Schweiz', label: 'Schweiz' },
+  { value: 'Liechtenstein', label: 'Liechtenstein' },
+  { value: 'Luxemburg', label: 'Luxemburg' },
+  { value: 'Belgien', label: 'Belgien' },
+  { value: 'Niederlande', label: 'Niederlande' },
+  { value: 'Frankreich', label: 'Frankreich' },
+  { value: 'Italien', label: 'Italien' },
+  { value: 'Spanien', label: 'Spanien' },
+  { value: 'Portugal', label: 'Portugal' },
+];
+
+// Consistent input styles
+const inputClass = "block w-full rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 sm:text-sm py-2.5 px-3 transition-all outline-none";
+const selectClass = "block w-full rounded-lg border border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 sm:text-sm py-2.5 px-3 transition-all outline-none";
+const labelClass = "block text-xs font-medium text-gray-600 mb-1.5";
+const textareaClass = "block w-full rounded-lg border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 sm:text-sm py-2.5 px-3 transition-all outline-none resize-none";
+const sectionTitleClass = "text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2";
+
+// Email Composer Component
+export interface AttachmentItem {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  data?: string;     // base64 for uploaded files
+  url?: string;      // S3/CDN URL for CRM files (backend fetches)
+  source: 'upload' | 'crm';
+  preview?: string;  // for image thumbnails
+}
+
+interface CrmLead { id: string; name: string; email: string; documents?: { id: string; name: string; url: string; type: string; size: number }[] }
+interface CrmProperty { id: string; address: string; title?: string; images?: { url: string; name?: string }[]; documents?: { id: string; name: string; url: string; type: string; size: number }[] }
+
+interface EmailComposerProps {
+  emailFormData: any;
+  updateEmailForm: (data: any) => void;
+  onSend: (attachments: AttachmentItem[]) => void;
+  onSaveDraft: () => void;
+  onDiscard: () => void;
+  loading: boolean;
+}
+
+function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, onDiscard, loading }: EmailComposerProps) {
+  const { apiUrl } = useEnv();
+  const t = useTranslations('drawer');
+  const [showCc, setShowCc] = useState(!!emailFormData.cc);
+  const [showBcc, setShowBcc] = useState(!!emailFormData.bcc);
+  const [signature, setSignature] = useState<string | null>(null);
+  // Attachment state
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+  const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
+  const [attachPickerTab, setAttachPickerTab] = useState<'upload' | 'leads' | 'properties'>('upload');
+  const [dragOver, setDragOver] = useState(false);
+  const [crmLeads, setCrmLeads] = useState<CrmLead[]>([]);
+  const [crmProperties, setCrmProperties] = useState<CrmProperty[]>([]);
+  const [crmLoading, setCrmLoading] = useState(false);
+  const [expandedCrmItem, setExpandedCrmItem] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [signatureLoaded, setSignatureLoaded] = useState(false);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const initializedRef = useRef(false);
+
+  // Load user signature
+  useEffect(() => {
+    const loadSignature = async () => {
+      if (!apiUrl || signatureLoaded) return;
+      try {
+        const response = await fetchWithAuth(`${apiUrl}/me/settings`);
+        if (response?.emailSignature) {
+          setSignature(response.emailSignature);
+        }
+        setSignatureLoaded(true);
+      } catch (error) {
+        console.warn('Could not load signature:', error);
+        setSignatureLoaded(true);
+      }
+    };
+    loadSignature();
+  }, [apiUrl, signatureLoaded]);
+
+  // Initialize editor with existing content (e.g. when editing a draft)
+  useEffect(() => {
+    if (editorRef.current && !initializedRef.current) {
+      initializedRef.current = true;
+      if (emailFormData.bodyHtml) {
+        editorRef.current.innerHTML = DOMPurify.sanitize(emailFormData.bodyHtml);
+      } else if (emailFormData.body) {
+        editorRef.current.innerHTML = DOMPurify.sanitize(emailFormData.body.replace(/\n/g, '<br>'));
+      }
+    }
+  }, [emailFormData.bodyHtml, emailFormData.body]);
+
+  // Auto-insert signature for new emails (no existing body)
+  useEffect(() => {
+    if (
+      signature &&
+      signatureLoaded &&
+      editorRef.current &&
+      !emailFormData.body &&
+      !emailFormData.bodyHtml
+    ) {
+      const sigHtml = '<br><br>' + signature.replace(/\n/g, '<br>');
+      editorRef.current.innerHTML = DOMPurify.sanitize(sigHtml);
+      // Place cursor at the very beginning (before signature)
+      const range = document.createRange();
+      const sel = window.getSelection();
+      range.setStart(editorRef.current, 0);
+      range.collapse(true);
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      syncContent();
+    }
+  }, [signature, signatureLoaded]);
+
+  // Sync editor content to form data
+  const syncContent = () => {
+    if (!editorRef.current) return;
+    const html = editorRef.current.innerHTML;
+    const text = editorRef.current.innerText || '';
+    updateEmailForm({ body: text, bodyHtml: html === '<br>' ? '' : html });
+  };
+
+  // Apply formatting using execCommand (works natively with contentEditable)
+  const applyFormat = (format: string) => {
+    editorRef.current?.focus();
+    switch (format) {
+      case 'bold':
+        document.execCommand('bold');
+        break;
+      case 'italic':
+        document.execCommand('italic');
+        break;
+      case 'underline':
+        document.execCommand('underline');
+        break;
+      case 'list':
+        document.execCommand('insertUnorderedList');
+        break;
+      case 'numbered':
+        document.execCommand('insertOrderedList');
+        break;
+      case 'link': {
+        const url = prompt('URL eingeben:', 'https://');
+        if (url) {
+          document.execCommand('createLink', false, url);
+        }
+        break;
+      }
+    }
+    syncContent();
+  };
+
+  // Handle Enter key in lists — double-Enter exits the list
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter') {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+
+      // Check if we're inside a list item
+      let node: Node | null = sel.anchorNode;
+      let listItem: HTMLLIElement | null = null;
+      while (node && node !== editorRef.current) {
+        if (node.nodeName === 'LI') {
+          listItem = node as HTMLLIElement;
+          break;
+        }
+        node = node.parentNode;
+      }
+
+      // If in an empty list item, exit the list on Enter
+      if (listItem && (listItem.textContent || '').trim() === '') {
+        e.preventDefault();
+        const list = listItem.parentElement;
+        if (list && (list.nodeName === 'UL' || list.nodeName === 'OL')) {
+          // Remove the empty li
+          list.removeChild(listItem);
+          // If list is now empty, remove it
+          if (list.children.length === 0 && list.parentNode) {
+            const br = document.createElement('br');
+            list.parentNode.insertBefore(br, list.nextSibling);
+            list.parentNode.removeChild(list);
+            // Place cursor after the br
+            const range = document.createRange();
+            range.setStartAfter(br);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+          } else {
+            // Place cursor after the list
+            const p = document.createElement('div');
+            p.innerHTML = '<br>';
+            if (list.parentNode) {
+              list.parentNode.insertBefore(p, list.nextSibling);
+              const range = document.createRange();
+              range.setStart(p, 0);
+              range.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(range);
+            }
+          }
+          syncContent();
+        }
+      }
+    }
+  };
+
+  // Insert signature
+  const insertSignature = () => {
+    if (signature && editorRef.current) {
+      editorRef.current.focus();
+      document.execCommand('insertHTML', false, '<br><br>' + signature.replace(/\n/g, '<br>'));
+      syncContent();
+    }
+  };
+
+  // Load CRM data when CRM tab is opened
+  const loadCrmData = async (tab: 'leads' | 'properties') => {
+    if (!apiUrl) return;
+    setCrmLoading(true);
+    try {
+      if (tab === 'leads') {
+        const data = await fetchWithAuth(`${apiUrl}/leads?limit=50`);
+        setCrmLeads(data?.leads || data || []);
+      } else {
+        const data = await fetchWithAuth(`${apiUrl}/properties?limit=50`);
+        setCrmProperties(data?.properties || data || []);
+      }
+    } catch (e) {
+      console.warn('CRM load error:', e);
+    } finally {
+      setCrmLoading(false);
+    }
+  };
+
+  const handleAttachPickerTab = (tab: 'upload' | 'leads' | 'properties') => {
+    setAttachPickerTab(tab);
+    if (tab === 'leads' && crmLeads.length === 0) loadCrmData('leads');
+    if (tab === 'properties' && crmProperties.length === 0) loadCrmData('properties');
+  };
+
+  // Convert file to base64 attachment
+  const fileToAttachment = (file: File): Promise<AttachmentItem> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        const base64 = dataUrl.split(',')[1];
+        resolve({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          size: file.size,
+          data: base64,
+          source: 'upload',
+          preview: file.type.startsWith('image/') ? dataUrl : undefined,
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFilesSelected = async (files: FileList | File[]) => {
+    const arr = Array.from(files);
+    const converted = await Promise.all(arr.map(fileToAttachment));
+    setAttachments(prev => [...prev, ...converted]);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files.length > 0) {
+      await handleFilesSelected(e.dataTransfer.files);
+    }
+  };
+
+  const addCrmFile = (item: { name: string; url: string; type?: string; size?: number }) => {
+    const already = attachments.some(a => a.url === item.url);
+    if (already) {
+      setAttachments(prev => prev.filter(a => a.url !== item.url));
+      return;
+    }
+    setAttachments(prev => [...prev, {
+      id: `crm-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      name: item.name || 'Datei',
+      type: item.type || 'application/octet-stream',
+      size: item.size || 0,
+      url: item.url,
+      source: 'crm',
+    }]);
+  };
+
+  const removeAttachment = (id: string) => setAttachments(prev => prev.filter(a => a.id !== id));
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Recipients */}
+      <div className="space-y-3 mb-4">
+        {/* To */}
+        <div className="flex items-center gap-2">
+          <label className="w-12 text-sm font-medium text-gray-500 shrink-0">An:</label>
+          <input
+            type="email"
+            value={emailFormData.to || ''}
+            onChange={(e) => updateEmailForm({ to: e.target.value })}
+            className="flex-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white text-sm py-2 px-3 transition-all outline-none"
+            placeholder="empfaenger@email.de"
+          />
+          <div className="flex gap-1 shrink-0">
+            {!showCc && (
+              <button
+                type="button"
+                onClick={() => setShowCc(true)}
+                className="px-2 py-1 text-xs text-gray-500 hover:text-blue-600 hover:bg-gray-50 rounded transition-colors"
+              >
+                CC
+              </button>
+            )}
+            {!showBcc && (
+              <button
+                type="button"
+                onClick={() => setShowBcc(true)}
+                className="px-2 py-1 text-xs text-gray-500 hover:text-blue-600 hover:bg-gray-50 rounded transition-colors"
+              >
+                BCC
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* CC */}
+        {showCc && (
+          <div className="flex items-center gap-2">
+            <label className="w-12 text-sm font-medium text-gray-500 shrink-0">CC:</label>
+            <input
+              type="email"
+              value={emailFormData.cc || ''}
+              onChange={(e) => updateEmailForm({ cc: e.target.value })}
+              className="flex-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white text-sm py-2 px-3 transition-all outline-none"
+              placeholder="cc@email.de"
+            />
+            <button
+              type="button"
+              onClick={() => { setShowCc(false); updateEmailForm({ cc: '' }); }}
+              className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* BCC */}
+        {showBcc && (
+          <div className="flex items-center gap-2">
+            <label className="w-12 text-sm font-medium text-gray-500 shrink-0">BCC:</label>
+            <input
+              type="email"
+              value={emailFormData.bcc || ''}
+              onChange={(e) => updateEmailForm({ bcc: e.target.value })}
+              className="flex-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white text-sm py-2 px-3 transition-all outline-none"
+              placeholder="bcc@email.de"
+            />
+            <button
+              type="button"
+              onClick={() => { setShowBcc(false); updateEmailForm({ bcc: '' }); }}
+              className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Subject */}
+        <div className="flex items-center gap-2">
+          <label className="w-12 text-sm font-medium text-gray-500 shrink-0">Betreff:</label>
+          <input
+            type="text"
+            value={emailFormData.subject || ''}
+            onChange={(e) => updateEmailForm({ subject: e.target.value })}
+            className="flex-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white text-sm py-2 px-3 transition-all outline-none font-medium"
+            placeholder="Betreff eingeben..."
+          />
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-gray-100 mb-3" />
+
+      {/* Formatting Toolbar */}
+      <div className="flex items-center gap-1 mb-3 pb-3 border-b border-gray-100">
+        <button
+          type="button"
+          onClick={() => applyFormat('bold')}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+          title="Fett"
+        >
+          <Bold className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyFormat('italic')}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+          title="Kursiv"
+        >
+          <Italic className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyFormat('underline')}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+          title="Unterstrichen"
+        >
+          <Underline className="w-4 h-4" />
+        </button>
+        <div className="w-px h-5 bg-gray-200 mx-1" />
+        <button
+          type="button"
+          onClick={() => applyFormat('list')}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+          title="Aufzählung"
+        >
+          <List className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyFormat('numbered')}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+          title="Nummerierte Liste"
+        >
+          <ListOrdered className="w-4 h-4" />
+        </button>
+        <div className="w-px h-5 bg-gray-200 mx-1" />
+        <button
+          type="button"
+          onClick={() => applyFormat('link')}
+          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+          title="Link einfügen"
+        >
+          <Link2 className="w-4 h-4" />
+        </button>
+        
+        <div className="flex-1" />
+        
+        {signature && (
+          <button
+            type="button"
+            onClick={insertSignature}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-gray-50 rounded-lg transition-colors"
+            title="Signatur einfügen"
+          >
+            <User className="w-3.5 h-3.5" />
+            Signatur
+          </button>
+        )}
+      </div>
+
+      {/* Email Body — Rich Text Editor */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div
+          ref={editorRef}
+          id="email-body"
+          contentEditable
+          suppressContentEditableWarning
+          onInput={syncContent}
+          onKeyDown={handleKeyDown}
+          className="w-full h-full rounded-lg border border-gray-200 bg-white text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm py-3 px-4 transition-all outline-none leading-relaxed"
+          style={{ minHeight: '280px' }}
+          data-placeholder="Schreiben Sie Ihre Nachricht..."
+        />
+        <style>{`
+          #email-body:empty::before {
+            content: attr(data-placeholder);
+            color: #9ca3af;
+            pointer-events: none;
+          }
+          #email-body ul { list-style-type: disc; padding-left: 24px; margin: 4px 0; }
+          #email-body ol { list-style-type: decimal; padding-left: 24px; margin: 4px 0; }
+          #email-body li { margin: 2px 0; display: list-item; }
+          #email-body a { color: #2563eb; text-decoration: underline; }
+        `}</style>
+      </div>
+
+      {/* Attachment chips */}
+      {attachments.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2 mb-1">
+          {attachments.map(att => (
+            <div key={att.id} className="flex items-center gap-1.5 px-2 py-1 bg-gray-100 rounded-lg text-xs text-gray-700 max-w-[200px]">
+              {att.preview ? (
+                <img src={att.preview} alt="" className="w-4 h-4 object-cover rounded" />
+              ) : (
+                <Paperclip className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              )}
+              <span className="truncate">{att.name}</span>
+              <span className="text-gray-400 shrink-0">({formatSize(att.size)})</span>
+              <button type="button" onClick={() => removeAttachment(att.id)} className="text-gray-400 hover:text-red-500 shrink-0 ml-0.5">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex items-center justify-between pt-4 mt-2 border-t border-gray-100">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => { setShowAttachmentPicker(true); setAttachPickerTab('upload'); }}
+            className={`p-2 rounded-lg transition-colors ${showAttachmentPicker ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
+            title="Anhang hinzufügen"
+          >
+            <Paperclip className="w-5 h-5" />
+          </button>
+          {attachments.length > 0 && (
+            <span className="text-xs text-gray-500">{attachments.length} Anhang{attachments.length > 1 ? 'änge' : ''}</span>
+          )}
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onDiscard}
+            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            {t('discard')}
+          </button>
+          <button
+            type="button"
+            onClick={onSaveDraft}
+            disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors flex items-center gap-2"
+          >
+            <FileText className="w-4 h-4" />
+            {t('draft')}
+          </button>
+          <button
+            type="button"
+            onClick={() => onSend(attachments)}
+            disabled={loading || !emailFormData.to}
+            className="px-5 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          >
+            <Send className="w-4 h-4" />
+            {loading ? t('sending') : t('send')}
+          </button>
+        </div>
+      </div>
+
+      {/* Attachment Picker Modal */}
+      {showAttachmentPicker && (
+        <div className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowAttachmentPicker(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                <Paperclip className="w-4 h-4 text-gray-500" />
+                Anhang hinzufügen
+              </h3>
+              <button onClick={() => setShowAttachmentPicker(false)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1 px-5 pt-3 pb-0 border-b border-gray-100">
+              {([
+                { id: 'upload' as const, label: 'Von PC hochladen', icon: Upload },
+                { id: 'leads' as const, label: 'Leads (CRM)', icon: Users },
+                { id: 'properties' as const, label: 'Objekte (CRM)', icon: Building2 },
+              ] as const).map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => handleAttachPickerTab(id)}
+                  className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors -mb-px ${
+                    attachPickerTab === id
+                      ? 'border-gray-900 text-gray-900 bg-white'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-5">
+              {/* ── Upload tab ── */}
+              {attachPickerTab === 'upload' && (
+                <div className="space-y-4">
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${
+                      dragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Upload className={`w-8 h-8 mx-auto mb-3 ${dragOver ? 'text-blue-500' : 'text-gray-300'}`} />
+                    <p className="text-sm font-medium text-gray-700">Dateien hier hineinziehen</p>
+                    <p className="text-xs text-gray-400 mt-1">oder klicken zum Auswählen</p>
+                    <p className="text-xs text-gray-400 mt-3">Bilder, PDFs, Word, Excel und mehr</p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => e.target.files && handleFilesSelected(e.target.files)}
+                    />
+                  </div>
+                  {attachments.filter(a => a.source === 'upload').length > 0 && (
+                    <div className="text-xs text-gray-500 font-medium">Ausgewählte Dateien:</div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Leads tab ── */}
+              {attachPickerTab === 'leads' && (
+                <div>
+                  {crmLoading ? (
+                    <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
+                  ) : crmLeads.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400">
+                      <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">Keine Leads gefunden</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {crmLeads.map(lead => {
+                        const docs = lead.documents || [];
+                        return (
+                          <div key={lead.id} className="border border-gray-100 rounded-xl overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedCrmItem(expandedCrmItem === lead.id ? null : lead.id)}
+                              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
+                                  {lead.name?.charAt(0)?.toUpperCase() || '?'}
+                                </div>
+                                <div className="text-left">
+                                  <div className="text-sm font-medium text-gray-900">{lead.name || 'Unbekannt'}</div>
+                                  <div className="text-xs text-gray-400">{lead.email}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400">{docs.length} Datei{docs.length !== 1 ? 'en' : ''}</span>
+                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedCrmItem === lead.id ? 'rotate-180' : ''}`} />
+                              </div>
+                            </button>
+                            {expandedCrmItem === lead.id && (
+                              <div className="border-t border-gray-100 bg-gray-50">
+                                {docs.length === 0 ? (
+                                  <p className="text-xs text-gray-400 px-4 py-3">Keine Dokumente vorhanden</p>
+                                ) : (
+                                  docs.map((doc) => {
+                                    const selected = attachments.some(a => a.url === doc.url);
+                                    return (
+                                      <button
+                                        key={doc.id}
+                                        type="button"
+                                        onClick={() => addCrmFile(doc)}
+                                        className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-100 transition-colors border-b last:border-b-0 border-gray-100 ${selected ? 'bg-blue-50' : ''}`}
+                                      >
+                                        <FileText className="w-4 h-4 text-gray-400 shrink-0" />
+                                        <span className="flex-1 text-sm text-left text-gray-700 truncate">{doc.name}</span>
+                                        <span className="text-xs text-gray-400">{formatSize(doc.size || 0)}</span>
+                                        {selected && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                                      </button>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Properties tab ── */}
+              {attachPickerTab === 'properties' && (
+                <div>
+                  {crmLoading ? (
+                    <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
+                  ) : crmProperties.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400">
+                      <Building2 className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">Keine Objekte gefunden</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {crmProperties.map(prop => {
+                        const images = prop.images || [];
+                        const docs = prop.documents || [];
+                        const total = images.length + docs.length;
+                        return (
+                          <div key={prop.id} className="border border-gray-100 rounded-xl overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedCrmItem(expandedCrmItem === prop.id ? null : prop.id)}
+                              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
+                                  <Building2 className="w-4 h-4 text-gray-400" />
+                                </div>
+                                <div className="text-left">
+                                  <div className="text-sm font-medium text-gray-900">{prop.title || prop.address}</div>
+                                  {prop.title && <div className="text-xs text-gray-400 truncate max-w-[200px]">{prop.address}</div>}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400">{total} Datei{total !== 1 ? 'en' : ''}</span>
+                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expandedCrmItem === prop.id ? 'rotate-180' : ''}`} />
+                              </div>
+                            </button>
+                            {expandedCrmItem === prop.id && (
+                              <div className="border-t border-gray-100 bg-gray-50">
+                                {total === 0 ? (
+                                  <p className="text-xs text-gray-400 px-4 py-3">Keine Dateien vorhanden</p>
+                                ) : (
+                                  <>
+                                    {images.length > 0 && (
+                                      <div className="p-3">
+                                        <div className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2 px-1">Bilder</div>
+                                        <div className="grid grid-cols-4 gap-2">
+                                          {images.map((img, idx) => {
+                                            const imgName = img.name || `Bild ${idx + 1}`;
+                                            const selected = attachments.some(a => a.url === img.url);
+                                            return (
+                                              <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => addCrmFile({ name: imgName, url: img.url, type: 'image/jpeg', size: 0 })}
+                                                className={`relative rounded-lg overflow-hidden aspect-square border-2 transition-colors ${selected ? 'border-blue-500' : 'border-transparent hover:border-gray-300'}`}
+                                              >
+                                                <img src={img.url} alt={imgName} className="w-full h-full object-cover" />
+                                                {selected && (
+                                                  <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
+                                                    <Check className="w-5 h-5 text-blue-600 drop-shadow" />
+                                                  </div>
+                                                )}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {docs.length > 0 && (
+                                      <div className="border-t border-gray-100">
+                                        <div className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2 pt-3 px-4">Dokumente</div>
+                                        {docs.map((doc) => {
+                                          const selected = attachments.some(a => a.url === doc.url);
+                                          return (
+                                            <button
+                                              key={doc.id}
+                                              type="button"
+                                              onClick={() => addCrmFile(doc)}
+                                              className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-100 transition-colors border-b last:border-b-0 border-gray-100 ${selected ? 'bg-blue-50' : ''}`}
+                                            >
+                                              <FileText className="w-4 h-4 text-gray-400 shrink-0" />
+                                              <span className="flex-1 text-sm text-left text-gray-700 truncate">{doc.name}</span>
+                                              <span className="text-xs text-gray-400">{formatSize(doc.size || 0)}</span>
+                                              {selected && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50">
+              <span className="text-xs text-gray-500">
+                {attachments.length > 0 ? `${attachments.length} Anhang${attachments.length > 1 ? 'änge' : ''} ausgewählt` : 'Keine Anhänge'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAttachmentPicker(false)}
+                className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                Fertig
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function GlobalDrawer() {
+  const router = useRouter();
+  const {
+    drawerOpen,
+    drawerMinimized,
+    drawerType,
+    sidebarExpanded,
+    closeDrawer,
+    minimizeDrawer,
+    maximizeDrawer,
+    leadFormData,
+    updateLeadForm,
+    propertyFormData,
+    updatePropertyForm,
+    emailFormData,
+    updateEmailForm
+  } = useGlobalState();
+  const t = useTranslations('drawer');
+
+  // Animation state
+  const [isVisible, setIsVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Bug report form state
+  const [bugTitle, setBugTitle] = useState('');
+  const [bugDescription, setBugDescription] = useState('');
+  const [bugSubmitting, setBugSubmitting] = useState(false);
+  const [bugSuccess, setBugSuccess] = useState(false);
+  const [bugError, setBugError] = useState(false);
+  const [bugImage, setBugImage] = useState<string | null>(null);
+  const [bugImageName, setBugImageName] = useState<string>('');
+  const [bugConsoleLogs, setBugConsoleLogs] = useState<any[]>([]);
+  const [bugIncludeLogs, setBugIncludeLogs] = useState(true);
+  const [bugLogsExpanded, setBugLogsExpanded] = useState(false);
+  const bugImageInputRef = useRef<HTMLInputElement>(null);
+  
+  // Collapsible sections for Property form
+  const [expandedSections, setExpandedSections] = useState({
+    address: true,
+    details: true,
+    price: true,
+    energy: false,
+    description: false,
+  });
+
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  // Animate in when drawer opens
+  useEffect(() => {
+    if (drawerOpen) {
+      const timer = setTimeout(() => setIsVisible(true), 10);
+      return () => clearTimeout(timer);
+    } else {
+      setIsVisible(false);
+    }
+  }, [drawerOpen]);
+
+  // Load console logs when BUG_REPORT drawer opens
+  useEffect(() => {
+    if (drawerOpen && drawerType === 'BUG_REPORT') {
+      setBugConsoleLogs([]);
+      setBugIncludeLogs(true);
+      setBugLogsExpanded(false);
+      setBugImage(null);
+      setBugImageName('');
+      import('@/lib/consoleCapture').then(({ getConsoleLogs }) => {
+        setBugConsoleLogs(getConsoleLogs());
+      });
+    }
+  }, [drawerOpen, drawerType]);
+
+  // Animated close function
+  const handleAnimatedClose = () => {
+    setIsVisible(false);
+    setTimeout(() => {
+      closeDrawer();
+    }, 300);
+  };
+
+  const handleCreateLead = async () => {
+    setLoading(true);
+    try {
+      const result = await createLead(leadFormData);
+      handleAnimatedClose();
+      mutate(API_ENDPOINTS.LEADS);
+      router.push(`/dashboard/crm/leads/${result.id}`);
+    } catch (error) {
+      console.error('Error creating lead:', error);
+      alert('Fehler beim Erstellen des Leads: ' + error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateProperty = async () => {
+    setLoading(true);
+    try {
+      // Build full address from components
+      const addressParts = [
+        propertyFormData.street,
+        propertyFormData.houseNumber,
+      ].filter(Boolean).join(' ');
+      
+      const fullAddress = [
+        addressParts,
+        propertyFormData.zipCode,
+        propertyFormData.city,
+      ].filter(Boolean).join(', ');
+
+      const result = await createProperty({
+        ...propertyFormData,
+        address: fullAddress || propertyFormData.address,
+        salePrice: propertyFormData.marketingType === 'RENT' ? undefined : Number(propertyFormData.salePrice) || undefined,
+        rentCold: propertyFormData.marketingType === 'RENT' ? Number(propertyFormData.rentCold) || undefined : undefined,
+        rentWarm: propertyFormData.marketingType === 'RENT' ? Number(propertyFormData.rentWarm) || undefined : undefined,
+        additionalCosts: propertyFormData.marketingType === 'RENT' ? Number(propertyFormData.additionalCosts) || undefined : undefined,
+        livingArea: Number(propertyFormData.livingArea) || undefined,
+        rooms: Number(propertyFormData.rooms) || undefined,
+        bedrooms: Number(propertyFormData.bedrooms) || undefined,
+        bathrooms: Number(propertyFormData.bathrooms) || undefined,
+        floor: Number(propertyFormData.floor) || undefined,
+        totalFloors: Number(propertyFormData.totalFloors) || undefined,
+        yearBuilt: Number(propertyFormData.yearBuilt) || undefined,
+        energyConsumption: Number(propertyFormData.energyConsumption) || undefined,
+      });
+      handleAnimatedClose();
+      mutate(API_ENDPOINTS.PROPERTIES);
+      router.push(`/dashboard/crm/properties/${result.id}`);
+    } catch (error) {
+      alert('Fehler beim Erstellen des Objekts: ' + error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendEmail = async (asDraft: boolean = false, attachments: AttachmentItem[] = []) => {
+    if (!emailFormData.to || !emailFormData.subject) {
+      alert('Bitte Empfänger und Betreff eingeben');
+      return;
+    }
+    setLoading(true);
+    try {
+      // Build attachment payload
+      const attachmentPayload = attachments.map(a => ({
+        name: a.name,
+        type: a.type,
+        size: a.size,
+        data: a.data,       // base64 for uploaded files
+        url: a.url,         // URL for CRM files (backend fetches)
+        source: a.source,
+      }));
+
+      await fetchWithAuth(`${getApiUrl()}/emails/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: emailFormData.to,
+          cc: emailFormData.cc || undefined,
+          bcc: emailFormData.bcc || undefined,
+          subject: emailFormData.subject,
+          body: emailFormData.body || '',
+          bodyHtml: emailFormData.bodyHtml || undefined,
+          leadId: emailFormData.leadId || undefined,
+          replyToEmailId: emailFormData.replyTo || undefined,
+          draftId: emailFormData.draftId || undefined,
+          asDraft,
+          attachments: attachmentPayload.length > 0 ? attachmentPayload : undefined,
+        }),
+      });
+      
+      handleAnimatedClose();
+      router.refresh();
+      updateEmailForm({ to: '', cc: '', bcc: '', subject: '', body: '', bodyHtml: '', leadId: '', replyTo: '', draftId: '' });
+      
+      // Refresh inbox
+      mutate((key: string) => typeof key === 'string' && key.includes('/emails'));
+    } catch (error) {
+      alert('Fehler beim Senden: ' + error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!drawerOpen) return null;
+
+  const handleSubmitBug = async () => {
+    if (!bugTitle.trim() || !bugDescription.trim()) return;
+    setBugSubmitting(true);
+    setBugError(false);
+    try {
+      const { fetchWithAuth, getApiUrl } = await import('@/lib/api');
+      await fetchWithAuth(`${getApiUrl()}/bug-reports`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: bugTitle.trim(),
+          description: bugDescription.trim(),
+          page: typeof window !== 'undefined' ? window.location.pathname : null,
+          screenshot: bugImage || null,
+          consoleLogs: bugIncludeLogs && bugConsoleLogs.length > 0 ? JSON.stringify(bugConsoleLogs) : null,
+        }),
+      });
+      setBugSuccess(true);
+      setBugTitle('');
+      setBugDescription('');
+      setBugImage(null);
+      setBugImageName('');
+      setBugConsoleLogs([]);
+      setTimeout(() => {
+        setBugSuccess(false);
+        handleAnimatedClose();
+      }, 2000);
+    } catch (err) {
+      console.error('Bug report error:', err);
+      setBugError(true);
+    } finally {
+      setBugSubmitting(false);
+    }
+  };
+
+  const getDrawerTitle = () => {
+    switch (drawerType) {
+      case 'LEAD': return t('newLead');
+      case 'PROPERTY': return t('newProperty');
+      case 'EMAIL': return t('composeEmail');
+      case 'BUG_REPORT': return t('reportBug');
+      default: return '';
+    }
+  };
+
+  const getHeaderColor = () => {
+    switch (drawerType) {
+      case 'LEAD': return 'bg-gray-800';
+      case 'PROPERTY': return 'bg-gray-800';
+      case 'EMAIL': return 'bg-gray-800';
+      case 'BUG_REPORT': return 'bg-red-700';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  const SectionHeader = ({ title, section, expanded }: { title: string; section: keyof typeof expandedSections; expanded: boolean }) => (
+    <button
+      type="button"
+      onClick={() => toggleSection(section)}
+      className="w-full flex items-center justify-between py-2 text-left"
+    >
+      <span className={sectionTitleClass}>{title}</span>
+      {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+    </button>
+  );
+
+  const renderDrawerContent = () => (
+    <>
+      {drawerType === 'EMAIL' && (
+        <EmailComposer
+              emailFormData={emailFormData}
+              updateEmailForm={updateEmailForm}
+              onSend={(atts) => handleSendEmail(false, atts)}
+              onSaveDraft={() => handleSendEmail(true)}
+              onDiscard={handleAnimatedClose}
+              loading={loading}
+            />
+          )}
+
+          {drawerType === 'LEAD' && (
+            <div className="max-w-4xl mx-auto space-y-5">
+              {/* Anrede & Name */}
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-12">
+                <div className="col-span-1 lg:col-span-2">
+                  <label className={labelClass}>Anrede</label>
+                  <select
+                    value={leadFormData.salutation || 'NONE'}
+                    onChange={(e) => updateLeadForm({ salutation: e.target.value })}
+                    className={selectClass}
+                  >
+                    {SALUTATION_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-1 lg:col-span-2">
+                  <label className={labelClass}>Ansprache</label>
+                  <div className="flex h-[42px]">
+                    <button
+                      type="button"
+                      onClick={() => updateLeadForm({ formalAddress: true })}
+                      className={`flex-1 px-3 py-2 text-sm font-medium rounded-l-lg border transition-colors ${
+                        leadFormData.formalAddress !== false
+                          ? 'bg-gray-900 text-white border-gray-900'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Sie
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateLeadForm({ formalAddress: false })}
+                      className={`flex-1 px-3 py-2 text-sm font-medium rounded-r-lg border-t border-r border-b transition-colors ${
+                        leadFormData.formalAddress === false
+                          ? 'bg-gray-900 text-white border-gray-900'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Du
+                    </button>
+                  </div>
+                </div>
+                <div className="col-span-1 lg:col-span-4">
+                  <label className={labelClass}>Vorname</label>
+                  <input
+                    type="text"
+                    value={leadFormData.firstName || ''}
+                    onChange={(e) => updateLeadForm({ firstName: e.target.value })}
+                    className={inputClass}
+                    placeholder="Max"
+                  />
+                </div>
+                <div className="col-span-1 lg:col-span-4">
+                  <label className={labelClass}>Nachname</label>
+                  <input
+                    type="text"
+                    value={leadFormData.lastName || ''}
+                    onChange={(e) => updateLeadForm({ lastName: e.target.value })}
+                    className={inputClass}
+                    placeholder="Mustermann"
+                  />
+                </div>
+              </div>
+
+              {/* Kontakt */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className={labelClass}>E-Mail *</label>
+                  <input
+                    type="email"
+                    value={leadFormData.email || ''}
+                    onChange={(e) => updateLeadForm({ email: e.target.value })}
+                    className={inputClass}
+                    placeholder="max.mustermann@example.com"
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Telefon</label>
+                  <input
+                    type="tel"
+                    value={leadFormData.phone || ''}
+                    onChange={(e) => updateLeadForm({ phone: e.target.value })}
+                    className={inputClass}
+                    placeholder="+49 123 456789"
+                  />
+                </div>
+              </div>
+
+              {/* Quelle */}
+              <div>
+                <label className={labelClass}>Quelle</label>
+                <select
+                  value={leadFormData.source || 'WEBSITE'}
+                  onChange={(e) => updateLeadForm({ source: e.target.value })}
+                  className={selectClass}
+                >
+                  {SOURCE_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Notizen */}
+              <div>
+                <label className={labelClass}>Notizen</label>
+                <textarea
+                  rows={3}
+                  value={leadFormData.notes || ''}
+                  onChange={(e) => updateLeadForm({ notes: e.target.value })}
+                  className={textareaClass}
+                  placeholder="Erste Informationen zum Lead..."
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end space-x-3 pt-4">
+                <button 
+                  onClick={handleAnimatedClose}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Abbrechen
+                </button>
+                <button 
+                  onClick={handleCreateLead}
+                  disabled={loading || !leadFormData.email}
+                  className="px-6 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                >
+                  {loading ? t('saving') : t('createLead')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {drawerType === 'PROPERTY' && (
+            <div className="max-w-5xl mx-auto space-y-4">
+              {/* Grunddaten */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="sm:col-span-2">
+                  <label className={labelClass}>Titel (Intern) *</label>
+                  <input
+                    type="text"
+                    value={propertyFormData.title || ''}
+                    onChange={(e) => updatePropertyForm({ title: e.target.value })}
+                    className={inputClass}
+                    placeholder="z.B. Altbauwohnung Mariahilf"
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Status</label>
+                  <select
+                    value={propertyFormData.status || 'ACTIVE'}
+                    onChange={(e) => updatePropertyForm({ status: e.target.value })}
+                    className={selectClass}
+                  >
+                    {STATUS_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Typ & Vermarktung */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className={labelClass}>Objekttyp</label>
+                  <select
+                    value={propertyFormData.propertyType || 'APARTMENT'}
+                    onChange={(e) => updatePropertyForm({ propertyType: e.target.value })}
+                    className={selectClass}
+                  >
+                    {PROPERTY_TYPE_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Vermarktungsart</label>
+                  <div className="flex h-[42px]">
+                    <button
+                      type="button"
+                      onClick={() => updatePropertyForm({ marketingType: 'SALE' })}
+                      className={`flex-1 px-4 py-2 text-sm font-medium rounded-l-lg border transition-colors ${
+                        (propertyFormData.marketingType || 'SALE') === 'SALE'
+                          ? 'bg-gray-900 text-white border-gray-900'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Kauf
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updatePropertyForm({ marketingType: 'RENT' })}
+                      className={`flex-1 px-4 py-2 text-sm font-medium rounded-r-lg border-t border-r border-b transition-colors ${
+                        propertyFormData.marketingType === 'RENT'
+                          ? 'bg-gray-900 text-white border-gray-900'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Miete
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Adresse Section */}
+              <div className="border-t border-gray-100 pt-4">
+                <SectionHeader title="📍 Adresse" section="address" expanded={expandedSections.address} />
+                {expandedSections.address && (
+                  <div className="space-y-4 mt-2">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-6 sm:gap-4">
+                      <div className="col-span-2 sm:col-span-3">
+                        <label className={labelClass}>Straße *</label>
+                        <input
+                          type="text"
+                          value={propertyFormData.street || ''}
+                          onChange={(e) => updatePropertyForm({ street: e.target.value })}
+                          className={inputClass}
+                          placeholder="Musterstraße"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Hausnr.</label>
+                        <input
+                          type="text"
+                          value={propertyFormData.houseNumber || ''}
+                          onChange={(e) => updatePropertyForm({ houseNumber: e.target.value })}
+                          className={inputClass}
+                          placeholder="12a"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Stiege</label>
+                        <input
+                          type="text"
+                          value={propertyFormData.staircase || ''}
+                          onChange={(e) => updatePropertyForm({ staircase: e.target.value })}
+                          className={inputClass}
+                          placeholder="2"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Tür</label>
+                        <input
+                          type="text"
+                          value={propertyFormData.apartmentNumber || ''}
+                          onChange={(e) => updatePropertyForm({ apartmentNumber: e.target.value })}
+                          className={inputClass}
+                          placeholder="15"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-6 sm:gap-4">
+                      <div>
+                        <label className={labelClass}>Etage</label>
+                        <input
+                          type="number"
+                          value={propertyFormData.floor || ''}
+                          onChange={(e) => updatePropertyForm({ floor: e.target.value })}
+                          className={inputClass}
+                          placeholder="3"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Block</label>
+                        <input
+                          type="text"
+                          value={propertyFormData.block || ''}
+                          onChange={(e) => updatePropertyForm({ block: e.target.value })}
+                          className={inputClass}
+                          placeholder="A"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>PLZ *</label>
+                        <input
+                          type="text"
+                          value={propertyFormData.zipCode || ''}
+                          onChange={(e) => updatePropertyForm({ zipCode: e.target.value })}
+                          className={inputClass}
+                          placeholder="1060"
+                        />
+                      </div>
+                      <div className="col-span-2 sm:col-span-2">
+                        <label className={labelClass}>Stadt *</label>
+                        <input
+                          type="text"
+                          value={propertyFormData.city || ''}
+                          onChange={(e) => updatePropertyForm({ city: e.target.value })}
+                          className={inputClass}
+                          placeholder="Wien"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Bezirk</label>
+                        <input
+                          type="text"
+                          value={propertyFormData.district || ''}
+                          onChange={(e) => updatePropertyForm({ district: e.target.value })}
+                          className={inputClass}
+                          placeholder="Mariahilf"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                      <div>
+                        <label className={labelClass}>Bundesland/Provinz</label>
+                        <input
+                          type="text"
+                          value={propertyFormData.state || ''}
+                          onChange={(e) => updatePropertyForm({ state: e.target.value })}
+                          className={inputClass}
+                          placeholder="Wien"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Land</label>
+                        <select
+                          value={propertyFormData.country || 'Österreich'}
+                          onChange={(e) => updatePropertyForm({ country: e.target.value })}
+                          className={selectClass}
+                        >
+                          {COUNTRY_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Preis Section */}
+              <div className="border-t border-gray-100 pt-4">
+                <SectionHeader title="💰 Preis" section="price" expanded={expandedSections.price} />
+                {expandedSections.price && (
+                  <div className="space-y-4 mt-2">
+                    {(propertyFormData.marketingType || 'SALE') === 'SALE' ? (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+                        <div>
+                          <label className={labelClass}>Kaufpreis (€) *</label>
+                          <input
+                            type="number"
+                            value={propertyFormData.salePrice || ''}
+                            onChange={(e) => updatePropertyForm({ salePrice: e.target.value })}
+                            className={inputClass}
+                            placeholder="350000"
+                          />
+                        </div>
+                        <div>
+                          <label className={labelClass}>Provision</label>
+                          <input
+                            type="text"
+                            value={propertyFormData.commission || ''}
+                            onChange={(e) => updatePropertyForm({ commission: e.target.value })}
+                            className={inputClass}
+                            placeholder="3% + MwSt."
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+                        <div>
+                          <label className={labelClass}>Kaltmiete (€) *</label>
+                          <input
+                            type="number"
+                            value={propertyFormData.rentCold || ''}
+                            onChange={(e) => updatePropertyForm({ rentCold: e.target.value })}
+                            className={inputClass}
+                            placeholder="850"
+                          />
+                        </div>
+                        <div>
+                          <label className={labelClass}>Nebenkosten (€)</label>
+                          <input
+                            type="number"
+                            value={propertyFormData.additionalCosts || ''}
+                            onChange={(e) => updatePropertyForm({ additionalCosts: e.target.value })}
+                            className={inputClass}
+                            placeholder="150"
+                          />
+                        </div>
+                        <div>
+                          <label className={labelClass}>Warmmiete (€)</label>
+                          <input
+                            type="number"
+                            value={propertyFormData.rentWarm || ''}
+                            onChange={(e) => updatePropertyForm({ rentWarm: e.target.value })}
+                            className={inputClass}
+                            placeholder="1000"
+                          />
+                        </div>
+                        <div>
+                          <label className={labelClass}>Kaution</label>
+                          <input
+                            type="text"
+                            value={propertyFormData.deposit || ''}
+                            onChange={(e) => updatePropertyForm({ deposit: e.target.value })}
+                            className={inputClass}
+                            placeholder="3 MM"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Details Section */}
+              <div className="border-t border-gray-100 pt-4">
+                <SectionHeader title="📐 Details" section="details" expanded={expandedSections.details} />
+                {expandedSections.details && (
+                  <div className="space-y-4 mt-2">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-5 sm:gap-4">
+                      <div>
+                        <label className={labelClass}>Wohnfläche (m²)</label>
+                        <input
+                          type="number"
+                          value={propertyFormData.livingArea || ''}
+                          onChange={(e) => updatePropertyForm({ livingArea: e.target.value })}
+                          className={inputClass}
+                          placeholder="85"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Zimmer</label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          value={propertyFormData.rooms || ''}
+                          onChange={(e) => updatePropertyForm({ rooms: e.target.value })}
+                          className={inputClass}
+                          placeholder="3"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Schlafzimmer</label>
+                        <input
+                          type="number"
+                          value={propertyFormData.bedrooms || ''}
+                          onChange={(e) => updatePropertyForm({ bedrooms: e.target.value })}
+                          className={inputClass}
+                          placeholder="2"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Badezimmer</label>
+                        <input
+                          type="number"
+                          value={propertyFormData.bathrooms || ''}
+                          onChange={(e) => updatePropertyForm({ bathrooms: e.target.value })}
+                          className={inputClass}
+                          placeholder="1"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Etagen ges.</label>
+                        <input
+                          type="number"
+                          value={propertyFormData.totalFloors || ''}
+                          onChange={(e) => updatePropertyForm({ totalFloors: e.target.value })}
+                          className={inputClass}
+                          placeholder="5"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+                      <div>
+                        <label className={labelClass}>Baujahr</label>
+                        <input
+                          type="number"
+                          value={propertyFormData.yearBuilt || ''}
+                          onChange={(e) => updatePropertyForm({ yearBuilt: e.target.value })}
+                          className={inputClass}
+                          placeholder="1920"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Zustand</label>
+                        <select
+                          value={propertyFormData.condition || ''}
+                          onChange={(e) => updatePropertyForm({ condition: e.target.value })}
+                          className={selectClass}
+                        >
+                          {CONDITION_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Energieausweis Section */}
+              <div className="border-t border-gray-100 pt-4">
+                <SectionHeader title="⚡ Energieausweis" section="energy" expanded={expandedSections.energy} />
+                {expandedSections.energy && (
+                  <div className="space-y-4 mt-2">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+                      <div>
+                        <label className={labelClass}>Art</label>
+                        <select
+                          value={propertyFormData.energyCertificateType || ''}
+                          onChange={(e) => updatePropertyForm({ energyCertificateType: e.target.value })}
+                          className={selectClass}
+                        >
+                          {ENERGY_CERT_TYPE_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className={labelClass}>Effizienzklasse</label>
+                        <select
+                          value={propertyFormData.energyEfficiencyClass || ''}
+                          onChange={(e) => updatePropertyForm({ energyEfficiencyClass: e.target.value })}
+                          className={selectClass}
+                        >
+                          {ENERGY_CLASS_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className={labelClass}>Verbrauch (kWh/m²·a)</label>
+                        <input
+                          type="number"
+                          value={propertyFormData.energyConsumption || ''}
+                          onChange={(e) => updatePropertyForm({ energyConsumption: e.target.value })}
+                          className={inputClass}
+                          placeholder="75"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Energieträger</label>
+                        <input
+                          type="text"
+                          value={propertyFormData.primaryEnergySource || ''}
+                          onChange={(e) => updatePropertyForm({ primaryEnergySource: e.target.value })}
+                          className={inputClass}
+                          placeholder="Gas"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Beschreibung Section */}
+              <div className="border-t border-gray-100 pt-4">
+                <SectionHeader title="📝 Beschreibung" section="description" expanded={expandedSections.description} />
+                {expandedSections.description && (
+                  <div className="space-y-4 mt-2">
+                    <div>
+                      <label className={labelClass}>Exposé-Text</label>
+                      <textarea
+                        rows={3}
+                        value={propertyFormData.description || ''}
+                        onChange={(e) => updatePropertyForm({ description: e.target.value })}
+                        className={textareaClass}
+                        placeholder="Öffentliche Beschreibung des Objekts..."
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Mivo-Fakten (Intern)</label>
+                      <textarea
+                        rows={2}
+                        value={propertyFormData.aiFacts || ''}
+                        onChange={(e) => updatePropertyForm({ aiFacts: e.target.value })}
+                        className={textareaClass}
+                        placeholder="z.B. Keine Haustiere, Südbalkon, ruhige Lage..."
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end space-x-3 pt-6 border-t border-gray-100">
+                <button 
+                  onClick={handleAnimatedClose}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Abbrechen
+                </button>
+                <button 
+                  onClick={handleCreateProperty}
+                  disabled={loading || !propertyFormData.title || !propertyFormData.street || !propertyFormData.city}
+                  className="px-6 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                >
+                  {loading ? t('saving') : t('createProperty')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {drawerType === 'BUG_REPORT' && (
+            <div className="space-y-5">
+              {bugSuccess ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mb-4">
+                    <svg className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">{t('bugSuccess')}</h3>
+                  <p className="text-sm text-gray-500">{t('bugSuccessDesc')}</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-500 mb-4">
+                    {t('bugPageInfo')}
+                  </p>
+                  <div>
+                    <label className={labelClass}>Titel *</label>
+                    <input
+                      type="text"
+                      value={bugTitle}
+                      onChange={(e) => setBugTitle(e.target.value)}
+                      className={inputClass}
+                      placeholder="Kurze Zusammenfassung des Fehlers..."
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Beschreibung *</label>
+                    <textarea
+                      rows={4}
+                      value={bugDescription}
+                      onChange={(e) => setBugDescription(e.target.value)}
+                      className={textareaClass}
+                      placeholder="Was ist passiert? Was hast du erwartet? Welche Schritte führen zum Fehler?"
+                    />
+                  </div>
+
+                  {/* Image Upload */}
+                  <div>
+                    <label className={labelClass}>Bild anhängen (optional)</label>
+                    <input
+                      ref={bugImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                          setBugImage(ev.target?.result as string);
+                          setBugImageName(file.name);
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                    {bugImage ? (
+                      <div className="relative rounded-lg overflow-hidden border border-gray-200">
+                        <img
+                          src={bugImage}
+                          alt="Angehängtes Bild"
+                          className="w-full max-h-48 object-cover"
+                        />
+                        <div className="absolute top-2 right-2 flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => bugImageInputRef.current?.click()}
+                            className="px-2 py-1 text-[11px] font-medium bg-white/90 hover:bg-white text-gray-700 rounded-md shadow-sm transition-colors"
+                          >
+                            Ersetzen
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setBugImage(null); setBugImageName(''); }}
+                            className="p-1 bg-white/90 hover:bg-white text-gray-500 hover:text-red-500 rounded-md shadow-sm transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-200">
+                          <span className="text-[11px] text-gray-500 truncate block">{bugImageName}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => bugImageInputRef.current?.click()}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 border border-dashed border-gray-300 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-colors text-left"
+                      >
+                        <Image className="w-4 h-4 text-gray-400 shrink-0" />
+                        <span className="text-sm text-gray-500">Screenshot oder Bild auswählen...</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Console Logs Toggle + Preview */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setBugIncludeLogs(!bugIncludeLogs)}
+                      className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Terminal className="w-3.5 h-3.5 text-gray-500" />
+                        <span className="text-xs font-medium text-gray-700">Console-Logs mitsenden</span>
+                        {bugConsoleLogs.length > 0 && (
+                          <span className="text-[10px] text-gray-400">({bugConsoleLogs.length})</span>
+                        )}
+                      </div>
+                      <div className={`w-8 h-[18px] rounded-full transition-colors relative ${bugIncludeLogs ? 'bg-red-500' : 'bg-gray-300'}`}>
+                        <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow transition-transform ${bugIncludeLogs ? 'translate-x-[16px]' : 'translate-x-[2px]'}`} />
+                      </div>
+                    </button>
+                    {bugIncludeLogs && bugConsoleLogs.length > 0 && (
+                      <div className="border-t border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => setBugLogsExpanded(!bugLogsExpanded)}
+                          className="w-full px-3 py-1.5 text-[10px] text-gray-400 hover:text-gray-600 text-left"
+                        >
+                          {bugLogsExpanded ? '▾ Logs ausblenden' : '▸ Logs anzeigen'}
+                        </button>
+                        {bugLogsExpanded && (
+                          <div className="max-h-40 overflow-y-auto px-3 pb-2 space-y-0.5">
+                            {bugConsoleLogs.map((log, i) => (
+                              <div key={i} className={`text-[10px] font-mono leading-tight truncate ${
+                                log.level === 'error' ? 'text-red-600' : log.level === 'warn' ? 'text-amber-600' : 'text-gray-500'
+                              }`}>
+                                <span className="text-gray-300 mr-1">{new Date(log.timestamp).toLocaleTimeString('de-DE')}</span>
+                                <span className={`mr-1 font-semibold ${
+                                  log.level === 'error' ? 'text-red-500' : log.level === 'warn' ? 'text-amber-500' : 'text-gray-400'
+                                }`}>[{log.level}]</span>
+                                {log.message}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {bugIncludeLogs && bugConsoleLogs.length === 0 && (
+                      <div className="p-3 border-t border-gray-100">
+                        <p className="text-xs text-gray-400">Keine Console-Logs vorhanden.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {bugError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                      Bug-Report konnte nicht gesendet werden. Bitte versuche es erneut.
+                    </div>
+                  )}
+
+                  <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
+                    <button
+                      onClick={handleAnimatedClose}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      onClick={handleSubmitBug}
+                      disabled={bugSubmitting || !bugTitle.trim() || !bugDescription.trim()}
+                      className="px-6 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                    >
+                      {bugSubmitting ? t('submittingBug') : t('submitBug')}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+    </>
+  );
+
+  return (
+    <>
+    {/* Mobile: Fullscreen overlay */}
+    <div
+      className={`lg:hidden fixed inset-0 bg-white z-50`}
+      style={{
+        transform: isVisible ? 'translateY(0)' : 'translateY(100%)',
+        transition: 'transform 0.3s ease-in-out'
+      }}
+    >
+      {/* Mobile Header */}
+      <div className="flex items-center justify-between px-4 h-14 bg-white border-b border-gray-100" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <div className="flex items-center space-x-2">
+          <div className={`w-2 h-2 rounded-full ${getHeaderColor()}`} />
+          <h3 className="text-gray-900 font-semibold text-sm">{getDrawerTitle()}</h3>
+        </div>
+        <button onClick={handleAnimatedClose} className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+      {/* Mobile Body */}
+      <div className="p-4 overflow-y-auto" style={{ height: 'calc(100dvh - 56px - env(safe-area-inset-top, 0px))' }}>
+        {renderDrawerContent()}
+      </div>
+    </div>
+
+    {/* Desktop: Bottom drawer */}
+    <div
+      className={`hidden lg:block fixed bottom-0 right-80 bg-white shadow-[0_-5px_30px_rgba(0,0,0,0.15)] border-t border-x border-gray-200 rounded-t-xl z-40 ${
+        drawerMinimized ? 'h-12' : 'h-[720px]'
+      }`}
+      style={{ 
+        transform: isVisible ? 'translateY(0)' : 'translateY(100%)',
+        left: sidebarExpanded ? '256px' : '80px',
+        transition: 'all 0.3s ease-in-out'
+      }}
+    >
+      {/* Header */}
+      <div 
+        className="flex items-center justify-between px-6 h-12 bg-white border-b border-gray-100 rounded-t-xl cursor-pointer hover:bg-gray-50 transition-colors"
+        onClick={drawerMinimized ? maximizeDrawer : minimizeDrawer}
+      >
+        <div className="flex items-center space-x-2">
+          <div className={`w-2 h-2 rounded-full ${getHeaderColor()}`} />
+          <h3 className="text-gray-900 font-semibold text-sm">
+            {getDrawerTitle()}
+          </h3>
+        </div>
+        <div className="flex items-center space-x-2">
+          {drawerMinimized ? (
+            <button onClick={(e) => { e.stopPropagation(); maximizeDrawer(); }} className="p-1 text-gray-400 hover:text-blue-600 rounded-md hover:bg-gray-50">
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          ) : (
+            <button onClick={minimizeDrawer} className="p-1 text-gray-400 hover:text-blue-600 rounded-md hover:bg-gray-50">
+              <Minus className="w-4 h-4" />
+            </button>
+          )}
+          <button onClick={handleAnimatedClose} className="p-1 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Body */}
+      {!drawerMinimized && (
+        <div className="p-6 overflow-y-auto h-[calc(720px-48px)]">
+          {renderDrawerContent()}
+        </div>
+      )}
+    </div>
+    </>
+  );
+}

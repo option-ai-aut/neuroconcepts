@@ -1,0 +1,23 @@
+{
+  "name": "bundling-temp-ae8498b91e141da17b32924052aa096b3bf8889cb6225644b7da664029dc0f63-building",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@prisma/client": "^5.10.2",
+    "ews-javascript-api": "^0.15.3",
+    "jszip": "^3.10.1",
+    "mammoth": "^1.11.0",
+    "pdf-parse": "^2.4.5",
+    "prisma": "^5.10.2",
+    "sharp": "^0.34.5",
+    "xlsx": "^0.18.5"
+  }
+}

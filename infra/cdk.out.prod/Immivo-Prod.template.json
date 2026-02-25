@@ -1,0 +1,4012 @@
+{
+ "Description": "Production environment for Immivo AI",
+ "Resources": {
+  "ImmivoVPCB1C78292": {
+   "Type": "AWS::EC2::VPC",
+   "Properties": {
+    "CidrBlock": "10.0.0.0/16",
+    "EnableDnsHostnames": true,
+    "EnableDnsSupport": true,
+    "InstanceTenancy": "default",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Immivo-Prod/ImmivoVPC"
+     },
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/Resource"
+   }
+  },
+  "ImmivoVPCPublicSubnet1SubnetF66FB41A": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "eu-central-1a",
+    "CidrBlock": "10.0.0.0/24",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "Immivo-Prod/ImmivoVPC/PublicSubnet1"
+     },
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "VpcId": {
+     "Ref": "ImmivoVPCB1C78292"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PublicSubnet1/Subnet"
+   }
+  },
+  "ImmivoVPCPublicSubnet1RouteTable7638AEB2": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Immivo-Prod/ImmivoVPC/PublicSubnet1"
+     },
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "VpcId": {
+     "Ref": "ImmivoVPCB1C78292"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PublicSubnet1/RouteTable"
+   }
+  },
+  "ImmivoVPCPublicSubnet1RouteTableAssociation48A7BC36": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "ImmivoVPCPublicSubnet1RouteTable7638AEB2"
+    },
+    "SubnetId": {
+     "Ref": "ImmivoVPCPublicSubnet1SubnetF66FB41A"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PublicSubnet1/RouteTableAssociation"
+   }
+  },
+  "ImmivoVPCPublicSubnet1DefaultRoute7933DA36": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "ImmivoVPCIGWCE166DAC"
+    },
+    "RouteTableId": {
+     "Ref": "ImmivoVPCPublicSubnet1RouteTable7638AEB2"
+    }
+   },
+   "DependsOn": [
+    "ImmivoVPCVPCGWEDE407B3"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PublicSubnet1/DefaultRoute"
+   }
+  },
+  "ImmivoVPCPublicSubnet1EIP6728BF6E": {
+   "Type": "AWS::EC2::EIP",
+   "Properties": {
+    "Domain": "vpc",
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Immivo-Prod/ImmivoVPC/PublicSubnet1"
+     },
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PublicSubnet1/EIP"
+   }
+  },
+  "ImmivoVPCPublicSubnet1NATGateway302E4A39": {
+   "Type": "AWS::EC2::NatGateway",
+   "Properties": {
+    "AllocationId": {
+     "Fn::GetAtt": [
+      "ImmivoVPCPublicSubnet1EIP6728BF6E",
+      "AllocationId"
+     ]
+    },
+    "SubnetId": {
+     "Ref": "ImmivoVPCPublicSubnet1SubnetF66FB41A"
+    },
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Immivo-Prod/ImmivoVPC/PublicSubnet1"
+     },
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "DependsOn": [
+    "ImmivoVPCPublicSubnet1DefaultRoute7933DA36",
+    "ImmivoVPCPublicSubnet1RouteTableAssociation48A7BC36"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PublicSubnet1/NATGateway"
+   }
+  },
+  "ImmivoVPCPublicSubnet2SubnetF03A036B": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "eu-central-1b",
+    "CidrBlock": "10.0.1.0/24",
+    "MapPublicIpOnLaunch": true,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Public"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Public"
+     },
+     {
+      "Key": "Name",
+      "Value": "Immivo-Prod/ImmivoVPC/PublicSubnet2"
+     },
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "VpcId": {
+     "Ref": "ImmivoVPCB1C78292"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PublicSubnet2/Subnet"
+   }
+  },
+  "ImmivoVPCPublicSubnet2RouteTable726D9D65": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Immivo-Prod/ImmivoVPC/PublicSubnet2"
+     },
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "VpcId": {
+     "Ref": "ImmivoVPCB1C78292"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PublicSubnet2/RouteTable"
+   }
+  },
+  "ImmivoVPCPublicSubnet2RouteTableAssociation0487F69E": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "ImmivoVPCPublicSubnet2RouteTable726D9D65"
+    },
+    "SubnetId": {
+     "Ref": "ImmivoVPCPublicSubnet2SubnetF03A036B"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PublicSubnet2/RouteTableAssociation"
+   }
+  },
+  "ImmivoVPCPublicSubnet2DefaultRouteF3093132": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "GatewayId": {
+     "Ref": "ImmivoVPCIGWCE166DAC"
+    },
+    "RouteTableId": {
+     "Ref": "ImmivoVPCPublicSubnet2RouteTable726D9D65"
+    }
+   },
+   "DependsOn": [
+    "ImmivoVPCVPCGWEDE407B3"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PublicSubnet2/DefaultRoute"
+   }
+  },
+  "ImmivoVPCPrivateSubnet1Subnet5717415A": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "eu-central-1a",
+    "CidrBlock": "10.0.2.0/24",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Private"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Private"
+     },
+     {
+      "Key": "Name",
+      "Value": "Immivo-Prod/ImmivoVPC/PrivateSubnet1"
+     },
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "VpcId": {
+     "Ref": "ImmivoVPCB1C78292"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PrivateSubnet1/Subnet"
+   }
+  },
+  "ImmivoVPCPrivateSubnet1RouteTable1CC356B3": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Immivo-Prod/ImmivoVPC/PrivateSubnet1"
+     },
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "VpcId": {
+     "Ref": "ImmivoVPCB1C78292"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PrivateSubnet1/RouteTable"
+   }
+  },
+  "ImmivoVPCPrivateSubnet1RouteTableAssociation88F519B0": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "ImmivoVPCPrivateSubnet1RouteTable1CC356B3"
+    },
+    "SubnetId": {
+     "Ref": "ImmivoVPCPrivateSubnet1Subnet5717415A"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PrivateSubnet1/RouteTableAssociation"
+   }
+  },
+  "ImmivoVPCPrivateSubnet1DefaultRouteD999B940": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "ImmivoVPCPublicSubnet1NATGateway302E4A39"
+    },
+    "RouteTableId": {
+     "Ref": "ImmivoVPCPrivateSubnet1RouteTable1CC356B3"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PrivateSubnet1/DefaultRoute"
+   }
+  },
+  "ImmivoVPCPrivateSubnet2Subnet7191D4D3": {
+   "Type": "AWS::EC2::Subnet",
+   "Properties": {
+    "AvailabilityZone": "eu-central-1b",
+    "CidrBlock": "10.0.3.0/24",
+    "MapPublicIpOnLaunch": false,
+    "Tags": [
+     {
+      "Key": "aws-cdk:subnet-name",
+      "Value": "Private"
+     },
+     {
+      "Key": "aws-cdk:subnet-type",
+      "Value": "Private"
+     },
+     {
+      "Key": "Name",
+      "Value": "Immivo-Prod/ImmivoVPC/PrivateSubnet2"
+     },
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "VpcId": {
+     "Ref": "ImmivoVPCB1C78292"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PrivateSubnet2/Subnet"
+   }
+  },
+  "ImmivoVPCPrivateSubnet2RouteTable537E4D6A": {
+   "Type": "AWS::EC2::RouteTable",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Immivo-Prod/ImmivoVPC/PrivateSubnet2"
+     },
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "VpcId": {
+     "Ref": "ImmivoVPCB1C78292"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PrivateSubnet2/RouteTable"
+   }
+  },
+  "ImmivoVPCPrivateSubnet2RouteTableAssociation1E67CE6F": {
+   "Type": "AWS::EC2::SubnetRouteTableAssociation",
+   "Properties": {
+    "RouteTableId": {
+     "Ref": "ImmivoVPCPrivateSubnet2RouteTable537E4D6A"
+    },
+    "SubnetId": {
+     "Ref": "ImmivoVPCPrivateSubnet2Subnet7191D4D3"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PrivateSubnet2/RouteTableAssociation"
+   }
+  },
+  "ImmivoVPCPrivateSubnet2DefaultRoute222B9F1A": {
+   "Type": "AWS::EC2::Route",
+   "Properties": {
+    "DestinationCidrBlock": "0.0.0.0/0",
+    "NatGatewayId": {
+     "Ref": "ImmivoVPCPublicSubnet1NATGateway302E4A39"
+    },
+    "RouteTableId": {
+     "Ref": "ImmivoVPCPrivateSubnet2RouteTable537E4D6A"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/PrivateSubnet2/DefaultRoute"
+   }
+  },
+  "ImmivoVPCIGWCE166DAC": {
+   "Type": "AWS::EC2::InternetGateway",
+   "Properties": {
+    "Tags": [
+     {
+      "Key": "Name",
+      "Value": "Immivo-Prod/ImmivoVPC"
+     },
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/IGW"
+   }
+  },
+  "ImmivoVPCVPCGWEDE407B3": {
+   "Type": "AWS::EC2::VPCGatewayAttachment",
+   "Properties": {
+    "InternetGatewayId": {
+     "Ref": "ImmivoVPCIGWCE166DAC"
+    },
+    "VpcId": {
+     "Ref": "ImmivoVPCB1C78292"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/VPCGW"
+   }
+  },
+  "ImmivoVPCRestrictDefaultSecurityGroupCustomResourceBCBA43EB": {
+   "Type": "Custom::VpcRestrictDefaultSG",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E",
+      "Arn"
+     ]
+    },
+    "DefaultSecurityGroupId": {
+     "Fn::GetAtt": [
+      "ImmivoVPCB1C78292",
+      "DefaultSecurityGroup"
+     ]
+    },
+    "Account": "463090596988"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoVPC/RestrictDefaultSecurityGroupCustomResource/Default"
+   }
+  },
+  "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Version": "2012-10-17",
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ]
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+     }
+    ],
+    "Policies": [
+     {
+      "PolicyName": "Inline",
+      "PolicyDocument": {
+       "Version": "2012-10-17",
+       "Statement": [
+        {
+         "Effect": "Allow",
+         "Action": [
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:AuthorizeSecurityGroupEgress",
+          "ec2:RevokeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupEgress"
+         ],
+         "Resource": [
+          {
+           "Fn::Join": [
+            "",
+            [
+             "arn:aws:ec2:eu-central-1:463090596988:security-group/",
+             {
+              "Fn::GetAtt": [
+               "ImmivoVPCB1C78292",
+               "DefaultSecurityGroup"
+              ]
+             }
+            ]
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/Custom::VpcRestrictDefaultSGCustomResourceProvider/Role"
+   }
+  },
+  "CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-463090596988-eu-central-1",
+     "S3Key": "7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200.zip"
+    },
+    "Timeout": 900,
+    "MemorySize": 128,
+    "Handler": "__entrypoint__.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs22.x",
+    "Description": "Lambda function for removing all inbound/outbound rules from the VPC default security group"
+   },
+   "DependsOn": [
+    "CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/Custom::VpcRestrictDefaultSGCustomResourceProvider/Handler",
+    "aws:asset:path": "asset.7fa1e366ee8a9ded01fc355f704cff92bfd179574e6f9cfee800a3541df1b200",
+    "aws:asset:property": "Code"
+   }
+  },
+  "DBSecretD58955BC": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "GenerateSecretString": {
+     "ExcludePunctuation": true,
+     "GenerateStringKey": "password",
+     "IncludeSpace": false,
+     "SecretStringTemplate": "{\"username\":\"postgres\"}"
+    },
+    "Name": "Immivo-DB-Secret-prod",
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/DBSecret/Resource"
+   }
+  },
+  "DBSecretAttachmentC565A14F": {
+   "Type": "AWS::SecretsManager::SecretTargetAttachment",
+   "Properties": {
+    "SecretId": {
+     "Ref": "DBSecretD58955BC"
+    },
+    "TargetId": {
+     "Ref": "AuroraCluster23D869C0"
+    },
+    "TargetType": "AWS::RDS::DBCluster"
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/DBSecret/Attachment/Resource"
+   }
+  },
+  "DBSecurityGroupE3B245A3": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Allow access to DB",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "255.255.255.255/32",
+      "Description": "Disallow all traffic",
+      "FromPort": 252,
+      "IpProtocol": "icmp",
+      "ToPort": 86
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "VpcId": {
+     "Ref": "ImmivoVPCB1C78292"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/DBSecurityGroup/Resource"
+   }
+  },
+  "DBSecurityGroupfromImmivoProdLambdaSecurityGroup4971252554321FB708A0": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "Allow Lambda (VPC) to reach DB",
+    "FromPort": 5432,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "DBSecurityGroupE3B245A3",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "LambdaSecurityGroup0BD9FC99",
+      "GroupId"
+     ]
+    },
+    "ToPort": 5432
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/DBSecurityGroup/from ImmivoProdLambdaSecurityGroup49712525:5432"
+   }
+  },
+  "LambdaSecurityGroup0BD9FC99": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Orchestrator Lambda - allows all outbound via NAT Gateway",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "VpcId": {
+     "Ref": "ImmivoVPCB1C78292"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/LambdaSecurityGroup/Resource"
+   }
+  },
+  "AuroraClusterSubnetsF3E9E6AD": {
+   "Type": "AWS::RDS::DBSubnetGroup",
+   "Properties": {
+    "DBSubnetGroupDescription": "Subnets for AuroraCluster database",
+    "SubnetIds": [
+     {
+      "Ref": "ImmivoVPCPrivateSubnet1Subnet5717415A"
+     },
+     {
+      "Ref": "ImmivoVPCPrivateSubnet2Subnet7191D4D3"
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/AuroraCluster/Subnets/Default"
+   }
+  },
+  "AuroraCluster23D869C0": {
+   "Type": "AWS::RDS::DBCluster",
+   "Properties": {
+    "CopyTagsToSnapshot": true,
+    "DBClusterParameterGroupName": "default.aurora-postgresql16",
+    "DBSubnetGroupName": {
+     "Ref": "AuroraClusterSubnetsF3E9E6AD"
+    },
+    "DatabaseName": "immivo",
+    "DeletionProtection": true,
+    "Engine": "aurora-postgresql",
+    "EngineVersion": "16.6",
+    "MasterUserPassword": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:secretsmanager:",
+       {
+        "Ref": "DBSecretD58955BC"
+       },
+       ":SecretString:password::}}"
+      ]
+     ]
+    },
+    "MasterUsername": {
+     "Fn::Join": [
+      "",
+      [
+       "{{resolve:secretsmanager:",
+       {
+        "Ref": "DBSecretD58955BC"
+       },
+       ":SecretString:username::}}"
+      ]
+     ]
+    },
+    "Port": 5432,
+    "ServerlessV2ScalingConfiguration": {
+     "MaxCapacity": 4,
+     "MinCapacity": 0.5
+    },
+    "StorageEncrypted": true,
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "VpcSecurityGroupIds": [
+     {
+      "Fn::GetAtt": [
+       "DBSecurityGroupE3B245A3",
+       "GroupId"
+      ]
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/AuroraCluster/Resource"
+   }
+  },
+  "AuroraClusterWriterAA1AB06C": {
+   "Type": "AWS::RDS::DBInstance",
+   "Properties": {
+    "DBClusterIdentifier": {
+     "Ref": "AuroraCluster23D869C0"
+    },
+    "DBInstanceClass": "db.serverless",
+    "Engine": "aurora-postgresql",
+    "PromotionTier": 0,
+    "PubliclyAccessible": false,
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "DependsOn": [
+    "ImmivoVPCPrivateSubnet1DefaultRouteD999B940",
+    "ImmivoVPCPrivateSubnet1RouteTableAssociation88F519B0",
+    "ImmivoVPCPrivateSubnet2DefaultRoute222B9F1A",
+    "ImmivoVPCPrivateSubnet2RouteTableAssociation1E67CE6F"
+   ],
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/AuroraCluster/Writer/Resource"
+   }
+  },
+  "CognitoEmailKmsKey6CC02FC5": {
+   "Type": "AWS::KMS::Key",
+   "Properties": {
+    "Description": "Immivo Cognito Email Sender KMS Key (prod)",
+    "EnableKeyRotation": true,
+    "KeyPolicy": {
+     "Statement": [
+      {
+       "Action": "kms:*",
+       "Effect": "Allow",
+       "Principal": {
+        "AWS": "arn:aws:iam::463090596988:root"
+       },
+       "Resource": "*"
+      },
+      {
+       "Action": [
+        "kms:CreateGrant",
+        "kms:Encrypt"
+       ],
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "cognito-idp.amazonaws.com"
+       },
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/CognitoEmailKmsKey/Resource"
+   }
+  },
+  "CognitoEmailKmsKeyAlias1CF22150": {
+   "Type": "AWS::KMS::Alias",
+   "Properties": {
+    "AliasName": "alias/immivo-cognito-email-prod",
+    "TargetKeyId": {
+     "Fn::GetAtt": [
+      "CognitoEmailKmsKey6CC02FC5",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/CognitoEmailKmsKey/Alias/Resource"
+   }
+  },
+  "CustomEmailSenderLambdaServiceRoleA213E962": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/CustomEmailSenderLambda/ServiceRole/Resource"
+   }
+  },
+  "CustomEmailSenderLambdaServiceRoleDefaultPolicy77D6D2A2": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "kms:Decrypt",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "CognitoEmailKmsKey6CC02FC5",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:GetSecretValue"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:secretsmanager:eu-central-1:463090596988:secret:Immivo-App-Secret-prod-??????"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "CustomEmailSenderLambdaServiceRoleDefaultPolicy77D6D2A2",
+    "Roles": [
+     {
+      "Ref": "CustomEmailSenderLambdaServiceRoleA213E962"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/CustomEmailSenderLambda/ServiceRole/DefaultPolicy/Resource"
+   }
+  },
+  "CustomEmailSenderLambdaA1C15DAA": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-463090596988-eu-central-1",
+     "S3Key": "618e00fc5df27b7edab44d5517b91ad2da8cba71dd93bfc27b6b02c4002050ec.zip"
+    },
+    "Environment": {
+     "Variables": {
+      "KEY_ARN": {
+       "Fn::GetAtt": [
+        "CognitoEmailKmsKey6CC02FC5",
+        "Arn"
+       ]
+      },
+      "APP_SECRET_ARN": "arn:aws:secretsmanager:eu-central-1:463090596988:secret:Immivo-App-Secret-prod"
+     }
+    },
+    "FunctionName": "Immivo-CustomEmailSender-prod",
+    "Handler": "index.handler",
+    "MemorySize": 256,
+    "Role": {
+     "Fn::GetAtt": [
+      "CustomEmailSenderLambdaServiceRoleA213E962",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs22.x",
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "Timeout": 30
+   },
+   "DependsOn": [
+    "CustomEmailSenderLambdaServiceRoleDefaultPolicy77D6D2A2",
+    "CustomEmailSenderLambdaServiceRoleA213E962"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/CustomEmailSenderLambda/Resource",
+    "aws:asset:path": "asset.618e00fc5df27b7edab44d5517b91ad2da8cba71dd93bfc27b6b02c4002050ec",
+    "aws:asset:is-bundled": true,
+    "aws:asset:property": "Code"
+   }
+  },
+  "CustomEmailSenderLambdaLogGroup86A507A2": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "CustomEmailSenderLambdaA1C15DAA"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 731,
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/CustomEmailSenderLambda/LogGroup/Resource"
+   }
+  },
+  "ImmivoUserPoolCustomEmailSenderCognito0BACD330": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "CustomEmailSenderLambdaA1C15DAA",
+      "Arn"
+     ]
+    },
+    "Principal": "cognito-idp.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "ImmivoUserPool48AD5837",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoUserPool/CustomEmailSenderCognito"
+   }
+  },
+  "ImmivoUserPool48AD5837": {
+   "Type": "AWS::Cognito::UserPool",
+   "Properties": {
+    "AccountRecoverySetting": {
+     "RecoveryMechanisms": [
+      {
+       "Name": "verified_email",
+       "Priority": 1
+      }
+     ]
+    },
+    "AdminCreateUserConfig": {
+     "AllowAdminCreateUserOnly": false
+    },
+    "AutoVerifiedAttributes": [
+     "email"
+    ],
+    "EmailVerificationMessage": "The verification code to your new account is {####}",
+    "EmailVerificationSubject": "Verify your new account",
+    "LambdaConfig": {
+     "CustomEmailSender": {
+      "LambdaArn": {
+       "Fn::GetAtt": [
+        "CustomEmailSenderLambdaA1C15DAA",
+        "Arn"
+       ]
+      },
+      "LambdaVersion": "V1_0"
+     },
+     "KMSKeyID": {
+      "Fn::GetAtt": [
+       "CognitoEmailKmsKey6CC02FC5",
+       "Arn"
+      ]
+     }
+    },
+    "Policies": {
+     "PasswordPolicy": {
+      "MinimumLength": 8,
+      "RequireLowercase": true,
+      "RequireNumbers": true,
+      "RequireUppercase": true
+     }
+    },
+    "Schema": [
+     {
+      "Mutable": true,
+      "Name": "given_name",
+      "Required": true
+     },
+     {
+      "Mutable": true,
+      "Name": "family_name",
+      "Required": true
+     },
+     {
+      "Mutable": true,
+      "Name": "phone_number",
+      "Required": false
+     },
+     {
+      "Mutable": true,
+      "Name": "address",
+      "Required": false
+     },
+     {
+      "AttributeDataType": "String",
+      "Mutable": true,
+      "Name": "company_name"
+     },
+     {
+      "AttributeDataType": "String",
+      "Mutable": true,
+      "Name": "postal_code"
+     },
+     {
+      "AttributeDataType": "String",
+      "Mutable": true,
+      "Name": "city"
+     },
+     {
+      "AttributeDataType": "String",
+      "Mutable": true,
+      "Name": "country"
+     }
+    ],
+    "SmsVerificationMessage": "The verification code to your new account is {####}",
+    "UserPoolName": "Immivo-Users-prod",
+    "UserPoolTags": {
+     "Project": "Immivo",
+     "Stage": "prod"
+    },
+    "UsernameAttributes": [
+     "email"
+    ],
+    "VerificationMessageTemplate": {
+     "DefaultEmailOption": "CONFIRM_WITH_CODE",
+     "EmailMessage": "The verification code to your new account is {####}",
+     "EmailSubject": "Verify your new account",
+     "SmsMessage": "The verification code to your new account is {####}"
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoUserPool/Resource"
+   }
+  },
+  "ImmivoUserPoolImmivoClient41F7052B": {
+   "Type": "AWS::Cognito::UserPoolClient",
+   "Properties": {
+    "AllowedOAuthFlows": [
+     "implicit",
+     "code"
+    ],
+    "AllowedOAuthFlowsUserPoolClient": true,
+    "AllowedOAuthScopes": [
+     "profile",
+     "phone",
+     "email",
+     "openid",
+     "aws.cognito.signin.user.admin"
+    ],
+    "CallbackURLs": [
+     "https://example.com"
+    ],
+    "ClientName": "Immivo-Client-prod",
+    "ExplicitAuthFlows": [
+     "ALLOW_USER_SRP_AUTH",
+     "ALLOW_REFRESH_TOKEN_AUTH"
+    ],
+    "GenerateSecret": false,
+    "SupportedIdentityProviders": [
+     "COGNITO"
+    ],
+    "UserPoolId": {
+     "Ref": "ImmivoUserPool48AD5837"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoUserPool/ImmivoClient/Resource"
+   }
+  },
+  "ImmivoAdminUserPoolCustomEmailSenderCognito1130A1B0": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "CustomEmailSenderLambdaA1C15DAA",
+      "Arn"
+     ]
+    },
+    "Principal": "cognito-idp.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "ImmivoAdminUserPool1121EFDE",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoAdminUserPool/CustomEmailSenderCognito"
+   }
+  },
+  "ImmivoAdminUserPool1121EFDE": {
+   "Type": "AWS::Cognito::UserPool",
+   "Properties": {
+    "AccountRecoverySetting": {
+     "RecoveryMechanisms": [
+      {
+       "Name": "verified_email",
+       "Priority": 1
+      }
+     ]
+    },
+    "AdminCreateUserConfig": {
+     "AllowAdminCreateUserOnly": true
+    },
+    "AutoVerifiedAttributes": [
+     "email"
+    ],
+    "EmailVerificationMessage": "The verification code to your new account is {####}",
+    "EmailVerificationSubject": "Verify your new account",
+    "LambdaConfig": {
+     "CustomEmailSender": {
+      "LambdaArn": {
+       "Fn::GetAtt": [
+        "CustomEmailSenderLambdaA1C15DAA",
+        "Arn"
+       ]
+      },
+      "LambdaVersion": "V1_0"
+     },
+     "KMSKeyID": {
+      "Fn::GetAtt": [
+       "CognitoEmailKmsKey6CC02FC5",
+       "Arn"
+      ]
+     }
+    },
+    "Policies": {
+     "PasswordPolicy": {
+      "MinimumLength": 12,
+      "RequireLowercase": true,
+      "RequireNumbers": true,
+      "RequireSymbols": true,
+      "RequireUppercase": true
+     }
+    },
+    "Schema": [
+     {
+      "Mutable": true,
+      "Name": "given_name",
+      "Required": true
+     },
+     {
+      "Mutable": true,
+      "Name": "family_name",
+      "Required": true
+     }
+    ],
+    "SmsVerificationMessage": "The verification code to your new account is {####}",
+    "UserPoolName": "Immivo-Admins-prod",
+    "UserPoolTags": {
+     "Project": "Immivo",
+     "Stage": "prod"
+    },
+    "UsernameAttributes": [
+     "email"
+    ],
+    "VerificationMessageTemplate": {
+     "DefaultEmailOption": "CONFIRM_WITH_CODE",
+     "EmailMessage": "The verification code to your new account is {####}",
+     "EmailSubject": "Verify your new account",
+     "SmsMessage": "The verification code to your new account is {####}"
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoAdminUserPool/Resource"
+   }
+  },
+  "ImmivoAdminUserPoolImmivoAdminClientC11B7155": {
+   "Type": "AWS::Cognito::UserPoolClient",
+   "Properties": {
+    "AllowedOAuthFlows": [
+     "implicit",
+     "code"
+    ],
+    "AllowedOAuthFlowsUserPoolClient": true,
+    "AllowedOAuthScopes": [
+     "profile",
+     "phone",
+     "email",
+     "openid",
+     "aws.cognito.signin.user.admin"
+    ],
+    "CallbackURLs": [
+     "https://example.com"
+    ],
+    "ClientName": "Immivo-Admin-Client-prod",
+    "ExplicitAuthFlows": [
+     "ALLOW_ADMIN_USER_PASSWORD_AUTH",
+     "ALLOW_USER_SRP_AUTH",
+     "ALLOW_REFRESH_TOKEN_AUTH"
+    ],
+    "GenerateSecret": false,
+    "SupportedIdentityProviders": [
+     "COGNITO"
+    ],
+    "UserPoolId": {
+     "Ref": "ImmivoAdminUserPool1121EFDE"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoAdminUserPool/ImmivoAdminClient/Resource"
+   }
+  },
+  "OrchestratorLambdaServiceRole403C7880": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     },
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "DependsOn": [
+    "ImmivoVPCPrivateSubnet1DefaultRouteD999B940",
+    "ImmivoVPCPrivateSubnet1RouteTableAssociation88F519B0",
+    "ImmivoVPCPrivateSubnet2DefaultRoute222B9F1A",
+    "ImmivoVPCPrivateSubnet2RouteTableAssociation1E67CE6F"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorLambda/ServiceRole/Resource"
+   }
+  },
+  "OrchestratorLambdaServiceRoleDefaultPolicy32C2103A": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:Abort*",
+        "s3:DeleteObject*",
+        "s3:GetBucket*",
+        "s3:GetObject*",
+        "s3:List*",
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "MediaBucketBCBB02BA",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "MediaBucketBCBB02BA",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:GetSecretValue"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:secretsmanager:eu-central-1:463090596988:secret:Immivo-App-Secret-prod-??????",
+        {
+         "Ref": "DBSecretD58955BC"
+        }
+       ]
+      },
+      {
+       "Action": [
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminDeleteUser",
+        "cognito-idp:AdminGetUser",
+        "cognito-idp:AdminSetUserPassword",
+        "cognito-idp:AdminUpdateUserAttributes",
+        "cognito-idp:ListUsers"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "ImmivoAdminUserPool1121EFDE",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::GetAtt": [
+          "ImmivoUserPool48AD5837",
+          "Arn"
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "ce:GetCostAndUsage",
+        "ce:GetCostForecast",
+        "ce:GetDimensionValues"
+       ],
+       "Effect": "Allow",
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "OrchestratorLambdaServiceRoleDefaultPolicy32C2103A",
+    "Roles": [
+     {
+      "Ref": "OrchestratorLambdaServiceRole403C7880"
+     }
+    ]
+   },
+   "DependsOn": [
+    "ImmivoVPCPrivateSubnet1DefaultRouteD999B940",
+    "ImmivoVPCPrivateSubnet1RouteTableAssociation88F519B0",
+    "ImmivoVPCPrivateSubnet2DefaultRoute222B9F1A",
+    "ImmivoVPCPrivateSubnet2RouteTableAssociation1E67CE6F"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorLambda/ServiceRole/DefaultPolicy/Resource"
+   }
+  },
+  "OrchestratorLambdaA7A0AD32": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-463090596988-eu-central-1",
+     "S3Key": "a1c4457a6e947fde5b64310ee5ecab001785864e1725f2414a4dcb88b1f724d8.zip"
+    },
+    "Environment": {
+     "Variables": {
+      "STAGE": "prod",
+      "DB_SECRET_ARN": {
+       "Ref": "DBSecretD58955BC"
+      },
+      "DB_ENDPOINT": {
+       "Fn::GetAtt": [
+        "AuroraCluster23D869C0",
+        "Endpoint.Address"
+       ]
+      },
+      "USER_POOL_ID": {
+       "Ref": "ImmivoUserPool48AD5837"
+      },
+      "CLIENT_ID": {
+       "Ref": "ImmivoUserPoolImmivoClient41F7052B"
+      },
+      "ADMIN_USER_POOL_ID": {
+       "Ref": "ImmivoAdminUserPool1121EFDE"
+      },
+      "ADMIN_CLIENT_ID": {
+       "Ref": "ImmivoAdminUserPoolImmivoAdminClientC11B7155"
+      },
+      "APP_SECRET_ARN": "arn:aws:secretsmanager:eu-central-1:463090596988:secret:Immivo-App-Secret-prod",
+      "BILLING_ENABLED": "false",
+      "DEPLOY_TS": "2026-02-25T14:53:21.933Z",
+      "MEDIA_BUCKET_NAME": {
+       "Ref": "MediaBucketBCBB02BA"
+      },
+      "MEDIA_CDN_URL": "https://media.immivo.ai"
+     }
+    },
+    "Handler": "index.handler",
+    "MemorySize": 1024,
+    "Role": {
+     "Fn::GetAtt": [
+      "OrchestratorLambdaServiceRole403C7880",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs22.x",
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "Timeout": 120,
+    "VpcConfig": {
+     "SecurityGroupIds": [
+      {
+       "Fn::GetAtt": [
+        "LambdaSecurityGroup0BD9FC99",
+        "GroupId"
+       ]
+      }
+     ],
+     "SubnetIds": [
+      {
+       "Ref": "ImmivoVPCPrivateSubnet1Subnet5717415A"
+      },
+      {
+       "Ref": "ImmivoVPCPrivateSubnet2Subnet7191D4D3"
+      }
+     ]
+    }
+   },
+   "DependsOn": [
+    "ImmivoVPCPrivateSubnet1DefaultRouteD999B940",
+    "ImmivoVPCPrivateSubnet1RouteTableAssociation88F519B0",
+    "ImmivoVPCPrivateSubnet2DefaultRoute222B9F1A",
+    "ImmivoVPCPrivateSubnet2RouteTableAssociation1E67CE6F",
+    "OrchestratorLambdaServiceRoleDefaultPolicy32C2103A",
+    "OrchestratorLambdaServiceRole403C7880"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorLambda/Resource",
+    "aws:asset:path": "asset.a1c4457a6e947fde5b64310ee5ecab001785864e1725f2414a4dcb88b1f724d8",
+    "aws:asset:is-bundled": true,
+    "aws:asset:property": "Code"
+   }
+  },
+  "OrchestratorLambdaLogGroup0594DD42": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "OrchestratorLambdaA7A0AD32"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 731,
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "DependsOn": [
+    "ImmivoVPCPrivateSubnet1DefaultRouteD999B940",
+    "ImmivoVPCPrivateSubnet1RouteTableAssociation88F519B0",
+    "ImmivoVPCPrivateSubnet2DefaultRoute222B9F1A",
+    "ImmivoVPCPrivateSubnet2RouteTableAssociation1E67CE6F"
+   ],
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorLambda/LogGroup/Resource"
+   }
+  },
+  "OrchestratorLambdaFunctionUrl11B98229": {
+   "Type": "AWS::Lambda::Url",
+   "Properties": {
+    "AuthType": "NONE",
+    "InvokeMode": "BUFFERED",
+    "TargetFunctionArn": {
+     "Fn::GetAtt": [
+      "OrchestratorLambdaA7A0AD32",
+      "Arn"
+     ]
+    }
+   },
+   "DependsOn": [
+    "ImmivoVPCPrivateSubnet1DefaultRouteD999B940",
+    "ImmivoVPCPrivateSubnet1RouteTableAssociation88F519B0",
+    "ImmivoVPCPrivateSubnet2DefaultRoute222B9F1A",
+    "ImmivoVPCPrivateSubnet2RouteTableAssociation1E67CE6F"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorLambda/FunctionUrl/Resource"
+   }
+  },
+  "OrchestratorLambdainvokefunctionurl21E31014": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunctionUrl",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "OrchestratorLambdaA7A0AD32",
+      "Arn"
+     ]
+    },
+    "FunctionUrlAuthType": "NONE",
+    "Principal": "*"
+   },
+   "DependsOn": [
+    "ImmivoVPCPrivateSubnet1DefaultRouteD999B940",
+    "ImmivoVPCPrivateSubnet1RouteTableAssociation88F519B0",
+    "ImmivoVPCPrivateSubnet2DefaultRoute222B9F1A",
+    "ImmivoVPCPrivateSubnet2RouteTableAssociation1E67CE6F"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorLambda/invoke-function-url"
+   }
+  },
+  "OrchestratorLambdainvokefunction504B79DD": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "OrchestratorLambdaA7A0AD32",
+      "Arn"
+     ]
+    },
+    "InvokedViaFunctionUrl": true,
+    "Principal": "*"
+   },
+   "DependsOn": [
+    "ImmivoVPCPrivateSubnet1DefaultRouteD999B940",
+    "ImmivoVPCPrivateSubnet1RouteTableAssociation88F519B0",
+    "ImmivoVPCPrivateSubnet2DefaultRoute222B9F1A",
+    "ImmivoVPCPrivateSubnet2RouteTableAssociation1E67CE6F"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorLambda/invoke-function"
+   }
+  },
+  "MediaBucketBCBB02BA": {
+   "Type": "AWS::S3::Bucket",
+   "Properties": {
+    "BucketEncryption": {
+     "ServerSideEncryptionConfiguration": [
+      {
+       "ServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "AES256"
+       }
+      }
+     ]
+    },
+    "CorsConfiguration": {
+     "CorsRules": [
+      {
+       "AllowedHeaders": [
+        "*"
+       ],
+       "AllowedMethods": [
+        "GET",
+        "HEAD"
+       ],
+       "AllowedOrigins": [
+        "https://test.immivo.ai",
+        "https://app.immivo.ai",
+        "https://immivo.ai",
+        "https://www.immivo.ai",
+        "https://admin.immivo.ai"
+       ],
+       "ExposedHeaders": [
+        "Content-Length",
+        "Content-Type",
+        "ETag"
+       ],
+       "MaxAge": 3600
+      }
+     ]
+    },
+    "PublicAccessBlockConfiguration": {
+     "BlockPublicAcls": true,
+     "BlockPublicPolicy": true,
+     "IgnorePublicAcls": true,
+     "RestrictPublicBuckets": true
+    },
+    "Tags": [
+     {
+      "Key": "aws-cdk:cr-owned:public/:19c62b89",
+      "Value": "true"
+     },
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "VersioningConfiguration": {
+     "Status": "Enabled"
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/MediaBucket/Resource"
+   }
+  },
+  "MediaBucketPolicy68C27F6B": {
+   "Type": "AWS::S3::BucketPolicy",
+   "Properties": {
+    "Bucket": {
+     "Ref": "MediaBucketBCBB02BA"
+    },
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "s3:*",
+       "Condition": {
+        "Bool": {
+         "aws:SecureTransport": "false"
+        }
+       },
+       "Effect": "Deny",
+       "Principal": {
+        "AWS": "*"
+       },
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "MediaBucketBCBB02BA",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "MediaBucketBCBB02BA",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "s3:GetObject",
+       "Condition": {
+        "StringEquals": {
+         "AWS:SourceArn": {
+          "Fn::Join": [
+           "",
+           [
+            "arn:",
+            {
+             "Ref": "AWS::Partition"
+            },
+            ":cloudfront::",
+            {
+             "Ref": "AWS::AccountId"
+            },
+            ":distribution/",
+            {
+             "Ref": "MediaCDN30A5345E"
+            }
+           ]
+          ]
+         }
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "cloudfront.amazonaws.com"
+       },
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::GetAtt": [
+            "MediaBucketBCBB02BA",
+            "Arn"
+           ]
+          },
+          "/*"
+         ]
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/MediaBucket/Policy/Resource"
+   }
+  },
+  "OrchestratorApiFA05180E": {
+   "Type": "AWS::ApiGateway::RestApi",
+   "Properties": {
+    "BinaryMediaTypes": [
+     "multipart/form-data",
+     "image/*",
+     "application/octet-stream"
+    ],
+    "Name": "OrchestratorApi",
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorApi/Resource"
+   }
+  },
+  "OrchestratorApiDeploymentD878F32Eb4ddc79adff3504e98e0b8121df783f2": {
+   "Type": "AWS::ApiGateway::Deployment",
+   "Properties": {
+    "Description": "Automatically created by the RestApi construct",
+    "RestApiId": {
+     "Ref": "OrchestratorApiFA05180E"
+    }
+   },
+   "DependsOn": [
+    "OrchestratorApiproxyANY03FB7B53",
+    "OrchestratorApiproxyOPTIONS0E0C159E",
+    "OrchestratorApiproxy426E8F4E",
+    "OrchestratorApiANY0AC930C1",
+    "OrchestratorApiOPTIONS124BD440",
+    "OrchestratorApiDefault4XX21F3CEDD",
+    "OrchestratorApiDefault5XX926F0626"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorApi/Deployment/Resource",
+    "aws:cdk:do-not-refactor": true
+   }
+  },
+  "OrchestratorApiDeploymentStageprod82FCF960": {
+   "Type": "AWS::ApiGateway::Stage",
+   "Properties": {
+    "DeploymentId": {
+     "Ref": "OrchestratorApiDeploymentD878F32Eb4ddc79adff3504e98e0b8121df783f2"
+    },
+    "RestApiId": {
+     "Ref": "OrchestratorApiFA05180E"
+    },
+    "StageName": "prod",
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorApi/DeploymentStage.prod/Resource"
+   }
+  },
+  "OrchestratorApiOPTIONS124BD440": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Admin-Secret'",
+        "method.response.header.Access-Control-Allow-Origin": "'https://test.immivo.ai'",
+        "method.response.header.Vary": "'Origin'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "ResponseTemplates": {
+        "application/json": "#set($origin = $input.params().header.get(\"Origin\"))\n#if($origin == \"\")\n  #set($origin = $input.params().header.get(\"origin\"))\n#end\n#if($origin == \"https://app.immivo.ai\" || $origin == \"https://immivo.ai\" || $origin == \"https://www.immivo.ai\" || $origin == \"https://admin.immivo.ai\")\n  #set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)\n#end"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Vary": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Fn::GetAtt": [
+      "OrchestratorApiFA05180E",
+      "RootResourceId"
+     ]
+    },
+    "RestApiId": {
+     "Ref": "OrchestratorApiFA05180E"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorApi/Default/OPTIONS/Resource"
+   }
+  },
+  "OrchestratorApiproxy426E8F4E": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Fn::GetAtt": [
+      "OrchestratorApiFA05180E",
+      "RootResourceId"
+     ]
+    },
+    "PathPart": "{proxy+}",
+    "RestApiId": {
+     "Ref": "OrchestratorApiFA05180E"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorApi/Default/{proxy+}/Resource"
+   }
+  },
+  "OrchestratorApiproxyOPTIONS0E0C159E": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Admin-Secret'",
+        "method.response.header.Access-Control-Allow-Origin": "'https://test.immivo.ai'",
+        "method.response.header.Vary": "'Origin'",
+        "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET,PUT,POST,DELETE,PATCH,HEAD'"
+       },
+       "ResponseTemplates": {
+        "application/json": "#set($origin = $input.params().header.get(\"Origin\"))\n#if($origin == \"\")\n  #set($origin = $input.params().header.get(\"origin\"))\n#end\n#if($origin == \"https://app.immivo.ai\" || $origin == \"https://immivo.ai\" || $origin == \"https://www.immivo.ai\" || $origin == \"https://admin.immivo.ai\")\n  #set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)\n#end"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Vary": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "OrchestratorApiproxy426E8F4E"
+    },
+    "RestApiId": {
+     "Ref": "OrchestratorApiFA05180E"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorApi/Default/{proxy+}/OPTIONS/Resource"
+   }
+  },
+  "OrchestratorApiproxyANYApiPermissionImmivoProdOrchestratorApiEF8DA01CANYproxy13AD54CC": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "OrchestratorLambdaA7A0AD32",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:aws:execute-api:eu-central-1:463090596988:",
+       {
+        "Ref": "OrchestratorApiFA05180E"
+       },
+       "/",
+       {
+        "Ref": "OrchestratorApiDeploymentStageprod82FCF960"
+       },
+       "/*/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorApi/Default/{proxy+}/ANY/ApiPermission.ImmivoProdOrchestratorApiEF8DA01C.ANY..{proxy+}"
+   }
+  },
+  "OrchestratorApiproxyANYApiPermissionTestImmivoProdOrchestratorApiEF8DA01CANYproxy4E1CA368": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "OrchestratorLambdaA7A0AD32",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:aws:execute-api:eu-central-1:463090596988:",
+       {
+        "Ref": "OrchestratorApiFA05180E"
+       },
+       "/test-invoke-stage/*/*"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorApi/Default/{proxy+}/ANY/ApiPermission.Test.ImmivoProdOrchestratorApiEF8DA01C.ANY..{proxy+}"
+   }
+  },
+  "OrchestratorApiproxyANY03FB7B53": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "ANY",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:aws:apigateway:eu-central-1:lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "OrchestratorLambdaA7A0AD32",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "OrchestratorApiproxy426E8F4E"
+    },
+    "RestApiId": {
+     "Ref": "OrchestratorApiFA05180E"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorApi/Default/{proxy+}/ANY/Resource"
+   }
+  },
+  "OrchestratorApiANYApiPermissionImmivoProdOrchestratorApiEF8DA01CANY0C2D2909": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "OrchestratorLambdaA7A0AD32",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:aws:execute-api:eu-central-1:463090596988:",
+       {
+        "Ref": "OrchestratorApiFA05180E"
+       },
+       "/",
+       {
+        "Ref": "OrchestratorApiDeploymentStageprod82FCF960"
+       },
+       "/*/"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorApi/Default/ANY/ApiPermission.ImmivoProdOrchestratorApiEF8DA01C.ANY.."
+   }
+  },
+  "OrchestratorApiANYApiPermissionTestImmivoProdOrchestratorApiEF8DA01CANY029543B4": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "OrchestratorLambdaA7A0AD32",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:aws:execute-api:eu-central-1:463090596988:",
+       {
+        "Ref": "OrchestratorApiFA05180E"
+       },
+       "/test-invoke-stage/*/"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorApi/Default/ANY/ApiPermission.Test.ImmivoProdOrchestratorApiEF8DA01C.ANY.."
+   }
+  },
+  "OrchestratorApiANY0AC930C1": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "ANY",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:aws:apigateway:eu-central-1:lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "OrchestratorLambdaA7A0AD32",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Fn::GetAtt": [
+      "OrchestratorApiFA05180E",
+      "RootResourceId"
+     ]
+    },
+    "RestApiId": {
+     "Ref": "OrchestratorApiFA05180E"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorApi/Default/ANY/Resource"
+   }
+  },
+  "OrchestratorApiDefault4XX21F3CEDD": {
+   "Type": "AWS::ApiGateway::GatewayResponse",
+   "Properties": {
+    "ResponseParameters": {
+     "gatewayresponse.header.Access-Control-Allow-Origin": "'https://app.immivo.ai'",
+     "gatewayresponse.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Admin-Secret'",
+     "gatewayresponse.header.Access-Control-Allow-Methods": "'GET,POST,PUT,DELETE,PATCH,OPTIONS'"
+    },
+    "ResponseType": "DEFAULT_4XX",
+    "RestApiId": {
+     "Ref": "OrchestratorApiFA05180E"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorApi/Default4XX/Resource"
+   }
+  },
+  "OrchestratorApiDefault5XX926F0626": {
+   "Type": "AWS::ApiGateway::GatewayResponse",
+   "Properties": {
+    "ResponseParameters": {
+     "gatewayresponse.header.Access-Control-Allow-Origin": "'https://app.immivo.ai'",
+     "gatewayresponse.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Admin-Secret'",
+     "gatewayresponse.header.Access-Control-Allow-Methods": "'GET,POST,PUT,DELETE,PATCH,OPTIONS'"
+    },
+    "ResponseType": "DEFAULT_5XX",
+    "RestApiId": {
+     "Ref": "OrchestratorApiFA05180E"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/OrchestratorApi/Default5XX/Resource"
+   }
+  },
+  "EmailIngestBucketD823E4FB": {
+   "Type": "AWS::S3::Bucket",
+   "Properties": {
+    "BucketEncryption": {
+     "ServerSideEncryptionConfiguration": [
+      {
+       "ServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "AES256"
+       }
+      }
+     ]
+    },
+    "LifecycleConfiguration": {
+     "Rules": [
+      {
+       "ExpirationInDays": 7,
+       "Status": "Enabled"
+      }
+     ]
+    },
+    "PublicAccessBlockConfiguration": {
+     "BlockPublicAcls": true,
+     "BlockPublicPolicy": true,
+     "IgnorePublicAcls": true,
+     "RestrictPublicBuckets": true
+    },
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/EmailIngestBucket/Resource"
+   }
+  },
+  "EmailIngestBucketPolicyB4E9DD11": {
+   "Type": "AWS::S3::BucketPolicy",
+   "Properties": {
+    "Bucket": {
+     "Ref": "EmailIngestBucketD823E4FB"
+    },
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "s3:*",
+       "Condition": {
+        "Bool": {
+         "aws:SecureTransport": "false"
+        }
+       },
+       "Effect": "Deny",
+       "Principal": {
+        "AWS": "*"
+       },
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "EmailIngestBucketD823E4FB",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "EmailIngestBucketD823E4FB",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/EmailIngestBucket/Policy/Resource"
+   }
+  },
+  "EmailIngestBucketNotifications8283E1F9": {
+   "Type": "Custom::S3BucketNotifications",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "BucketNotificationsHandler050a0587b7544547bf325f094a3db8347ECC3691",
+      "Arn"
+     ]
+    },
+    "BucketName": {
+     "Ref": "EmailIngestBucketD823E4FB"
+    },
+    "NotificationConfiguration": {
+     "LambdaFunctionConfigurations": [
+      {
+       "Events": [
+        "s3:ObjectCreated:*"
+       ],
+       "LambdaFunctionArn": {
+        "Fn::GetAtt": [
+         "EmailProcessor218EC076",
+         "Arn"
+        ]
+       }
+      }
+     ]
+    },
+    "Managed": true,
+    "SkipDestinationValidation": false
+   },
+   "DependsOn": [
+    "EmailIngestBucketAllowBucketNotificationsToImmivoProdEmailProcessor68CB3E02EED2E805",
+    "EmailIngestBucketPolicyB4E9DD11"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/EmailIngestBucket/Notifications/Resource"
+   }
+  },
+  "EmailIngestBucketAllowBucketNotificationsToImmivoProdEmailProcessor68CB3E02EED2E805": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "EmailProcessor218EC076",
+      "Arn"
+     ]
+    },
+    "Principal": "s3.amazonaws.com",
+    "SourceAccount": "463090596988",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "EmailIngestBucketD823E4FB",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/EmailIngestBucket/AllowBucketNotificationsToImmivoProdEmailProcessor68CB3E02"
+   }
+  },
+  "EmailProcessorServiceRole637381CE": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/EmailProcessor/ServiceRole/Resource"
+   }
+  },
+  "EmailProcessorServiceRoleDefaultPolicy0B15DAB8": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:GetBucket*",
+        "s3:GetObject*",
+        "s3:List*"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "EmailIngestBucketD823E4FB",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "EmailIngestBucketD823E4FB",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": [
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:GetSecretValue"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:secretsmanager:eu-central-1:463090596988:secret:Immivo-App-Secret-prod-??????",
+        {
+         "Ref": "DBSecretD58955BC"
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "EmailProcessorServiceRoleDefaultPolicy0B15DAB8",
+    "Roles": [
+     {
+      "Ref": "EmailProcessorServiceRole637381CE"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/EmailProcessor/ServiceRole/DefaultPolicy/Resource"
+   }
+  },
+  "EmailProcessor218EC076": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-463090596988-eu-central-1",
+     "S3Key": "e43faa84e807b82a1b6ab4c0369726145445dec663b40a48de4b82bc1b38488a.zip"
+    },
+    "Environment": {
+     "Variables": {
+      "STAGE": "prod",
+      "DB_SECRET_ARN": {
+       "Ref": "DBSecretD58955BC"
+      },
+      "DB_ENDPOINT": {
+       "Fn::GetAtt": [
+        "AuroraCluster23D869C0",
+        "Endpoint.Address"
+       ]
+      },
+      "ORCHESTRATOR_API_URL": {
+       "Fn::Join": [
+        "",
+        [
+         "https://",
+         {
+          "Ref": "OrchestratorApiFA05180E"
+         },
+         ".execute-api.eu-central-1.",
+         {
+          "Ref": "AWS::URLSuffix"
+         },
+         "/",
+         {
+          "Ref": "OrchestratorApiDeploymentStageprod82FCF960"
+         },
+         "/"
+        ]
+       ]
+      },
+      "APP_SECRET_ARN": "arn:aws:secretsmanager:eu-central-1:463090596988:secret:Immivo-App-Secret-prod"
+     }
+    },
+    "Handler": "index.handler",
+    "MemorySize": 512,
+    "Role": {
+     "Fn::GetAtt": [
+      "EmailProcessorServiceRole637381CE",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs22.x",
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "Timeout": 60
+   },
+   "DependsOn": [
+    "EmailProcessorServiceRoleDefaultPolicy0B15DAB8",
+    "EmailProcessorServiceRole637381CE"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/EmailProcessor/Resource",
+    "aws:asset:path": "asset.e43faa84e807b82a1b6ab4c0369726145445dec663b40a48de4b82bc1b38488a",
+    "aws:asset:is-bundled": true,
+    "aws:asset:property": "Code"
+   }
+  },
+  "EmailProcessorLogGroup29EAFE92": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "EmailProcessor218EC076"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 731,
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/EmailProcessor/LogGroup/Resource"
+   }
+  },
+  "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleB6FB88EC": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/BucketNotificationsHandler050a0587b7544547bf325f094a3db834/Role/Resource"
+   }
+  },
+  "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleDefaultPolicy2CF63D36": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "s3:PutBucketNotification",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "EmailIngestBucketD823E4FB",
+         "Arn"
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleDefaultPolicy2CF63D36",
+    "Roles": [
+     {
+      "Ref": "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleB6FB88EC"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/BucketNotificationsHandler050a0587b7544547bf325f094a3db834/Role/DefaultPolicy/Resource"
+   }
+  },
+  "BucketNotificationsHandler050a0587b7544547bf325f094a3db8347ECC3691": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Description": "AWS CloudFormation handler for \"Custom::S3BucketNotifications\" resources (@aws-cdk/aws-s3)",
+    "Code": {
+     "ZipFile": "import boto3  # type: ignore\nimport json\nimport logging\nimport urllib.request\n\ns3 = boto3.client(\"s3\")\n\nEVENTBRIDGE_CONFIGURATION = 'EventBridgeConfiguration'\nCONFIGURATION_TYPES = [\"TopicConfigurations\", \"QueueConfigurations\", \"LambdaFunctionConfigurations\"]\n\ndef handler(event: dict, context):\n  response_status = \"SUCCESS\"\n  error_message = \"\"\n  try:\n    props = event[\"ResourceProperties\"]\n    notification_configuration = props[\"NotificationConfiguration\"]\n    managed = props.get('Managed', 'true').lower() == 'true'\n    skipDestinationValidation = props.get('SkipDestinationValidation', 'false').lower() == 'true'\n    stack_id = event['StackId']\n    old = event.get(\"OldResourceProperties\", {}).get(\"NotificationConfiguration\", {})\n    if managed:\n      config = handle_managed(event[\"RequestType\"], notification_configuration)\n    else:\n      config = handle_unmanaged(props[\"BucketName\"], stack_id, event[\"RequestType\"], notification_configuration, old)\n    s3.put_bucket_notification_configuration(Bucket=props[\"BucketName\"], NotificationConfiguration=config, SkipDestinationValidation=skipDestinationValidation)\n  except Exception as e:\n    logging.exception(\"Failed to put bucket notification configuration\")\n    response_status = \"FAILED\"\n    error_message = f\"Error: {str(e)}. \"\n  finally:\n    submit_response(event, context, response_status, error_message)\n\ndef handle_managed(request_type, notification_configuration):\n  if request_type == 'Delete':\n    return {}\n  return notification_configuration\n\ndef handle_unmanaged(bucket, stack_id, request_type, notification_configuration, old):\n  def get_id(n):\n    n['Id'] = ''\n    sorted_notifications = sort_filter_rules(n)\n    strToHash=json.dumps(sorted_notifications, sort_keys=True).replace('\"Name\": \"prefix\"', '\"Name\": \"Prefix\"').replace('\"Name\": \"suffix\"', '\"Name\": \"Suffix\"')\n    return f\"{stack_id}-{hash(strToHash)}\"\n  def with_id(n):\n    n['Id'] = get_id(n)\n    return n\n\n  external_notifications = {}\n  existing_notifications = s3.get_bucket_notification_configuration(Bucket=bucket)\n  for t in CONFIGURATION_TYPES:\n    if request_type == 'Update':\n        old_incoming_ids = [get_id(n) for n in old.get(t, [])]\n        external_notifications[t] = [n for n in existing_notifications.get(t, []) if not get_id(n) in old_incoming_ids]      \n    elif request_type == 'Delete':\n        external_notifications[t] = [n for n in existing_notifications.get(t, []) if not n['Id'].startswith(f\"{stack_id}-\")]\n    elif request_type == 'Create':\n        external_notifications[t] = [n for n in existing_notifications.get(t, [])]\n  if EVENTBRIDGE_CONFIGURATION in existing_notifications:\n    external_notifications[EVENTBRIDGE_CONFIGURATION] = existing_notifications[EVENTBRIDGE_CONFIGURATION]\n\n  if request_type == 'Delete':\n    return external_notifications\n\n  notifications = {}\n  for t in CONFIGURATION_TYPES:\n    external = external_notifications.get(t, [])\n    incoming = [with_id(n) for n in notification_configuration.get(t, [])]\n    notifications[t] = external + incoming\n\n  if EVENTBRIDGE_CONFIGURATION in notification_configuration:\n    notifications[EVENTBRIDGE_CONFIGURATION] = notification_configuration[EVENTBRIDGE_CONFIGURATION]\n  elif EVENTBRIDGE_CONFIGURATION in external_notifications:\n    notifications[EVENTBRIDGE_CONFIGURATION] = external_notifications[EVENTBRIDGE_CONFIGURATION]\n\n  return notifications\n\ndef submit_response(event: dict, context, response_status: str, error_message: str):\n  response_body = json.dumps(\n    {\n      \"Status\": response_status,\n      \"Reason\": f\"{error_message}See the details in CloudWatch Log Stream: {context.log_stream_name}\",\n      \"PhysicalResourceId\": event.get(\"PhysicalResourceId\") or event[\"LogicalResourceId\"],\n      \"StackId\": event[\"StackId\"],\n      \"RequestId\": event[\"RequestId\"],\n      \"LogicalResourceId\": event[\"LogicalResourceId\"],\n      \"NoEcho\": False,\n    }\n  ).encode(\"utf-8\")\n  headers = {\"content-type\": \"\", \"content-length\": str(len(response_body))}\n  try:\n    req = urllib.request.Request(url=event[\"ResponseURL\"], headers=headers, data=response_body, method=\"PUT\")\n    with urllib.request.urlopen(req) as response:\n      print(response.read().decode(\"utf-8\"))\n    print(\"Status code: \" + response.reason)\n  except Exception as e:\n      print(\"send(..) failed executing request.urlopen(..): \" + str(e))\n\ndef sort_filter_rules(json_obj):\n  if not isinstance(json_obj, dict):\n      return json_obj\n  for key, value in json_obj.items():\n      if isinstance(value, dict):\n          json_obj[key] = sort_filter_rules(value)\n      elif isinstance(value, list):\n          json_obj[key] = [sort_filter_rules(item) for item in value]\n  if \"Filter\" in json_obj and \"Key\" in json_obj[\"Filter\"] and \"FilterRules\" in json_obj[\"Filter\"][\"Key\"]:\n      filter_rules = json_obj[\"Filter\"][\"Key\"][\"FilterRules\"]\n      sorted_filter_rules = sorted(filter_rules, key=lambda x: x[\"Name\"])\n      json_obj[\"Filter\"][\"Key\"][\"FilterRules\"] = sorted_filter_rules\n  return json_obj"
+    },
+    "Handler": "index.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleB6FB88EC",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.13",
+    "Timeout": 300,
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "DependsOn": [
+    "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleDefaultPolicy2CF63D36",
+    "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleB6FB88EC"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/BucketNotificationsHandler050a0587b7544547bf325f094a3db834/Resource"
+   }
+  },
+  "FrontendLambdaServiceRoleC530666C": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/FrontendLambda/ServiceRole/Resource"
+   }
+  },
+  "FrontendLambda8ACF4B3B": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "ImageUri": {
+      "Fn::Sub": "463090596988.dkr.ecr.eu-central-1.${AWS::URLSuffix}/cdk-hnb659fds-container-assets-463090596988-eu-central-1:f396e6e3cc3c20430d5af83f72d6392ef02ca35a1a3d6e9ffdc91a29c8eef27c"
+     }
+    },
+    "Environment": {
+     "Variables": {
+      "RUNTIME_API_URL": {
+       "Fn::Join": [
+        "",
+        [
+         "https://",
+         {
+          "Ref": "OrchestratorApiFA05180E"
+         },
+         ".execute-api.eu-central-1.",
+         {
+          "Ref": "AWS::URLSuffix"
+         },
+         "/",
+         {
+          "Ref": "OrchestratorApiDeploymentStageprod82FCF960"
+         },
+         "/"
+        ]
+       ]
+      },
+      "RUNTIME_STREAM_URL": {
+       "Fn::GetAtt": [
+        "OrchestratorLambdaFunctionUrl11B98229",
+        "FunctionUrl"
+       ]
+      },
+      "RUNTIME_USER_POOL_ID": {
+       "Ref": "ImmivoUserPool48AD5837"
+      },
+      "RUNTIME_USER_POOL_CLIENT_ID": {
+       "Ref": "ImmivoUserPoolImmivoClient41F7052B"
+      },
+      "RUNTIME_ADMIN_USER_POOL_ID": {
+       "Ref": "ImmivoAdminUserPool1121EFDE"
+      },
+      "RUNTIME_ADMIN_USER_POOL_CLIENT_ID": {
+       "Ref": "ImmivoAdminUserPoolImmivoAdminClientC11B7155"
+      },
+      "RUNTIME_AWS_REGION": "eu-central-1",
+      "RUNTIME_MEDIA_CDN_URL": "https://media.immivo.ai",
+      "NEXT_PUBLIC_API_URL": {
+       "Fn::Join": [
+        "",
+        [
+         "https://",
+         {
+          "Ref": "OrchestratorApiFA05180E"
+         },
+         ".execute-api.eu-central-1.",
+         {
+          "Ref": "AWS::URLSuffix"
+         },
+         "/",
+         {
+          "Ref": "OrchestratorApiDeploymentStageprod82FCF960"
+         },
+         "/"
+        ]
+       ]
+      },
+      "NEXT_PUBLIC_USER_POOL_ID": {
+       "Ref": "ImmivoUserPool48AD5837"
+      },
+      "NEXT_PUBLIC_USER_POOL_CLIENT_ID": {
+       "Ref": "ImmivoUserPoolImmivoClient41F7052B"
+      },
+      "NEXT_PUBLIC_AWS_REGION": "eu-central-1",
+      "PORT": "3000",
+      "AWS_LAMBDA_EXEC_WRAPPER": "/opt/extensions/lambda-adapter"
+     }
+    },
+    "MemorySize": 2048,
+    "PackageType": "Image",
+    "Role": {
+     "Fn::GetAtt": [
+      "FrontendLambdaServiceRoleC530666C",
+      "Arn"
+     ]
+    },
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "Timeout": 30
+   },
+   "DependsOn": [
+    "FrontendLambdaServiceRoleC530666C"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/FrontendLambda/Resource",
+    "aws:asset:path": "asset.f396e6e3cc3c20430d5af83f72d6392ef02ca35a1a3d6e9ffdc91a29c8eef27c",
+    "aws:asset:dockerfile-path": "Dockerfile",
+    "aws:asset:docker-build-args": {
+     "NEXT_PUBLIC_AWS_REGION": "eu-central-1",
+     "NEXT_PUBLIC_MEDIA_CDN_URL": "https://media.immivo.ai"
+    },
+    "aws:asset:property": "Code.ImageUri"
+   }
+  },
+  "FrontendLambdaLogGroupF61F1686": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "FrontendLambda8ACF4B3B"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 731,
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/FrontendLambda/LogGroup/Resource"
+   }
+  },
+  "FrontendLambdaFunctionUrl1B051328": {
+   "Type": "AWS::Lambda::Url",
+   "Properties": {
+    "AuthType": "NONE",
+    "TargetFunctionArn": {
+     "Fn::GetAtt": [
+      "FrontendLambda8ACF4B3B",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/FrontendLambda/FunctionUrl/Resource"
+   }
+  },
+  "FrontendLambdainvokefunctionurl6F8608B9": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunctionUrl",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "FrontendLambda8ACF4B3B",
+      "Arn"
+     ]
+    },
+    "FunctionUrlAuthType": "NONE",
+    "Principal": "*"
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/FrontendLambda/invoke-function-url"
+   }
+  },
+  "FrontendLambdainvokefunctionBB8CC149": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "FrontendLambda8ACF4B3B",
+      "Arn"
+     ]
+    },
+    "InvokedViaFunctionUrl": true,
+    "Principal": "*"
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/FrontendLambda/invoke-function"
+   }
+  },
+  "MediaOACC4276BB0": {
+   "Type": "AWS::CloudFront::OriginAccessControl",
+   "Properties": {
+    "OriginAccessControlConfig": {
+     "Description": "OAC for Immivo Media Bucket",
+     "Name": "ImmivoProdMediaOAC337A226F",
+     "OriginAccessControlOriginType": "s3",
+     "SigningBehavior": "always",
+     "SigningProtocol": "sigv4"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/MediaOAC/Resource"
+   }
+  },
+  "MediaCDN30A5345E": {
+   "Type": "AWS::CloudFront::Distribution",
+   "Properties": {
+    "DistributionConfig": {
+     "Aliases": [
+      "media.immivo.ai"
+     ],
+     "Comment": "Immivo Media CDN (prod)",
+     "DefaultCacheBehavior": {
+      "AllowedMethods": [
+       "GET",
+       "HEAD"
+      ],
+      "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+      "Compress": true,
+      "TargetOriginId": "ImmivoProdMediaCDNOrigin1D467EB9C",
+      "ViewerProtocolPolicy": "redirect-to-https"
+     },
+     "Enabled": true,
+     "HttpVersion": "http2and3",
+     "IPV6Enabled": true,
+     "Origins": [
+      {
+       "DomainName": {
+        "Fn::GetAtt": [
+         "MediaBucketBCBB02BA",
+         "RegionalDomainName"
+        ]
+       },
+       "Id": "ImmivoProdMediaCDNOrigin1D467EB9C",
+       "OriginAccessControlId": {
+        "Fn::GetAtt": [
+         "MediaOACC4276BB0",
+         "Id"
+        ]
+       },
+       "S3OriginConfig": {
+        "OriginAccessIdentity": ""
+       }
+      }
+     ],
+     "PriceClass": "PriceClass_100",
+     "ViewerCertificate": {
+      "AcmCertificateArn": "arn:aws:acm:us-east-1:463090596988:certificate/b61f08cd-54f2-4f62-8e0a-9a69264e0436",
+      "MinimumProtocolVersion": "TLSv1.3_2025",
+      "SslSupportMethod": "sni-only"
+     }
+    },
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/MediaCDN/Resource"
+   }
+  },
+  "MediaDnsRecord7D520F66": {
+   "Type": "AWS::Route53::RecordSet",
+   "Properties": {
+    "AliasTarget": {
+     "DNSName": {
+      "Fn::GetAtt": [
+       "MediaCDN30A5345E",
+       "DomainName"
+      ]
+     },
+     "HostedZoneId": {
+      "Fn::FindInMap": [
+       "AWSCloudFrontPartitionHostedZoneIdMap",
+       {
+        "Ref": "AWS::Partition"
+       },
+       "zoneId"
+      ]
+     }
+    },
+    "HostedZoneId": "Z10381383JI4OXGQXAULB",
+    "Name": "media.immivo.ai.",
+    "Type": "A"
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/MediaDnsRecord/Resource"
+   }
+  },
+  "SesDkimRecord1C46217B9": {
+   "Type": "AWS::Route53::RecordSet",
+   "Properties": {
+    "HostedZoneId": "Z10381383JI4OXGQXAULB",
+    "Name": "cztec6cd7jjiptw5pipfdicp37v3jngr._domainkey.immivo.ai.",
+    "ResourceRecords": [
+     "cztec6cd7jjiptw5pipfdicp37v3jngr.dkim.amazonses.com"
+    ],
+    "TTL": "1800",
+    "Type": "CNAME"
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/SesDkimRecord1/Resource"
+   }
+  },
+  "SesDkimRecord2D2028549": {
+   "Type": "AWS::Route53::RecordSet",
+   "Properties": {
+    "HostedZoneId": "Z10381383JI4OXGQXAULB",
+    "Name": "cb5vtkh7c7tprv2uqrcmwdzkkzcuohxc._domainkey.immivo.ai.",
+    "ResourceRecords": [
+     "cb5vtkh7c7tprv2uqrcmwdzkkzcuohxc.dkim.amazonses.com"
+    ],
+    "TTL": "1800",
+    "Type": "CNAME"
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/SesDkimRecord2/Resource"
+   }
+  },
+  "SesDkimRecord3F78E5BFE": {
+   "Type": "AWS::Route53::RecordSet",
+   "Properties": {
+    "HostedZoneId": "Z10381383JI4OXGQXAULB",
+    "Name": "q6tkl6njuisz6jhxdized6ry7fq2ao2f._domainkey.immivo.ai.",
+    "ResourceRecords": [
+     "q6tkl6njuisz6jhxdized6ry7fq2ao2f.dkim.amazonses.com"
+    ],
+    "TTL": "1800",
+    "Type": "CNAME"
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/SesDkimRecord3/Resource"
+   }
+  },
+  "LandingVideoDeployAwsCliLayer7FF82229": {
+   "Type": "AWS::Lambda::LayerVersion",
+   "Properties": {
+    "Content": {
+     "S3Bucket": "cdk-hnb659fds-assets-463090596988-eu-central-1",
+     "S3Key": "0cfdecad2260a3a84ad0c2d08a77e03c9d25e26c7b52f26b1e1faf97aef92f18.zip"
+    },
+    "Description": "/opt/awscli/aws"
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/LandingVideoDeploy/AwsCliLayer/Resource",
+    "aws:asset:path": "asset.0cfdecad2260a3a84ad0c2d08a77e03c9d25e26c7b52f26b1e1faf97aef92f18.zip",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Content"
+   }
+  },
+  "LandingVideoDeployCustomResource2048MiB2048MiB4FC83F07": {
+   "Type": "Custom::CDKBucketDeployment",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C2048MiB2048MiBD44B8A53",
+      "Arn"
+     ]
+    },
+    "SourceBucketNames": [
+     "cdk-hnb659fds-assets-463090596988-eu-central-1"
+    ],
+    "SourceObjectKeys": [
+     "38c3cbfae814645b1dd770cf8dcfc133fb8e7fa320a09e9a17fd69a1f5e60979.zip"
+    ],
+    "DestinationBucketName": {
+     "Ref": "MediaBucketBCBB02BA"
+    },
+    "DestinationBucketKeyPrefix": "public/",
+    "WaitForDistributionInvalidation": true,
+    "Prune": true,
+    "OutputObjectKeys": true
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/LandingVideoDeploy/CustomResource-2048MiB-2048MiB/Default"
+   }
+  },
+  "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C2048MiB2048MiBServiceRoleE8335660": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C2048MiB2048MiB/ServiceRole/Resource"
+   }
+  },
+  "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C2048MiB2048MiBServiceRoleDefaultPolicyB72D5CB5": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:GetBucket*",
+        "s3:GetObject*",
+        "s3:List*"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:s3:::cdk-hnb659fds-assets-463090596988-eu-central-1",
+        "arn:aws:s3:::cdk-hnb659fds-assets-463090596988-eu-central-1/*"
+       ]
+      },
+      {
+       "Action": [
+        "s3:Abort*",
+        "s3:DeleteObject*",
+        "s3:GetBucket*",
+        "s3:GetObject*",
+        "s3:List*",
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "MediaBucketBCBB02BA",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "MediaBucketBCBB02BA",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C2048MiB2048MiBServiceRoleDefaultPolicyB72D5CB5",
+    "Roles": [
+     {
+      "Ref": "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C2048MiB2048MiBServiceRoleE8335660"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C2048MiB2048MiB/ServiceRole/DefaultPolicy/Resource"
+   }
+  },
+  "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C2048MiB2048MiBD44B8A53": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-463090596988-eu-central-1",
+     "S3Key": "3423a042b818e31c1e34a19d6689ab2e5f9b70fcbe9e71df66f241b20a200bd9.zip"
+    },
+    "Environment": {
+     "Variables": {
+      "AWS_CA_BUNDLE": "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
+     }
+    },
+    "EphemeralStorage": {
+     "Size": 2048
+    },
+    "Handler": "index.handler",
+    "Layers": [
+     {
+      "Ref": "LandingVideoDeployAwsCliLayer7FF82229"
+     }
+    ],
+    "MemorySize": 2048,
+    "Role": {
+     "Fn::GetAtt": [
+      "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C2048MiB2048MiBServiceRoleE8335660",
+      "Arn"
+     ]
+    },
+    "Runtime": "python3.13",
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "Timeout": 900
+   },
+   "DependsOn": [
+    "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C2048MiB2048MiBServiceRoleDefaultPolicyB72D5CB5",
+    "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C2048MiB2048MiBServiceRoleE8335660"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C2048MiB2048MiB/Resource",
+    "aws:asset:path": "asset.3423a042b818e31c1e34a19d6689ab2e5f9b70fcbe9e71df66f241b20a200bd9",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C2048MiB2048MiBLogGroupA9164DD5": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "CustomCDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C2048MiB2048MiBD44B8A53"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 731,
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C2048MiB2048MiB/LogGroup/Resource"
+   }
+  },
+  "ApiWaf": {
+   "Type": "AWS::WAFv2::WebACL",
+   "Properties": {
+    "DefaultAction": {
+     "Allow": {}
+    },
+    "Name": "Immivo-API-WAF-prod",
+    "Rules": [
+     {
+      "Name": "AWSManagedRulesCommonRuleSet",
+      "OverrideAction": {
+       "None": {}
+      },
+      "Priority": 1,
+      "Statement": {
+       "ManagedRuleGroupStatement": {
+        "ExcludedRules": [
+         {
+          "Name": "SizeRestrictions_BODY"
+         },
+         {
+          "Name": "CrossSiteScripting_BODY"
+         }
+        ],
+        "Name": "AWSManagedRulesCommonRuleSet",
+        "VendorName": "AWS"
+       }
+      },
+      "VisibilityConfig": {
+       "CloudWatchMetricsEnabled": true,
+       "MetricName": "CommonRules",
+       "SampledRequestsEnabled": true
+      }
+     },
+     {
+      "Name": "AWSManagedRulesSQLiRuleSet",
+      "OverrideAction": {
+       "None": {}
+      },
+      "Priority": 2,
+      "Statement": {
+       "ManagedRuleGroupStatement": {
+        "Name": "AWSManagedRulesSQLiRuleSet",
+        "VendorName": "AWS"
+       }
+      },
+      "VisibilityConfig": {
+       "CloudWatchMetricsEnabled": true,
+       "MetricName": "SQLiRules",
+       "SampledRequestsEnabled": true
+      }
+     },
+     {
+      "Name": "AWSManagedRulesKnownBadInputsRuleSet",
+      "OverrideAction": {
+       "None": {}
+      },
+      "Priority": 3,
+      "Statement": {
+       "ManagedRuleGroupStatement": {
+        "Name": "AWSManagedRulesKnownBadInputsRuleSet",
+        "VendorName": "AWS"
+       }
+      },
+      "VisibilityConfig": {
+       "CloudWatchMetricsEnabled": true,
+       "MetricName": "BadInputRules",
+       "SampledRequestsEnabled": true
+      }
+     },
+     {
+      "Action": {
+       "Block": {}
+      },
+      "Name": "RateLimit",
+      "Priority": 4,
+      "Statement": {
+       "RateBasedStatement": {
+        "AggregateKeyType": "IP",
+        "Limit": 2000
+       }
+      },
+      "VisibilityConfig": {
+       "CloudWatchMetricsEnabled": true,
+       "MetricName": "RateLimit",
+       "SampledRequestsEnabled": true
+      }
+     }
+    ],
+    "Scope": "REGIONAL",
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "VisibilityConfig": {
+     "CloudWatchMetricsEnabled": true,
+     "MetricName": "ImmivoApiWaf-prod",
+     "SampledRequestsEnabled": true
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ApiWaf"
+   }
+  },
+  "ApiWafAssociation": {
+   "Type": "AWS::WAFv2::WebACLAssociation",
+   "Properties": {
+    "ResourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:aws:apigateway:eu-central-1::/restapis/",
+       {
+        "Ref": "OrchestratorApiFA05180E"
+       },
+       "/stages/",
+       {
+        "Ref": "OrchestratorApiDeploymentStageprod82FCF960"
+       }
+      ]
+     ]
+    },
+    "WebACLArn": {
+     "Fn::GetAtt": [
+      "ApiWaf",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ApiWafAssociation"
+   }
+  },
+  "CloudTrailBucket98B0BFE1": {
+   "Type": "AWS::S3::Bucket",
+   "Properties": {
+    "BucketEncryption": {
+     "ServerSideEncryptionConfiguration": [
+      {
+       "ServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "AES256"
+       }
+      }
+     ]
+    },
+    "LifecycleConfiguration": {
+     "Rules": [
+      {
+       "ExpirationInDays": 90,
+       "Status": "Enabled"
+      }
+     ]
+    },
+    "PublicAccessBlockConfiguration": {
+     "BlockPublicAcls": true,
+     "BlockPublicPolicy": true,
+     "IgnorePublicAcls": true,
+     "RestrictPublicBuckets": true
+    },
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/CloudTrailBucket/Resource"
+   }
+  },
+  "CloudTrailBucketPolicy2A856177": {
+   "Type": "AWS::S3::BucketPolicy",
+   "Properties": {
+    "Bucket": {
+     "Ref": "CloudTrailBucket98B0BFE1"
+    },
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "s3:*",
+       "Condition": {
+        "Bool": {
+         "aws:SecureTransport": "false"
+        }
+       },
+       "Effect": "Deny",
+       "Principal": {
+        "AWS": "*"
+       },
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "CloudTrailBucket98B0BFE1",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "CloudTrailBucket98B0BFE1",
+             "Arn"
+            ]
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "s3:GetBucketAcl",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "cloudtrail.amazonaws.com"
+       },
+       "Resource": {
+        "Fn::GetAtt": [
+         "CloudTrailBucket98B0BFE1",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": "s3:PutObject",
+       "Condition": {
+        "StringEquals": {
+         "s3:x-amz-acl": "bucket-owner-full-control"
+        }
+       },
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "cloudtrail.amazonaws.com"
+       },
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          {
+           "Fn::GetAtt": [
+            "CloudTrailBucket98B0BFE1",
+            "Arn"
+           ]
+          },
+          "/AWSLogs/463090596988/*"
+         ]
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/CloudTrailBucket/Policy/Resource"
+   }
+  },
+  "TrailLogGroup7A1F916A": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": "/immivo/cloudtrail/prod",
+    "RetentionInDays": 90,
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/TrailLogGroup/Resource"
+   }
+  },
+  "ImmivoTrailLogsRole9F4A9B8A": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "cloudtrail.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoTrail/LogsRole/Resource"
+   }
+  },
+  "ImmivoTrailLogsRoleDefaultPolicy8D03D805": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "TrailLogGroup7A1F916A",
+         "Arn"
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "ImmivoTrailLogsRoleDefaultPolicy8D03D805",
+    "Roles": [
+     {
+      "Ref": "ImmivoTrailLogsRole9F4A9B8A"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoTrail/LogsRole/DefaultPolicy/Resource"
+   }
+  },
+  "ImmivoTrailC39560C4": {
+   "Type": "AWS::CloudTrail::Trail",
+   "Properties": {
+    "CloudWatchLogsLogGroupArn": {
+     "Fn::GetAtt": [
+      "TrailLogGroup7A1F916A",
+      "Arn"
+     ]
+    },
+    "CloudWatchLogsRoleArn": {
+     "Fn::GetAtt": [
+      "ImmivoTrailLogsRole9F4A9B8A",
+      "Arn"
+     ]
+    },
+    "EnableLogFileValidation": true,
+    "EventSelectors": [],
+    "IncludeGlobalServiceEvents": true,
+    "IsLogging": true,
+    "IsMultiRegionTrail": false,
+    "S3BucketName": {
+     "Ref": "CloudTrailBucket98B0BFE1"
+    },
+    "Tags": [
+     {
+      "Key": "Project",
+      "Value": "Immivo"
+     },
+     {
+      "Key": "Stage",
+      "Value": "prod"
+     }
+    ],
+    "TrailName": "Immivo-Trail-prod"
+   },
+   "DependsOn": [
+    "CloudTrailBucketPolicy2A856177",
+    "ImmivoTrailLogsRoleDefaultPolicy8D03D805",
+    "ImmivoTrailLogsRole9F4A9B8A"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/ImmivoTrail/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/+0aa08bufa3bD5eDXNZuLvS7bcQaIuWQJQJXWkrhJwZZ2LwjOfankAa5b/vOX6NA4GWhXZp90pITI4f5+nzsvfSvf1f092fyI3ayYvrHc6m6SrTJL9OAHS5ovleuvrQ5B9XvYrc9j+p3pvev3pJryb6HdH0hiw9RLXTmuqBqGesbCXRTNS9N7AsZ4UcEnUdFlZ0Y8Vk2SBg1E45y3vr5MtXSLYAEnrri/VFMpjVH0aDxO6SmWmAmywI42TKONPLP0Ttt1k0+XHhvhHZARe5x1aRxm5y3JzVJ6St83nvjZYtTXqsWfw6uDOdKMXK+hhG+kUhqVJn9UBSxz3MQH5eBRWGkKI4DXoD5cDIxash8HVQYU3JGhB+jUWr6YRMOe3gHayvlMiZ2SBMxo+j4xH+64SdOGN9ccucEa5egcyfR8broeSVkGGt8LjWVIK5eBuyPs796mtw0vOK1jrJaN5KoPedFG0DtgXEOlQFVblkTdgakHMubvqcn7V6Ktq6cJQ673Bcl0jQuOXUugfUjfcST9sWT6E7TDF59wAO5TpRNJdUq4rUpKQSgpD5DezYgdMuCpS0phIPkxnItGR12XvjJ9rfE1o1HKODXUJvc94WdATK0a0TtfMTtRnJGpLToLaAwez1G11axQR+AE1i/02ILKnulBHodYi1GbfLo9V3l60TWah0dUg0mRJFB7xVoHvYjNYlQyv0Xy72GZ4M4AOVyrCz6s1azsNPZ5pXQsYg0GZDJIgSdjfif0sqxpc+vAKznJ4rKsdCGyn1mwYMm0Satlg3lhV0Rlqucd1GrG4aITUtTkSJVCtPQGdH8GUdojLq2xrck94N2AqVflcqF1RysJgPe0NWDwjoDUxp2yi5vTMKgi9A1gx0HOZHlqhcRAwMeW1Epqe0kGCeR3Uulw3w5q1I0kosCB8JkBaiAxUTVqPKLYP+aN4/OU+VxsOYwLgODyJ0FuBMyf44rpUmdQ7H/boCcwPD3koTrTG4wag3A88m4YyoyJhhStJHGEY0/B+Jylp+ODtmvpm7TjippgW5rEVBr1R6av69xaMJqD6iHdvPaDPZgt6qzvK19Eqdk7rgwTxwEgRhb/4gK7nM2Kdu4YJJUeOJc5ApOCvu/EfFajZbel6VaGVOh6TxAHqL7pjwoSjAPwZzzoH8OJB9T9Q7kl+Ivqea8gOn7y+y6Vz3Nj5RSRUEluK9ENcPKe6Rv3+kgF6c+2eY7+Paeg0Egn9jpEpXY8EpOkOl2ooWB0tc2UASkbOG8H6eQ3LkN7dzcEE/j5K/ns2ACuPhGSrI1N4dbNmXbu6FS9smYuRR+LjwceVGTYpxXAMXNIyFuu/Rwcf3/SYMJq+R8683+sMbzVdi3+09jPn92yTwDZX4w9vLcy3i5Wm+sH0eThMLt0WyWzAROHJvn/vgosggsaYYadTG8bgP/tr7vwj4byLyxdB+L0o01mcNb52o/csVWD/kkGkf/yUFbbhY4vz0oM2vqT4MAJydriz0AEraxH5is8h2Bz5bysJJa7U4pJxqeja9ojkS5VNKWw7b05ftXw77p/13R4eYQGHfy3bH4NhCXR5SrZmA/CnLTjzaXEjrhUwriRZDqueiMEnvu6MJLHl/1D/E7NeNn0lWstrv54DvKSmoDEhuG6HuAvEWo6Sbrm0AuF3P65viN3bh9R0pwon1RTVxX+IP6YazGc2XOadjWx9Eln0SD5mRDRZewg62YX+46/F5ssyRsdbujN457hVk9/gzZJqP/Iw28afP9jDSFQz41oU5nFRWTKEiEw8+lzxqaniDafXcFXynZ6dHPWxELsQ1Hdoy5+D87dujMYgu7ig8sNRSB1iSQxAylccVRPGonRIqpy0lz2ZFdLcA+mxhvFGFPQOP4eCELKlvViaZaUVqUUeMtC3zPXiOcx+riK16Rq3EI7iVCGnc7QOVYDMHvysJz2y/77M1fG9bN9EAZwzMeKnAj3vKRGkmhMI7SG2zWI2LWp/ggtUXRBPXm8cDc7F9yJl+JLzPSuy7l85RzFInBeciYvbRnwEila5OHDoUkPsMfTtc+U2A6N40NqbxiP939763K6jSUiz9OXHr10kuypppka6w9T4SAv1M6z7jpjXls4yV9XlzZBq7IdSbeyjblKWmEUUrwnhouWCYgfNouh53xxrIPG6EDMWW6Y+c0LrU88DT/1om6QnERZkTPIQ+vzDw86bZCj+EsIo242mwyf6Y5gICJCDawyY8mAKRRV9ryaattrQTe5mGn26rLpJWrUbGfa8G7KpVWlTxBtbcDDijNQTs3yrlm9fenUwg5pfGjFaPdOKTL1WCI+61ayEAs2U1Ffwv6Gb9QpK1gc7JNvEfA87sxZuXutu53Rh/8P4w6AHj6ltI44wOcHEmQ3cv+Yq7w1gBajPsOH12TcWIYYtpnZCGlfYOGPyXkd4Y/EO/YeYux9xc4c1xKeNru03v2UhxG1qZtmw4M3mbbUdrcOqRy+pNWU3kckgLRrqbvHBNhtnzSNIZZ+VcR9uYnHhLmhwy6w4Up8hG2N8TubYlYFWQdCXX1ps10F3n8sGmu+kqxAfTtwAnz3LC8dHBRvfstcDtdWOgPslQCYZlD/J+b1M79g4cYQmIzDTRsR61WYkV9Ud04HbIG6/WjR1zAHbPvkWkSDhpQkJOIjd/hQccHmTWhwv1tdEOXnrejR7b52NihCQBGw1gdj00YFe3atClLdINj/y1u78/XXeZW7TLUzdJ/i+sbyUsdzyfuYM5AHZBMkK/5o8BsNIQ2R2cB125G7B7nN2hLsioe7/z/SjZaCgSwhaGLoK7NUJL3Gsoj9L6DvTEvqrpiPN4N7x38tQFBv0drOsEYv2l68VFRbhty8FYOqZQh0KqLpem+5Zz0RYzKFZ0usr2bdCxfZEBwKRJ5O8GD4t5y9zkkCmbbPl6v4r8byEgYzSPEUKSS6VmM3zVQzct6oDOyYIJYyTC4PG1HKOQPoK1apGLOC0rwCpyvaPFDh4DhZuTfB5a5q6EqxqbmPs3JJv9NWtouL57qIS/9iAF2DfBn+V0wInpGY3Cj8ufd3fR4ljNqrbytHVbTE6yxc/p/uXe7t4v/nVMJKd1IvGx5i/76aqPCazEsPOpe/AnDezec5ZgNF861VkrzsjwRSk+kPoifJ3evgjnjzQd3MANmS32THPtdzrtD06S8BU9uV3bc6QllETpaoL/Nrt6oAoERqiYGoKhszEt0XFJU0v5p5r2IeA7LqaEZ1QuwNKOFjYzc+UyVC8TMUCcvxOdzyEnCmN5DO06GFb/BhGEsOC1BqYaCp7f9yo2PNvmHDDwBQMvZNyH8SuYRLG6NE6h1U1rnisPSdMg0L2wMk2fS3Kjcs7S/o2CEsI0Qmxqh++v0iv178Xef9L9dPenK8XYjmuspGP7/08k/gsiIDAAAA=="
+   },
+   "Metadata": {
+    "aws:cdk:path": "Immivo-Prod/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "OrchestratorFunctionUrl": {
+   "Description": "Lambda Function URL for streaming (bypasses API GW 29s limit)",
+   "Value": {
+    "Fn::GetAtt": [
+     "OrchestratorLambdaFunctionUrl11B98229",
+     "FunctionUrl"
+    ]
+   }
+  },
+  "OrchestratorApiEndpoint8D207D42": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "OrchestratorApiFA05180E"
+      },
+      ".execute-api.eu-central-1.",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "OrchestratorApiDeploymentStageprod82FCF960"
+      },
+      "/"
+     ]
+    ]
+   }
+  },
+  "VpcId": {
+   "Value": {
+    "Ref": "ImmivoVPCB1C78292"
+   }
+  },
+  "DBEndpoint": {
+   "Value": {
+    "Fn::GetAtt": [
+     "AuroraCluster23D869C0",
+     "Endpoint.Address"
+    ]
+   }
+  },
+  "EmailBucketName": {
+   "Value": {
+    "Ref": "EmailIngestBucketD823E4FB"
+   }
+  },
+  "MediaBucketName": {
+   "Value": {
+    "Ref": "MediaBucketBCBB02BA"
+   }
+  },
+  "MediaCDNUrl": {
+   "Value": "https://media.immivo.ai"
+  },
+  "MediaDistributionId": {
+   "Value": {
+    "Ref": "MediaCDN30A5345E"
+   }
+  },
+  "OrchestratorApiUrl": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "OrchestratorApiFA05180E"
+      },
+      ".execute-api.eu-central-1.",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "OrchestratorApiDeploymentStageprod82FCF960"
+      },
+      "/"
+     ]
+    ]
+   }
+  },
+  "FrontendUrl": {
+   "Value": {
+    "Fn::GetAtt": [
+     "FrontendLambdaFunctionUrl1B051328",
+     "FunctionUrl"
+    ]
+   }
+  },
+  "UserPoolId": {
+   "Value": {
+    "Ref": "ImmivoUserPool48AD5837"
+   }
+  },
+  "UserPoolClientId": {
+   "Value": {
+    "Ref": "ImmivoUserPoolImmivoClient41F7052B"
+   }
+  },
+  "AdminUserPoolId": {
+   "Value": {
+    "Ref": "ImmivoAdminUserPool1121EFDE"
+   }
+  },
+  "AdminUserPoolClientId": {
+   "Value": {
+    "Ref": "ImmivoAdminUserPoolImmivoAdminClientC11B7155"
+   }
+  },
+  "WafAclArn": {
+   "Value": {
+    "Fn::GetAtt": [
+     "ApiWaf",
+     "Arn"
+    ]
+   }
+  }
+ },
+ "Mappings": {
+  "AWSCloudFrontPartitionHostedZoneIdMap": {
+   "aws": {
+    "zoneId": "Z2FDTNDATAQYW2"
+   },
+   "aws-cn": {
+    "zoneId": "Z3RFFRIM2A3IF5"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

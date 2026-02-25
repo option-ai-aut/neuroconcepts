@@ -1,0 +1,447 @@
+@import "tailwindcss";
+
+/* Override Tailwind v4 default dark mode (media) to use .dark class instead */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  background-color: #ffffff;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  background-color: #ffffff;
+}
+
+/* Overscroll background (rubber-band effect on iOS) follows system preference */
+@media (prefers-color-scheme: dark) {
+  html, body { background-color: #000000; }
+}
+@media (prefers-color-scheme: light) {
+  html, body { background-color: #ffffff; }
+}
+
+/* Lock viewport for app shells (dashboard/admin) — prevents iOS Safari bounce.
+   Applied via .app-shell class on the layout root element. */
+html:has(.app-shell) {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+html:has(.app-shell) body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* ========================================
+   DARK MODE — Applied via .dark class on dashboard root
+   Comprehensive color overrides for all UI elements.
+   ======================================== */
+
+/* Base backgrounds */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #f5f5f5;
+  color-scheme: dark;
+}
+
+/* White backgrounds → dark */
+.dark .bg-white { background-color: #111111 !important; }
+.dark .bg-gray-50 { background-color: #151515 !important; }
+.dark .bg-gray-100 { background-color: #1a1a1a !important; }
+
+/* Text colors → inverted */
+.dark .text-gray-900 { color: #f5f5f5 !important; }
+.dark .text-gray-800 { color: #e5e5e5 !important; }
+.dark .text-gray-700 { color: #d4d4d4 !important; }
+.dark .text-gray-600 { color: #a3a3a3 !important; }
+.dark .text-gray-500 { color: #737373 !important; }
+.dark .text-gray-400 { color: #525252 !important; }
+
+/* Borders → dark borders */
+.dark .border-gray-100 { border-color: #262626 !important; }
+.dark .border-gray-200 { border-color: #2a2a2a !important; }
+.dark .border-gray-300 { border-color: #333333 !important; }
+
+/* Hover states */
+.dark .hover\:bg-gray-50:hover { background-color: #1a1a1a !important; }
+.dark .hover\:bg-gray-100:hover { background-color: #222222 !important; }
+.dark .hover\:bg-gray-800:hover { background-color: #262626 !important; }
+.dark .hover\:text-gray-600:hover { color: #d4d4d4 !important; }
+.dark .hover\:text-gray-900:hover { color: #f5f5f5 !important; }
+
+/* Focus rings */
+.dark .focus\:ring-blue-500:focus { --tw-ring-color: #3b82f6 !important; }
+.dark .focus\:border-blue-500:focus { border-color: #3b82f6 !important; }
+
+/* Inputs, textareas, selects */
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: #1a1a1a !important;
+  color: #f5f5f5 !important;
+  border-color: #333333 !important;
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #525252 !important;
+}
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  border-color: #3b82f6 !important;
+  --tw-ring-color: #3b82f6 !important;
+}
+
+/* Dark gray backgrounds → slightly lighter in dark mode */
+/* Note: bg-gray-900 used for buttons is handled via .dark-btn-invert class */
+.dark .bg-gray-800 { background-color: #1f1f1f !important; }
+
+/* Explicit button inversion for dark mode */
+.dark button.bg-gray-900,
+.dark a.bg-gray-900,
+.dark [type="submit"].bg-gray-900 {
+  background-color: #f5f5f5 !important;
+  color: #111111 !important;
+}
+.dark button.bg-gray-900:hover,
+.dark a.bg-gray-900:hover {
+  background-color: #e5e5e5 !important;
+}
+
+/* Blue accents stay but adjust slightly */
+.dark .text-blue-600 { color: #60a5fa !important; }
+.dark .text-blue-500 { color: #60a5fa !important; }
+.dark .bg-blue-50 { background-color: #1e293b !important; }
+.dark .bg-blue-600 { background-color: #2563eb !important; }
+
+/* Green status colors */
+.dark .text-green-600 { color: #4ade80 !important; }
+.dark .bg-green-50 { background-color: #14532d33 !important; }
+.dark .bg-green-100 { background-color: #14532d55 !important; }
+
+/* Red/warning colors */
+.dark .text-red-600 { color: #f87171 !important; }
+.dark .bg-red-50 { background-color: #7f1d1d33 !important; }
+.dark .text-red-500 { color: #f87171 !important; }
+
+/* Amber/yellow */
+.dark .text-amber-600 { color: #fbbf24 !important; }
+.dark .bg-amber-50 { background-color: #78350f33 !important; }
+
+/* Gradients in dark mode */
+.dark .from-gray-50 { --tw-gradient-from: #151515 !important; }
+.dark .to-white { --tw-gradient-to: #111111 !important; }
+.dark .from-white { --tw-gradient-from: #111111 !important; }
+.dark .to-gray-50 { --tw-gradient-to: #151515 !important; }
+
+/* Shadow adjustments */
+.dark .shadow-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3) !important; }
+.dark .shadow { box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.4) !important; }
+.dark .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4) !important; }
+.dark .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4) !important; }
+.dark .shadow-xl { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5) !important; }
+
+/* Scrollbar in dark mode */
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #404040 !important;
+}
+.dark .scrollbar-thin:hover::-webkit-scrollbar-thumb {
+  background: #525252 !important;
+}
+
+/* Dividers */
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #262626 !important;
+}
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #2a2a2a !important;
+}
+
+/* Ring colors */
+.dark .ring-gray-100 { --tw-ring-color: #262626 !important; }
+.dark .ring-gray-200 { --tw-ring-color: #2a2a2a !important; }
+
+/* Tables */
+.dark table thead { background-color: #151515 !important; }
+.dark table th { color: #a3a3a3 !important; border-color: #262626 !important; }
+.dark table td { color: #d4d4d4 !important; border-color: #1a1a1a !important; }
+.dark table tr:hover { background-color: #1a1a1a !important; }
+
+/* Specific component overrides */
+
+/* Mobile safe area top fill */
+.dark .safe-area-top-fill {
+  background-color: #111111 !important;
+}
+
+/* iframes (email content) — inject dark background */
+.dark iframe {
+  filter: invert(0.88) hue-rotate(180deg);
+}
+
+/* Badges / pills */
+.dark .bg-gray-50.border { background-color: #1a1a1a !important; }
+
+/* Dropdown menus */
+.dark [role="menu"],
+.dark [role="listbox"] {
+  background-color: #1a1a1a !important;
+  border-color: #333333 !important;
+}
+
+/* Sticky / fixed elements */
+.dark .bg-white\/80 { background-color: rgba(17, 17, 17, 0.8) !important; }
+.dark .bg-white\/90 { background-color: rgba(17, 17, 17, 0.9) !important; }
+
+/* Calendar event cards */
+.dark .bg-gray-50\/80 { background-color: rgba(21, 21, 21, 0.8) !important; }
+
+/* Tab navigation */
+.dark .border-b-2.border-gray-300 { border-color: #525252 !important; }
+.dark .border-b-2.border-gray-800 { border-color: #f5f5f5 !important; }
+.dark .border-transparent { border-color: transparent !important; }
+
+/* Active tab underline */
+.dark .shadow-\[0_4px_6px_-1px_rgba\(0\,0\,0\,0\.1\)\] {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Placeholder text */
+.dark .placeholder-gray-400::placeholder,
+.dark .placeholder-gray-500::placeholder {
+  color: #525252 !important;
+}
+
+/* Skeleton/loading animations */
+.dark .animate-pulse { background-color: #1a1a1a !important; }
+
+/* Empty state illustrations */
+.dark .bg-gradient-to-br.from-gray-50 { background: #151515 !important; }
+.dark .bg-gradient-to-br.from-gray-100 { background: #1a1a1a !important; }
+
+/* --- END DARK MODE --- */
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Prevent Safari auto-zoom on input focus (requires font-size >= 16px) */
+/* Use 1023px to match Tailwind lg: breakpoint (1024px) — covers iPhone landscape */
+@media screen and (max-width: 1023px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
+/* Global Border Radius - Override Tailwind defaults */
+:root {
+  --radius-sm: 0.25rem;  /* 4px */
+  --radius-md: 0.5rem;   /* 8px */
+  --radius-lg: 0.75rem;  /* 12px */
+  --radius-xl: 1rem;     /* 16px */
+}
+
+@layer utilities {
+  .rounded-sm { border-radius: 0.25rem !important; }
+  .rounded-md { border-radius: 0.5rem !important; }
+  .rounded-lg { border-radius: 0.75rem !important; }
+  .rounded-xl { border-radius: 1rem !important; }
+  .rounded-2xl { border-radius: 1.25rem !important; }
+  
+  /* Thin scrollbar styles */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin:hover::-webkit-scrollbar-thumb {
+    background: #9ca3af;
+  }
+  
+  .scrollbar-thumb-gray-300::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+  }
+  
+  .scrollbar-thumb-gray-400::-webkit-scrollbar-thumb {
+    background: #9ca3af;
+  }
+  
+  .scrollbar-track-transparent::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@keyframes typewriter {
+  from { width: 0ch; }
+  to { width: 6ch; }
+}
+
+@keyframes blink-caret {
+  from, to { border-color: transparent; }
+  50% { border-color: rgba(255,255,255,0.7); }
+}
+
+@keyframes float-rotate {
+  0% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(5deg);
+  }
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+}
+
+.animate-alive {
+  animation: float-rotate 4s ease-in-out infinite;
+}
+
+/* Mobile slide-up animation for Mivo chat */
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes slide-down {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out forwards;
+}
+.animate-slide-down {
+  animation: slide-down 0.25s ease-in forwards;
+}
+
+/* Mobile slide-right animation for drawers */
+@keyframes slide-right {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+.animate-slide-right {
+  animation: slide-right 0.25s ease-out forwards;
+}
+
+/* Mivo FAB pulse */
+@keyframes fab-pulse {
+  0%, 100% { box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4); }
+  50% { box-shadow: 0 4px 20px rgba(79, 70, 229, 0.6); }
+}
+.animate-fab-pulse {
+  animation: fab-pulse 3s ease-in-out infinite;
+}
+
+/* Safe area for bottom navigation (iPhone notch) */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Landscape phone: compact vertical spacing */
+@media (orientation: landscape) and (max-height: 500px) {
+  .landscape-compact-py { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+  .landscape-compact-gap { gap: 0.5rem; }
+  .mobile-bottom-nav { height: 2.75rem; }
+  .main-content-area { padding-bottom: 2.75rem; }
+}
+
+/* Prevent overscroll bounce on mobile — applied globally via body above */
+/* Scrollable content areas should use overscroll-behavior: contain */
+
+/* Image Studio staging animation */
+@keyframes staging-pop {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+@keyframes staging-sparkle {
+  0%, 100% { opacity: 0; transform: scale(0.5) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(180deg); }
+}
+
+/* Felder-Button spark/particle effect when template input is focused */
+.fields-toggle-btn {
+  position: relative;
+  overflow: visible;
+}
+
+.fields-btn-spark {
+  border-color: #818CF8;
+  color: #6366F1;
+  background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.25), 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.fields-btn-spark::before,
+.fields-btn-spark::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.fields-btn-spark::before {
+  width: 4px;
+  height: 4px;
+  background: #818CF8;
+  animation: spark-particle-1 1.2s ease-out infinite;
+}
+
+.fields-btn-spark::after {
+  width: 3px;
+  height: 3px;
+  background: #A78BFA;
+  animation: spark-particle-2 1.2s ease-out 0.4s infinite;
+}
+
+@keyframes spark-particle-1 {
+  0% { opacity: 1; transform: translate(-2px, 50%) scale(1); }
+  60% { opacity: 0.8; transform: translate(-14px, 30%) scale(1.2); }
+  100% { opacity: 0; transform: translate(-20px, 10%) scale(0); }
+}
+
+@keyframes spark-particle-2 {
+  0% { opacity: 1; transform: translate(-2px, 50%) scale(1); }
+  60% { opacity: 0.8; transform: translate(-12px, 70%) scale(1.1); }
+  100% { opacity: 0; transform: translate(-18px, 90%) scale(0); }
+}
+
+/* Extra particles via box-shadow animation */
+.fields-btn-spark {
+  animation: fields-glow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes fields-glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(99, 102, 241, 0.15), 0 2px 8px rgba(0,0,0,0.06); }
+  50% { box-shadow: 0 0 16px rgba(99, 102, 241, 0.35), 0 2px 12px rgba(0,0,0,0.1); }
+}

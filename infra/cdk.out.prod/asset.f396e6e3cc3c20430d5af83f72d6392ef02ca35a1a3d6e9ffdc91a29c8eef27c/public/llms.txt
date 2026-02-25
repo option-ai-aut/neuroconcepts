@@ -1,0 +1,144 @@
+# Immivo AI — KI-Betriebssystem für Immobilienmakler
+# https://immivo.ai
+
+## Was ist Immivo?
+
+Immivo ist das erste vollständig KI-gesteuerte Betriebssystem für Immobilienmakler im deutschsprachigen Raum. Die Plattform automatisiert das gesamte Tagesgeschäft eines Maklers — von der Lead-Qualifizierung über E-Mail-Kommunikation bis hin zu Exposé-Erstellung und Terminbuchung.
+
+Der zentrale KI-Assistent heißt **Mivo**. Er ist rund um die Uhr verfügbar, beantwortet Anfragen in Sekunden, qualifiziert Leads automatisch und erstellt professionelle Exposés — ohne manuellen Aufwand.
+
+## Das Problem, das Immivo löst
+
+Immobilienmakler verbringen bis zu 80% ihrer Zeit mit administrativen Aufgaben:
+- 50+ E-Mails täglich beantworten
+- 3–5 E-Mails pro Terminvereinbarung
+- 2 Stunden pro Exposé-Erstellung
+- Manuelle Dateneingabe in mehrere Portale
+
+Immivo reduziert diesen Overhead durch vollständige Automatisierung.
+
+## Features & Funktionen
+
+### Mivo KI-Assistent
+- 24/7 verfügbar, antwortet auf Anfragen in unter 30 Sekunden
+- Qualifiziert Leads automatisch nach Kaufbereitschaft, Budget und Zeitraum
+- Versteht E-Mails, Anfragen von Portalen und direkte Nachrichten
+- Erstellt Exposés in Minuten auf Basis vorhandener Objektdaten
+- Powered by OpenAI GPT-5
+
+### Intelligentes CRM
+- Vollständige Lead-Verwaltung mit Anrede, Du/Sie-Präferenz und Suchprofilen
+- Automatische Lead-Qualifizierung und Sentiment-Analyse
+- Aktivitäts-Timeline pro Lead
+- Lead-Weiterleitung per E-Mail-Forwarding von Portalen
+
+### E-Mail-Automatisierung
+- White-Label-E-Mail-Versand über eigene Domain
+- Mivo antwortet im Namen des Maklers
+- Eingehende Portal-E-Mails werden automatisch als Leads erfasst
+- Unterstützung für Gmail und SMTP
+
+### Kalender-Integration
+- Automatische Terminbuchung in Google Calendar oder Outlook
+- Besichtigungstermine direkt durch Mivo buchbar
+- Echtzeit-Synchronisation
+
+### KI-Exposé-Editor
+- Professionelle Exposés in Minuten
+- Templates mit Variablen und Live-Vorschau
+- PDF-Export und direkter Versand
+
+### KI-Bildbearbeitung (Virtual Staging)
+- Leere Räume werden mit ultra-realistischen KI-Möbeln eingerichtet
+- Verschiedene Einrichtungsstile wählbar
+- Steigert Aufmerksamkeit um +73%
+- Ergebnis in Sekunden
+
+### Portal-Anbindung
+- 24 Immobilienportale verbunden: ImmoScout24, Willhaben, Immowelt, Homegate, Kleinanzeigen und 19 weitere
+- Ein-Klick-Push von Objekten in alle Portale gleichzeitig
+
+### Objektverwaltung
+- Alle Immobilien an einem Ort
+- Energieausweis, Bilder, Beschreibungen, Portal-Sync
+- Zuordnung zu Leads und Maklern
+
+### Analytics & Reports
+- Echtzeit-Dashboards mit Conversion-Rates
+- Lead-Quellen und Performance-Metriken
+- Zeitersparnis-Tracking
+
+## Ergebnisse (durchschnittliche Nutzerdaten)
+
+- **15 Stunden** Zeitersparnis pro Woche
+- **+40%** mehr qualifizierte Leads
+- **3x** schnellere Reaktionszeit auf Anfragen
+- **+25%** höhere Abschlussquote
+
+## Hosting & Sicherheit
+
+- AWS Frankfurt (EU) — DSGVO-konform
+- Alle Daten verschlüsselt
+- Keine US-Server, kein Datentransfer außerhalb der EU
+- Single Sign-On via Google und Microsoft
+
+## Preise & Pakete
+
+### Starter (kostenlos)
+- Alle Grundfunktionen
+- Mivo KI-Assistent (begrenzt)
+- Bildstudio (begrenzt)
+- Kein Portal-Push
+- E-Mail-Support
+
+### Solo (Pro, kostenpflichtig)
+- Zugriff auf alle Funktionen
+- Unbegrenzter Mivo
+- Unbegrenztes Bildstudio
+- 24 Portal-Integrationen
+- KI-Exposé-Editor
+- CRM + Lead-Management
+- E-Mail & Kalender
+- Priority Support
+
+### Team
+- Alle Solo-Features
+- Team-Verwaltung
+- Gemeinsame Objekte & Leads
+- Rollen & Berechtigungen
+
+### Enterprise
+- Alle Team-Features
+- Eigene Domain
+- Dedizierter Account Manager
+- API-Zugang
+- Custom Integrationen
+- SLA-Garantie
+
+## Sprache & Zielmarkt
+
+Primäre Sprachen: Deutsch, Österreichisches Deutsch
+Zielmärkte: Deutschland, Österreich, Schweiz
+Zielgruppe: Selbstständige Immobilienmakler, kleine und mittlere Maklerbüros, Immobiliengenturen
+
+## Kontakt & Links
+
+- Website: https://immivo.ai
+- Login: https://app.immivo.ai/login
+- Demo buchen: https://app.immivo.ai/demo
+- Pricing: https://immivo.ai/pricing
+- Blog: https://immivo.ai/blog
+- Impressum: https://immivo.ai/imprint
+- Datenschutz: https://immivo.ai/privacy
+- AGB: https://immivo.ai/terms
+
+## Technologie
+
+- Frontend: Next.js, React, Tailwind CSS
+- Backend: AWS Lambda, Node.js, Express
+- Datenbank: PostgreSQL (via Prisma ORM, Neon)
+- KI: OpenAI GPT-5, GPT-5-mini
+- Hosting: AWS Frankfurt (eu-central-1)
+- E-Mail: AWS SES, Gmail API, SMTP
+- Authentifizierung: AWS Cognito
+- Zahlungen: Stripe

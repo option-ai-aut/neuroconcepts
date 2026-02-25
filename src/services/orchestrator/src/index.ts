@@ -186,6 +186,7 @@ async function loadAppSecrets() {
           'WORKMAIL_EMAIL',
           'WORKMAIL_PASSWORD',
           'WORKMAIL_EWS_URL',
+          'WORKMAIL_CREDENTIALS',
           'STRIPE_SECRET_KEY',
           'STRIPE_WEBHOOK_SECRET',
           'INTERNAL_API_SECRET',
@@ -10611,48 +10612,54 @@ app.put('/admin/contacts/:id', adminAuthMiddleware, async (req, res) => {
 
 app.get('/admin/emails', adminAuthMiddleware, async (req, res) => {
   try {
-    const creds = getWorkMailCreds();
-    if (!creds.email || !creds.password) {
-      return res.json({ emails: [], total: 0, unreadCounts: {} });
+    const { getEmails, hasAnyCredentials, getMailboxCredentials } = await import('./services/WorkMailEmailService');
+
+    if (!hasAnyCredentials()) {
+      return res.json({ emails: [], total: 0, error: 'WorkMail not configured. Set WORKMAIL_CREDENTIALS in Secrets Manager.' });
     }
 
-    const mailbox = (req.query.mailbox as string) || creds.email;
+    const mailbox = (req.query.mailbox as string) || process.env.WORKMAIL_EMAIL || '';
     const folder = (req.query.folder as string) || 'INBOX';
     const search = req.query.search as string | undefined;
     const limit = parseInt(req.query.limit as string) || 50;
 
-    const { getEmails } = await import('./services/WorkMailEmailService');
+    const creds = getMailboxCredentials(mailbox);
+    if (!creds) {
+      return res.json({ emails: [], total: 0, error: `Keine Zugangsdaten für ${mailbox}. Bitte WORKMAIL_CREDENTIALS in Secrets Manager konfigurieren.` });
+    }
+
     const result = await getEmails(creds, mailbox, folder as any, limit, search);
 
     res.json({
       emails: result.emails,
       total: result.total,
-      unreadCounts: {},
+      ...(result.error ? { error: result.error } : {}),
     });
   } catch (error: any) {
     console.error('Admin emails error:', error);
-    res.json({ emails: [], total: 0, unreadCounts: {} });
+    res.json({ emails: [], total: 0, error: error?.message || 'Fehler beim Laden der E-Mails' });
   }
 });
 
 app.get('/admin/emails/unread-counts', adminAuthMiddleware, async (req, res) => {
   try {
-    const creds = getWorkMailCreds();
-    if (!creds.email || !creds.password) {
+    const { getUnreadCount, hasAnyCredentials, getMailboxCredentials } = await import('./services/WorkMailEmailService');
+
+    if (!hasAnyCredentials()) {
       return res.json({ counts: {} });
     }
 
+    const creds = getWorkMailCreds();
     const mailboxes = ['office@immivo.ai', 'support@immivo.ai', 'dennis.kral@immivo.ai', 'josef.leutgeb@immivo.ai'];
-    const { getUnreadCount } = await import('./services/WorkMailEmailService');
 
     const counts: Record<string, number> = {};
-    for (const mb of mailboxes) {
+    await Promise.all(mailboxes.map(async (mb) => {
       try {
         counts[mb] = await getUnreadCount(creds, mb);
       } catch {
         counts[mb] = 0;
       }
-    }
+    }));
 
     res.json({ counts });
   } catch (error: any) {
@@ -10663,16 +10670,41 @@ app.get('/admin/emails/unread-counts', adminAuthMiddleware, async (req, res) => 
 
 app.patch('/admin/emails/:id/read', adminAuthMiddleware, async (req, res) => {
   try {
+    const { markEmailRead, hasAnyCredentials } = await import('./services/WorkMailEmailService');
+    if (!hasAnyCredentials()) return res.json({ success: false });
+    const mailbox = req.body.mailbox as string | undefined;
     const creds = getWorkMailCreds();
-    if (!creds.email || !creds.password) {
-      return res.json({ success: false });
-    }
-
-    const { markEmailRead } = await import('./services/WorkMailEmailService');
-    const result = await markEmailRead(creds, req.params.id, req.body.isRead ?? true);
+    const result = await markEmailRead(creds, req.params.id, req.body.isRead ?? true, mailbox);
     res.json({ success: result });
   } catch (error: any) {
     res.json({ success: false });
+  }
+});
+
+// Send email from a WorkMail mailbox
+app.post('/admin/emails/send', adminAuthMiddleware, async (req, res) => {
+  try {
+    const { sendEmail, getMailboxCredentials } = await import('./services/WorkMailEmailService');
+    const { from, to, cc, bcc, subject, bodyHtml, bodyText, replyToMessageId } = req.body;
+
+    if (!from || !to || !subject) {
+      return res.status(400).json({ error: 'from, to und subject sind erforderlich' });
+    }
+
+    if (!getMailboxCredentials(from)) {
+      return res.status(400).json({ error: `Keine Zugangsdaten für ${from}. Bitte WORKMAIL_CREDENTIALS konfigurieren.` });
+    }
+
+    const result = await sendEmail({ from, to: Array.isArray(to) ? to : [to], cc, bcc, subject, bodyHtml, bodyText, replyToMessageId });
+
+    if (!result.success) {
+      return res.status(500).json({ error: result.error || 'Fehler beim Senden' });
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Admin send email error:', error);
+    res.status(500).json({ error: error?.message || 'Fehler beim Senden' });
   }
 });
 
