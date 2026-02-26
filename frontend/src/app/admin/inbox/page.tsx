@@ -176,7 +176,13 @@ export default function AdminInboxPage() {
     setLoadError('');
     try {
       const data = await getAdminEmails(activeMailbox, selectedFolder, searchQuery || undefined);
-      setEmails(data.emails || []);
+      let fetched = data.emails || [];
+      // Hide internal @immivo.ai emails from INBOX (support/personal inboxes should
+      // only show external customer emails, not internal system/forwarded messages)
+      if (selectedFolder === 'INBOX') {
+        fetched = fetched.filter(e => !e.from.toLowerCase().endsWith('@immivo.ai'));
+      }
+      setEmails(fetched);
       if (data.error) {
         // Provide actionable guidance for impersonation errors
         if (data.error.includes('Impersonation') || data.error.includes('ImpersonateUser') || data.error.includes('Access is denied')) {
