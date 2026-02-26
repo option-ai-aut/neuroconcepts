@@ -161,8 +161,8 @@ function AdminSidebar({
     items: section.items.filter(item => canAccessHref(item.href, role, extraPages)),
   })).filter(section => section.items.length > 0);
 
-  const getCount = (key: string | null): number => {
-    if (!key) return 0;
+  const getCount = (key: string | null, active: boolean): number => {
+    if (!key || active) return 0; // Hide badge when on that page
     return (notifCounts as any)[key] ?? 0;
   };
 
@@ -187,7 +187,7 @@ function AdminSidebar({
             <div className="space-y-0.5">
               {section.items.map((item) => {
                 const active = isActive(item.href);
-                const count = getCount(item.notifKey);
+                const count = getCount(item.notifKey, active);
                 return (
                   <Link
                     key={item.name}
@@ -639,6 +639,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       chat: computeChatUnread(prev.channelMsgCounts),
     }));
   }, [pathname]);
+
+  // Re-poll immediately when inbox page signals an email was read
+  useEffect(() => {
+    const handler = () => { if (token) fetchNotifCounts(token); };
+    window.addEventListener('admin-email-read', handler);
+    return () => window.removeEventListener('admin-email-read', handler);
+  }, [token, fetchNotifCounts]);
 
   const notifTotal = notifCounts.contacts + notifCounts.careers + notifCounts.bugReports + notifCounts.chat;
 

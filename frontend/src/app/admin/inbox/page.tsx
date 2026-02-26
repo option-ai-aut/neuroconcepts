@@ -170,21 +170,52 @@ export default function AdminInboxPage() {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [compose, setCompose] = useState<ComposeState>(defaultCompose);
 
+  // Cache: key = "mailbox|folder|search" → { emails, ts }
+  const emailCache = useRef<Record<string, { emails: AdminEmail[]; ts: number }>>({});
+  const CACHE_TTL = 90_000;
+
+  // Immediately clear list when mailbox changes so stale emails don't persist
+  useEffect(() => {
+    setSelectedEmail(null);
+    setEmails([]);
+    setLoadError('');
+  }, [activeMailbox]);
+
   const fetchEmails = useCallback(async () => {
-    if (!activeMailbox) return; // wait for mailbox to load
+    if (!activeMailbox) return;
+    const cacheKey = `${activeMailbox}|${selectedFolder}|${searchQuery}`;
+    const cached = emailCache.current[cacheKey];
+
+    // Show cached data instantly while re-fetching in background
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      setEmails(cached.emails);
+      setLoading(false);
+      setLoadError('');
+      // Silent background refresh
+      getAdminEmails(activeMailbox, selectedFolder, searchQuery || undefined)
+        .then(data => {
+          let fetched = data.emails || [];
+          if (selectedFolder === 'INBOX') {
+            fetched = fetched.filter(e => !e.from.toLowerCase().endsWith('@immivo.ai'));
+          }
+          emailCache.current[cacheKey] = { emails: fetched, ts: Date.now() };
+          setEmails(fetched);
+        })
+        .catch(() => {});
+      return;
+    }
+
     setLoading(true);
     setLoadError('');
     try {
       const data = await getAdminEmails(activeMailbox, selectedFolder, searchQuery || undefined);
       let fetched = data.emails || [];
-      // Hide internal @immivo.ai emails from INBOX (support/personal inboxes should
-      // only show external customer emails, not internal system/forwarded messages)
       if (selectedFolder === 'INBOX') {
         fetched = fetched.filter(e => !e.from.toLowerCase().endsWith('@immivo.ai'));
       }
+      emailCache.current[cacheKey] = { emails: fetched, ts: Date.now() };
       setEmails(fetched);
       if (data.error) {
-        // Provide actionable guidance for impersonation errors
         if (data.error.includes('Impersonation') || data.error.includes('ImpersonateUser') || data.error.includes('Access is denied')) {
           setLoadError(`WorkMail Impersonation nicht eingerichtet. Bitte in der AWS WorkMail Console eine Impersonation-Rolle für "${activeMailbox}" anlegen, die dem Service-Account Zugriff gewährt.`);
         } else if (data.error.includes('nicht konfiguriert') || data.error.includes('WORKMAIL_EMAIL')) {
@@ -222,6 +253,18 @@ export default function AdminInboxPage() {
       try {
         await markAdminEmailRead(email.id, true, activeMailbox);
         setEmails(prev => prev.map(e => e.id === email.id ? { ...e, isRead: true } : e));
+        // Invalidate cache for this mailbox/folder so next load fetches fresh unread count
+        const cacheKey = `${activeMailbox}|${selectedFolder}|${searchQuery}`;
+        if (emailCache.current[cacheKey]) {
+          emailCache.current[cacheKey].ts = 0;
+        }
+        // Update local unread counts display
+        setUnreadCounts(prev => ({
+          ...prev,
+          [activeMailbox]: Math.max(0, (prev[activeMailbox] ?? 1) - 1),
+        }));
+        // Signal layout to re-poll email unread counts
+        window.dispatchEvent(new CustomEvent('admin-email-read'));
       } catch {}
     }
   };
