@@ -190,6 +190,10 @@ async function loadAppSecrets() {
           'STRIPE_SECRET_KEY',
           'STRIPE_WEBHOOK_SECRET',
           'INTERNAL_API_SECRET',
+          'LIVEKIT_API_KEY',
+          'LIVEKIT_API_SECRET',
+          'LIVEKIT_SERVER_URL',
+          'LIVEKIT_SERVER_HOST',
         ];
         for (const key of keysToLoad) {
           if (secrets[key]) process.env[key] = secrets[key];
@@ -366,7 +370,7 @@ async function upsertWorkmailCredential(email: string, password: string | null):
 }
 
 // ── Version-gated migrations ─────────────────────────────────────────────────
-const MIGRATION_VERSION = 16; // Increment when adding new migrations
+const MIGRATION_VERSION = 17; // Increment when adding new migrations
 let _migrationsApplied = false;
 
 async function applyPendingMigrations(db: PrismaClient) {
@@ -573,6 +577,20 @@ async function applyPendingMigrations(db: PrismaClient) {
     // v14: Ensure Email table has correct indexes
     `CREATE INDEX IF NOT EXISTS "Email_tenantId_folder_receivedAt_idx" ON "Email"("tenantId", "folder", "receivedAt")`,
     `CREATE INDEX IF NOT EXISTS "Email_leadId_idx" ON "Email"("leadId")`,
+    // v17 - ActivityType missing enum values + DemoBooking Meet fields
+    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'PORTAL_INQUIRY'`,
+    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'EXPOSE_SENT'`,
+    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'VIEWING_SCHEDULED'`,
+    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'VIEWING_DONE'`,
+    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'MIVO_QUERY'`,
+    `ALTER TYPE "ActivityType" ADD VALUE IF NOT EXISTS 'LINK_CLICK_REQUIRED'`,
+    `ALTER TABLE "LeadActivity" ADD COLUMN IF NOT EXISTS "metadata" JSONB`,
+    `ALTER TYPE "EmailFolder" ADD VALUE IF NOT EXISTS 'FORWARDING'`,
+    `ALTER TYPE "EmailProvider" ADD VALUE IF NOT EXISTS 'OTHER'`,
+    `ALTER TYPE "PendingActionType" ADD VALUE IF NOT EXISTS 'NEW_LEAD_REPLY'`,
+    `ALTER TABLE "DemoBooking" ADD COLUMN IF NOT EXISTS "meetRoomCode" TEXT`,
+    `ALTER TABLE "DemoBooking" ADD COLUMN IF NOT EXISTS "meetLink" TEXT`,
+    `ALTER TABLE "DemoBooking" ADD COLUMN IF NOT EXISTS "assignedUserId" TEXT`,
   ];
   
   for (const sql of migrations) {
@@ -8879,10 +8897,78 @@ app.get('/admin/platform/demo-bookings', adminAuthMiddleware, async (req, res) =
 app.patch('/admin/platform/demo-bookings/:id', adminAuthMiddleware, async (req, res) => {
   try {
     const db = await initializePrisma();
-    const { status, adminNotes } = req.body;
+    const { status, adminNotes, assignedUserId } = req.body;
     const data: any = {};
     if (status) data.status = status;
     if (adminNotes !== undefined) data.adminNotes = adminNotes;
+    if (assignedUserId !== undefined) data.assignedUserId = assignedUserId;
+
+    // When confirming: create LiveKit room + send email with Meet link
+    if (status === 'CONFIRMED') {
+      const existing = await db.demoBooking.findUnique({ where: { id: req.params.id } });
+      if (existing && !existing.meetRoomCode) {
+        try {
+          const { roomService } = await getLiveKitClients();
+          const roomCode = generateRoomCode();
+          await roomService.createRoom({ name: roomCode, emptyTimeout: 600, maxParticipants: 10 });
+          const meetLink = `https://meet.immivo.ai/${roomCode}`;
+          data.meetRoomCode = roomCode;
+          data.meetLink = meetLink;
+
+          // Send confirmation email with Meet link
+          const startDate = new Date(existing.start);
+          const dateStr = startDate.toLocaleDateString('de-AT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+          const timeStr = startDate.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' });
+          const endTimeStr = new Date(existing.end).toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' });
+
+          const { sendSystemEmail } = await import('./services/SystemEmailService');
+          await sendSystemEmail({
+            to: existing.email,
+            subject: `Demo bestätigt: ${dateStr} um ${timeStr} Uhr — Meet-Link`,
+            html: `
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: #111827; color: white; padding: 24px 32px; border-radius: 12px 12px 0 0;">
+                  <h2 style="margin: 0; font-size: 20px;">Deine Demo ist bestätigt!</h2>
+                  <p style="margin: 4px 0 0; opacity: 0.7; font-size: 14px;">Immivo AI</p>
+                </div>
+                <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+                  <p style="margin: 0 0 16px; font-size: 16px; color: #111827;">Hallo ${existing.name},</p>
+                  <p style="margin: 0 0 24px; color: #4b5563;">deine Demo wurde bestätigt. Hier sind alle Details:</p>
+
+                  <div style="background: white; padding: 24px; border-radius: 12px; border: 1px solid #e5e7eb; margin-bottom: 24px;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                      <tr><td style="padding: 6px 0; color: #6b7280; font-size: 14px; width: 100px;">Datum</td><td style="padding: 6px 0; font-weight: 600; color: #111827;">${dateStr}</td></tr>
+                      <tr><td style="padding: 6px 0; color: #6b7280; font-size: 14px;">Uhrzeit</td><td style="padding: 6px 0; font-weight: 600; color: #111827;">${timeStr} – ${endTimeStr} Uhr</td></tr>
+                      <tr><td style="padding: 6px 0; color: #6b7280; font-size: 14px;">Format</td><td style="padding: 6px 0; color: #111827;">Video-Meeting (kein Download nötig)</td></tr>
+                    </table>
+                  </div>
+
+                  <div style="text-align: center; margin-bottom: 24px;">
+                    <a href="${meetLink}" style="display: inline-block; background: #2563eb; color: white; font-weight: 700; font-size: 16px; padding: 16px 32px; border-radius: 12px; text-decoration: none;">
+                      Meeting beitreten
+                    </a>
+                    <p style="margin: 12px 0 0; font-size: 12px; color: #9ca3af;">${meetLink}</p>
+                  </div>
+
+                  <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+                    <p style="margin: 0; font-size: 13px; color: #1d4ed8;">
+                      <strong>Hinweis:</strong> Einfach auf den Link klicken — direkt im Browser, kein Download oder Konto erforderlich.
+                    </p>
+                  </div>
+
+                  <p style="margin: 0; color: #4b5563; font-size: 14px;">
+                    Bei Fragen erreichst du uns unter <a href="mailto:office@immivo.ai" style="color: #2563eb;">office@immivo.ai</a>.
+                  </p>
+                  <p style="margin: 16px 0 0; color: #4b5563; font-size: 14px;">Bis bald!<br/><strong>Das Immivo Team</strong></p>
+                </div>
+              </div>`,
+            replyTo: 'office@immivo.ai',
+          }).catch(e => console.warn('Meet confirmation email failed:', e.message));
+        } catch (meetErr: any) {
+          console.warn('Meet room creation failed (non-fatal):', meetErr.message);
+        }
+      }
+    }
 
     const booking = await db.demoBooking.update({
       where: { id: req.params.id },
@@ -8892,6 +8978,89 @@ app.patch('/admin/platform/demo-bookings/:id', adminAuthMiddleware, async (req, 
   } catch (error: any) {
     console.error('Demo booking update error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// ============================================
+// Meet API (LiveKit Video Rooms)
+// ============================================
+
+function generateRoomCode(length = 8): string {
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+async function getLiveKitClients() {
+  const { RoomServiceClient, AccessToken } = await import('livekit-server-sdk');
+  const apiKey = process.env.LIVEKIT_API_KEY;
+  const apiSecret = process.env.LIVEKIT_API_SECRET;
+  const host = process.env.LIVEKIT_SERVER_HOST || 'http://52.28.12.176:7880';
+  if (!apiKey || !apiSecret) throw new Error('LiveKit credentials not configured');
+  const roomService = new RoomServiceClient(host, apiKey, apiSecret);
+  return { roomService, AccessToken, apiKey, apiSecret };
+}
+
+// Create a new room
+app.post('/meet/rooms', async (req, res) => {
+  try {
+    const { roomService } = await getLiveKitClients();
+    const roomCode = generateRoomCode();
+    await roomService.createRoom({
+      name: roomCode,
+      emptyTimeout: 300,
+      maxParticipants: 10,
+    });
+    res.json({ roomCode, url: `https://meet.immivo.ai/${roomCode}` });
+  } catch (error: any) {
+    console.error('Create room error:', error);
+    res.status(500).json({ error: 'Raum konnte nicht erstellt werden' });
+  }
+});
+
+// Get room info
+app.get('/meet/rooms/:code', async (req, res) => {
+  try {
+    const { roomService } = await getLiveKitClients();
+    const rooms = await roomService.listRooms([req.params.code]);
+    if (rooms.length === 0) return res.status(404).json({ error: 'Raum nicht gefunden oder bereits beendet' });
+    const room = rooms[0];
+    res.json({
+      roomCode: room.name,
+      numParticipants: room.numParticipants,
+      creationTime: room.creationTime,
+      exists: true,
+    });
+  } catch (error: any) {
+    console.error('Room info error:', error);
+    res.status(500).json({ error: 'Raum-Info nicht verfügbar' });
+  }
+});
+
+// Generate participant token (join room)
+app.post('/meet/rooms/:code/join', async (req, res) => {
+  try {
+    const { AccessToken, apiKey, apiSecret } = await getLiveKitClients();
+    const { name } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Name erforderlich' });
+    const roomCode = req.params.code;
+
+    const token = new AccessToken(apiKey, apiSecret, {
+      identity: `${name.trim()}-${Date.now()}`,
+      name: name.trim(),
+      ttl: '4h',
+    });
+    token.addGrant({
+      room: roomCode,
+      roomJoin: true,
+      canPublish: true,
+      canSubscribe: true,
+      canPublishData: true,
+    });
+    const jwt = await token.toJwt();
+    res.json({ token: jwt, roomCode, serverUrl: process.env.LIVEKIT_SERVER_URL || 'wss://meet.immivo.ai' });
+  } catch (error: any) {
+    console.error('Join room error:', error);
+    res.status(500).json({ error: 'Token konnte nicht erstellt werden' });
   }
 });
 
@@ -10432,11 +10601,24 @@ function getAllowedMailboxes(callerEmail: string, role: string): string[] {
 // Forces a fresh secrets reload so results reflect current Secrets Manager state.
 app.get('/admin/workmail-status', async (_req, res) => {
   appSecretsLoaded = false; // force reload every time this endpoint is called
+
+  // Also show raw keys from the secret (without values) for debugging
+  const secretArn = process.env.APP_SECRET_ARN || '';
+  let rawSecretKeys: string[] = [];
+  if (secretArn) {
+    try {
+      const sm = new AWS.SecretsManager();
+      const raw = await sm.getSecretValue({ SecretId: secretArn }).promise();
+      if (raw.SecretString) rawSecretKeys = Object.keys(JSON.parse(raw.SecretString));
+    } catch (e: any) {
+      rawSecretKeys = [`ERROR: ${e.message}`];
+    }
+  }
+
   await loadAppSecrets();
   const email = process.env.WORKMAIL_EMAIL || '';
   const password = process.env.WORKMAIL_PASSWORD || '';
   const credsRaw = process.env.WORKMAIL_CREDENTIALS || '';
-  const secretArn = process.env.APP_SECRET_ARN || '';
   let parsedCreds: string[] = [];
   let credsParseError = '';
   if (credsRaw) {
@@ -10449,8 +10631,9 @@ app.get('/admin/workmail-status', async (_req, res) => {
     smtpMailboxes: parsedCreds,
     credentialsParseError: credsParseError || undefined,
     ewsUrl: process.env.WORKMAIL_EWS_URL || '(default)',
-    secretArn: secretArn ? `${secretArn.slice(0, 40)}…` : '✗ NOT SET — check APP_SECRET_ARN env var',
-    appSecretsLoadedFlag: appSecretsLoaded,
+    secretArn: secretArn ? `${secretArn.slice(0, 50)}…` : '✗ NOT SET',
+    // All key names currently stored in the secret (no values shown):
+    allSecretKeys: rawSecretKeys,
   });
 });
 
