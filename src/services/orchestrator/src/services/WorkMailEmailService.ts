@@ -97,7 +97,7 @@ function createImpersonatedService(targetEmail: string): ExchangeService {
   const svc = getServiceCreds();
   if (!svc) throw new Error('WorkMail service account (WORKMAIL_EMAIL/PASSWORD) not configured');
 
-  const service = new ExchangeService(ExchangeVersion.Exchange2013_SP1);
+  const service = new ExchangeService(ExchangeVersion.Exchange2010_SP2);
   service.Url = new Uri(EWS_URL);
   service.Credentials = new WebCredentials(svc.email, svc.password);
 
