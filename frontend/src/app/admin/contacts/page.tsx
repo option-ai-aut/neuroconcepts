@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { fetchAuthSession } from 'aws-amplify/auth';
-import { Mail, Clock, CheckCircle2, AlertCircle, Loader2, MessageSquare, User, CalendarDays, Building2, Phone } from 'lucide-react';
+import { Mail, Clock, CheckCircle2, AlertCircle, Loader2, MessageSquare, User, CalendarDays, Building2, Video, ExternalLink, Copy } from 'lucide-react';
 import { useRuntimeConfig } from '@/components/RuntimeConfigProvider';
 import { getAdminDemoBookings, updateAdminDemoBooking, DemoBooking } from '@/lib/adminApi';
 
@@ -108,12 +108,17 @@ export default function AdminContactsPage() {
     }
   };
 
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
   const updateDemoStatus = async (id: string, status: string) => {
     try {
+      if (status === 'CONFIRMED') setConfirmingId(id);
       await updateAdminDemoBooking(id, { status });
       fetchDemos();
     } catch (err) {
       console.error('Failed to update demo:', err);
+    } finally {
+      setConfirmingId(null);
     }
   };
 
@@ -320,12 +325,37 @@ export default function AdminContactsPage() {
                             <p className="text-sm text-gray-700 whitespace-pre-wrap">{demo.adminNotes}</p>
                           </div>
                         )}
+                        {/* Meet link display */}
+                        {demo.meetLink && (
+                          <div className="mb-4 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5">
+                            <Video className="w-4 h-4 text-blue-600 shrink-0" />
+                            <span className="text-xs text-blue-800 font-medium truncate flex-1">{demo.meetLink}</span>
+                            <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(demo.meetLink!); }}
+                              className="p-1 hover:bg-blue-100 rounded transition-colors shrink-0" title="Kopieren">
+                              <Copy className="w-3.5 h-3.5 text-blue-600" />
+                            </button>
+                            <a href={demo.meetLink} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                              className="p-1 hover:bg-blue-100 rounded transition-colors shrink-0" title="Öffnen">
+                              <ExternalLink className="w-3.5 h-3.5 text-blue-600" />
+                            </a>
+                          </div>
+                        )}
+
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs text-gray-500">Status:</span>
                           {(['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] as const).map((key) => (
-                            <button key={key} onClick={(e) => { e.stopPropagation(); updateDemoStatus(demo.id, key); }}
-                              className={`px-3 py-1 text-xs rounded-lg transition-colors ${demo.status === key ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                              {DEMO_STATUS_CONFIG[key].label}
+                            <button key={key} onClick={(e) => {
+                              e.stopPropagation();
+                              updateDemoStatus(demo.id, key);
+                            }}
+                              disabled={confirmingId === demo.id}
+                              className={`px-3 py-1 text-xs rounded-lg transition-colors flex items-center gap-1 ${demo.status === key ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                              {key === 'CONFIRMED' && confirmingId === demo.id
+                                ? <><Loader2 className="w-3 h-3 animate-spin" /> Erstelle Meet...</>
+                                : key === 'CONFIRMED' && !demo.meetLink
+                                  ? <><Video className="w-3 h-3" /> Bestätigen & Meet erstellen</>
+                                  : DEMO_STATUS_CONFIG[key].label
+                              }
                             </button>
                           ))}
                           <a href={`mailto:${demo.email}?subject=Demo Call – ${demo.name}`} onClick={(e) => e.stopPropagation()}

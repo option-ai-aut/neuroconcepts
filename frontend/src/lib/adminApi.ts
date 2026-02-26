@@ -203,6 +203,9 @@ export interface DemoBooking {
   eventId: string | null;
   status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
   adminNotes: string | null;
+  meetRoomCode: string | null;
+  meetLink: string | null;
+  assignedUserId: string | null;
   createdAt: string;
 }
 
@@ -215,7 +218,7 @@ export interface DemoBookingsResponse {
 export const getAdminDemoBookings = (status?: string) =>
   adminFetch<DemoBookingsResponse>(`/admin/platform/demo-bookings${status && status !== 'ALL' ? `?status=${status}` : ''}`);
 
-export const updateAdminDemoBooking = (id: string, data: { status?: string; adminNotes?: string }) =>
+export const updateAdminDemoBooking = (id: string, data: { status?: string; adminNotes?: string; assignedUserId?: string }) =>
   adminFetch<DemoBooking>(`/admin/platform/demo-bookings/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 
 export const backfillPortalEmails = () =>
