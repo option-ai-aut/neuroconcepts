@@ -8243,7 +8243,8 @@ async function ensureAdminStaff(db: any) {
     await db.adminStaff.upsert({
       where: { email: f.email },
       create: f,
-      update: { role: f.role, firstName: f.firstName, lastName: f.lastName },
+      // Only sync name — never overwrite role so manual promotions are preserved
+      update: { firstName: f.firstName, lastName: f.lastName },
     });
   }
 }
