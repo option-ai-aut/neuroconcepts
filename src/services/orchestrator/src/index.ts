@@ -9071,8 +9071,7 @@ app.patch('/admin/platform/demo-bookings/:id', adminAuthMiddleware, async (req, 
             await sendSystemEmail({
               to: staffEmail,
               subject: `Demo bestätigt: ${existing.name} – ${dateStr} ${timeStr} Uhr`,
-              html: `
-                `<!DOCTYPE html>
+              html: `<!DOCTYPE html>
 <html lang="de">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
