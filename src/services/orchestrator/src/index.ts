@@ -10775,23 +10775,41 @@ app.get('/admin/emails/test-connection', async (_req, res) => {
     });
   }
 
-  // Try to read the service account inbox (no impersonation needed — quickest test)
+  // Optional: test impersonation for a specific mailbox via ?mailbox=x@immivo.ai
+  const testMailbox = (_req as any).query?.mailbox as string | undefined;
+
   try {
     const { getEmails } = await import('./services/WorkMailEmailService');
-    const result = await getEmails(
-      { email: svcEmail, password: svcPassword },
-      svcEmail,
-      'INBOX',
-      1, // just 1 email to test connectivity
-    );
-    if (result.error) {
-      return res.json({ ok: false, step: 'ews', error: result.error, serviceAccount: svcEmail });
+    // First test: service account own inbox (no impersonation)
+    const ownResult = await getEmails({ email: svcEmail, password: svcPassword }, svcEmail, 'INBOX', 1);
+    if (ownResult.error) {
+      return res.json({ ok: false, step: 'ews', error: ownResult.error, serviceAccount: svcEmail });
     }
+
+    // Second test: impersonation for a different mailbox (if requested)
+    if (testMailbox && testMailbox.toLowerCase() !== svcEmail.toLowerCase()) {
+      const impResult = await getEmails({ email: testMailbox, password: '' }, testMailbox, 'INBOX', 1);
+      if (impResult.error) {
+        return res.json({
+          ok: false,
+          step: 'impersonation',
+          error: impResult.error,
+          serviceAccount: svcEmail,
+          testedMailbox: testMailbox,
+          hint: 'WorkMail Console → Organization → Impersonation roles → Create role → give Full Access to ' + svcEmail,
+        });
+      }
+      return res.json({
+        ok: true, serviceAccount: svcEmail, testedMailbox: testMailbox,
+        message: `Impersonation für ${testMailbox} ✓ — ${impResult.total} E-Mail(s)`,
+      });
+    }
+
     return res.json({
       ok: true,
       serviceAccount: svcEmail,
-      inboxCount: result.total,
-      message: `WorkMail verbunden ✓ — ${result.total} E-Mail(s) im Service-Account-Postfach`,
+      inboxCount: ownResult.total,
+      message: `WorkMail verbunden ✓ — ${ownResult.total} E-Mail(s) im Service-Account-Postfach`,
     });
   } catch (e: any) {
     return res.json({ ok: false, step: 'ews_exception', error: e.message, serviceAccount: svcEmail });
