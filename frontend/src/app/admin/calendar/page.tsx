@@ -57,6 +57,8 @@ export default function AdminCalendarPage() {
   const [newEventStartTime, setNewEventStartTime] = useState('09:00');
   const [newEventEndTime, setNewEventEndTime] = useState('10:00');
   const [newEventSaving, setNewEventSaving] = useState(false);
+  const [newEventAddCall, setNewEventAddCall] = useState(false);
+  const [newEventAttendeesInput, setNewEventAttendeesInput] = useState('');
 
   const weekStart = new Date(currentDate);
   weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
@@ -205,25 +207,64 @@ export default function AdminCalendarPage() {
       const start = new Date(`${newEventDate}T${newEventStartTime}:00`);
       const end = new Date(`${newEventDate}T${newEventEndTime}:00`);
 
+      // Parse attendees (comma or newline separated)
+      const attendeeList = newEventAttendeesInput
+        .split(/[,\n]/)
+        .map(e => e.trim())
+        .filter(e => e.includes('@'));
+
+      // Optionally create a LiveKit video call room
+      let meetLink: string | undefined;
+      if (newEventAddCall) {
+        try {
+          const roomData = await adminFetch('/meet/rooms', { method: 'POST' });
+          meetLink = roomData.url;
+        } catch (roomErr) {
+          console.error('Failed to create meet room:', roomErr);
+        }
+      }
+
+      const eventBody = {
+        subject: newEventSubject,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        ...(meetLink && { meetLink, location: meetLink }),
+        ...(attendeeList.length > 0 && { attendees: attendeeList }),
+      };
+
       // Create in personal calendar
       await adminFetch('/calendar/events', {
         method: 'POST',
-        body: JSON.stringify({ subject: newEventSubject, start: start.toISOString(), end: end.toISOString() }),
+        body: JSON.stringify(eventBody),
       });
 
       // Also sync to office@ calendar
       try {
         await adminFetch('/calendar/events/sync-to-office', {
           method: 'POST',
-          body: JSON.stringify({ subject: newEventSubject, start: start.toISOString(), end: end.toISOString() }),
+          body: JSON.stringify(eventBody),
         });
       } catch (syncErr) {
         console.error('Office sync failed:', syncErr);
       }
 
+      // Send email invitations to external attendees
+      if (attendeeList.length > 0) {
+        try {
+          await adminFetch('/calendar/events/send-invites', {
+            method: 'POST',
+            body: JSON.stringify({ subject: newEventSubject, start: start.toISOString(), end: end.toISOString(), attendees: attendeeList, meetLink }),
+          });
+        } catch (inviteErr) {
+          console.error('Invite emails failed:', inviteErr);
+        }
+      }
+
       setShowNewEvent(false);
       setNewEventSubject('');
       setNewEventDate('');
+      setNewEventAddCall(false);
+      setNewEventAttendeesInput('');
       fetchCalendars();
     } catch (err) {
       console.error('Failed to create event:', err);
@@ -481,6 +522,34 @@ export default function AdminCalendarPage() {
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                 </div>
               </div>
+              {/* Video Call Option */}
+              <div className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-2">
+                  <Video className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm text-gray-700 font-medium">Video-Call hinzufügen</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNewEventAddCall(v => !v)}
+                  className={`w-10 h-5 rounded-full transition-colors relative ${newEventAddCall ? 'bg-blue-600' : 'bg-gray-300'}`}
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${newEventAddCall ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+
+              {/* Attendees */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Eingeladene (optional)</label>
+                <textarea
+                  value={newEventAttendeesInput}
+                  onChange={(e) => setNewEventAttendeesInput(e.target.value)}
+                  placeholder="E-Mail-Adressen, komma- oder zeilengetrennt&#10;z.B. max@example.com, anna@example.com"
+                  rows={2}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                />
+                <p className="text-xs text-gray-400 mt-1">Eingeladene erhalten eine E-Mail mit Kalender-Einladung (.ics)</p>
+              </div>
+
               <p className="text-xs text-gray-400 flex items-center gap-1">
                 <Calendar className="w-3 h-3" />
                 Wird automatisch in deinem und im Office-Kalender eingetragen

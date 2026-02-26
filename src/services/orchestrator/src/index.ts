@@ -8903,7 +8903,7 @@ app.patch('/admin/platform/demo-bookings/:id', adminAuthMiddleware, async (req, 
     if (adminNotes !== undefined) data.adminNotes = adminNotes;
     if (assignedUserId !== undefined) data.assignedUserId = assignedUserId;
 
-    // When confirming: create LiveKit room + send email with Meet link
+    // When confirming: create LiveKit room + calendar entries + send emails with .ics
     if (status === 'CONFIRMED') {
       const existing = await db.demoBooking.findUnique({ where: { id: req.params.id } });
       if (existing && !existing.meetRoomCode) {
@@ -8915,16 +8915,85 @@ app.patch('/admin/platform/demo-bookings/:id', adminAuthMiddleware, async (req, 
           data.meetRoomCode = roomCode;
           data.meetLink = meetLink;
 
-          // Send confirmation email with Meet link
           const startDate = new Date(existing.start);
+          const endDate = new Date(existing.end);
           const dateStr = startDate.toLocaleDateString('de-AT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
           const timeStr = startDate.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' });
-          const endTimeStr = new Date(existing.end).toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' });
+          const endTimeStr = endDate.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' });
+          const eventSubject = `Demo Call – ${existing.name}${existing.company ? ` (${existing.company})` : ''}`;
 
-          const { sendSystemEmail } = await import('./services/SystemEmailService');
+          // Look up assigned staff member email
+          let staffEmail: string | null = null;
+          const resolvedUserId = assignedUserId || existing.assignedUserId;
+          if (resolvedUserId) {
+            try {
+              const staffUser = await db.user.findUnique({ where: { id: resolvedUserId }, select: { email: true } });
+              if (staffUser?.email) staffEmail = staffUser.email;
+            } catch (e) { /* non-fatal */ }
+          }
+
+          // Create WorkMail calendar event for office@ (visible to whole team)
+          const { sendSystemEmail, generateIcs } = await import('./services/SystemEmailService');
+          try {
+            const { createCalendarEvent: createWMEvent } = await import('./services/WorkMailCalendarService');
+            const wmCreds = getWorkMailCreds();
+            if (wmCreds.email && wmCreds.password) {
+              const attendees = [existing.email, ...(staffEmail ? [staffEmail] : [])];
+              await createWMEvent(
+                { email: 'office@immivo.ai', password: wmCreds.password },
+                {
+                  subject: eventSubject,
+                  body: `Demo-Termin mit ${existing.name}\nE-Mail: ${existing.email}${existing.company ? `\nUnternehmen: ${existing.company}` : ''}${existing.message ? `\nNachricht: ${existing.message}` : ''}\n\nMeeting-Link: ${meetLink}`,
+                  start: startDate,
+                  end: endDate,
+                  location: meetLink,
+                  meetLink,
+                  attendees,
+                }
+              );
+              console.log('✅ Office WorkMail calendar event created for demo confirmation');
+
+              // Also create event in assigned staff member's own calendar
+              if (staffEmail) {
+                try {
+                  await createWMEvent(
+                    { email: staffEmail, password: wmCreds.password },
+                    {
+                      subject: eventSubject,
+                      body: `Demo-Termin mit ${existing.name}\nE-Mail: ${existing.email}\n\nMeeting-Link: ${meetLink}`,
+                      start: startDate,
+                      end: endDate,
+                      location: meetLink,
+                      meetLink,
+                      attendees: [existing.email],
+                    }
+                  );
+                  console.log(`✅ Staff WorkMail calendar event created for ${staffEmail}`);
+                } catch (staffCalErr: any) {
+                  console.warn(`⚠️ Staff calendar event failed (non-fatal):`, staffCalErr.message);
+                }
+              }
+            }
+          } catch (calErr: any) {
+            console.warn('⚠️ WorkMail calendar event failed (non-fatal):', calErr.message);
+          }
+
+          // Generate .ics calendar invite for prospect email
+          const icsContent = generateIcs({
+            uid: `demo-${existing.id}`,
+            subject: eventSubject,
+            description: `Immivo AI Demo\n\nMeeting-Link: ${meetLink}\n\nEinfach auf den Link klicken – kein Download nötig.`,
+            location: meetLink,
+            start: startDate,
+            end: endDate,
+            organizer: 'office@immivo.ai',
+            attendees: [existing.email],
+          });
+
+          // Send confirmation email to prospect with .ics attachment
           await sendSystemEmail({
             to: existing.email,
-            subject: `Demo bestätigt: ${dateStr} um ${timeStr} Uhr — Meet-Link`,
+            subject: `Demo bestätigt: ${dateStr} um ${timeStr} Uhr`,
             html: `
               <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
                 <div style="background: #111827; color: white; padding: 24px 32px; border-radius: 12px 12px 0 0;">
@@ -8934,7 +9003,6 @@ app.patch('/admin/platform/demo-bookings/:id', adminAuthMiddleware, async (req, 
                 <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
                   <p style="margin: 0 0 16px; font-size: 16px; color: #111827;">Hallo ${existing.name},</p>
                   <p style="margin: 0 0 24px; color: #4b5563;">deine Demo wurde bestätigt. Hier sind alle Details:</p>
-
                   <div style="background: white; padding: 24px; border-radius: 12px; border: 1px solid #e5e7eb; margin-bottom: 24px;">
                     <table style="width: 100%; border-collapse: collapse;">
                       <tr><td style="padding: 6px 0; color: #6b7280; font-size: 14px; width: 100px;">Datum</td><td style="padding: 6px 0; font-weight: 600; color: #111827;">${dateStr}</td></tr>
@@ -8942,28 +9010,68 @@ app.patch('/admin/platform/demo-bookings/:id', adminAuthMiddleware, async (req, 
                       <tr><td style="padding: 6px 0; color: #6b7280; font-size: 14px;">Format</td><td style="padding: 6px 0; color: #111827;">Video-Meeting (kein Download nötig)</td></tr>
                     </table>
                   </div>
-
                   <div style="text-align: center; margin-bottom: 24px;">
-                    <a href="${meetLink}" style="display: inline-block; background: #2563eb; color: white; font-weight: 700; font-size: 16px; padding: 16px 32px; border-radius: 12px; text-decoration: none;">
-                      Meeting beitreten
-                    </a>
+                    <a href="${meetLink}" style="display: inline-block; background: #2563eb; color: white; font-weight: 700; font-size: 16px; padding: 16px 32px; border-radius: 12px; text-decoration: none;">Meeting beitreten</a>
                     <p style="margin: 12px 0 0; font-size: 12px; color: #9ca3af;">${meetLink}</p>
                   </div>
-
+                  <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+                    <p style="margin: 0; font-size: 13px; color: #166534;">
+                      <strong>Kalender-Einladung:</strong> Im Anhang findest du eine .ics-Datei – einfach öffnen, um den Termin zu deinem Kalender hinzuzufügen.
+                    </p>
+                  </div>
                   <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
                     <p style="margin: 0; font-size: 13px; color: #1d4ed8;">
                       <strong>Hinweis:</strong> Einfach auf den Link klicken — direkt im Browser, kein Download oder Konto erforderlich.
                     </p>
                   </div>
-
-                  <p style="margin: 0; color: #4b5563; font-size: 14px;">
-                    Bei Fragen erreichst du uns unter <a href="mailto:office@immivo.ai" style="color: #2563eb;">office@immivo.ai</a>.
-                  </p>
+                  <p style="margin: 0; color: #4b5563; font-size: 14px;">Bei Fragen erreichst du uns unter <a href="mailto:office@immivo.ai" style="color: #2563eb;">office@immivo.ai</a>.</p>
                   <p style="margin: 16px 0 0; color: #4b5563; font-size: 14px;">Bis bald!<br/><strong>Das Immivo Team</strong></p>
                 </div>
               </div>`,
             replyTo: 'office@immivo.ai',
+            attachments: [{ filename: 'termin-immivo-demo.ics', content: icsContent, contentType: 'text/calendar' }],
           }).catch(e => console.warn('Meet confirmation email failed:', e.message));
+
+          // Send internal notification to assigned staff member
+          if (staffEmail) {
+            const staffIcs = generateIcs({
+              uid: `demo-staff-${existing.id}`,
+              subject: eventSubject,
+              description: `Demo mit ${existing.name} (${existing.email})\n\nMeeting-Link: ${meetLink}`,
+              location: meetLink,
+              start: startDate,
+              end: endDate,
+              organizer: 'office@immivo.ai',
+              attendees: [staffEmail, existing.email],
+            });
+            await sendSystemEmail({
+              to: staffEmail,
+              subject: `Demo bestätigt: ${existing.name} – ${dateStr} ${timeStr} Uhr`,
+              html: `
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <div style="background: #1e40af; color: white; padding: 24px 32px; border-radius: 12px 12px 0 0;">
+                    <h2 style="margin: 0; font-size: 20px;">Demo-Termin bestätigt</h2>
+                    <p style="margin: 4px 0 0; opacity: 0.7; font-size: 14px;">Interne Benachrichtigung</p>
+                  </div>
+                  <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+                    <p style="margin: 0 0 16px; font-size: 16px; color: #111827;">Du wurdest für diesen Demo-Termin eingeteilt:</p>
+                    <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e5e7eb; margin-bottom: 20px;">
+                      <table style="width: 100%; border-collapse: collapse;">
+                        <tr><td style="padding: 5px 0; color: #6b7280; font-size: 14px; width: 100px;">Kontakt</td><td style="padding: 5px 0; font-weight: 600;">${existing.name}${existing.company ? ` – ${existing.company}` : ''}</td></tr>
+                        <tr><td style="padding: 5px 0; color: #6b7280; font-size: 14px;">E-Mail</td><td style="padding: 5px 0;">${existing.email}</td></tr>
+                        <tr><td style="padding: 5px 0; color: #6b7280; font-size: 14px;">Datum</td><td style="padding: 5px 0; font-weight: 600;">${dateStr}</td></tr>
+                        <tr><td style="padding: 5px 0; color: #6b7280; font-size: 14px;">Uhrzeit</td><td style="padding: 5px 0; font-weight: 600;">${timeStr} – ${endTimeStr} Uhr</td></tr>
+                      </table>
+                    </div>
+                    <div style="text-align: center; margin-bottom: 20px;">
+                      <a href="${meetLink}" style="display: inline-block; background: #1e40af; color: white; font-weight: 700; font-size: 15px; padding: 14px 28px; border-radius: 10px; text-decoration: none;">Meeting öffnen</a>
+                    </div>
+                    <p style="margin: 0; font-size: 13px; color: #6b7280;">Kalender-Einladung im Anhang (.ics).</p>
+                  </div>
+                </div>`,
+              attachments: [{ filename: 'demo-termin.ics', content: staffIcs, contentType: 'text/calendar' }],
+            }).catch(e => console.warn('Staff notification email failed:', e.message));
+          }
         } catch (meetErr: any) {
           console.warn('Meet room creation failed (non-fatal):', meetErr.message);
         }
@@ -10930,6 +11038,87 @@ app.delete('/admin/platform/users/:id', adminAuthMiddleware, async (req, res) =>
     res.json({ success: true });
   } catch (error: any) {
     console.error('Admin delete user error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Calendar: Send invitation emails with .ics to attendees
+// ═══════════════════════════════════════════════════════════════════
+
+app.post('/calendar/events/send-invites', authMiddleware, async (req: any, res) => {
+  try {
+    const { subject, start, end, attendees, meetLink, location } = req.body;
+    if (!subject || !start || !end || !attendees?.length) {
+      return res.status(400).json({ error: 'subject, start, end, attendees required' });
+    }
+
+    const { sendSystemEmail, generateIcs } = await import('./services/SystemEmailService');
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const dateStr = startDate.toLocaleDateString('de-AT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStr = startDate.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' });
+    const endTimeStr = endDate.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' });
+
+    const uid = `cal-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const icsContent = generateIcs({
+      uid,
+      subject,
+      description: meetLink ? `Meeting-Link: ${meetLink}` : subject,
+      location: location || meetLink || '',
+      start: startDate,
+      end: endDate,
+      organizer: 'office@immivo.ai',
+      attendees,
+    });
+
+    const meetSection = meetLink
+      ? `<div style="text-align:center;margin:20px 0;">
+           <a href="${meetLink}" style="display:inline-block;background:#2563eb;color:white;font-weight:700;font-size:15px;padding:12px 28px;border-radius:10px;text-decoration:none;">Meeting beitreten</a>
+           <p style="margin:8px 0 0;font-size:11px;color:#9ca3af;">${meetLink}</p>
+         </div>`
+      : '';
+
+    const html = `
+      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:580px;margin:0 auto;">
+        <div style="background:#111827;color:white;padding:22px 28px;border-radius:12px 12px 0 0;">
+          <h2 style="margin:0;font-size:18px;">Kalender-Einladung: ${subject}</h2>
+          <p style="margin:4px 0 0;opacity:0.7;font-size:13px;">Immivo AI</p>
+        </div>
+        <div style="background:#f9fafb;padding:28px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;">
+          <p style="margin:0 0 20px;font-size:15px;color:#111827;">Du wurdest zu folgendem Termin eingeladen:</p>
+          <div style="background:white;padding:20px;border-radius:10px;border:1px solid #e5e7eb;margin-bottom:20px;">
+            <table style="width:100%;border-collapse:collapse;">
+              <tr><td style="padding:5px 0;color:#6b7280;font-size:13px;width:80px;">Titel</td><td style="padding:5px 0;font-weight:600;color:#111827;">${subject}</td></tr>
+              <tr><td style="padding:5px 0;color:#6b7280;font-size:13px;">Datum</td><td style="padding:5px 0;font-weight:600;color:#111827;">${dateStr}</td></tr>
+              <tr><td style="padding:5px 0;color:#6b7280;font-size:13px;">Uhrzeit</td><td style="padding:5px 0;font-weight:600;color:#111827;">${timeStr} – ${endTimeStr} Uhr</td></tr>
+            </table>
+          </div>
+          ${meetSection}
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px;margin-bottom:16px;">
+            <p style="margin:0;font-size:12px;color:#166534;">
+              <strong>Kalender-Einladung im Anhang (.ics):</strong> Öffne die angehängte Datei, um den Termin zu deinem Kalender hinzuzufügen.
+            </p>
+          </div>
+          <p style="margin:0;color:#6b7280;font-size:13px;">Bei Fragen: <a href="mailto:office@immivo.ai" style="color:#2563eb;">office@immivo.ai</a></p>
+        </div>
+      </div>`;
+
+    let sent = 0;
+    for (const email of attendees) {
+      const ok = await sendSystemEmail({
+        to: email,
+        subject: `Einladung: ${subject} – ${dateStr} ${timeStr} Uhr`,
+        html,
+        replyTo: 'office@immivo.ai',
+        attachments: [{ filename: 'termin-einladung.ics', content: icsContent, contentType: 'text/calendar' }],
+      });
+      if (ok) sent++;
+    }
+
+    res.json({ success: true, sent });
+  } catch (error: any) {
+    console.error('Send invites error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });

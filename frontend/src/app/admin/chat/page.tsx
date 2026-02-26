@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
-  MessageSquare, Plus, Hash, Send, Loader2, X, Trash2, Pencil, Check, Users, Menu
+  MessageSquare, Plus, Hash, Send, Loader2, X, Trash2, Pencil, Check, Users, Menu, Video, Copy, ExternalLink
 } from 'lucide-react';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { getRuntimeConfig } from '@/components/EnvProvider';
@@ -58,6 +58,12 @@ export default function AdminChatPage() {
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
   const [editChannelName, setEditChannelName] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Meeting room
+  const [showMeetingModal, setShowMeetingModal] = useState(false);
+  const [meetingCreating, setMeetingCreating] = useState(false);
+  const [meetingLink, setMeetingLink] = useState<string | null>(null);
+  const [meetingCopied, setMeetingCopied] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -152,6 +158,35 @@ export default function AdminChatPage() {
     } catch (err) {
       console.error('Failed to update channel:', err);
     }
+  };
+
+  const handleCreateMeeting = async () => {
+    setMeetingCreating(true);
+    setMeetingLink(null);
+    try {
+      const data = await adminFetch('/meet/rooms', { method: 'POST' });
+      setMeetingLink(data.url);
+      // Optionally post the link to the current channel
+      if (selectedChannel) {
+        await adminFetch(`/admin/team/channels/${selectedChannel.id}/messages`, {
+          method: 'POST',
+          body: JSON.stringify({ content: `Video-Meeting gestartet: ${data.url}` }),
+        });
+        fetchMessages(selectedChannel.id);
+      }
+    } catch (err) {
+      console.error('Failed to create meeting:', err);
+    } finally {
+      setMeetingCreating(false);
+    }
+  };
+
+  const handleCopyMeetingLink = () => {
+    if (!meetingLink) return;
+    navigator.clipboard.writeText(meetingLink).then(() => {
+      setMeetingCopied(true);
+      setTimeout(() => setMeetingCopied(false), 2000);
+    });
   };
 
   const handleDeleteChannel = async (channelId: string) => {
@@ -270,7 +305,15 @@ export default function AdminChatPage() {
                 <Menu className="w-5 h-5" />
               </button>
               <Hash className="w-4 h-4 text-gray-400" />
-              <span className="font-semibold text-sm text-gray-900">{selectedChannel.name}</span>
+              <span className="font-semibold text-sm text-gray-900 flex-1">{selectedChannel.name}</span>
+              <button
+                onClick={() => { setShowMeetingModal(true); setMeetingLink(null); }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors"
+                title="Neues Meeting erstellen"
+              >
+                <Video className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Meeting</span>
+              </button>
             </div>
 
             {/* Messages */}
@@ -371,6 +414,78 @@ export default function AdminChatPage() {
                 {creatingChannel && <Loader2 className="w-3 h-3 animate-spin" />}
                 Erstellen
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Meeting Room Modal */}
+      {showMeetingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <Video className="w-4 h-4 text-blue-600" />
+                <h3 className="font-semibold text-gray-900 text-sm">Neues Meeting</h3>
+              </div>
+              <button onClick={() => { setShowMeetingModal(false); setMeetingLink(null); }} className="p-1 text-gray-400 hover:text-gray-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5">
+              {!meetingLink ? (
+                <>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Erstelle einen Meetingraum und teile den Link mit deinem Team oder externen Teilnehmern.
+                  </p>
+                  {selectedChannel && (
+                    <p className="text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg mb-4">
+                      Der Link wird automatisch in #{selectedChannel.name} gepostet.
+                    </p>
+                  )}
+                  <button
+                    onClick={handleCreateMeeting}
+                    disabled={meetingCreating}
+                    className="w-full py-2.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {meetingCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Video className="w-4 h-4" />}
+                    {meetingCreating ? 'Erstelle Raum...' : 'Meeting erstellen'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center shrink-0">
+                      <Check className="w-4 h-4 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">Meeting bereit!</p>
+                      <p className="text-xs text-gray-500">Teile den Link mit den Teilnehmern</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3">
+                    <span className="flex-1 text-xs text-gray-700 truncate">{meetingLink}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleCopyMeetingLink}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                    >
+                      {meetingCopied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      {meetingCopied ? 'Kopiert!' : 'Kopieren'}
+                    </button>
+                    <a
+                      href={meetingLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Beitreten
+                    </a>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

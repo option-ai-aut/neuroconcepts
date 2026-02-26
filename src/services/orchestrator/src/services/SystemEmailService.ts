@@ -31,13 +31,14 @@ interface SendEmailParams {
   html: string;
   text?: string;
   replyTo?: string;
+  attachments?: { filename: string; content: string; contentType: string }[];
 }
 
 /**
  * Send a system email via Resend
  */
 export async function sendSystemEmail(params: SendEmailParams): Promise<boolean> {
-  const { to, subject, html, text, replyTo } = params;
+  const { to, subject, html, text, replyTo, attachments } = params;
   const recipients = Array.isArray(to) ? to : [to];
 
   // Log in development mode
@@ -59,6 +60,12 @@ export async function sendSystemEmail(params: SendEmailParams): Promise<boolean>
       html,
       ...(text && { text }),
       ...(replyTo && { replyTo }),
+      ...(attachments && attachments.length > 0 && {
+        attachments: attachments.map(a => ({
+          filename: a.filename,
+          content: Buffer.from(a.content).toString('base64'),
+        })),
+      }),
     });
 
     if (error) {
@@ -311,8 +318,48 @@ export function renderLeadResponseEmail(params: {
   `.trim();
 }
 
+/**
+ * Generate an ICS calendar invite as a string (RFC 5545)
+ */
+export function generateIcs(params: {
+  uid: string;
+  subject: string;
+  description?: string;
+  location?: string;
+  start: Date;
+  end: Date;
+  organizer?: string;
+  attendees?: string[];
+}): string {
+  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+
+  const lines: string[] = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Immivo AI//NONSGML//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:REQUEST',
+    'BEGIN:VEVENT',
+    `UID:${params.uid}@immivo.ai`,
+    `DTSTAMP:${fmt(new Date())}`,
+    `DTSTART:${fmt(params.start)}`,
+    `DTEND:${fmt(params.end)}`,
+    `SUMMARY:${esc(params.subject)}`,
+  ];
+  if (params.description) lines.push(`DESCRIPTION:${esc(params.description)}`);
+  if (params.location) lines.push(`LOCATION:${esc(params.location)}`);
+  if (params.organizer) lines.push(`ORGANIZER;CN=Immivo AI:MAILTO:${params.organizer}`);
+  for (const a of params.attendees || []) {
+    lines.push(`ATTENDEE;ROLE=REQ-PARTICIPANT;RSVP=TRUE:MAILTO:${a}`);
+  }
+  lines.push('END:VEVENT', 'END:VCALENDAR');
+  return lines.join('\r\n');
+}
+
 export default {
   sendSystemEmail,
+  generateIcs,
   renderMivoQuestionEmail,
   renderReminderEmail,
   renderEscalationEmail,
