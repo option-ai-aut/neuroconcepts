@@ -437,15 +437,15 @@ export default function SupportPage() {
                   </div>
                 )}
 
-                {/* Admin Notes */}
+                {/* Notes */}
                 <div className="p-5">
-                  <p className="text-xs font-medium text-gray-500 mb-2">Interne Notizen</p>
+                  <p className="text-xs font-medium text-gray-500 mb-2">Notizen</p>
                   <textarea
                     rows={3}
                     value={adminNotes}
                     onChange={(e) => setAdminNotes(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                    placeholder="Notizen zum Bug (nur für Admins sichtbar)..."
+                    placeholder="Notizen zum Bug..."
                   />
                   <button
                     onClick={handleSaveNotes}
