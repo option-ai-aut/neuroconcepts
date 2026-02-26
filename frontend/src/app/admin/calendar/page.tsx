@@ -6,10 +6,16 @@ import { getRuntimeConfig } from '@/components/EnvProvider';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { getAdminDemoBookings, DemoBooking } from '@/lib/adminApi';
 
-const TEAM_MEMBERS = [
-  { email: 'dennis.kral@immivo.ai', name: 'Dennis Kral', color: 'bg-blue-500', textColor: 'text-blue-600' },
-  { email: 'josef.leutgeb@immivo.ai', name: 'Josef Leutgeb', color: 'bg-emerald-500', textColor: 'text-emerald-600' },
-];
+// Fixed colors per well-known mailbox; others get cycled from the palette
+const KNOWN_COLORS: Record<string, string> = {
+  'office@immivo.ai':       'bg-amber-500',
+  'dennis.kral@immivo.ai':  'bg-blue-500',
+  'josef.leutgeb@immivo.ai':'bg-emerald-500',
+};
+const COLOR_PALETTE = ['bg-violet-500','bg-rose-500','bg-cyan-500','bg-orange-500','bg-pink-500','bg-teal-500','bg-indigo-500'];
+
+// Ordered list of "priority" emails that always appear before others
+const PRIORITY_ORDER = ['office@immivo.ai','dennis.kral@immivo.ai','josef.leutgeb@immivo.ai'];
 
 interface CalEvent {
   id: string;
@@ -37,7 +43,12 @@ async function adminFetch(path: string, options?: RequestInit) {
   return res.json();
 }
 
-type ViewMode = 'mine' | 'member' | 'office';
+interface StaffTag {
+  email: string;
+  name: string;
+  color: string; // bg-* class
+  isOwn: boolean;
+}
 
 export default function AdminCalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -45,10 +56,11 @@ export default function AdminCalendarPage() {
   const [demoBookings, setDemoBookings] = useState<DemoBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
-  
-  // View mode: 'mine' (mein Kalender), 'member' (einzelner Mitarbeiter), 'office' (alle = Office)
-  const [viewMode, setViewMode] = useState<ViewMode>('mine');
-  const [selectedMember, setSelectedMember] = useState<string>(TEAM_MEMBERS[0].email);
+
+  // Multi-select tag state
+  const [myEmail, setMyEmail] = useState<string>('');
+  const [staffTags, setStaffTags] = useState<StaffTag[]>([]);
+  const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
 
   // New event modal
   const [showNewEvent, setShowNewEvent] = useState(false);
@@ -108,11 +120,69 @@ export default function AdminCalendarPage() {
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 7);
 
+  // Load staff tags + set own email + pre-select own tag
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const session = await fetchAuthSession();
+        const email = (session.tokens?.idToken?.payload?.email as string || '').toLowerCase();
+        setMyEmail(email);
+
+        const members: { email: string; firstName?: string; lastName?: string; createdAt?: string }[] =
+          await adminFetch('/admin/team/members');
+
+        // Build color map: palette index for non-known emails
+        let paletteIdx = 0;
+        const colorOf = (e: string) => KNOWN_COLORS[e.toLowerCase()] || COLOR_PALETTE[paletteIdx++ % COLOR_PALETTE.length];
+
+        // Ordered: own first, then priority list (office, dennis, josef), then others by createdAt
+        const own = members.find(m => m.email.toLowerCase() === email);
+        const priority = PRIORITY_ORDER.filter(p => p !== email && members.some(m => m.email.toLowerCase() === p));
+        const others = members
+          .filter(m => m.email.toLowerCase() !== email && !PRIORITY_ORDER.includes(m.email.toLowerCase()))
+          .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+
+        const orderedEmails = [
+          ...(own ? [own.email.toLowerCase()] : [email]),
+          ...priority,
+          ...others.map(m => m.email.toLowerCase()),
+        ];
+
+        // Add office@ if not already a staff member
+        const officeEmail = 'office@immivo.ai';
+        if (!orderedEmails.includes(officeEmail)) {
+          orderedEmails.splice(1, 0, officeEmail); // right after own
+        }
+
+        const nameOf = (e: string) => {
+          const m = members.find(x => x.email.toLowerCase() === e);
+          if (m?.firstName || m?.lastName) return `${m.firstName || ''} ${m.lastName || ''}`.trim();
+          if (e === officeEmail) return 'Office';
+          return e.split('@')[0];
+        };
+
+        const tags: StaffTag[] = orderedEmails.map(e => ({
+          email: e,
+          name: e === email ? `${nameOf(e)} (Ich)` : nameOf(e),
+          color: colorOf(e),
+          isOwn: e === email,
+        }));
+
+        setStaffTags(tags);
+        // Pre-select own calendar only
+        setActiveTags(new Set([email]));
+      } catch (err) {
+        console.error('Failed to load staff tags:', err);
+      }
+    };
+    load();
+  }, []);
+
   const fetchCalendars = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch WorkMail calendars + demo bookings from DB in parallel
-      const allEmails = [...TEAM_MEMBERS.map(t => t.email), 'office@immivo.ai'];
+      // Always fetch all staff + office calendars at once
+      const allEmails = [...new Set([...staffTags.map(t => t.email), 'office@immivo.ai'])];
       const emails = allEmails.join(',');
 
       const [calData, demoData] = await Promise.allSettled([
@@ -127,9 +197,11 @@ export default function AdminCalendarPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentDate]);
+  }, [currentDate, staffTags]);
 
-  useEffect(() => { fetchCalendars(); }, [fetchCalendars]);
+  useEffect(() => {
+    if (staffTags.length > 0) fetchCalendars();
+  }, [fetchCalendars]);
 
   useEffect(() => {
     const check = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth < 1024);
@@ -164,29 +236,28 @@ export default function AdminCalendarPage() {
       organizer: d.email,
     }));
 
-  // Determine which events to show based on view mode
+  // Toggle a tag on/off; own tag cannot be fully deselected if it's the only one active
+  const toggleTag = (email: string) => {
+    setActiveTags(prev => {
+      const next = new Set(prev);
+      if (next.has(email)) {
+        if (next.size === 1) return prev; // keep at least one active
+        next.delete(email);
+      } else {
+        next.add(email);
+      }
+      return next;
+    });
+  };
+
+  // Determine which events to show based on active tags
   const getVisibleEvents = (): Record<string, CalEvent[]> => {
-    const demoKey = 'demo-bookings';
-    switch (viewMode) {
-      case 'mine':
-        return {
-          [TEAM_MEMBERS[0].email]: calendars[TEAM_MEMBERS[0].email] || [],
-          'office@immivo.ai': calendars['office@immivo.ai'] || [],
-          [demoKey]: demoCalEvents,
-        };
-      case 'member':
-        return {
-          [selectedMember]: calendars[selectedMember] || [],
-          'office@immivo.ai': calendars['office@immivo.ai'] || [],
-          [demoKey]: demoCalEvents,
-        };
-      case 'office':
-        return {
-          'office@immivo.ai': calendars['office@immivo.ai'] || [],
-          ...TEAM_MEMBERS.reduce((acc, m) => ({ ...acc, [m.email]: calendars[m.email] || [] }), {}),
-          [demoKey]: demoCalEvents,
-        };
+    const result: Record<string, CalEvent[]> = {};
+    for (const email of activeTags) {
+      result[email] = calendars[email] || [];
     }
+    result['demo-bookings'] = demoCalEvents;
+    return result;
   };
 
   const visibleCalendars = getVisibleEvents();
@@ -219,11 +290,10 @@ export default function AdminCalendarPage() {
   };
 
   const getTeamColor = (email: string) => {
-    const member = TEAM_MEMBERS.find(t => t.email === email);
-    if (member) return member.color;
-    if (email === 'office@immivo.ai') return 'bg-amber-500';
     if (email === 'demo-bookings') return 'bg-purple-600';
-    return 'bg-gray-400';
+    const tag = staffTags.find(t => t.email === email);
+    if (tag) return tag.color;
+    return KNOWN_COLORS[email.toLowerCase()] || 'bg-gray-400';
   };
 
   const isDemoEvent = (id: string) => id.startsWith('demo-');
@@ -352,51 +422,32 @@ export default function AdminCalendarPage() {
         </div>
       </div>
 
-      {/* View Mode Toggle */}
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
-          <button
-            onClick={() => setViewMode('mine')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              viewMode === 'mine' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Mein Kalender
-          </button>
-          <button
-            onClick={() => setViewMode('office')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              viewMode === 'office' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Office (Alle)
-          </button>
-        </div>
-
-        {/* Individual member toggles */}
-        <div className="flex items-center gap-1.5 ml-2 flex-wrap">
-          {TEAM_MEMBERS.map((member) => (
+      {/* Calendar Tag Filter */}
+      <div className="flex items-center gap-1.5 mb-4 flex-wrap">
+        {staffTags.map((tag) => {
+          const active = activeTags.has(tag.email);
+          return (
             <button
-              key={member.email}
-              onClick={() => { setViewMode('member'); setSelectedMember(member.email); }}
+              key={tag.email}
+              onClick={() => toggleTag(tag.email)}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border transition-all ${
-                viewMode === 'member' && selectedMember === member.email
-                  ? 'bg-white border-gray-300 text-gray-800 shadow-sm'
-                  : 'bg-gray-50 border-gray-100 text-gray-400 hover:text-gray-600'
+                active
+                  ? 'bg-white border-gray-300 text-gray-800 shadow-sm ring-1 ring-gray-200'
+                  : 'bg-gray-50 border-gray-100 text-gray-400 hover:text-gray-600 hover:border-gray-200'
               }`}
             >
-              <span className={`w-2 h-2 rounded-full ${member.color}`} />
-              {member.name.split(' ')[0]}
+              <span className={`w-2 h-2 rounded-full ${active ? tag.color : 'bg-gray-300'}`} />
+              {tag.name}
             </button>
-          ))}
-          {demoBookings.filter(d => d.status !== 'CANCELLED').length > 0 && (
-            <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border bg-purple-50 border-purple-200 text-purple-700">
-              <span className="w-2 h-2 rounded-full bg-purple-600" />
-              <Video className="w-3 h-3" />
-              Demo Calls ({demoBookings.filter(d => d.status !== 'CANCELLED').length})
-            </span>
-          )}
-        </div>
+          );
+        })}
+        {demoBookings.filter(d => d.status !== 'CANCELLED').length > 0 && (
+          <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border bg-purple-50 border-purple-200 text-purple-700">
+            <span className="w-2 h-2 rounded-full bg-purple-600" />
+            <Video className="w-3 h-3" />
+            Demo Calls ({demoBookings.filter(d => d.status !== 'CANCELLED').length})
+          </span>
+        )}
       </div>
 
       {loading && Object.keys(calendars).length === 0 ? (
