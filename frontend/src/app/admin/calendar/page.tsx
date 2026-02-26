@@ -56,9 +56,51 @@ export default function AdminCalendarPage() {
   const [newEventDate, setNewEventDate] = useState('');
   const [newEventStartTime, setNewEventStartTime] = useState('09:00');
   const [newEventEndTime, setNewEventEndTime] = useState('10:00');
+  const [newEventEndManual, setNewEventEndManual] = useState(false);
   const [newEventSaving, setNewEventSaving] = useState(false);
   const [newEventAddCall, setNewEventAddCall] = useState(false);
-  const [newEventAttendeesInput, setNewEventAttendeesInput] = useState('');
+  const [attendeeTags, setAttendeeTags] = useState<string[]>([]);
+  const [attendeeInput, setAttendeeInput] = useState('');
+
+  // Time validation
+  const timeToMinutes = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+  const addOneHour = (t: string) => { const mins = timeToMinutes(t) + 60; const h = Math.floor(mins / 60) % 24; const m = mins % 60; return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`; };
+  const isTimeInvalid = timeToMinutes(newEventEndTime) <= timeToMinutes(newEventStartTime);
+
+  const handleStartTimeChange = (val: string) => {
+    setNewEventStartTime(val);
+    if (!newEventEndManual) setNewEventEndTime(addOneHour(val));
+  };
+
+  // Tag input helpers
+  const addAttendeeTag = (raw: string) => {
+    const email = raw.trim().toLowerCase();
+    if (email && email.includes('@') && !attendeeTags.includes(email)) {
+      setAttendeeTags(prev => [...prev, email]);
+    }
+    setAttendeeInput('');
+  };
+
+  const handleAttendeeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === ',' || e.key === 'Enter') {
+      e.preventDefault();
+      addAttendeeTag(attendeeInput);
+    } else if (e.key === 'Backspace' && attendeeInput === '' && attendeeTags.length > 0) {
+      setAttendeeTags(prev => prev.slice(0, -1));
+    }
+  };
+
+  const closeModal = () => {
+    setShowNewEvent(false);
+    setNewEventSubject('');
+    setNewEventDate('');
+    setNewEventStartTime('09:00');
+    setNewEventEndTime('10:00');
+    setNewEventEndManual(false);
+    setNewEventAddCall(false);
+    setAttendeeTags([]);
+    setAttendeeInput('');
+  };
 
   const weekStart = new Date(currentDate);
   weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
@@ -201,17 +243,15 @@ export default function AdminCalendarPage() {
   };
 
   const handleCreateEvent = async () => {
-    if (!newEventSubject || !newEventDate) return;
+    if (!newEventSubject || !newEventDate || isTimeInvalid) return;
     setNewEventSaving(true);
     try {
       const start = new Date(`${newEventDate}T${newEventStartTime}:00`);
       const end = new Date(`${newEventDate}T${newEventEndTime}:00`);
 
-      // Parse attendees (comma or newline separated)
-      const attendeeList = newEventAttendeesInput
-        .split(/[,\n]/)
-        .map(e => e.trim())
-        .filter(e => e.includes('@'));
+      // Flush any uncommitted attendee input
+      const pendingEmail = attendeeInput.trim().toLowerCase();
+      const attendeeList = [...attendeeTags, ...(pendingEmail.includes('@') ? [pendingEmail] : [])];
 
       // Optionally create a LiveKit video call room
       let meetLink: string | undefined;
@@ -260,11 +300,7 @@ export default function AdminCalendarPage() {
         }
       }
 
-      setShowNewEvent(false);
-      setNewEventSubject('');
-      setNewEventDate('');
-      setNewEventAddCall(false);
-      setNewEventAttendeesInput('');
+      closeModal();
       fetchCalendars();
     } catch (err) {
       console.error('Failed to create event:', err);
@@ -289,7 +325,14 @@ export default function AdminCalendarPage() {
         <div className="flex items-center gap-2">
           <button onClick={() => {
             setShowNewEvent(true);
-            setNewEventDate(new Date().toISOString().split('T')[0]);
+            const today = new Date();
+            setNewEventDate(today.toISOString().split('T')[0]);
+            const h = String(today.getHours()).padStart(2,'0');
+            const m = today.getMinutes() < 30 ? '00' : '30';
+            const startT = `${h}:${m}`;
+            setNewEventStartTime(startT);
+            setNewEventEndTime(addOneHour(startT));
+            setNewEventEndManual(false);
           }}
             className="px-3 py-1.5 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5" /> Neuer Termin
@@ -496,17 +539,17 @@ export default function AdminCalendarPage() {
       {/* New Event Modal */}
       {showNewEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
               <h3 className="font-semibold text-gray-900">Neuer Termin</h3>
-              <button onClick={() => { setShowNewEvent(false); setNewEventSubject(''); setNewEventDate(''); setNewEventAddCall(false); setNewEventAttendeesInput(''); }} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              <button onClick={closeModal} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Betreff</label>
                 <input type="text" value={newEventSubject} onChange={(e) => setNewEventSubject(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="z.B. Besichtigung Sterngasse 3" />
+                  placeholder="z.B. Besichtigung Sterngasse 3" autoFocus />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Datum</label>
@@ -516,17 +559,27 @@ export default function AdminCalendarPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Von</label>
-                  <input type="time" value={newEventStartTime} onChange={(e) => setNewEventStartTime(e.target.value)}
+                  <input type="time" value={newEventStartTime}
+                    onChange={(e) => handleStartTimeChange(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Bis</label>
-                  <input type="time" value={newEventEndTime} onChange={(e) => setNewEventEndTime(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                  <input type="time" value={newEventEndTime}
+                    onChange={(e) => { setNewEventEndTime(e.target.value); setNewEventEndManual(true); }}
+                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:border-transparent transition-colors ${
+                      isTimeInvalid
+                        ? 'border-red-400 bg-red-50 text-red-700 focus:ring-red-300'
+                        : 'border-gray-200 focus:ring-blue-500'
+                    }`} />
+                  {isTimeInvalid && (
+                    <p className="text-xs text-red-500 mt-1">Endzeit muss nach Startzeit liegen</p>
+                  )}
                 </div>
               </div>
+
               {/* Video Call Option */}
-              <div className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center justify-between py-2.5 px-3 bg-gray-50 rounded-lg border border-gray-200">
                 <div className="flex items-center gap-2">
                   <Video className="w-4 h-4 text-blue-600" />
                   <span className="text-sm text-gray-700 font-medium">Video-Call hinzufügen</span>
@@ -535,22 +588,46 @@ export default function AdminCalendarPage() {
                   role="switch"
                   aria-checked={newEventAddCall}
                   onClick={() => setNewEventAddCall(v => !v)}
-                  className={`w-10 h-5 rounded-full transition-colors duration-200 relative overflow-hidden cursor-pointer shrink-0 ${newEventAddCall ? 'bg-blue-600' : 'bg-gray-300'}`}
+                  className={`w-10 h-6 rounded-full transition-colors duration-200 flex items-center cursor-pointer shrink-0 px-0.5 ${newEventAddCall ? 'bg-blue-600' : 'bg-gray-300'}`}
                 >
-                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${newEventAddCall ? 'translate-x-5' : 'translate-x-0'}`} />
+                  <span className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${newEventAddCall ? 'translate-x-4' : 'translate-x-0'}`} />
                 </div>
               </div>
 
-              {/* Attendees */}
+              {/* Attendees tag input */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Eingeladene (optional)</label>
-                <textarea
-                  value={newEventAttendeesInput}
-                  onChange={(e) => setNewEventAttendeesInput(e.target.value)}
-                  placeholder="E-Mail-Adressen, komma- oder zeilengetrennt&#10;z.B. max@example.com, anna@example.com"
-                  rows={2}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                />
+                <div
+                  className="min-h-[40px] w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent flex flex-wrap gap-1.5 cursor-text"
+                  onClick={() => (document.getElementById('attendee-input') as HTMLInputElement)?.focus()}
+                >
+                  {attendeeTags.map((tag) => (
+                    <span key={tag} className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-md px-2 py-0.5 text-xs font-medium">
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setAttendeeTags(prev => prev.filter(t => t !== tag)); }}
+                        className="text-blue-400 hover:text-blue-700 leading-none"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    id="attendee-input"
+                    type="text"
+                    value={attendeeInput}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val.endsWith(',')) { addAttendeeTag(val.slice(0, -1)); }
+                      else setAttendeeInput(val);
+                    }}
+                    onKeyDown={handleAttendeeKeyDown}
+                    onBlur={() => { if (attendeeInput.trim()) addAttendeeTag(attendeeInput); }}
+                    placeholder={attendeeTags.length === 0 ? 'E-Mail eingeben, mit Beistrich bestätigen…' : ''}
+                    className="flex-1 min-w-[140px] outline-none text-sm bg-transparent py-0.5"
+                  />
+                </div>
                 <p className="text-xs text-gray-400 mt-1">Eingeladene erhalten eine E-Mail mit Kalender-Einladung (.ics)</p>
               </div>
 
@@ -559,9 +636,9 @@ export default function AdminCalendarPage() {
                 Wird automatisch in deinem und im Office-Kalender eingetragen
               </p>
             </div>
-            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
-              <button onClick={() => { setShowNewEvent(false); setNewEventSubject(''); setNewEventDate(''); setNewEventAddCall(false); setNewEventAttendeesInput(''); }} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg">Abbrechen</button>
-              <button onClick={handleCreateEvent} disabled={newEventSaving || !newEventSubject || !newEventDate}
+            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl shrink-0">
+              <button onClick={closeModal} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg">Abbrechen</button>
+              <button onClick={handleCreateEvent} disabled={newEventSaving || !newEventSubject || !newEventDate || isTimeInvalid}
                 className="px-4 py-2 text-sm font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 flex items-center gap-2">
                 {newEventSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 Erstellen

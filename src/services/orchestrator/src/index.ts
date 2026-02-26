@@ -8998,41 +8998,60 @@ app.patch('/admin/platform/demo-bookings/:id', adminAuthMiddleware, async (req, 
           // Send confirmation email to prospect with .ics attachment
           await sendSystemEmail({
             to: existing.email,
-            subject: `Demo bestätigt: ${dateStr} um ${timeStr} Uhr`,
-            html: `
-              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-                <div style="background: #111827; color: white; padding: 24px 32px; border-radius: 12px 12px 0 0;">
-                  <h2 style="margin: 0; font-size: 20px;">Deine Demo ist bestätigt!</h2>
-                  <p style="margin: 4px 0 0; opacity: 0.7; font-size: 14px;">Immivo AI</p>
-                </div>
-                <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
-                  <p style="margin: 0 0 16px; font-size: 16px; color: #111827;">Hallo ${existing.name},</p>
-                  <p style="margin: 0 0 24px; color: #4b5563;">deine Demo wurde bestätigt. Hier sind alle Details:</p>
-                  <div style="background: white; padding: 24px; border-radius: 12px; border: 1px solid #e5e7eb; margin-bottom: 24px;">
-                    <table style="width: 100%; border-collapse: collapse;">
-                      <tr><td style="padding: 6px 0; color: #6b7280; font-size: 14px; width: 100px;">Datum</td><td style="padding: 6px 0; font-weight: 600; color: #111827;">${dateStr}</td></tr>
-                      <tr><td style="padding: 6px 0; color: #6b7280; font-size: 14px;">Uhrzeit</td><td style="padding: 6px 0; font-weight: 600; color: #111827;">${timeStr} – ${endTimeStr} Uhr</td></tr>
-                      <tr><td style="padding: 6px 0; color: #6b7280; font-size: 14px;">Format</td><td style="padding: 6px 0; color: #111827;">Video-Meeting (kein Download nötig)</td></tr>
-                    </table>
-                  </div>
-                  <div style="text-align: center; margin-bottom: 24px;">
-                    <a href="${meetLink}" style="display: inline-block; background: #2563eb; color: white; font-weight: 700; font-size: 16px; padding: 16px 32px; border-radius: 12px; text-decoration: none;">Meeting beitreten</a>
-                    <p style="margin: 12px 0 0; font-size: 12px; color: #9ca3af;">${meetLink}</p>
-                  </div>
-                  <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
-                    <p style="margin: 0; font-size: 13px; color: #166534;">
-                      <strong>Kalender-Einladung:</strong> Im Anhang findest du eine .ics-Datei – einfach öffnen, um den Termin zu deinem Kalender hinzuzufügen.
-                    </p>
-                  </div>
-                  <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
-                    <p style="margin: 0; font-size: 13px; color: #1d4ed8;">
-                      <strong>Hinweis:</strong> Einfach auf den Link klicken — direkt im Browser, kein Download oder Konto erforderlich.
-                    </p>
-                  </div>
-                  <p style="margin: 0; color: #4b5563; font-size: 14px;">Bei Fragen erreichst du uns unter <a href="mailto:office@immivo.ai" style="color: #2563eb;">office@immivo.ai</a>.</p>
-                  <p style="margin: 16px 0 0; color: #4b5563; font-size: 14px;">Bis bald!<br/><strong>Das Immivo Team</strong></p>
-                </div>
-              </div>`,
+            subject: `Demo bestätigt: ${dateStr}, ${timeStr} Uhr – Immivo AI`,
+            html: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="max-width:560px;margin:32px auto;padding:0 16px;">
+    <div style="background:#111827;padding:28px 32px;border-radius:14px 14px 0 0;">
+      <p style="margin:0 0 6px;font-size:11px;font-weight:600;letter-spacing:0.08em;color:#6b7280;text-transform:uppercase;">Immivo AI</p>
+      <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">Deine Demo ist bestätigt!</h1>
+    </div>
+    <div style="background:#ffffff;padding:32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 14px 14px;">
+      <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+        Hallo <strong>${existing.name}</strong>,<br>
+        dein Demo-Termin wurde bestätigt. Wir freuen uns auf das Gespräch!
+      </p>
+
+      <div style="background:#f9fafb;border-radius:10px;padding:20px;margin-bottom:24px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="padding:7px 0;color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;width:80px;">Datum</td>
+            <td style="padding:7px 0;font-size:15px;color:#111827;font-weight:700;">${dateStr}</td>
+          </tr>
+          <tr>
+            <td style="padding:7px 0;color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Uhrzeit</td>
+            <td style="padding:7px 0;font-size:15px;color:#111827;font-weight:700;">${timeStr} – ${endTimeStr} Uhr</td>
+          </tr>
+          <tr>
+            <td style="padding:7px 0;color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Format</td>
+            <td style="padding:7px 0;font-size:14px;color:#2563eb;font-weight:600;">Video-Meeting</td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${meetLink}" style="display:inline-block;background:#2563eb;color:#ffffff;font-weight:700;font-size:16px;padding:16px 36px;border-radius:12px;text-decoration:none;letter-spacing:0.01em;">
+          Meeting beitreten
+        </a>
+        <p style="margin:10px 0 0;font-size:12px;color:#9ca3af;">Direkt im Browser – kein Download, kein Konto nötig.</p>
+      </div>
+
+      <div style="background:#eff6ff;border-left:3px solid #2563eb;border-radius:0 8px 8px 0;padding:14px 16px;margin-bottom:20px;">
+        <p style="margin:0;font-size:13px;color:#1e40af;line-height:1.5;">
+          <strong>Kalender-Einladung im Anhang (.ics):</strong> Einfach öffnen und den Termin zu deinem Kalender hinzufügen – funktioniert mit Google, Apple, Outlook und mehr.
+        </p>
+      </div>
+
+      <hr style="border:none;border-top:1px solid #f3f4f6;margin:20px 0;">
+      <p style="margin:0;font-size:14px;color:#4b5563;line-height:1.6;">Bis bald!<br><strong>Das Immivo Team</strong></p>
+      <p style="margin:12px 0 0;font-size:13px;color:#9ca3af;">Fragen? <a href="mailto:office@immivo.ai" style="color:#2563eb;text-decoration:none;">office@immivo.ai</a></p>
+    </div>
+    <p style="text-align:center;font-size:11px;color:#9ca3af;margin:16px 0 32px;">Immivo AI · automatisch generierte Bestätigung</p>
+  </div>
+</body>
+</html>`,
             replyTo: 'office@immivo.ai',
             attachments: [{ filename: 'termin-immivo-demo.ics', content: icsContent, contentType: 'text/calendar' }],
           }).catch(e => console.warn('Meet confirmation email failed:', e.message));
@@ -9053,27 +9072,55 @@ app.patch('/admin/platform/demo-bookings/:id', adminAuthMiddleware, async (req, 
               to: staffEmail,
               subject: `Demo bestätigt: ${existing.name} – ${dateStr} ${timeStr} Uhr`,
               html: `
-                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-                  <div style="background: #1e40af; color: white; padding: 24px 32px; border-radius: 12px 12px 0 0;">
-                    <h2 style="margin: 0; font-size: 20px;">Demo-Termin bestätigt</h2>
-                    <p style="margin: 4px 0 0; opacity: 0.7; font-size: 14px;">Interne Benachrichtigung</p>
-                  </div>
-                  <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
-                    <p style="margin: 0 0 16px; font-size: 16px; color: #111827;">Du wurdest für diesen Demo-Termin eingeteilt:</p>
-                    <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e5e7eb; margin-bottom: 20px;">
-                      <table style="width: 100%; border-collapse: collapse;">
-                        <tr><td style="padding: 5px 0; color: #6b7280; font-size: 14px; width: 100px;">Kontakt</td><td style="padding: 5px 0; font-weight: 600;">${existing.name}${existing.company ? ` – ${existing.company}` : ''}</td></tr>
-                        <tr><td style="padding: 5px 0; color: #6b7280; font-size: 14px;">E-Mail</td><td style="padding: 5px 0;">${existing.email}</td></tr>
-                        <tr><td style="padding: 5px 0; color: #6b7280; font-size: 14px;">Datum</td><td style="padding: 5px 0; font-weight: 600;">${dateStr}</td></tr>
-                        <tr><td style="padding: 5px 0; color: #6b7280; font-size: 14px;">Uhrzeit</td><td style="padding: 5px 0; font-weight: 600;">${timeStr} – ${endTimeStr} Uhr</td></tr>
-                      </table>
-                    </div>
-                    <div style="text-align: center; margin-bottom: 20px;">
-                      <a href="${meetLink}" style="display: inline-block; background: #1e40af; color: white; font-weight: 700; font-size: 15px; padding: 14px 28px; border-radius: 10px; text-decoration: none;">Meeting öffnen</a>
-                    </div>
-                    <p style="margin: 0; font-size: 13px; color: #6b7280;">Kalender-Einladung im Anhang (.ics).</p>
-                  </div>
-                </div>`,
+                `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="max-width:560px;margin:32px auto;padding:0 16px;">
+    <div style="background:#1e3a8a;padding:24px 32px;border-radius:14px 14px 0 0;">
+      <p style="margin:0 0 4px;font-size:11px;font-weight:600;letter-spacing:0.08em;color:#93c5fd;text-transform:uppercase;">Immivo AI · Intern</p>
+      <h1 style="margin:0;font-size:20px;font-weight:700;color:#ffffff;">Demo-Termin: Du bist eingeteilt</h1>
+    </div>
+    <div style="background:#ffffff;padding:32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 14px 14px;">
+      <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6;">
+        Folgender Demo-Termin wurde dir zugewiesen:
+      </p>
+      <div style="background:#f9fafb;border-radius:10px;padding:20px;margin-bottom:24px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="padding:7px 0;color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;width:80px;">Kontakt</td>
+            <td style="padding:7px 0;font-size:14px;color:#111827;font-weight:700;">${existing.name}${existing.company ? ` · ${existing.company}` : ''}</td>
+          </tr>
+          <tr>
+            <td style="padding:7px 0;color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">E-Mail</td>
+            <td style="padding:7px 0;font-size:14px;color:#2563eb;"><a href="mailto:${existing.email}" style="color:#2563eb;text-decoration:none;">${existing.email}</a></td>
+          </tr>
+          <tr>
+            <td style="padding:7px 0;color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Datum</td>
+            <td style="padding:7px 0;font-size:14px;color:#111827;font-weight:700;">${dateStr}</td>
+          </tr>
+          <tr>
+            <td style="padding:7px 0;color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Uhrzeit</td>
+            <td style="padding:7px 0;font-size:14px;color:#111827;font-weight:700;">${timeStr} – ${endTimeStr} Uhr</td>
+          </tr>
+          ${existing.message ? `<tr>
+            <td style="padding:7px 0;color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;vertical-align:top;">Nachricht</td>
+            <td style="padding:7px 0;font-size:13px;color:#4b5563;font-style:italic;">${existing.message}</td>
+          </tr>` : ''}
+        </table>
+      </div>
+      <div style="text-align:center;margin:24px 0;">
+        <a href="${meetLink}" style="display:inline-block;background:#1e40af;color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:10px;text-decoration:none;">Meeting öffnen</a>
+        <p style="margin:8px 0 0;font-size:12px;color:#9ca3af;">${meetLink}</p>
+      </div>
+      <div style="background:#eff6ff;border-left:3px solid #2563eb;border-radius:0 8px 8px 0;padding:12px 16px;">
+        <p style="margin:0;font-size:12px;color:#1e40af;">Kalender-Einladung im Anhang (.ics) – in deinem WorkMail-Kalender ist der Termin bereits eingetragen.</p>
+      </div>
+    </div>
+    <p style="text-align:center;font-size:11px;color:#9ca3af;margin:16px 0 32px;">Immivo AI · interne Benachrichtigung</p>
+  </div>
+</body>
+</html>`,
               attachments: [{ filename: 'demo-termin.ics', content: staffIcs, contentType: 'text/calendar' }],
             }).catch(e => console.warn('Staff notification email failed:', e.message));
           }
@@ -11089,36 +11136,63 @@ app.post('/calendar/events/send-invites', authMiddleware, async (req: any, res) 
     });
 
     const meetSection = meetLink
-      ? `<div style="text-align:center;margin:20px 0;">
-           <a href="${meetLink}" style="display:inline-block;background:#2563eb;color:white;font-weight:700;font-size:15px;padding:12px 28px;border-radius:10px;text-decoration:none;">Meeting beitreten</a>
-           <p style="margin:8px 0 0;font-size:11px;color:#9ca3af;">${meetLink}</p>
+      ? `<div style="text-align:center;margin:24px 0;">
+           <a href="${meetLink}" style="display:inline-block;background:#2563eb;color:white;font-weight:700;font-size:15px;padding:14px 32px;border-radius:10px;text-decoration:none;letter-spacing:0.01em;">
+             Video-Meeting beitreten
+           </a>
+           <p style="margin:10px 0 0;font-size:12px;color:#9ca3af;">oder direkt öffnen: <a href="${meetLink}" style="color:#6b7280;">${meetLink}</a></p>
          </div>`
       : '';
 
-    const html = `
-      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:580px;margin:0 auto;">
-        <div style="background:#111827;color:white;padding:22px 28px;border-radius:12px 12px 0 0;">
-          <h2 style="margin:0;font-size:18px;">Kalender-Einladung: ${subject}</h2>
-          <p style="margin:4px 0 0;opacity:0.7;font-size:13px;">Immivo AI</p>
-        </div>
-        <div style="background:#f9fafb;padding:28px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;">
-          <p style="margin:0 0 20px;font-size:15px;color:#111827;">Du wurdest zu folgendem Termin eingeladen:</p>
-          <div style="background:white;padding:20px;border-radius:10px;border:1px solid #e5e7eb;margin-bottom:20px;">
-            <table style="width:100%;border-collapse:collapse;">
-              <tr><td style="padding:5px 0;color:#6b7280;font-size:13px;width:80px;">Titel</td><td style="padding:5px 0;font-weight:600;color:#111827;">${subject}</td></tr>
-              <tr><td style="padding:5px 0;color:#6b7280;font-size:13px;">Datum</td><td style="padding:5px 0;font-weight:600;color:#111827;">${dateStr}</td></tr>
-              <tr><td style="padding:5px 0;color:#6b7280;font-size:13px;">Uhrzeit</td><td style="padding:5px 0;font-weight:600;color:#111827;">${timeStr} – ${endTimeStr} Uhr</td></tr>
-            </table>
-          </div>
-          ${meetSection}
-          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px;margin-bottom:16px;">
-            <p style="margin:0;font-size:12px;color:#166534;">
-              <strong>Kalender-Einladung im Anhang (.ics):</strong> Öffne die angehängte Datei, um den Termin zu deinem Kalender hinzuzufügen.
-            </p>
-          </div>
-          <p style="margin:0;color:#6b7280;font-size:13px;">Bei Fragen: <a href="mailto:office@immivo.ai" style="color:#2563eb;">office@immivo.ai</a></p>
-        </div>
-      </div>`;
+    const html = `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="max-width:560px;margin:32px auto;padding:0 16px;">
+    <div style="background:#111827;padding:24px 32px;border-radius:14px 14px 0 0;">
+      <p style="margin:0 0 4px;font-size:11px;font-weight:600;letter-spacing:0.08em;color:#6b7280;text-transform:uppercase;">Immivo AI</p>
+      <h1 style="margin:0;font-size:20px;font-weight:700;color:#ffffff;">Kalender-Einladung</h1>
+    </div>
+    <div style="background:#ffffff;padding:32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 14px 14px;">
+      <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.5;">
+        Du wurdest zu folgendem Termin eingeladen:
+      </p>
+
+      <div style="background:#f9fafb;border-radius:10px;padding:20px;margin-bottom:24px;">
+        <h2 style="margin:0 0 16px;font-size:16px;font-weight:700;color:#111827;">${subject}</h2>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="padding:6px 0;color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;width:72px;">Datum</td>
+            <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;">${dateStr}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Uhrzeit</td>
+            <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;">${timeStr} – ${endTimeStr} Uhr</td>
+          </tr>
+          ${meetLink ? `<tr>
+            <td style="padding:6px 0;color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Format</td>
+            <td style="padding:6px 0;font-size:14px;color:#2563eb;">Video-Meeting</td>
+          </tr>` : ''}
+        </table>
+      </div>
+
+      ${meetSection}
+
+      <div style="background:#eff6ff;border-left:3px solid #2563eb;border-radius:0 8px 8px 0;padding:14px 16px;margin-bottom:24px;">
+        <p style="margin:0;font-size:13px;color:#1e40af;line-height:1.5;">
+          <strong>Kalender-Einladung im Anhang:</strong> Öffne die <code style="background:#dbeafe;padding:1px 5px;border-radius:3px;font-size:12px;">.ics</code>-Datei, um den Termin direkt zu Google Kalender, Apple Kalender oder Outlook hinzuzufügen.
+        </p>
+      </div>
+
+      <hr style="border:none;border-top:1px solid #f3f4f6;margin:0 0 20px;">
+      <p style="margin:0;font-size:13px;color:#9ca3af;">
+        Fragen? Schreib uns: <a href="mailto:office@immivo.ai" style="color:#2563eb;text-decoration:none;">office@immivo.ai</a>
+      </p>
+    </div>
+    <p style="text-align:center;font-size:11px;color:#9ca3af;margin:16px 0 32px;">Immivo AI · automatisch generierte Einladung</p>
+  </div>
+</body>
+</html>`;
 
     let sent = 0;
     for (const email of attendees) {
