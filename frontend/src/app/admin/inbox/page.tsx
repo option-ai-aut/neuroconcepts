@@ -5,9 +5,9 @@ import {
   RefreshCw, Search, Mail, Inbox, Send, FileText, Trash2,
   Reply, Forward,
   Paperclip, Plus, AlertCircle, Loader2,
-  ArrowLeft, Menu, X, Repeat, ExternalLink
+  ArrowLeft, Menu, X, ExternalLink
 } from 'lucide-react';
-import { getAdminEmails, markAdminEmailRead, getAdminUnreadCounts, sendAdminEmail, backfillPortalEmails, AdminEmail } from '@/lib/adminApi';
+import { getAdminEmails, markAdminEmailRead, getAdminUnreadCounts, sendAdminEmail, AdminEmail } from '@/lib/adminApi';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import DOMPurify from 'dompurify';
 import { getRuntimeConfig } from '@/components/EnvProvider';
@@ -44,7 +44,6 @@ function buildMailboxEntry(email: string) {
 
 const FOLDERS = [
   { id: 'INBOX', label: 'Posteingang', icon: Inbox },
-  { id: 'FORWARDING', label: 'Portal Anfragen', icon: Repeat },
   { id: 'SENT', label: 'Gesendet', icon: Send },
   { id: 'DRAFTS', label: 'Entwürfe', icon: FileText },
   { id: 'TRASH', label: 'Papierkorb', icon: Trash2 },
@@ -171,16 +170,12 @@ export default function AdminInboxPage() {
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [compose, setCompose] = useState<ComposeState>(defaultCompose);
 
-  const [backfilling, setBackfilling] = useState(false);
-
   const fetchEmails = useCallback(async () => {
-    if (selectedFolder !== 'FORWARDING' && !activeMailbox) return; // wait for mailbox to load
+    if (!activeMailbox) return; // wait for mailbox to load
     setLoading(true);
     setLoadError('');
     try {
-      // FORWARDING folder reads from DB (portal inquiries), mailbox is irrelevant
-      const mailboxParam = selectedFolder === 'FORWARDING' ? '' : activeMailbox;
-      const data = await getAdminEmails(mailboxParam, selectedFolder, searchQuery || undefined);
+      const data = await getAdminEmails(activeMailbox, selectedFolder, searchQuery || undefined);
       setEmails(data.emails || []);
       if (data.error) {
         // Provide actionable guidance for impersonation errors
@@ -201,20 +196,15 @@ export default function AdminInboxPage() {
     }
   }, [activeMailbox, selectedFolder, searchQuery]);
 
-  const handleBackfill = async () => {
-    setBackfilling(true);
-    try {
-      const result = await backfillPortalEmails();
-      alert(`Backfill abgeschlossen: ${result.created} neue E-Mails erstellt, ${result.skipped} übersprungen.`);
-      fetchEmails();
-    } catch (err: any) {
-      alert('Backfill fehlgeschlagen: ' + err.message);
-    } finally {
-      setBackfilling(false);
-    }
-  };
-
   useEffect(() => { fetchEmails(); }, [fetchEmails]);
+
+  // Auto-refresh every 15s when page is visible
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchEmails();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [fetchEmails]);
 
   useEffect(() => {
     getAdminUnreadCounts().then(d => setUnreadCounts(d.counts || {})).catch(() => {});
@@ -413,7 +403,7 @@ export default function AdminInboxPage() {
               <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Postfach</p>
               {adminRole && (
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                  adminRole === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-700' :
+                  adminRole === 'SUPER_ADMIN' ? 'bg-red-100 text-red-700' :
                   adminRole === 'ADMIN' ? 'bg-gray-900 text-white' :
                   adminRole === 'SUPPORT' ? 'bg-amber-100 text-amber-700' :
                   'bg-gray-100 text-gray-500'
@@ -464,19 +454,12 @@ export default function AdminInboxPage() {
             })}
           </nav>
 
-          <div className="p-3 border-t border-gray-200 flex flex-col gap-2">
+          <div className="p-3 border-t border-gray-200">
             <button onClick={fetchEmails} disabled={loading}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg transition-colors">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               {loading ? 'Laden...' : 'Aktualisieren'}
             </button>
-            {selectedFolder === 'FORWARDING' && (
-              <button onClick={handleBackfill} disabled={backfilling}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-200">
-                {backfilling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Repeat className="w-4 h-4" />}
-                {backfilling ? 'Läuft...' : 'Alte Emails nachladen'}
-              </button>
-            )}
           </div>
         </div>
 

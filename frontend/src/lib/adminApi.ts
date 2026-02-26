@@ -236,7 +236,7 @@ export const getAdminEmails = (mailbox: string, folder = 'INBOX', search?: strin
 export const getAdminUnreadCounts = () =>
   adminFetch<{ counts: Record<string, number> }>('/admin/emails/unread-counts');
 export const markAdminEmailRead = (id: string, isRead: boolean, mailbox?: string) =>
-  adminFetch<{ success: boolean }>(`/admin/emails/${id}/read`, { method: 'PATCH', body: JSON.stringify({ isRead, mailbox }) });
+  adminFetch<{ success: boolean }>(`/admin/emails/${encodeURIComponent(id)}/read`, { method: 'PATCH', body: JSON.stringify({ isRead, mailbox }) });
 
 export interface SendEmailPayload {
   from: string;

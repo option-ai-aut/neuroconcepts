@@ -10,7 +10,7 @@ import {
   Loader2, LayoutDashboard, Users, MessageSquare, Calendar, 
   HeadphonesIcon, DollarSign, Activity, TrendingUp, 
   ClipboardList, Settings, LogOut,
-  Bell, Search, Command, Mail, Inbox,
+  Bell, Search, Command, Mail, Inbox, RefreshCw,
   Newspaper, Briefcase, Megaphone, Menu, X
 } from 'lucide-react';
 import { safeRedirect } from '@/lib/safeRedirect';
@@ -257,6 +257,13 @@ function AdminTopBar({
         </button>
       </div>
       <div className="flex items-center gap-1.5 sm:gap-3">
+        <button
+          onClick={() => router.refresh()}
+          className="relative p-1.5 sm:p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          title="Aktualisieren"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
         <button
           onClick={() => router.push('/admin/contacts')}
           className="relative p-1.5 sm:p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
