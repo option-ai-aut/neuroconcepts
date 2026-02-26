@@ -195,10 +195,15 @@ async function loadAppSecrets() {
           'LIVEKIT_SERVER_URL',
           'LIVEKIT_SERVER_HOST',
         ];
-        for (const key of keysToLoad) {
-          if (secrets[key]) process.env[key] = secrets[key];
+        // Normalize: rebuild map with trimmed keys (guards against accidental whitespace/tabs in key names)
+        const normalizedSecrets: Record<string, string> = {};
+        for (const [k, v] of Object.entries(secrets)) {
+          normalizedSecrets[k.trim()] = v as string;
         }
-        console.log('✅ App secrets loaded from Secrets Manager:', keysToLoad.filter(k => !!secrets[k]).length, 'keys');
+        for (const key of keysToLoad) {
+          if (normalizedSecrets[key]) process.env[key] = normalizedSecrets[key];
+        }
+        console.log('✅ App secrets loaded from Secrets Manager:', keysToLoad.filter(k => !!normalizedSecrets[k]).length, 'keys');
       }
     } catch (error) {
       console.error('Failed to load app secrets from Secrets Manager:', error);
