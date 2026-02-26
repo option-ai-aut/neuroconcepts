@@ -10430,6 +10430,8 @@ function getAllowedMailboxes(callerEmail: string, role: string): string[] {
 
 // WorkMail configuration status (debug endpoint)
 app.get('/admin/workmail-status', adminAuthMiddleware, async (_req, res) => {
+  // Must call initializePrisma() first to ensure secrets are loaded from Secrets Manager
+  await initializePrisma();
   const email = process.env.WORKMAIL_EMAIL || '';
   const password = process.env.WORKMAIL_PASSWORD || '';
   const credsRaw = process.env.WORKMAIL_CREDENTIALS || '';
@@ -10438,7 +10440,7 @@ app.get('/admin/workmail-status', adminAuthMiddleware, async (_req, res) => {
     try { parsedCreds = Object.keys(JSON.parse(credsRaw)); } catch {}
   }
   res.json({
-    serviceAccount: email ? `${email.substring(0, 3)}***` : null,
+    serviceAccount: email ? `${email.substring(0, 5)}***` : null,
     serviceAccountConfigured: !!(email && password),
     smtpMailboxes: parsedCreds,
     ewsUrl: process.env.WORKMAIL_EWS_URL || 'https://ews.mail.eu-west-1.awsapps.com/EWS/Exchange.asmx',
@@ -10505,6 +10507,10 @@ app.get('/admin/emails', adminAuthMiddleware, async (req: any, res) => {
       });
     }
 
+    // IMPORTANT: initializePrisma() must be called first — it loads secrets from
+    // Secrets Manager (WORKMAIL_EMAIL, WORKMAIL_PASSWORD) via loadAppSecrets().
+    // Checking hasAnyCredentials() before this always returns false on cold start.
+    const db = await initializePrisma();
     const { getEmails, hasAnyCredentials } = await import('./services/WorkMailEmailService');
 
     if (!hasAnyCredentials()) {
@@ -10517,7 +10523,6 @@ app.get('/admin/emails', adminAuthMiddleware, async (req: any, res) => {
     // Role-based access control: verify the caller may access this mailbox
     const callerEmail = (req.user?.email as string || '').toLowerCase();
     if (callerEmail && mailbox) {
-      const db = await initializePrisma();
       const staff = await db.adminStaff.findUnique({ where: { email: callerEmail } });
       const role = staff?.role || 'ADMIN';
       const allowed = getAllowedMailboxes(callerEmail, role);
