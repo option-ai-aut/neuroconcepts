@@ -273,14 +273,14 @@ export default function AdminCalendarPage() {
       };
 
       // Create in personal calendar
-      await adminFetch('/calendar/events', {
+      await adminFetch('/admin/calendar/events', {
         method: 'POST',
         body: JSON.stringify(eventBody),
       });
 
       // Also sync to office@ calendar
       try {
-        await adminFetch('/calendar/events/sync-to-office', {
+        await adminFetch('/admin/calendar/events/sync-to-office', {
           method: 'POST',
           body: JSON.stringify(eventBody),
         });
@@ -291,7 +291,7 @@ export default function AdminCalendarPage() {
       // Send email invitations to external attendees
       if (attendeeList.length > 0) {
         try {
-          await adminFetch('/calendar/events/send-invites', {
+          await adminFetch('/admin/calendar/events/send-invites', {
             method: 'POST',
             body: JSON.stringify({ subject: newEventSubject, start: start.toISOString(), end: end.toISOString(), attendees: attendeeList, meetLink }),
           });

@@ -8656,8 +8656,8 @@ function getWorkMailCreds(): WorkMailCredentials {
 // NOTE: GET /calendar/events is defined earlier (line ~5633) with Google/Outlook integration.
 // WorkMail calendar events are accessed via /admin/platform/calendars.
 
-// Create a calendar event
-app.post('/calendar/events', authMiddleware, async (req: any, res) => {
+// Create a calendar event (admin)
+app.post('/admin/calendar/events', adminAuthMiddleware, async (req: any, res) => {
   try {
     const creds = getWorkMailCreds();
     if (!creds.email || !creds.password) {
@@ -8686,8 +8686,8 @@ app.post('/calendar/events', authMiddleware, async (req: any, res) => {
   }
 });
 
-// Delete a calendar event
-app.delete('/calendar/events/:id', authMiddleware, async (req: any, res) => {
+// Delete a calendar event (admin)
+app.delete('/admin/calendar/events/:id', adminAuthMiddleware, async (req: any, res) => {
   try {
     const creds = getWorkMailCreds();
     if (!creds.email || !creds.password) {
@@ -9166,6 +9166,9 @@ async function getLiveKitClients() {
 
 // Create a new room
 app.post('/meet/rooms', async (req, res) => {
+  if (!process.env.LIVEKIT_API_KEY || !process.env.LIVEKIT_API_SECRET) {
+    return res.status(503).json({ error: 'LiveKit nicht konfiguriert', configured: false });
+  }
   try {
     const { roomService } = await getLiveKitClients();
     const roomCode = generateRoomCode();
@@ -11131,7 +11134,7 @@ app.delete('/admin/platform/users/:id', adminAuthMiddleware, async (req, res) =>
 // Calendar: Send invitation emails with .ics to attendees
 // ═══════════════════════════════════════════════════════════════════
 
-app.post('/calendar/events/send-invites', authMiddleware, async (req: any, res) => {
+app.post('/admin/calendar/events/send-invites', adminAuthMiddleware, async (req: any, res) => {
   try {
     const { subject, start, end, attendees, meetLink, location } = req.body;
     if (!subject || !start || !end || !attendees?.length) {
@@ -11239,7 +11242,7 @@ app.post('/calendar/events/send-invites', authMiddleware, async (req: any, res) 
 // Calendar: Sync to office@ when creating events
 // ═══════════════════════════════════════════════════════════════════
 
-app.post('/calendar/events/sync-to-office', authMiddleware, async (req: any, res) => {
+app.post('/admin/calendar/events/sync-to-office', adminAuthMiddleware, async (req: any, res) => {
   try {
     const creds = getWorkMailCreds();
     if (!creds.email || !creds.password) {
