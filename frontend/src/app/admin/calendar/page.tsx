@@ -287,7 +287,10 @@ export default function AdminCalendarPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowNewEvent(true)}
+          <button onClick={() => {
+            setShowNewEvent(true);
+            setNewEventDate(new Date().toISOString().split('T')[0]);
+          }}
             className="px-3 py-1.5 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5" /> Neuer Termin
           </button>
@@ -496,7 +499,7 @@ export default function AdminCalendarPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h3 className="font-semibold text-gray-900">Neuer Termin</h3>
-              <button onClick={() => setShowNewEvent(false)} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              <button onClick={() => { setShowNewEvent(false); setNewEventSubject(''); setNewEventDate(''); setNewEventAddCall(false); setNewEventAttendeesInput(''); }} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 space-y-4">
               <div>
@@ -528,13 +531,14 @@ export default function AdminCalendarPage() {
                   <Video className="w-4 h-4 text-blue-600" />
                   <span className="text-sm text-gray-700 font-medium">Video-Call hinzufügen</span>
                 </div>
-                <button
-                  type="button"
+                <div
+                  role="switch"
+                  aria-checked={newEventAddCall}
                   onClick={() => setNewEventAddCall(v => !v)}
-                  className={`w-10 h-5 rounded-full transition-colors relative ${newEventAddCall ? 'bg-blue-600' : 'bg-gray-300'}`}
+                  className={`w-10 h-5 rounded-full transition-colors duration-200 relative overflow-hidden cursor-pointer shrink-0 ${newEventAddCall ? 'bg-blue-600' : 'bg-gray-300'}`}
                 >
-                  <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${newEventAddCall ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                </button>
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${newEventAddCall ? 'translate-x-5' : 'translate-x-0'}`} />
+                </div>
               </div>
 
               {/* Attendees */}
@@ -556,7 +560,7 @@ export default function AdminCalendarPage() {
               </p>
             </div>
             <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
-              <button onClick={() => setShowNewEvent(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg">Abbrechen</button>
+              <button onClick={() => { setShowNewEvent(false); setNewEventSubject(''); setNewEventDate(''); setNewEventAddCall(false); setNewEventAttendeesInput(''); }} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg">Abbrechen</button>
               <button onClick={handleCreateEvent} disabled={newEventSaving || !newEventSubject || !newEventDate}
                 className="px-4 py-2 text-sm font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 flex items-center gap-2">
                 {newEventSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
