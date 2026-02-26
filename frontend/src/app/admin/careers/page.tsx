@@ -200,31 +200,39 @@ export default function KarriereAdminPage() {
   const selectedJob = jobs.find((j) => j.id === selectedId);
   const isNew = selectedId === 'new';
 
-  const fetchJobs = useCallback(async () => {
+  const fetchJobs = useCallback(async (silent = false) => {
     if (!token) return;
     try {
-      setLoading(true);
-      setError(null);
+      if (!silent) setLoading(true);
+      if (!silent) setError(null);
       const res = await fetch(`${getApiUrl()}/admin/jobs`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Fehler beim Laden');
       const data = await res.json();
       setJobs(data.jobs ?? []);
-      if (selectedId && selectedId !== 'new' && !data.jobs?.find((j: JobPosting) => j.id === selectedId)) {
+      if (!silent && selectedId && selectedId !== 'new' && !data.jobs?.find((j: JobPosting) => j.id === selectedId)) {
         setSelectedId(null);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fehler beim Laden');
-      setJobs([]);
+      if (!silent) { setError(e instanceof Error ? e.message : 'Fehler beim Laden'); setJobs([]); }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [token, selectedId]);
 
   useEffect(() => {
     fetchJobs();
   }, [fetchJobs]);
+
+  // Silent background refresh every 15s
+  const fetchJobsRef = useRef(fetchJobs);
+  useEffect(() => { fetchJobsRef.current = fetchJobs; }, [fetchJobs]);
+  useEffect(() => {
+    const handler = () => fetchJobsRef.current(true);
+    window.addEventListener('admin-bg-refresh', handler);
+    return () => window.removeEventListener('admin-bg-refresh', handler);
+  }, []);
 
   const fetchApplications = useCallback(
     async (jobId: string) => {

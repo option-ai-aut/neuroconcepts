@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Bug, Inbox, ChevronRight, Clock, CheckCircle, XCircle, AlertTriangle, ArrowRight, RefreshCw, Filter, Camera, Terminal, Maximize2 } from 'lucide-react';
 import {
   getAdminBugReports,
@@ -39,24 +39,33 @@ export default function SupportPage() {
   const [logsExpanded, setLogsExpanded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const fetchReports = useCallback(async () => {
+  const fetchReports = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
-      setLoadError(null);
+      if (!silent) setLoading(true);
+      if (!silent) setLoadError(null);
       const data = await getAdminBugReports(filterStatus);
       setReports(data.reports);
       setCounts(data.counts);
     } catch (err: any) {
       console.error('Failed to load bug reports:', err);
-      setLoadError(err.message || 'Fehler beim Laden der Bug Reports');
+      if (!silent) setLoadError(err.message || 'Fehler beim Laden der Bug Reports');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [filterStatus]);
 
   useEffect(() => {
     fetchReports();
   }, [fetchReports]);
+
+  // Silent background refresh every 15s
+  const fetchReportsRef = useRef(fetchReports);
+  useEffect(() => { fetchReportsRef.current = fetchReports; }, [fetchReports]);
+  useEffect(() => {
+    const handler = () => fetchReportsRef.current(true);
+    window.addEventListener('admin-bg-refresh', handler);
+    return () => window.removeEventListener('admin-bg-refresh', handler);
+  }, []);
 
   const handleStatusChange = async (report: BugReport, newStatus: BugReportStatus) => {
     setSaving(true);

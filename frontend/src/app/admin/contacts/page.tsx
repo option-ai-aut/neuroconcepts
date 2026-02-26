@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { Mail, Clock, CheckCircle2, AlertCircle, Loader2, MessageSquare, User, CalendarDays, Building2, Video, ExternalLink, Copy } from 'lucide-react';
 import { useRuntimeConfig } from '@/components/RuntimeConfigProvider';
@@ -53,9 +53,9 @@ export default function AdminContactsPage() {
 
   const apiUrl = (config.apiUrl || process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
 
-  const fetchContacts = async () => {
+  const fetchContacts = async (silent = false) => {
     setContactError(null);
-    setContactLoading(true);
+    if (!silent) setContactLoading(true);
     try {
       const session = await fetchAuthSession();
       const token = session.tokens?.idToken?.toString();
@@ -66,23 +66,23 @@ export default function AdminContactsPage() {
       const data = await res.json();
       setSubmissions(data.submissions || []);
     } catch (err: any) {
-      setContactError(err.message || 'Fehler beim Laden');
+      if (!silent) setContactError(err.message || 'Fehler beim Laden');
     } finally {
-      setContactLoading(false);
+      if (!silent) setContactLoading(false);
     }
   };
 
-  const fetchDemos = async () => {
+  const fetchDemos = async (silent = false) => {
     setDemoError(null);
-    setDemoLoading(true);
+    if (!silent) setDemoLoading(true);
     try {
       const data = await getAdminDemoBookings();
       setDemos(data.bookings || []);
       setDemoCounts(data.counts || {});
     } catch (err: any) {
-      setDemoError(err.message || 'Fehler beim Laden');
+      if (!silent) setDemoError(err.message || 'Fehler beim Laden');
     } finally {
-      setDemoLoading(false);
+      if (!silent) setDemoLoading(false);
     }
   };
 
@@ -92,6 +92,18 @@ export default function AdminContactsPage() {
       fetchDemos();
     }
   }, [tab]);
+
+  // Silent background refresh every 15s
+  const tabRef = useRef(tab);
+  useEffect(() => { tabRef.current = tab; }, [tab]);
+  useEffect(() => {
+    const handler = () => {
+      fetchContacts(true);
+      if (tabRef.current === 'demos') fetchDemos(true);
+    };
+    window.addEventListener('admin-bg-refresh', handler);
+    return () => window.removeEventListener('admin-bg-refresh', handler);
+  }, []);
 
   const updateContactStatus = async (id: string, status: string) => {
     try {

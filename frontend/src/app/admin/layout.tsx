@@ -630,7 +630,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (!token || isLoginPage) return;
     fetchNotifCounts(token);
-    const interval = setInterval(() => fetchNotifCounts(token), 30_000);
+    // 15s interval: refresh notification counts AND signal all pages to silently refresh
+    const interval = setInterval(() => {
+      fetchNotifCounts(token);
+      if (!document.hidden) window.dispatchEvent(new CustomEvent('admin-bg-refresh'));
+    }, 15_000);
     return () => clearInterval(interval);
   }, [token, isLoginPage, fetchNotifCounts]);
 
