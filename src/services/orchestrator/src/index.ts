@@ -11006,6 +11006,54 @@ app.post('/admin/backfill-portal-emails', adminAuthMiddleware, async (req, res) 
   }
 });
 
+// Lightweight notification counts for sidebar badges (no email – email is slow, polled separately)
+app.get('/admin/notifications/counts', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const db = await initializePrisma();
+    const [contacts, careers, bugReports, channels] = await Promise.all([
+      db.contactSubmission.count({ where: { status: 'NEW' } }).catch(() => 0),
+      db.jobApplication.count({ where: { status: 'NEW' } }).catch(() => 0),
+      db.bugReport.count({ where: { status: 'OPEN' } }).catch(() => 0),
+      db.adminChannel.findMany({
+        select: { id: true, _count: { select: { messages: true } } },
+      }).catch(() => [] as { id: string; _count: { messages: number } }[]),
+    ]);
+    res.json({ contacts, careers, bugReports, channels });
+  } catch {
+    res.json({ contacts: 0, careers: 0, bugReports: 0, channels: [] });
+  }
+});
+
+// Recent unread items for bell popup
+app.get('/admin/notifications/recent', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const db = await initializePrisma();
+    const [contacts, careers, bugs] = await Promise.all([
+      db.contactSubmission.findMany({
+        where: { status: 'NEW' },
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, firstName: true, lastName: true, subject: true, createdAt: true },
+      }).catch(() => []),
+      db.jobApplication.findMany({
+        where: { status: 'NEW' },
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, firstName: true, lastName: true, createdAt: true },
+      }).catch(() => []),
+      db.bugReport.findMany({
+        where: { status: 'OPEN' },
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, title: true, priority: true, createdAt: true },
+      }).catch(() => []),
+    ]);
+    res.json({ contacts, careers, bugs });
+  } catch {
+    res.json({ contacts: [], careers: [], bugs: [] });
+  }
+});
+
 app.get('/admin/emails/unread-counts', adminAuthMiddleware, async (req, res) => {
   try {
     const { getUnreadCount, hasAnyCredentials, getMailboxCredentials } = await import('./services/WorkMailEmailService');

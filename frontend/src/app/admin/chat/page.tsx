@@ -68,44 +68,99 @@ export default function AdminChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // localStorage-based unread tracking
+  // { [channelId]: { readCount: number, lastReadAt: string } }
+  const [channelReadState, setChannelReadState] = useState<Record<string, { readCount: number; lastReadAt: string }>>({});
+  // Timestamp to split "old" vs "new" messages when opening a channel
+  const [newMessagesBoundary, setNewMessagesBoundary] = useState<string | null>(null);
+
+  const loadReadState = useCallback(() => {
+    try {
+      const raw = localStorage.getItem('admin_chat_read_v1');
+      setChannelReadState(raw ? JSON.parse(raw) : {});
+    } catch {
+      setChannelReadState({});
+    }
+  }, []);
+
+  const markChannelRead = useCallback((channelId: string, msgCount: number) => {
+    try {
+      const raw = localStorage.getItem('admin_chat_read_v1');
+      const state = raw ? JSON.parse(raw) : {};
+      state[channelId] = { readCount: msgCount, lastReadAt: new Date().toISOString() };
+      localStorage.setItem('admin_chat_read_v1', JSON.stringify(state));
+      setChannelReadState({ ...state });
+    } catch {}
+  }, []);
+
+  const isChannelUnread = useCallback((ch: Channel) => {
+    const msgCount = ch._count?.messages ?? 0;
+    const stored = channelReadState[ch.id];
+    if (!stored) return msgCount > 0;
+    return msgCount > stored.readCount;
+  }, [channelReadState]);
+
+  useEffect(() => { loadReadState(); }, [loadReadState]);
+
   const fetchChannels = useCallback(async () => {
     try {
       const data = await adminFetch('/admin/team/channels');
       setChannels(Array.isArray(data) ? data : data.channels || []);
+      loadReadState();
     } catch (err) {
       console.error('Failed to load channels:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadReadState]);
 
   const fetchMessages = useCallback(async (channelId: string) => {
     setMessagesLoading(true);
     try {
       const data = await adminFetch(`/admin/team/channels/${channelId}/messages`);
-      setMessages(Array.isArray(data) ? data : data.messages || []);
+      const msgs = Array.isArray(data) ? data : data.messages || [];
+      setMessages(msgs);
+      // Keep read count updated to actual message count
+      if (msgs.length > 0) {
+        markChannelRead(channelId, msgs.length);
+      }
     } catch (err) {
       console.error('Failed to load messages:', err);
       setMessages([]);
     } finally {
       setMessagesLoading(false);
     }
-  }, []);
+  }, [markChannelRead]);
 
   useEffect(() => { fetchChannels(); }, [fetchChannels]);
 
   useEffect(() => {
     if (selectedChannel) {
+      // Capture the "last read at" before marking as read – used for the divider
+      try {
+        const raw = localStorage.getItem('admin_chat_read_v1');
+        const state = raw ? JSON.parse(raw) : {};
+        const prevState = state[selectedChannel.id];
+        setNewMessagesBoundary(prevState?.lastReadAt ?? null);
+      } catch {
+        setNewMessagesBoundary(null);
+      }
+
+      // Mark as read immediately (use current _count.messages)
+      const msgCount = selectedChannel._count?.messages ?? 0;
+      markChannelRead(selectedChannel.id, msgCount);
+
       fetchMessages(selectedChannel.id);
-      // Poll for new messages every 5s
       pollIntervalRef.current = setInterval(() => {
         fetchMessages(selectedChannel.id);
+        // Keep read count in sync with latest messages
+        markChannelRead(selectedChannel.id, selectedChannel._count?.messages ?? 0);
       }, 5000);
       return () => {
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       };
     }
-  }, [selectedChannel, fetchMessages]);
+  }, [selectedChannel, fetchMessages, markChannelRead]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -259,34 +314,41 @@ export default function AdminChatPage() {
               Noch keine Channels
             </div>
           ) : (
-            channels.map((ch) => (
-              <div
-                key={ch.id}
-                className={`group flex items-center gap-2 px-3 py-2 mx-1 rounded-lg cursor-pointer transition-colors ${
-                  selectedChannel?.id === ch.id
-                    ? 'bg-white shadow-sm text-gray-900'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-                onClick={() => { setSelectedChannel(ch); setSidebarOpen(false); }}
-              >
-                <Hash className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                <span className="flex-1 text-sm font-medium truncate">{ch.name}</span>
-                <div className="hidden group-hover:flex items-center gap-0.5">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setEditingChannel(ch); setEditChannelName(ch.name); }}
-                    className="p-0.5 text-gray-400 hover:text-gray-600 rounded"
-                  >
-                    <Pencil className="w-3 h-3" />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDeleteChannel(ch.id); }}
-                    className="p-0.5 text-gray-400 hover:text-red-600 rounded"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+            channels.map((ch) => {
+              const active = selectedChannel?.id === ch.id;
+              const unread = !active && isChannelUnread(ch);
+              return (
+                <div
+                  key={ch.id}
+                  className={`group flex items-center gap-2 px-3 py-2 mx-1 rounded-lg cursor-pointer transition-colors ${
+                    active
+                      ? 'bg-white shadow-sm text-gray-900'
+                      : unread
+                        ? 'text-gray-900 hover:bg-gray-100'
+                        : 'text-gray-500 hover:bg-gray-100'
+                  }`}
+                  onClick={() => { setSelectedChannel(ch); setSidebarOpen(false); }}
+                >
+                  <Hash className={`w-3.5 h-3.5 shrink-0 ${unread ? 'text-red-500' : 'text-gray-400'}`} />
+                  <span className={`flex-1 text-sm truncate ${unread ? 'font-bold text-gray-900' : 'font-medium'}`}>{ch.name}</span>
+                  <div className="hidden group-hover:flex items-center gap-0.5">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingChannel(ch); setEditChannelName(ch.name); }}
+                      className="p-0.5 text-gray-400 hover:text-gray-600 rounded"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteChannel(ch.id); }}
+                      className="p-0.5 text-gray-400 hover:text-red-600 rounded"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                  {unread && <span className="w-2 h-2 bg-red-500 rounded-full shrink-0" />}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -327,23 +389,39 @@ export default function AdminChatPage() {
                   Noch keine Nachrichten in #{selectedChannel.name}
                 </div>
               ) : (
-                messages.map((msg) => {
-                  const name = [msg.user?.firstName, msg.user?.lastName].filter(Boolean).join(' ') || msg.user?.email || 'Unbekannt';
-                  return (
-                    <div key={msg.id} className="flex items-start gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600 shrink-0 mt-0.5">
-                        {name[0]?.toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-sm font-semibold text-gray-900">{name}</span>
-                          <span className="text-[10px] text-gray-400">{formatDate(msg.createdAt)} {formatTime(msg.createdAt)}</span>
+                (() => {
+                  let dividerInserted = false;
+                  return messages.map((msg) => {
+                    const name = [msg.user?.firstName, msg.user?.lastName].filter(Boolean).join(' ') || msg.user?.email || 'Unbekannt';
+                    const isNew = newMessagesBoundary && new Date(msg.createdAt) > new Date(newMessagesBoundary);
+                    const showDivider = isNew && !dividerInserted;
+                    if (showDivider) dividerInserted = true;
+
+                    return (
+                      <div key={msg.id}>
+                        {showDivider && (
+                          <div className="flex items-center gap-3 my-3">
+                            <div className="flex-1 h-px bg-red-200" />
+                            <span className="text-[11px] font-semibold text-red-500 whitespace-nowrap">Neue Nachrichten</span>
+                            <div className="flex-1 h-px bg-red-200" />
+                          </div>
+                        )}
+                        <div className="flex items-start gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600 shrink-0 mt-0.5">
+                            {name[0]?.toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-sm font-semibold text-gray-900">{name}</span>
+                              <span className="text-[10px] text-gray-400">{formatDate(msg.createdAt)} {formatTime(msg.createdAt)}</span>
+                            </div>
+                            <p className="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap break-words">{msg.content}</p>
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap break-words">{msg.content}</p>
                       </div>
-                    </div>
-                  );
-                })
+                    );
+                  });
+                })()
               )}
               <div ref={messagesEndRef} />
             </div>
