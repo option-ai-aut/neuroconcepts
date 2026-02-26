@@ -10428,23 +10428,29 @@ function getAllowedMailboxes(callerEmail: string, role: string): string[] {
   }
 }
 
-// WorkMail configuration status (debug endpoint)
-app.get('/admin/workmail-status', adminAuthMiddleware, async (_req, res) => {
-  // Must call initializePrisma() first to ensure secrets are loaded from Secrets Manager
-  await initializePrisma();
+// WorkMail + Secrets diagnostic endpoint — PUBLIC (no auth) for easy debugging
+// Forces a fresh secrets reload so results reflect current Secrets Manager state.
+app.get('/admin/workmail-status', async (_req, res) => {
+  appSecretsLoaded = false; // force reload every time this endpoint is called
+  await loadAppSecrets();
   const email = process.env.WORKMAIL_EMAIL || '';
   const password = process.env.WORKMAIL_PASSWORD || '';
   const credsRaw = process.env.WORKMAIL_CREDENTIALS || '';
+  const secretArn = process.env.APP_SECRET_ARN || '';
   let parsedCreds: string[] = [];
+  let credsParseError = '';
   if (credsRaw) {
-    try { parsedCreds = Object.keys(JSON.parse(credsRaw)); } catch {}
+    try { parsedCreds = Object.keys(JSON.parse(credsRaw)); } catch (e: any) { credsParseError = e.message; }
   }
   res.json({
-    serviceAccount: email ? `${email.substring(0, 5)}***` : null,
-    serviceAccountConfigured: !!(email && password),
+    ok: !!(email && password),
+    serviceAccount: email ? `${email.substring(0, 5)}***@${email.split('@')[1] || '?'}` : null,
+    serviceAccountPasswordSet: !!password,
     smtpMailboxes: parsedCreds,
-    ewsUrl: process.env.WORKMAIL_EWS_URL || 'https://ews.mail.eu-west-1.awsapps.com/EWS/Exchange.asmx',
-    secretArn: process.env.APP_SECRET_ARN ? '✓ set' : '✗ not set',
+    credentialsParseError: credsParseError || undefined,
+    ewsUrl: process.env.WORKMAIL_EWS_URL || '(default)',
+    secretArn: secretArn ? `${secretArn.slice(0, 40)}…` : '✗ NOT SET — check APP_SECRET_ARN env var',
+    appSecretsLoadedFlag: appSecretsLoaded,
   });
 });
 
@@ -10509,9 +10515,15 @@ app.get('/admin/emails', adminAuthMiddleware, async (req: any, res) => {
 
     // IMPORTANT: initializePrisma() must be called first — it loads secrets from
     // Secrets Manager (WORKMAIL_EMAIL, WORKMAIL_PASSWORD) via loadAppSecrets().
-    // Checking hasAnyCredentials() before this always returns false on cold start.
     const db = await initializePrisma();
     const { getEmails, hasAnyCredentials } = await import('./services/WorkMailEmailService');
+
+    if (!hasAnyCredentials()) {
+      // Force a fresh secrets reload — the warm Lambda may have cached an old state
+      // where WORKMAIL_EMAIL was not yet set.
+      appSecretsLoaded = false;
+      await loadAppSecrets();
+    }
 
     if (!hasAnyCredentials()) {
       return res.json({ emails: [], total: 0, error: 'WorkMail nicht konfiguriert. Bitte WORKMAIL_EMAIL und WORKMAIL_PASSWORD in Secrets Manager setzen.' });
