@@ -8240,10 +8240,11 @@ async function ensureAdminStaff(db: any) {
     { email: 'josef.leutgeb@immivo.ai', firstName: 'Josef', lastName: 'Leutgeb', role: 'ADMIN' as const },
   ];
   for (const f of founders) {
-    const existing = await db.adminStaff.findUnique({ where: { email: f.email } });
-    if (!existing) {
-      await db.adminStaff.create({ data: f });
-    }
+    await db.adminStaff.upsert({
+      where: { email: f.email },
+      create: f,
+      update: { role: f.role, firstName: f.firstName, lastName: f.lastName },
+    });
   }
 }
 
@@ -8251,6 +8252,9 @@ async function ensureAdminStaff(db: any) {
 app.get('/admin/team/me', adminAuthMiddleware, async (req: any, res) => {
   try {
     const db = await initializePrisma();
+    // Always sync founders (ensures correct role/name on every call)
+    await ensureAdminStaff(db);
+
     const email = (req.user?.email as string || '').toLowerCase();
     if (!email) return res.status(400).json({ error: 'No email in token' });
 
