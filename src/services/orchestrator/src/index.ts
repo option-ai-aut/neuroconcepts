@@ -10428,15 +10428,34 @@ function getAllowedMailboxes(callerEmail: string, role: string): string[] {
   }
 }
 
+// WorkMail configuration status (debug endpoint)
+app.get('/admin/workmail-status', adminAuthMiddleware, async (_req, res) => {
+  const email = process.env.WORKMAIL_EMAIL || '';
+  const password = process.env.WORKMAIL_PASSWORD || '';
+  const credsRaw = process.env.WORKMAIL_CREDENTIALS || '';
+  let parsedCreds: string[] = [];
+  if (credsRaw) {
+    try { parsedCreds = Object.keys(JSON.parse(credsRaw)); } catch {}
+  }
+  res.json({
+    serviceAccount: email ? `${email.substring(0, 3)}***` : null,
+    serviceAccountConfigured: !!(email && password),
+    smtpMailboxes: parsedCreds,
+    ewsUrl: process.env.WORKMAIL_EWS_URL || 'https://ews.mail.eu-west-1.awsapps.com/EWS/Exchange.asmx',
+    secretArn: process.env.APP_SECRET_ARN ? '✓ set' : '✗ not set',
+  });
+});
+
 // Returns the allowed mailboxes for the current admin
 app.get('/admin/emails/allowed-mailboxes', adminAuthMiddleware, async (req: any, res) => {
   try {
     const db = await initializePrisma();
     const email = (req.user?.email as string || '').toLowerCase();
     const staff = await db.adminStaff.findUnique({ where: { email } });
-    const role = staff?.role || 'STANDARD';
+    const role = staff?.role || 'ADMIN';
+    const extraPages = staff?.extraPages || [];
     const allowed = getAllowedMailboxes(email, role);
-    res.json({ mailboxes: allowed, role, email });
+    res.json({ mailboxes: allowed, role, email, extraPages });
   } catch (error: any) {
     res.status(500).json({ error: 'Internal Server Error' });
   }
@@ -10486,10 +10505,10 @@ app.get('/admin/emails', adminAuthMiddleware, async (req: any, res) => {
       });
     }
 
-    const { getEmails, hasAnyCredentials, getMailboxCredentials } = await import('./services/WorkMailEmailService');
+    const { getEmails, hasAnyCredentials } = await import('./services/WorkMailEmailService');
 
     if (!hasAnyCredentials()) {
-      return res.json({ emails: [], total: 0, error: 'WorkMail nicht konfiguriert. Bitte WORKMAIL_CREDENTIALS in Secrets Manager setzen.' });
+      return res.json({ emails: [], total: 0, error: 'WorkMail nicht konfiguriert. Bitte WORKMAIL_EMAIL und WORKMAIL_PASSWORD in Secrets Manager setzen.' });
     }
 
     const mailbox = (req.query.mailbox as string) || process.env.WORKMAIL_EMAIL || '';
@@ -10500,19 +10519,16 @@ app.get('/admin/emails', adminAuthMiddleware, async (req: any, res) => {
     if (callerEmail && mailbox) {
       const db = await initializePrisma();
       const staff = await db.adminStaff.findUnique({ where: { email: callerEmail } });
-      const role = staff?.role || 'STANDARD';
+      const role = staff?.role || 'ADMIN';
       const allowed = getAllowedMailboxes(callerEmail, role);
       if (!allowed.includes(mailbox.toLowerCase())) {
         return res.status(403).json({ emails: [], total: 0, error: `Kein Zugriff auf Postfach ${mailbox}. Deine Rolle (${role}) erlaubt nur: ${allowed.join(', ')}` });
       }
     }
 
-    const creds = getMailboxCredentials(mailbox);
-    if (!creds) {
-      return res.json({ emails: [], total: 0, error: `Keine Zugangsdaten für ${mailbox}.` });
-    }
-
-    const result = await getEmails(creds, mailbox, folder as any, limit, search);
+    // For READING: EWS impersonation handles all mailboxes — no per-mailbox credential needed
+    // getEmails internally uses the service account (WORKMAIL_EMAIL/PASSWORD) to impersonate
+    const result = await getEmails({ email: mailbox, password: '' }, mailbox, folder as any, limit, search);
 
     res.json({
       emails: result.emails,
