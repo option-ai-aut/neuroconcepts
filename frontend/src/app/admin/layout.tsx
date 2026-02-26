@@ -10,10 +10,11 @@ import {
   Loader2, LayoutDashboard, Users, MessageSquare, Calendar, 
   HeadphonesIcon, DollarSign, Activity, TrendingUp, 
   ClipboardList, Settings, LogOut,
-  Bell, Search, Command, Mail, Inbox, RefreshCw,
-  Newspaper, Briefcase, Megaphone, Menu, X, ChevronRight,
+  Bell, Command, Mail, Inbox, RefreshCw,
+  Newspaper, Briefcase, Megaphone, Menu, X,
   User, Bug, AlertCircle
 } from 'lucide-react';
+import GlobalSearch from '@/components/admin/GlobalSearch';
 import { safeRedirect } from '@/lib/safeRedirect';
 import { useRuntimeConfig } from '@/components/RuntimeConfigProvider';
 import { getRuntimeConfig } from '@/components/EnvProvider';
@@ -439,13 +440,14 @@ function AdminTopBar({
           <Menu className="w-5 h-5" />
         </button>
         <h1 className="lg:hidden text-sm font-semibold text-gray-800 truncate">{pageTitle}</h1>
-        <button className="hidden lg:flex items-center gap-2 px-3 py-1.5 text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors">
-          <Search className="w-3.5 h-3.5" />
-          <span>Suchen...</span>
-          <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] text-gray-400 bg-gray-100 border border-gray-200 rounded font-mono">
-            <Command className="w-2.5 h-2.5" />K
-          </kbd>
-        </button>
+        {token && (
+          <GlobalSearch
+            apiUrl={apiUrl}
+            token={token}
+            role={profile?.role ?? 'SUPER_ADMIN'}
+            extraPages={profile?.extraPages ?? []}
+          />
+        )}
       </div>
       <div className="flex items-center gap-1.5 sm:gap-3">
         <button

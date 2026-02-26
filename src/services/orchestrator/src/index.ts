@@ -11006,6 +11006,59 @@ app.post('/admin/backfill-portal-emails', adminAuthMiddleware, async (req, res) 
   }
 });
 
+// Global admin search across all content types
+app.get('/admin/search', adminAuthMiddleware, async (req, res) => {
+  const q = ((req.query.q as string) || '').trim();
+  if (!q || q.length < 2) return res.json({ contacts: [], careers: [], bugReports: [], blogs: [], staff: [], channels: [], tenants: [] });
+  try {
+    const db = await initializePrisma();
+    const s = { contains: q, mode: 'insensitive' as const };
+
+    const [contacts, careers, bugReports, blogs, staff, channels, tenants] = await Promise.all([
+      db.contactSubmission.findMany({
+        where: { OR: [{ firstName: s }, { lastName: s }, { email: s }, { subject: s }, { message: s }] },
+        take: 5, orderBy: { createdAt: 'desc' },
+        select: { id: true, firstName: true, lastName: true, email: true, subject: true, status: true, createdAt: true },
+      }).catch(() => []),
+      db.jobApplication.findMany({
+        where: { OR: [{ firstName: s }, { lastName: s }, { email: s }] },
+        take: 5, orderBy: { createdAt: 'desc' },
+        select: { id: true, firstName: true, lastName: true, email: true, status: true, createdAt: true },
+      }).catch(() => []),
+      db.bugReport.findMany({
+        where: { OR: [{ title: s }, { description: s }, { userEmail: s }, { userName: s }, { tenantName: s }] },
+        take: 5, orderBy: { createdAt: 'desc' },
+        select: { id: true, title: true, userEmail: true, userName: true, status: true, priority: true, createdAt: true },
+      }).catch(() => []),
+      db.blogPost.findMany({
+        where: { OR: [{ title: s }, { excerpt: s }, { author: s }, { category: s }] },
+        take: 5, orderBy: { createdAt: 'desc' },
+        select: { id: true, title: true, author: true, published: true, slug: true, category: true, createdAt: true },
+      }).catch(() => []),
+      db.adminStaff.findMany({
+        where: { OR: [{ firstName: s }, { lastName: s }, { email: s }] },
+        take: 5,
+        select: { id: true, firstName: true, lastName: true, email: true, role: true },
+      }).catch(() => []),
+      db.adminChannel.findMany({
+        where: { name: s },
+        take: 5,
+        select: { id: true, name: true },
+      }).catch(() => []),
+      db.tenant.findMany({
+        where: { OR: [{ name: s }, { email: s }] },
+        take: 5, orderBy: { createdAt: 'desc' },
+        select: { id: true, name: true, email: true },
+      }).catch(() => []),
+    ]);
+
+    res.json({ contacts, careers, bugReports, blogs, staff, channels, tenants });
+  } catch (err: any) {
+    console.error('Admin search error:', err);
+    res.json({ contacts: [], careers: [], bugReports: [], blogs: [], staff: [], channels: [], tenants: [] });
+  }
+});
+
 // Lightweight notification counts for sidebar badges (no email – email is slow, polled separately)
 app.get('/admin/notifications/counts', adminAuthMiddleware, async (_req, res) => {
   try {
