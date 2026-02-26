@@ -174,18 +174,28 @@ export default function AdminInboxPage() {
   const [backfilling, setBackfilling] = useState(false);
 
   const fetchEmails = useCallback(async () => {
+    if (selectedFolder !== 'FORWARDING' && !activeMailbox) return; // wait for mailbox to load
     setLoading(true);
     setLoadError('');
     try {
-      // FORWARDING folder reads from DB (all portal inquiries), mailbox is irrelevant
+      // FORWARDING folder reads from DB (portal inquiries), mailbox is irrelevant
       const mailboxParam = selectedFolder === 'FORWARDING' ? '' : activeMailbox;
       const data = await getAdminEmails(mailboxParam, selectedFolder, searchQuery || undefined);
       setEmails(data.emails || []);
-      if (data.error) setLoadError(data.error);
+      if (data.error) {
+        // Provide actionable guidance for impersonation errors
+        if (data.error.includes('Impersonation') || data.error.includes('ImpersonateUser') || data.error.includes('Access is denied')) {
+          setLoadError(`WorkMail Impersonation nicht eingerichtet. Bitte in der AWS WorkMail Console eine Impersonation-Rolle für "${activeMailbox}" anlegen, die dem Service-Account Zugriff gewährt.`);
+        } else if (data.error.includes('nicht konfiguriert') || data.error.includes('WORKMAIL_EMAIL')) {
+          setLoadError('WorkMail nicht konfiguriert – bitte WORKMAIL_EMAIL und WORKMAIL_PASSWORD in AWS Secrets Manager setzen.');
+        } else {
+          setLoadError(data.error);
+        }
+      }
     } catch (err: any) {
       console.error('Failed to load emails:', err);
       setEmails([]);
-      setLoadError(err?.message || 'Fehler beim Laden');
+      setLoadError(err?.message || 'Fehler beim Laden der E-Mails');
     } finally {
       setLoading(false);
     }

@@ -10705,45 +10705,56 @@ function getAllowedMailboxes(callerEmail: string, role: string): string[] {
   }
 }
 
-// WorkMail + Secrets diagnostic endpoint — PUBLIC (no auth) for easy debugging
-// Forces a fresh secrets reload so results reflect current Secrets Manager state.
-app.get('/admin/workmail-status', async (_req, res) => {
-  appSecretsLoaded = false; // force reload every time this endpoint is called
-
-  // Also show raw keys from the secret (without values) for debugging
-  const secretArn = process.env.APP_SECRET_ARN || '';
-  let rawSecretKeys: string[] = [];
-  if (secretArn) {
-    try {
-      const sm = new AWS.SecretsManager();
-      const raw = await sm.getSecretValue({ SecretId: secretArn }).promise();
-      if (raw.SecretString) rawSecretKeys = Object.keys(JSON.parse(raw.SecretString));
-    } catch (e: any) {
-      rawSecretKeys = [`ERROR: ${e.message}`];
-    }
-  }
-
+// WorkMail live connection test — PUBLIC, forces fresh secrets reload
+app.get('/admin/emails/test-connection', async (_req, res) => {
+  // Always reload secrets fresh so the result reflects current Secrets Manager state
+  appSecretsLoaded = false;
   await loadAppSecrets();
-  const email = process.env.WORKMAIL_EMAIL || '';
-  const password = process.env.WORKMAIL_PASSWORD || '';
-  const credsRaw = process.env.WORKMAIL_CREDENTIALS || '';
-  let parsedCreds: string[] = [];
-  let credsParseError = '';
-  if (credsRaw) {
-    try { parsedCreds = Object.keys(JSON.parse(credsRaw)); } catch (e: any) { credsParseError = e.message; }
+
+  const svcEmail = process.env.WORKMAIL_EMAIL || '';
+  const svcPassword = process.env.WORKMAIL_PASSWORD || '';
+
+  if (!svcEmail || !svcPassword) {
+    return res.json({
+      ok: false,
+      step: 'credentials',
+      error: 'WORKMAIL_EMAIL oder WORKMAIL_PASSWORD fehlt in Secrets Manager',
+      secretKeys: await getSecretKeys(),
+    });
   }
-  res.json({
-    ok: !!(email && password),
-    serviceAccount: email ? `${email.substring(0, 5)}***@${email.split('@')[1] || '?'}` : null,
-    serviceAccountPasswordSet: !!password,
-    smtpMailboxes: parsedCreds,
-    credentialsParseError: credsParseError || undefined,
-    ewsUrl: process.env.WORKMAIL_EWS_URL || '(default)',
-    secretArn: secretArn ? `${secretArn.slice(0, 50)}…` : '✗ NOT SET',
-    // All key names currently stored in the secret (no values shown):
-    allSecretKeys: rawSecretKeys,
-  });
+
+  // Try to read the service account inbox (no impersonation needed — quickest test)
+  try {
+    const { getEmails } = await import('./services/WorkMailEmailService');
+    const result = await getEmails(
+      { email: svcEmail, password: svcPassword },
+      svcEmail,
+      'INBOX',
+      1, // just 1 email to test connectivity
+    );
+    if (result.error) {
+      return res.json({ ok: false, step: 'ews', error: result.error, serviceAccount: svcEmail });
+    }
+    return res.json({
+      ok: true,
+      serviceAccount: svcEmail,
+      inboxCount: result.total,
+      message: `WorkMail verbunden ✓ — ${result.total} E-Mail(s) im Service-Account-Postfach`,
+    });
+  } catch (e: any) {
+    return res.json({ ok: false, step: 'ews_exception', error: e.message, serviceAccount: svcEmail });
+  }
 });
+
+async function getSecretKeys(): Promise<string[]> {
+  const arn = process.env.APP_SECRET_ARN;
+  if (!arn) return ['APP_SECRET_ARN not set'];
+  try {
+    const sm = new AWS.SecretsManager();
+    const r = await sm.getSecretValue({ SecretId: arn }).promise();
+    return r.SecretString ? Object.keys(JSON.parse(r.SecretString)) : [];
+  } catch (e: any) { return [`ERROR: ${e.message}`]; }
+}
 
 // Returns the allowed mailboxes for the current admin
 app.get('/admin/emails/allowed-mailboxes', adminAuthMiddleware, async (req: any, res) => {
