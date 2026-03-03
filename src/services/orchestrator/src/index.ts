@@ -8015,19 +8015,148 @@ app.post('/admin/platform/tenants', adminAuthMiddleware, async (req, res) => {
 
 // --- Admin: Delete Tenant ---
 app.delete('/admin/platform/tenants/:id', adminAuthMiddleware, async (req: any, res) => {
+  const tenantId = req.params.id;
+  const log: string[] = [];
   try {
-    // SUPER_ADMIN only — most destructive operation
     const db = await initializePrisma();
+
+    // Permission: SUPER_ADMIN or ADMIN
     const callerEmail = (req.user?.email as string || '').toLowerCase();
     const caller = await db.adminStaff.findUnique({ where: { email: callerEmail } });
-    if (!caller || caller.role !== 'SUPER_ADMIN') {
-      return res.status(403).json({ error: 'Nur Super Admins können Tenants löschen.' });
+    if (!caller || !['SUPER_ADMIN', 'ADMIN'].includes(caller.role)) {
+      return res.status(403).json({ error: 'Nur Admins können Tenants löschen.' });
     }
-    await db.tenant.delete({ where: { id: req.params.id } });
-    res.json({ success: true });
+
+    // Load tenant + all users (for Cognito + S3 cleanup)
+    const tenant = await db.tenant.findUnique({
+      where: { id: tenantId },
+      include: { users: { select: { id: true, email: true } } },
+    });
+    if (!tenant) return res.status(404).json({ error: 'Tenant nicht gefunden.' });
+
+    // ── Step 1: S3 Cleanup ─────────────────────────────────────────────
+    if (MEDIA_BUCKET) {
+      const prefixes = [
+        `properties/${tenantId}/`,
+        `chat-uploads/${tenantId}/`,
+        `tenants/${tenantId}/`,
+      ];
+      // Collect individual S3 keys from DB before deletion
+      const exposes = await db.expose.findMany({ where: { tenantId }, select: { pdfUrl: true } });
+      const bugReports = await db.bugReport.findMany({ where: { tenantId }, select: { screenshotUrl: true } }).catch(() => [] as { screenshotUrl: string | null }[]);
+      const individualKeys: string[] = [];
+
+      exposes.forEach(e => { const k = e.pdfUrl ? extractS3Key(e.pdfUrl) : null; if (k) individualKeys.push(k); });
+      bugReports.forEach(b => { const k = b.screenshotUrl ? extractS3Key(b.screenshotUrl) : null; if (k) individualKeys.push(k); });
+
+      // Tenant logo
+      if (tenant.logoUrl) { const k = extractS3Key(tenant.logoUrl); if (k) individualKeys.push(k); }
+
+      for (const prefix of prefixes) {
+        let continuationToken: string | undefined;
+        do {
+          const listed = await s3Client.listObjectsV2({
+            Bucket: MEDIA_BUCKET,
+            Prefix: prefix,
+            ContinuationToken: continuationToken,
+          }).promise();
+          const keys = (listed.Contents || []).map(o => o.Key!).filter(Boolean);
+          if (keys.length > 0) {
+            await s3Client.deleteObjects({
+              Bucket: MEDIA_BUCKET,
+              Delete: { Objects: keys.map(k => ({ Key: k })) },
+            }).promise();
+            log.push(`s3: deleted ${keys.length} objects from ${prefix}`);
+          }
+          continuationToken = listed.IsTruncated ? listed.NextContinuationToken : undefined;
+        } while (continuationToken);
+      }
+
+      // Individual keys (expose PDFs, bug report screenshots, logo)
+      for (const key of individualKeys) {
+        await s3Client.deleteObject({ Bucket: MEDIA_BUCKET, Key: key }).promise().catch(() => {});
+      }
+      if (individualKeys.length > 0) log.push(`s3: deleted ${individualKeys.length} individual files`);
+    }
+
+    // ── Step 2: Cognito Cleanup ────────────────────────────────────────
+    const appUserPoolId = process.env.USER_POOL_ID;
+    if (appUserPoolId && tenant.users.length > 0) {
+      let cognitoDeleted = 0;
+      for (const user of tenant.users) {
+        try {
+          await cognito.adminDeleteUser({ UserPoolId: appUserPoolId, Username: user.email }).promise();
+          cognitoDeleted++;
+        } catch (e: any) {
+          if (e.code !== 'UserNotFoundException') console.warn(`Cognito delete failed for ${user.email}:`, e.message);
+        }
+      }
+      log.push(`cognito: deleted ${cognitoDeleted} users`);
+    }
+
+    // ── Step 3: Database Cascade Deletion ─────────────────────────────
+    const userIds = tenant.users.map(u => u.id);
+
+    // 3a. Nullify LeadActivity.mivoActionId to allow MivoPendingAction deletion
+    await db.$executeRaw`
+      UPDATE "LeadActivity"
+      SET "mivoActionId" = NULL
+      WHERE "leadId" IN (SELECT id FROM "Lead" WHERE "tenantId" = ${tenantId})
+        AND "mivoActionId" IS NOT NULL
+    `.catch(() => {});
+
+    // 3b. Delete in order (children before parents)
+    await db.mivoPendingAction.deleteMany({ where: { tenantId } });
+    await db.notification.deleteMany({ where: { tenantId } });
+    await db.realtimeEvent.deleteMany({ where: { tenantId } });
+    await db.aiAuditLog.deleteMany({ where: { tenantId } });
+    await db.aiUsageLog.deleteMany({ where: { tenantId: tenantId } }).catch(() => {});
+    await db.bugReport.deleteMany({ where: { tenantId } }).catch(() => {});
+    await db.email.deleteMany({ where: { tenantId } });
+
+    // Portal connections cascade PortalSyncLog
+    await db.portalConnection.deleteMany({ where: { tenantId } });
+    if (userIds.length > 0) {
+      await db.portalConnection.deleteMany({ where: { userId: { in: userIds } } });
+    }
+
+    // Channels cascade ChannelMessage + ChannelMember
+    await db.channel.deleteMany({ where: { tenantId } });
+
+    // Leads cascade Message + LeadActivity
+    await db.lead.deleteMany({ where: { tenantId } });
+
+    // Exposes (PDFs already cleaned from S3)
+    await db.expose.deleteMany({ where: { tenantId } });
+
+    // Properties cascade PropertyAssignment
+    await db.property.deleteMany({ where: { tenantId } });
+
+    await db.emailTemplate.deleteMany({ where: { tenantId } });
+    await db.exposeTemplate.deleteMany({ where: { tenantId } });
+
+    // User-level records
+    if (userIds.length > 0) {
+      await db.userChat.deleteMany({ where: { userId: { in: userIds } } });
+      await db.conversationSummary.deleteMany({ where: { userId: { in: userIds } } });
+      await db.userSettings.deleteMany({ where: { userId: { in: userIds } } }).catch(() => {});
+    }
+
+    // TenantSettings (1:1)
+    await db.tenantSettings.deleteMany({ where: { tenantId } }).catch(() => {});
+
+    // Users
+    await db.user.deleteMany({ where: { tenantId } });
+
+    // Finally: the tenant itself
+    await db.tenant.delete({ where: { id: tenantId } });
+
+    log.push(`db: tenant ${tenantId} and all related data deleted`);
+    console.log(`[admin] Tenant ${tenantId} (${tenant.name}) fully deleted by ${callerEmail}. Steps: ${log.join('; ')}`);
+    res.json({ success: true, deleted: tenant.name, steps: log });
   } catch (error: any) {
     console.error('Admin delete tenant error:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: error.message || 'Internal Server Error', steps: log });
   }
 });
 
