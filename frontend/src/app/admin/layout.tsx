@@ -230,8 +230,16 @@ function AdminSidebar({
         )}
         <button
           onClick={async () => {
-            await signOut();
-            safeRedirect('/admin/login');
+            try { await signOut(); } catch {}
+            try {
+              const keys: string[] = [];
+              for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && (k.startsWith('CognitoIdentityServiceProvider.') || k.startsWith('amplify-') || k.includes('cognito'))) keys.push(k);
+              }
+              keys.forEach(k => localStorage.removeItem(k));
+            } catch {}
+            window.location.replace('/admin/login');
           }}
           className="w-full flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] text-gray-600 hover:text-white hover:bg-white/5 rounded-lg transition-all"
         >
@@ -489,8 +497,16 @@ function AdminTopBar({
         </div>
         <button
           onClick={async () => {
-            await signOut();
-            safeRedirect('/admin/login');
+            try { await signOut(); } catch {}
+            try {
+              const keys: string[] = [];
+              for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && (k.startsWith('CognitoIdentityServiceProvider.') || k.startsWith('amplify-') || k.includes('cognito'))) keys.push(k);
+              }
+              keys.forEach(k => localStorage.removeItem(k));
+            } catch {}
+            window.location.replace('/admin/login');
           }}
           className="p-1.5 sm:p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
           title="Abmelden"

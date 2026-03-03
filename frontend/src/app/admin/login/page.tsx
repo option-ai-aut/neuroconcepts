@@ -63,28 +63,20 @@ export default function AdminLoginPage() {
   const [error, setError] = useState('');
   const [view, setView] = useState<'signIn' | 'newPasswordRequired'>('signIn');
 
-  // On login page: always sign out any existing session so a different user can log in cleanly.
-  // This prevents the "already logged in" redirect which would log you in as the previous user.
+  // If already logged in as admin → redirect directly to dashboard (convenience)
   useEffect(() => {
-    const clearSession = async () => {
+    const checkAuth = async () => {
       try {
-        // Sign out silently – ignore errors if no session exists
-        await signOut({ global: false });
-      } catch {}
-      // Also purge any stale localStorage tokens
-      try {
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && (key.startsWith('CognitoIdentityServiceProvider.') || key.startsWith('amplify-') || key.includes('cognito') || key.includes('Cognito'))) {
-            keysToRemove.push(key);
-          }
+        const session = await fetchAuthSession();
+        if (session.tokens) {
+          window.location.replace('/admin');
         }
-        keysToRemove.forEach(k => localStorage.removeItem(k));
-      } catch {}
+      } catch {
+        // No active session – show login form (normal case after logout)
+      }
     };
     if (config.adminUserPoolId) {
-      clearSession();
+      checkAuth();
     }
   }, [config]);
 
@@ -93,14 +85,27 @@ export default function AdminLoginPage() {
     setError('');
     setIsLoading(true);
     try {
+      // Fully purge any previous session before signing in with new credentials
       try { await signOut(); } catch {}
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith('CognitoIdentityServiceProvider.') || key.startsWith('amplify-') || key.includes('cognito'))) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+      } catch {}
+
       const result = await signIn({ username: email, password });
       if (result.nextStep?.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
         setView('newPasswordRequired');
         setIsLoading(false);
         return;
       }
-      router.push('/admin');
+      // Hard redirect (not router.push) so the whole app re-initialises with the new session
+      window.location.replace('/admin');
     } catch (err: any) {
       setError(formatAuthError(err.message) || 'Anmeldung fehlgeschlagen');
     } finally {
