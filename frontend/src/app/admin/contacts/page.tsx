@@ -173,7 +173,7 @@ export default function AdminContactsPage() {
             <div className="mb-6 bg-red-50 rounded-xl border border-red-200 p-6 text-center">
               <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
               <p className="text-sm text-red-600 mb-3">{contactError}</p>
-              <button onClick={fetchContacts} className="text-sm text-blue-600 hover:underline">Erneut versuchen</button>
+              <button onClick={() => fetchContacts()} className="text-sm text-blue-600 hover:underline">Erneut versuchen</button>
             </div>
           )}
 
@@ -253,7 +253,7 @@ export default function AdminContactsPage() {
             <div className="mb-6 bg-red-50 rounded-xl border border-red-200 p-6 text-center">
               <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
               <p className="text-sm text-red-600 mb-3">{demoError}</p>
-              <button onClick={fetchDemos} className="text-sm text-blue-600 hover:underline">Erneut versuchen</button>
+              <button onClick={() => fetchDemos()} className="text-sm text-blue-600 hover:underline">Erneut versuchen</button>
             </div>
           )}
 
@@ -267,7 +267,7 @@ export default function AdminContactsPage() {
                 </button>
               );
             })}
-            <button onClick={fetchDemos} disabled={demoLoading}
+            <button onClick={() => fetchDemos()} disabled={demoLoading}
               className="ml-auto px-3 py-1.5 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-1">
               <Loader2 className={`w-3 h-3 ${demoLoading ? 'animate-spin' : 'hidden'}`} />
               Aktualisieren

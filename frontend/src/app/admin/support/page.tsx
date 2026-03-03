@@ -123,7 +123,7 @@ export default function SupportPage() {
           </p>
         </div>
         <button
-          onClick={fetchReports}
+          onClick={() => fetchReports()}
           className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
           title="Aktualisieren"
         >
@@ -180,7 +180,7 @@ export default function SupportPage() {
           </div>
           <h3 className="text-base font-semibold text-gray-900 mb-1">Fehler beim Laden</h3>
           <p className="text-sm text-red-600 max-w-sm mx-auto mb-4">{loadError}</p>
-          <button onClick={fetchReports} className="text-sm text-blue-600 hover:underline">Erneut versuchen</button>
+          <button onClick={() => fetchReports()} className="text-sm text-blue-600 hover:underline">Erneut versuchen</button>
         </div>
       ) : loading && reports.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
