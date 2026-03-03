@@ -109,6 +109,7 @@ export interface AttachmentItem {
 
 interface CrmLead { id: string; name: string; email: string; documents?: { id: string; name: string; url: string; type: string; size: number }[] }
 interface CrmProperty { id: string; address: string; title?: string; images?: { url: string; name?: string }[]; documents?: { id: string; name: string; url: string; type: string; size: number }[] }
+interface CrmExpose { id: string; pdfUrl?: string | null; status: string; property?: { title?: string; address?: string } | null }
 
 interface EmailComposerProps {
   emailFormData: any;
@@ -128,10 +129,11 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
   // Attachment state
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
-  const [attachPickerTab, setAttachPickerTab] = useState<'upload' | 'leads' | 'properties'>('upload');
+  const [attachPickerTab, setAttachPickerTab] = useState<'upload' | 'leads' | 'properties' | 'exposes'>('upload');
   const [dragOver, setDragOver] = useState(false);
   const [crmLeads, setCrmLeads] = useState<CrmLead[]>([]);
   const [crmProperties, setCrmProperties] = useState<CrmProperty[]>([]);
+  const [crmExposes, setCrmExposes] = useState<CrmExpose[]>([]);
   const [crmLoading, setCrmLoading] = useState(false);
   const [expandedCrmItem, setExpandedCrmItem] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -293,16 +295,19 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
   };
 
   // Load CRM data when CRM tab is opened
-  const loadCrmData = async (tab: 'leads' | 'properties') => {
+  const loadCrmData = async (tab: 'leads' | 'properties' | 'exposes') => {
     if (!apiUrl) return;
     setCrmLoading(true);
     try {
       if (tab === 'leads') {
         const data = await fetchWithAuth(`${apiUrl}/leads?limit=50`);
         setCrmLeads(data?.leads || data || []);
-      } else {
+      } else if (tab === 'properties') {
         const data = await fetchWithAuth(`${apiUrl}/properties?limit=50`);
         setCrmProperties(data?.properties || data || []);
+      } else {
+        const data = await fetchWithAuth(`${apiUrl}/exposes`);
+        setCrmExposes(Array.isArray(data) ? data : []);
       }
     } catch (e) {
       console.warn('CRM load error:', e);
@@ -311,10 +316,11 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
     }
   };
 
-  const handleAttachPickerTab = (tab: 'upload' | 'leads' | 'properties') => {
+  const handleAttachPickerTab = (tab: 'upload' | 'leads' | 'properties' | 'exposes') => {
     setAttachPickerTab(tab);
     if (tab === 'leads' && crmLeads.length === 0) loadCrmData('leads');
     if (tab === 'properties' && crmProperties.length === 0) loadCrmData('properties');
+    if (tab === 'exposes' && crmExposes.length === 0) loadCrmData('exposes');
   };
 
   // Convert file to base64 attachment
@@ -651,6 +657,7 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
                 { id: 'upload' as const, label: 'Von PC hochladen', icon: Upload },
                 { id: 'leads' as const, label: 'Leads (CRM)', icon: Users },
                 { id: 'properties' as const, label: 'Objekte (CRM)', icon: Building2 },
+                { id: 'exposes' as const, label: 'Exposés (PDF)', icon: FileText },
               ] as const).map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
@@ -862,6 +869,56 @@ function EmailComposer({ emailFormData, updateEmailForm, onSend, onSaveDraft, on
                               </div>
                             )}
                           </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Exposés tab ── */}
+              {attachPickerTab === 'exposes' && (
+                <div>
+                  {crmLoading ? (
+                    <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
+                  ) : crmExposes.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400">
+                      <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">Keine Exposés vorhanden</p>
+                      <p className="text-xs mt-1 opacity-60">Erstelle zuerst ein Exposé im CRM</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {crmExposes.map(expose => {
+                        const title = expose.property?.title || expose.property?.address || `Exposé ${expose.id.slice(0, 8)}`;
+                        const hasPdf = !!expose.pdfUrl;
+                        const selected = hasPdf && attachments.some(a => a.url === expose.pdfUrl);
+                        return (
+                          <button
+                            key={expose.id}
+                            type="button"
+                            disabled={!hasPdf}
+                            onClick={() => hasPdf && expose.pdfUrl && addCrmFile({
+                              name: `Exposé – ${title}.pdf`,
+                              url: expose.pdfUrl,
+                              type: 'application/pdf',
+                              size: 0,
+                            })}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
+                              selected ? 'bg-blue-50 border-blue-200' : hasPdf ? 'border-gray-100 hover:bg-gray-50' : 'border-gray-100 opacity-50 cursor-not-allowed'
+                            }`}
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                              <FileText className="w-4 h-4 text-red-500" />
+                            </div>
+                            <div className="flex-1 text-left min-w-0">
+                              <div className="text-sm font-medium text-gray-900 truncate">{title}</div>
+                              <div className="text-xs text-gray-400 mt-0.5">
+                                {hasPdf ? 'PDF verfügbar' : 'Noch kein PDF – zuerst in Mivo generieren'}
+                              </div>
+                            </div>
+                            {selected && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                          </button>
                         );
                       })}
                     </div>

@@ -464,7 +464,7 @@ interface ExposeEditorProps {
 // ============================================
 
 export default function ExposeEditor({ exposeId, propertyId, templateId, isTemplate = false, onClose }: ExposeEditorProps) {
-  const { setActiveExposeContext, activeExposeContext, sidebarExpanded } = useGlobalState();
+  const { setActiveExposeContext, activeExposeContext, sidebarExpanded, setAiChatDraft } = useGlobalState();
   
   // State
   const [expose, setExpose] = useState<Expose | null>(null);
@@ -3194,6 +3194,22 @@ export default function ExposeEditor({ exposeId, propertyId, templateId, isTempl
                   ) : (
                     <Download className="w-4 h-4" />
                   )}
+                </button>
+              )}
+
+              {/* Send to Mivo chat — pre-fills Mivo with expose context */}
+              {!isTemplate && expose && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const propertyTitle = (expose as any).property?.title || expose.id;
+                    setAiChatDraft(`Generiere das Exposé-PDF für "${propertyTitle}" (Expose-ID: ${expose.id}) und schick es mir als Link. Du kannst es danach auch direkt an einen Lead senden.`);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-md transition-colors border border-indigo-200"
+                  title="Mit Mivo AI arbeiten"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                  Mivo
                 </button>
               )}
 

@@ -127,6 +127,7 @@ const TOOL_LABELS: Record<string, { label: string; icon: string }> = {
   set_expose_status: { label: 'Status geändert', icon: '✏️' },
   set_expose_theme: { label: 'Design geändert', icon: '🎨' },
   generate_expose_pdf: { label: 'PDF generiert', icon: '📄' },
+  send_expose_to_lead: { label: 'Exposé versendet', icon: '📧' },
   generate_expose_text: { label: 'Text generiert', icon: '✍️' },
 
   create_expose_block: { label: 'Block hinzugefügt', icon: '➕' },
@@ -1172,14 +1173,14 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                   const msgContent = msg.content || '';
                   if (!msgContent) return null;
 
-                  // Normalize markdown links containing download/image URLs to bare URLs
-                  // e.g. [Download: file.csv](https://...csv) → https://...csv
+                  // Normalize markdown links with known file URLs to bare URLs
+                  // e.g. [Download: expose.pdf](https://...pdf) → https://...pdf
                   const normalized = msgContent.replace(
-                    /\[([^\]]*)\]\((https?:\/\/[^\s)]+?\.(csv|xlsx|png|jpg|jpeg|webp|gif)[^\s)]*)\)/gi,
+                    /\[([^\]]*)\]\((https?:\/\/[^\s)]+?\.(csv|xlsx|pdf|png|jpg|jpeg|webp|gif)[^\s)]*)\)/gi,
                     '$2'
                   );
 
-                  const hasMediaUrls = /(https?:\/\/[^\s]+?\.(png|jpg|jpeg|webp|gif|csv|xlsx)(\?[^\s]*)?)/gi.test(normalized);
+                  const hasMediaUrls = /(https?:\/\/[^\s]+?\.(png|jpg|jpeg|webp|gif|csv|xlsx|pdf)(\?[^\s]*)?)/gi.test(normalized);
 
                   if (!hasMediaUrls) {
                     return <div className="whitespace-pre-wrap mivo-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(normalized) }} />;
@@ -1187,7 +1188,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
 
                   const elements: React.ReactNode[] = [];
                   let lastIndex = 0;
-                  const regex = /(https?:\/\/[^\s]+?\.(png|jpg|jpeg|webp|gif|csv|xlsx)(\?[^\s]*)?)/gi;
+                  const regex = /(https?:\/\/[^\s]+?\.(png|jpg|jpeg|webp|gif|csv|xlsx|pdf)(\?[^\s]*)?)/gi;
                   let match;
 
                   while ((match = regex.exec(normalized)) !== null) {
@@ -1197,7 +1198,24 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
                     }
                     const url = match[0];
                     const ext = (match[2] || '').toLowerCase();
-                    if (ext === 'csv' || ext === 'xlsx') {
+                    if (ext === 'pdf') {
+                      const fname = url.split('/').pop()?.split('?')[0] || 'dokument.pdf';
+                      elements.push(
+                        <a
+                          key={`pdf-${match.index}`}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2.5 mt-2 mb-1 pl-3 pr-4 py-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-lg transition-colors shadow-sm cursor-pointer"
+                        >
+                          <svg className="w-4 h-4 flex-shrink-0 opacity-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                          <div className="flex flex-col items-start leading-tight">
+                            <span className="text-[11px] font-semibold">PDF öffnen</span>
+                            <span className="text-[10px] text-white/70 font-normal">{fname}</span>
+                          </div>
+                        </a>
+                      );
+                    } else if (ext === 'csv' || ext === 'xlsx') {
                       const fname = url.split('/').pop()?.split('?')[0] || `export.${ext}`;
                       const isXlsx = ext === 'xlsx';
                       elements.push(
