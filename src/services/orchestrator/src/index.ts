@@ -12233,6 +12233,58 @@ const serverlessHandler = serverless(app, {
 
 const ALLOWED_ORIGINS = ['https://app.immivo.ai', 'https://test.immivo.ai', 'http://localhost:3000'];
 
+// Parse Lambda Function URL event body — handles both JSON and multipart/form-data (file uploads)
+async function parseFormData(event: any): Promise<{
+  message: string;
+  pageContext: string;
+  undoCutoffTime: string;
+  files: Array<{ buffer: Buffer; originalname: string; mimetype: string; size: number }>;
+}> {
+  const contentType = event.headers?.['content-type'] || event.headers?.['Content-Type'] || '';
+  if (!contentType.toLowerCase().includes('multipart/form-data')) {
+    const rawBody = event.isBase64Encoded
+      ? Buffer.from(event.body || '', 'base64').toString('utf8')
+      : (event.body || '');
+    let body: any = {};
+    try { body = JSON.parse(rawBody || '{}'); } catch { /* ignore */ }
+    return { message: body.message || '', pageContext: body.pageContext || '', undoCutoffTime: body.undoCutoffTime || '', files: [] };
+  }
+
+  const bodyBuffer = event.isBase64Encoded
+    ? Buffer.from(event.body || '', 'base64')
+    : Buffer.from(event.body || '', 'binary');
+
+  return new Promise((resolve, reject) => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Busboy = require('busboy');
+    const bb = Busboy({ headers: { 'content-type': contentType }, limits: { fileSize: 10 * 1024 * 1024, files: 10 } });
+    const fields: Record<string, string> = {};
+    const files: Array<{ buffer: Buffer; originalname: string; mimetype: string; size: number }> = [];
+
+    bb.on('field', (name: string, value: string) => { fields[name] = value; });
+    bb.on('file', (_fieldname: string, file: any, info: any) => {
+      const { filename, mimeType } = info;
+      const chunks: Buffer[] = [];
+      file.on('data', (chunk: Buffer) => chunks.push(chunk));
+      file.on('end', () => {
+        const buffer = Buffer.concat(chunks);
+        if (CHAT_ALLOWED_MIMETYPES.has(mimeType)) {
+          files.push({ buffer, originalname: filename || 'file', mimetype: mimeType, size: buffer.length });
+        }
+      });
+    });
+    bb.on('finish', () => resolve({
+      message: fields.message || '',
+      pageContext: fields.pageContext || '',
+      undoCutoffTime: fields.undoCutoffTime || '',
+      files,
+    }));
+    bb.on('error', reject);
+    bb.write(bodyBuffer);
+    bb.end();
+  });
+}
+
 // Dedicated handler for /chat/stream via Function URL — bypasses serverless-http buffering
 async function handleChatStream(event: any) {
   const headers = event.headers || {};
@@ -12259,10 +12311,8 @@ async function handleChatStream(event: any) {
     const userPayload = await v.verify(token) as any;
     if (userPayload.email) userPayload.email = (userPayload.email as string).toLowerCase().trim();
 
-    const rawBody = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString() : event.body;
-    const body = JSON.parse(rawBody || '{}');
-    const message = body.message || '';
-    const pageContext = body.pageContext || '';
+    // Parse body — handles both JSON and multipart/form-data (file uploads)
+    const { message, pageContext, files } = await parseFormData(event);
 
     const db = prisma || (await initializePrisma());
     const currentUser = await db.user.findUnique({ where: { email: userPayload.email } });
@@ -12277,6 +12327,58 @@ async function handleChatStream(event: any) {
       write({ done: true }); return { statusCode: 200, headers: sseHeaders, body: chunks.join('') };
     }
 
+    // Process uploaded files — upload to S3 and build AI context
+    let fileContext = '';
+    const uploadedFileUrls: string[] = [];
+    if (files.length > 0) {
+      const folder = `chat-uploads/${tenantId}/${userId}`;
+      const fileInfos = await Promise.all(files.map(async (f) => {
+        const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(f.originalname)}`;
+        const url = await uploadToS3(f.buffer, uniqueName, f.mimetype, folder);
+
+        let extractedText: string | null = null;
+        try {
+          const ext = path.extname(f.originalname).toLowerCase();
+          if (ext === '.docx' || f.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+            const result = await mammoth.extractRawText({ buffer: f.buffer });
+            extractedText = result.value?.trim() || null;
+          } else if (ext === '.pdf' || f.mimetype === 'application/pdf') {
+            const pp = getPdfParse();
+            if (pp) { const result = await pp(f.buffer); extractedText = result.text?.trim() || null; }
+          } else if (ext === '.txt' || f.mimetype === 'text/plain') {
+            extractedText = f.buffer.toString('utf-8').trim();
+          } else if (['.xlsx', '.xls', '.csv'].includes(ext) || f.mimetype.includes('spreadsheet') || f.mimetype === 'text/csv') {
+            const XLSX = getXLSX();
+            const workbook = XLSX.read(f.buffer, { type: 'buffer' });
+            const lines: string[] = [];
+            for (const sheetName of workbook.SheetNames) {
+              const sheet = workbook.Sheets[sheetName];
+              const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+              if (rows.length === 0) continue;
+              const hdrs = (rows[0] as any[]).map(String);
+              lines.push(hdrs.join(' | '));
+              lines.push(hdrs.map(() => '---').join(' | '));
+              rows.slice(1, 201).forEach(row => lines.push((row as any[]).map(v => String(v ?? '')).join(' | ')));
+            }
+            extractedText = lines.join('\n');
+          }
+        } catch (err) {
+          console.warn(`⚠️ [FnURL] Text extraction failed for ${f.originalname}:`, err);
+        }
+        return { name: f.originalname, type: f.mimetype, size: f.size, url, extractedText };
+      }));
+
+      uploadedFileUrls.push(...fileInfos.map(fi => fi.url));
+      const imageFiles = fileInfos.filter(fi => fi.type.startsWith('image/'));
+      const otherFiles = fileInfos.filter(fi => !fi.type.startsWith('image/'));
+      if (imageFiles.length > 0) fileContext += `\n[${imageFiles.length} Bild(er): ${imageFiles.map(fi => fi.name).join(', ')}]`;
+      otherFiles.forEach(fi => {
+        fileContext += `\n[Datei: ${fi.name}]`;
+        if (fi.extractedText) fileContext += `\n${fi.extractedText.substring(0, 3000)}`;
+      });
+    }
+
+    const fullMessage = fileContext ? `${message}\n${fileContext}` : message;
     const openai = new OpenAIService();
     let fullResponse = '';
     let hadFunctionCalls = false;
@@ -12291,10 +12393,10 @@ async function handleChatStream(event: any) {
       company: tenant ? { name: tenant.name, description: tenant.description || undefined, phone: tenant.phone || undefined, email: tenant.email || undefined, website: tenant.website || undefined, address: tenant.address || undefined } : undefined,
     };
 
-    console.log(`💬 [FnURL] ${currentUser.email}: "${message.substring(0, 200)}"${pageContext ? ` [${pageContext}]` : ''}`);
-    await db.userChat.create({ data: { userId, role: 'USER', content: message } });
+    console.log(`💬 [FnURL] ${currentUser.email}: "${message.substring(0, 200)}"${files.length ? ` [${files.length} file(s)]` : ''}${pageContext ? ` [${pageContext}]` : ''}`);
+    await db.userChat.create({ data: { userId, role: 'USER', content: message || `[${files.length} Datei(en) angehängt]` } });
 
-    for await (const result of openai.chatStream(message, tenantId, recentHistory, [], currentUser.id, userContext)) {
+    for await (const result of openai.chatStream(fullMessage, tenantId, recentHistory, uploadedFileUrls, currentUser.id, userContext)) {
       fullResponse += result.chunk;
       if (result.hadFunctionCalls) hadFunctionCalls = true;
       if (result.toolsUsed) toolsUsed = result.toolsUsed;
