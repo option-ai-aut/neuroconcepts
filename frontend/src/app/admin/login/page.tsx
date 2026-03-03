@@ -63,46 +63,49 @@ export default function AdminLoginPage() {
   const [error, setError] = useState('');
   const [view, setView] = useState<'signIn' | 'newPasswordRequired'>('signIn');
 
-  // Check if already authenticated as admin
+  // If already logged in as admin → redirect directly to dashboard (convenience)
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const session = await fetchAuthSession();
         if (session.tokens) {
-          router.push('/admin');
+          window.location.replace('/admin');
         }
       } catch {
-        try {
-          const keysToRemove: string[] = [];
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && (key.startsWith('CognitoIdentityServiceProvider.') || key.startsWith('amplify-') || key.includes('cognito') || key.includes('Cognito'))) {
-              keysToRemove.push(key);
-            }
-          }
-          keysToRemove.forEach(k => localStorage.removeItem(k));
-          try { await signOut(); } catch {}
-        } catch {}
+        // No active session – show login form (normal case after logout)
       }
     };
     if (config.adminUserPoolId) {
       checkAuth();
     }
-  }, [router, config]);
+  }, [config]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
     try {
+      // Fully purge any previous session before signing in with new credentials
       try { await signOut(); } catch {}
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith('CognitoIdentityServiceProvider.') || key.startsWith('amplify-') || key.includes('cognito'))) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+      } catch {}
+
       const result = await signIn({ username: email, password });
       if (result.nextStep?.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
         setView('newPasswordRequired');
         setIsLoading(false);
         return;
       }
-      router.push('/admin');
+      // Hard redirect so the whole app re-initialises with the new session
+      window.location.replace('/admin');
     } catch (err: any) {
       setError(formatAuthError(err.message) || 'Anmeldung fehlgeschlagen');
     } finally {
@@ -124,7 +127,7 @@ export default function AdminLoginPage() {
     setIsLoading(true);
     try {
       await confirmSignIn({ challengeResponse: newPassword });
-      router.push('/admin');
+      window.location.replace('/admin');
     } catch (err: any) {
       setError(formatAuthError(err.message) || 'Fehler beim Setzen des Passworts');
     } finally {
