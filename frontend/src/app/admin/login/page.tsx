@@ -63,32 +63,30 @@ export default function AdminLoginPage() {
   const [error, setError] = useState('');
   const [view, setView] = useState<'signIn' | 'newPasswordRequired'>('signIn');
 
-  // Check if already authenticated as admin
+  // On login page: always sign out any existing session so a different user can log in cleanly.
+  // This prevents the "already logged in" redirect which would log you in as the previous user.
   useEffect(() => {
-    const checkAuth = async () => {
+    const clearSession = async () => {
       try {
-        const session = await fetchAuthSession();
-        if (session.tokens) {
-          router.push('/admin');
-        }
-      } catch {
-        try {
-          const keysToRemove: string[] = [];
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && (key.startsWith('CognitoIdentityServiceProvider.') || key.startsWith('amplify-') || key.includes('cognito') || key.includes('Cognito'))) {
-              keysToRemove.push(key);
-            }
+        // Sign out silently – ignore errors if no session exists
+        await signOut({ global: false });
+      } catch {}
+      // Also purge any stale localStorage tokens
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith('CognitoIdentityServiceProvider.') || key.startsWith('amplify-') || key.includes('cognito') || key.includes('Cognito'))) {
+            keysToRemove.push(key);
           }
-          keysToRemove.forEach(k => localStorage.removeItem(k));
-          try { await signOut(); } catch {}
-        } catch {}
-      }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+      } catch {}
     };
     if (config.adminUserPoolId) {
-      checkAuth();
+      clearSession();
     }
-  }, [router, config]);
+  }, [config]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
