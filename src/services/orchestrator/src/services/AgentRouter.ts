@@ -40,6 +40,7 @@ const TOOL_CATEGORIES: Record<AgentCategory, string[]> = {
     'get_property_images', 'delete_property_image', 'delete_all_property_images',
     'move_image_to_floorplan',
     'add_video_to_property', 'set_virtual_tour',
+    'generate_expose_pdf', 'send_expose_to_lead',
     'get_company_info', 'get_team_members',
     'send_team_message', 'get_team_channels', 'get_channel_messages',
     'export_data',
@@ -47,6 +48,7 @@ const TOOL_CATEGORIES: Record<AgentCategory, string[]> = {
   email: [
     'get_emails', 'get_email', 'draft_email', 'send_email', 'reply_to_email',
     'get_email_templates',
+    'get_email_signature', 'update_email_signature',
     'get_leads', 'get_lead', 'search_contacts',
   ],
   calendar: [
@@ -61,7 +63,7 @@ const TOOL_CATEGORIES: Record<AgentCategory, string[]> = {
     'clear_expose_blocks', 'get_exposes', 'get_expose_templates', 'get_template',
     'update_expose_template', 'update_template',
     'delete_expose', 'delete_all_exposes', 'delete_expose_template',
-    'generate_expose_pdf', 'virtual_staging',
+    'generate_expose_pdf', 'send_expose_to_lead', 'virtual_staging',
     'get_properties', 'get_property',
   ],
   memory: [
@@ -76,7 +78,7 @@ const CLASSIFICATION_PROMPT = `Classify the user message into exactly ONE catego
 Categories:
 smalltalk = greetings, casual chat, humor, questions about yourself, short/ambiguous messages, numbers, jokes, counting, anything that is NOT a clear work instruction. Also: questions about the current conversation ("was hab ich gefragt?", "worüber haben wir geredet?") — the assistant already has the recent chat history.
 crm = leads, properties, search, stats, assignments, uploading images/photos/files to properties or leads, property media management, team chat (Nachricht ans Team, Team-Channels)
-email = read, write, send emails
+email = read, write, send emails, email signature (Signatur lesen/bearbeiten/ändern), email settings
 calendar = events, appointments, availability
 expose = ONLY explicit exposé/PDF creation, templates, blocks, themes. NOT image uploads to properties!
 memory = ONLY when user explicitly asks about OLDER/ARCHIVED conversations ("letzte Woche", "vor einem Monat", "früheres Gespräch"). NOT for recent messages.
