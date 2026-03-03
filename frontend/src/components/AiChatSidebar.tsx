@@ -1305,7 +1305,7 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
             ref={fileInputRef}
             type="file"
             multiple
-            accept="image/*,.pdf,.doc,.docx,.txt"
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.txt"
             onChange={handleFileSelect}
             className="hidden"
           />
