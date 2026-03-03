@@ -1,0 +1,8 @@
+-- AlterEnum
+ALTER TYPE "AdminRole" ADD VALUE 'STANDARD';
+ALTER TYPE "AdminRole" ADD VALUE 'FINANCE';
+ALTER TYPE "AdminRole" ADD VALUE 'MARKETING';
+ALTER TYPE "AdminRole" ADD VALUE 'SALES';
+
+-- AlterTable
+ALTER TABLE "AdminStaff" ADD COLUMN "extraPages" TEXT[] NOT NULL DEFAULT '{}';
