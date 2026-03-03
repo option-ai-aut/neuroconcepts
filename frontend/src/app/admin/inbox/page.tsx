@@ -50,7 +50,9 @@ const FOLDERS = [
   { id: 'TRASH', label: 'Papierkorb', icon: Trash2 },
 ];
 
-// Email Body Viewer (sandboxed iframe)
+const POLL_INTERVAL_MS = 10_000;
+
+// ─── Email Body Viewer ────────────────────────────────────────────────────────
 function EmailBodyViewer({ email }: { email: AdminEmail }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [iframeHeight, setIframeHeight] = useState(400);
@@ -117,10 +119,42 @@ interface ComposeState {
 
 const defaultCompose: ComposeState = { open: false, to: '', cc: '', subject: '', body: '', sending: false, error: '' };
 
+// ─── Cache ────────────────────────────────────────────────────────────────────
+interface CacheEntry {
+  emails: AdminEmail[];
+  fetchedAt: number;
+  error?: string;
+}
+
 export default function AdminInboxPage() {
   const [mailboxes, setMailboxes] = useState<{ email: string; label: string; shortLabel: string; color: string }[]>([]);
   const [activeMailbox, setActiveMailbox] = useState('');
   const [adminRole, setAdminRole] = useState<string>('');
+  const [selectedFolder, setSelectedFolder] = useState('INBOX');
+  const [selectedEmail, setSelectedEmail] = useState<AdminEmail | null>(null);
+  const [emails, setEmails] = useState<AdminEmail[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  // loading = true only when we have NO cached data for this view (first time)
+  const [loading, setLoading] = useState(true);
+  // refreshing = silent background refresh (spinner in corner only)
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string>('');
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [showMobileFolders, setShowMobileFolders] = useState(false);
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
+  const [compose, setCompose] = useState<ComposeState>(defaultCompose);
+  const [backfilling, setBackfilling] = useState(false);
+
+  // In-memory cache: key = `mailbox::folder::search`
+  const cache = useRef<Map<string, CacheEntry>>(new Map());
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const activeKeyRef = useRef('');
+
+  const cacheKey = useCallback(
+    (mailbox: string, folder: string, search: string) =>
+      `${mailbox}::${folder}::${search}`,
+    []
+  );
 
   // Load allowed mailboxes from API (role-based)
   useEffect(() => {
@@ -135,7 +169,6 @@ export default function AdminInboxPage() {
         if (res.ok) {
           const data = await res.json();
           const boxes = (data.mailboxes as string[]).map(buildMailboxEntry);
-          // Own mailbox first, then shared
           const email = (data.email as string || '').toLowerCase();
           const sorted = [
             ...boxes.filter(b => b.email === email),
@@ -145,47 +178,42 @@ export default function AdminInboxPage() {
           setActiveMailbox(sorted[0]?.email || '');
           setAdminRole(data.role || 'STANDARD');
         }
-      } catch (err) {
-        console.error('Failed to load allowed mailboxes:', err);
-        // Fallback: show only own mailbox from token
+      } catch {
         try {
           const session = await fetchAuthSession();
           const email = (session.tokens?.idToken?.payload?.email as string || '').toLowerCase();
-          if (email) {
-            setMailboxes([buildMailboxEntry(email)]);
-            setActiveMailbox(email);
-          }
+          if (email) { setMailboxes([buildMailboxEntry(email)]); setActiveMailbox(email); }
         } catch {}
       }
     };
     load();
   }, []);
-  const [selectedFolder, setSelectedFolder] = useState('INBOX');
-  const [selectedEmail, setSelectedEmail] = useState<AdminEmail | null>(null);
-  const [emails, setEmails] = useState<AdminEmail[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string>('');
-  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
-  const [showMobileFolders, setShowMobileFolders] = useState(false);
-  const [showMobileSearch, setShowMobileSearch] = useState(false);
-  const [compose, setCompose] = useState<ComposeState>(defaultCompose);
 
-  const [backfilling, setBackfilling] = useState(false);
+  // Core fetch — silent=true means we have cached data already shown, don't show full spinner
+  const fetchEmails = useCallback(async (silent = false) => {
+    if (selectedFolder !== 'FORWARDING' && !activeMailbox) return;
+    const key = cacheKey(activeMailbox, selectedFolder, searchQuery);
+    activeKeyRef.current = key;
 
-  const fetchEmails = useCallback(async () => {
-    if (selectedFolder !== 'FORWARDING' && !activeMailbox) return; // wait for mailbox to load
-    setLoading(true);
+    const hasCached = cache.current.has(key);
+    if (!hasCached) setLoading(true);
+    else if (!silent) setRefreshing(true);
+
     setLoadError('');
     try {
-      // FORWARDING folder reads from DB (portal inquiries), mailbox is irrelevant
       const mailboxParam = selectedFolder === 'FORWARDING' ? '' : activeMailbox;
       const data = await getAdminEmails(mailboxParam, selectedFolder, searchQuery || undefined);
-      setEmails(data.emails || []);
+
+      // Only apply result if this is still the active view
+      if (activeKeyRef.current !== key) return;
+
+      const newEmails = data.emails || [];
+      cache.current.set(key, { emails: newEmails, fetchedAt: Date.now(), error: data.error });
+      setEmails(newEmails);
+
       if (data.error) {
-        // Provide actionable guidance for impersonation errors
         if (data.error.includes('Impersonation') || data.error.includes('ImpersonateUser') || data.error.includes('Access is denied')) {
-          setLoadError(`WorkMail Impersonation nicht eingerichtet. Bitte in der AWS WorkMail Console eine Impersonation-Rolle für "${activeMailbox}" anlegen, die dem Service-Account Zugriff gewährt.`);
+          setLoadError(`WorkMail Impersonation: Kein Zugriff auf "${activeMailbox}". Credentials prüfen.`);
         } else if (data.error.includes('nicht konfiguriert') || data.error.includes('WORKMAIL_EMAIL')) {
           setLoadError('WorkMail nicht konfiguriert – bitte WORKMAIL_EMAIL und WORKMAIL_PASSWORD in AWS Secrets Manager setzen.');
         } else {
@@ -193,20 +221,74 @@ export default function AdminInboxPage() {
         }
       }
     } catch (err: any) {
-      console.error('Failed to load emails:', err);
-      setEmails([]);
+      if (activeKeyRef.current !== key) return;
       setLoadError(err?.message || 'Fehler beim Laden der E-Mails');
     } finally {
-      setLoading(false);
+      if (activeKeyRef.current === key) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, [activeMailbox, selectedFolder, searchQuery]);
+  }, [activeMailbox, selectedFolder, searchQuery, cacheKey]);
+
+  // When mailbox/folder/search changes: show cached immediately, fetch in background
+  useEffect(() => {
+    const key = cacheKey(activeMailbox, selectedFolder, searchQuery);
+    const cached = cache.current.get(key);
+    if (cached) {
+      setEmails(cached.emails);
+      setLoading(false);
+      // Only background-refresh if cache is older than 10s
+      if (Date.now() - cached.fetchedAt > POLL_INTERVAL_MS) {
+        fetchEmails(true);
+      }
+    } else {
+      fetchEmails(false);
+    }
+  }, [activeMailbox, selectedFolder, searchQuery, fetchEmails, cacheKey]);
+
+  // 10-second polling — only while page is visible
+  useEffect(() => {
+    const startPolling = () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      pollTimerRef.current = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          fetchEmails(true);
+          getAdminUnreadCounts().then(d => setUnreadCounts(d.counts || {})).catch(() => {});
+        }
+      }, POLL_INTERVAL_MS);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchEmails(true);
+        startPolling();
+      } else {
+        if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      }
+    };
+
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [fetchEmails]);
+
+  // Initial unread counts
+  useEffect(() => {
+    getAdminUnreadCounts().then(d => setUnreadCounts(d.counts || {})).catch(() => {});
+  }, []);
 
   const handleBackfill = async () => {
     setBackfilling(true);
     try {
       const result = await backfillPortalEmails();
       alert(`Backfill abgeschlossen: ${result.created} neue E-Mails erstellt, ${result.skipped} übersprungen.`);
-      fetchEmails();
+      // Invalidate FORWARDING cache
+      cache.current.forEach((_, k) => { if (k.includes('::FORWARDING::')) cache.current.delete(k); });
+      fetchEmails(false);
     } catch (err: any) {
       alert('Backfill fehlgeschlagen: ' + err.message);
     } finally {
@@ -214,50 +296,37 @@ export default function AdminInboxPage() {
     }
   };
 
-  useEffect(() => { fetchEmails(); }, [fetchEmails]);
-
-  useEffect(() => {
-    getAdminUnreadCounts().then(d => setUnreadCounts(d.counts || {})).catch(() => {});
-  }, []);
-
   const handleEmailClick = async (email: AdminEmail) => {
     setSelectedEmail(email);
     if (!email.isRead) {
       try {
         await markAdminEmailRead(email.id, true, activeMailbox);
-        setEmails(prev => prev.map(e => e.id === email.id ? { ...e, isRead: true } : e));
+        // Update both state and cache
+        const updater = (list: AdminEmail[]) => list.map(e => e.id === email.id ? { ...e, isRead: true } : e);
+        setEmails(prev => updater(prev));
+        const key = cacheKey(activeMailbox, selectedFolder, searchQuery);
+        const cached = cache.current.get(key);
+        if (cached) cache.current.set(key, { ...cached, emails: updater(cached.emails) });
       } catch {}
     }
   };
 
   const openReply = (email: AdminEmail) => {
     setCompose({
-      open: true,
-      to: email.from,
-      cc: '',
+      open: true, to: email.from, cc: '',
       subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
       body: `\n\n---\nAm ${new Date(email.receivedAt).toLocaleString('de-DE')} schrieb ${email.fromName || email.from}:\n${email.bodyText?.substring(0, 500) || ''}`,
-      replyToId: email.id,
-      sending: false,
-      error: '',
+      replyToId: email.id, sending: false, error: '',
     });
   };
 
   const openForward = (email: AdminEmail) => {
     setCompose({
-      open: true,
-      to: '',
-      cc: '',
+      open: true, to: '', cc: '',
       subject: email.subject.startsWith('Fwd:') ? email.subject : `Fwd: ${email.subject}`,
       body: `\n\n---\nWeitergeleitete Nachricht von ${email.fromName || email.from}:\n${email.bodyText?.substring(0, 1000) || ''}`,
-      replyToId: undefined,
-      sending: false,
-      error: '',
+      replyToId: undefined, sending: false, error: '',
     });
-  };
-
-  const openNew = () => {
-    setCompose({ ...defaultCompose, open: true });
   };
 
   const handleSend = async () => {
@@ -276,7 +345,9 @@ export default function AdminInboxPage() {
         replyToMessageId: compose.replyToId,
       });
       setCompose(defaultCompose);
-      if (selectedFolder === 'SENT') fetchEmails();
+      // Invalidate SENT cache so it refreshes
+      cache.current.forEach((_, k) => { if (k.includes('::SENT::')) cache.current.delete(k); });
+      if (selectedFolder === 'SENT') fetchEmails(false);
     } catch (err: any) {
       setCompose(c => ({ ...c, sending: false, error: err?.message || 'Fehler beim Senden' }));
     }
@@ -299,7 +370,6 @@ export default function AdminInboxPage() {
   const currentFolder = FOLDERS.find(f => f.id === selectedFolder)!;
   const activeMailboxInfo = mailboxes.find(m => m.email === activeMailbox) || mailboxes[0];
 
-  // Email List Item
   const EmailListItem = ({ email, compact }: { email: AdminEmail; compact?: boolean }) => (
     <button
       onClick={() => handleEmailClick(email)}
@@ -361,9 +431,7 @@ export default function AdminInboxPage() {
             </button>
           </div>
           <div className="px-4 py-3 border-b border-gray-100">
-            <h2 className="text-base font-semibold text-gray-900 leading-snug mb-2">
-              {selectedEmail.subject || '(Kein Betreff)'}
-            </h2>
+            <h2 className="text-base font-semibold text-gray-900 leading-snug mb-2">{selectedEmail.subject || '(Kein Betreff)'}</h2>
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-gray-800 flex items-center justify-center text-white font-semibold text-sm shrink-0">
                 {(selectedEmail.fromName || selectedEmail.from).charAt(0).toUpperCase()}
@@ -371,16 +439,12 @@ export default function AdminInboxPage() {
               <div className="flex-1 min-w-0">
                 <span className="font-semibold text-gray-900 text-sm">{selectedEmail.fromName || selectedEmail.from.split('@')[0]}</span>
                 <div className="text-xs text-gray-400 truncate">
-                  {selectedEmail.from} · {new Date(selectedEmail.receivedAt).toLocaleString('de-DE', {
-                    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
-                  })}
+                  {selectedEmail.from} · {new Date(selectedEmail.receivedAt).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                 </div>
               </div>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto bg-white">
-            <EmailBodyViewer email={selectedEmail} />
-          </div>
+          <div className="flex-1 overflow-y-auto bg-white"><EmailBodyViewer email={selectedEmail} /></div>
           <div className="px-4 py-3 border-t border-gray-100 flex gap-2 bg-white">
             <button onClick={() => openReply(selectedEmail)}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg">
@@ -388,8 +452,6 @@ export default function AdminInboxPage() {
             </button>
           </div>
         </div>
-
-        {/* Desktop stays in layout */}
         <div className="hidden lg:flex h-full bg-gray-50">{renderDesktopLayout()}</div>
       </>
     );
@@ -400,13 +462,13 @@ export default function AdminInboxPage() {
       <>
         {/* Folder Sidebar */}
         <div className="w-52 bg-gray-100 border-r border-gray-200 flex flex-col">
-          {/* New Email Button */}
           <div className="p-3 pb-2">
-            <button onClick={openNew}
+            <button onClick={() => setCompose({ ...defaultCompose, open: true })}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors">
               <Plus className="w-4 h-4" /> Neue E-Mail
             </button>
           </div>
+
           {/* Mailbox Selector */}
           <div className="p-3 border-b border-gray-200">
             <div className="flex items-center justify-between mb-2 px-1">
@@ -426,8 +488,7 @@ export default function AdminInboxPage() {
               </div>
             )}
             {mailboxes.map((mb) => (
-              <button
-                key={mb.email}
+              <button key={mb.email}
                 onClick={() => { setActiveMailbox(mb.email); setSelectedEmail(null); }}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors mb-1 ${
                   activeMailbox === mb.email ? 'bg-white text-gray-900 shadow-sm font-medium' : 'text-gray-600 hover:bg-gray-200'
@@ -465,9 +526,10 @@ export default function AdminInboxPage() {
           </nav>
 
           <div className="p-3 border-t border-gray-200 flex flex-col gap-2">
-            <button onClick={fetchEmails} disabled={loading}
+            {/* Manual refresh with subtle spinner indicator */}
+            <button onClick={() => fetchEmails(false)} disabled={loading}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg transition-colors">
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${(loading || refreshing) ? 'animate-spin' : ''}`} />
               {loading ? 'Laden...' : 'Aktualisieren'}
             </button>
             {selectedFolder === 'FORWARDING' && (
@@ -482,12 +544,18 @@ export default function AdminInboxPage() {
 
         {/* Email List */}
         <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+          {/* Search + silent refresh indicator */}
           <div className="p-3 border-b border-gray-200">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input type="text" placeholder="E-Mails durchsuchen..." value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent rounded-lg text-sm focus:bg-white focus:border-gray-300 focus:ring-1 focus:ring-blue-500 transition-all" />
+              {refreshing && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Loader2 className="w-3.5 h-3.5 text-gray-300 animate-spin" />
+                </div>
+              )}
             </div>
           </div>
           {loadError && (
@@ -497,7 +565,7 @@ export default function AdminInboxPage() {
             </div>
           )}
           <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
-            {loading && emails.length === 0 ? (
+            {loading ? (
               <div className="flex items-center justify-center h-32"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
             ) : emails.length === 0 && !loadError ? (
               <div className="flex flex-col items-center justify-center h-32 text-gray-400">
@@ -513,9 +581,7 @@ export default function AdminInboxPage() {
             <>
               <div className="px-6 pt-5 pb-4 border-b border-gray-100 bg-white">
                 <div className="flex items-start justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-gray-900 leading-snug pr-4">
-                    {selectedEmail.subject || '(Kein Betreff)'}
-                  </h2>
+                  <h2 className="text-xl font-semibold text-gray-900 leading-snug pr-4">{selectedEmail.subject || '(Kein Betreff)'}</h2>
                 </div>
                 <div className="flex items-center gap-3.5">
                   <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-white font-semibold text-sm shrink-0">
@@ -536,9 +602,7 @@ export default function AdminInboxPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto bg-white">
-                <EmailBodyViewer email={selectedEmail} />
-              </div>
+              <div className="flex-1 overflow-y-auto bg-white"><EmailBodyViewer email={selectedEmail} /></div>
               <div className="px-5 py-3 border-t border-gray-100 flex gap-2 bg-white flex-wrap">
                 {selectedEmail.leadId && (
                   <a href={`/dashboard/crm/leads/${selectedEmail.leadId}`} target="_blank" rel="noreferrer"
@@ -576,11 +640,9 @@ export default function AdminInboxPage() {
 
       {/* MOBILE */}
       <div className="lg:hidden flex flex-col h-full bg-white">
-        {/* Mailbox Toggle */}
         <div className="flex items-center gap-1 px-3 pt-3 pb-1 overflow-x-auto">
           {mailboxes.map((mb) => (
-            <button
-              key={mb.email}
+            <button key={mb.email}
               onClick={() => { setActiveMailbox(mb.email); setSelectedEmail(null); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border whitespace-nowrap transition-all ${
                 activeMailbox === mb.email ? 'bg-gray-900 text-white border-gray-900' : 'bg-white border-gray-200 text-gray-600'
@@ -597,13 +659,13 @@ export default function AdminInboxPage() {
           ))}
         </div>
 
-        {/* Mobile Header */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 shrink-0">
           <button onClick={() => setShowMobileFolders(true)} className="flex items-center gap-2 text-gray-900">
             <Menu className="w-5 h-5 text-gray-500" />
             <span className="font-semibold text-base">{currentFolder.label}</span>
           </button>
           <div className="flex items-center gap-1">
+            {refreshing && <Loader2 className="w-4 h-4 text-gray-300 animate-spin" />}
             <button onClick={() => setShowMobileSearch(!showMobileSearch)} className="p-2 text-gray-500 rounded-lg">
               <Search className="w-5 h-5" />
             </button>
@@ -627,14 +689,11 @@ export default function AdminInboxPage() {
         )}
 
         <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
-          {loading && emails.length === 0 ? (
-            <div className="flex items-center justify-center h-40">
-              <Loader2 className="w-6 h-6 animate-spin text-gray-500 mx-auto" />
-            </div>
+          {loading ? (
+            <div className="flex items-center justify-center h-40"><Loader2 className="w-6 h-6 animate-spin text-gray-500 mx-auto" /></div>
           ) : emails.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-gray-400">
-              <Mail className="w-10 h-10 mb-2 opacity-40" />
-              <p className="text-sm font-medium text-gray-500">Keine E-Mails</p>
+              <Mail className="w-10 h-10 mb-2 opacity-40" /><p className="text-sm font-medium text-gray-500">Keine E-Mails</p>
             </div>
           ) : emails.map((email) => <EmailListItem key={email.id} email={email} compact />)}
         </div>
@@ -666,7 +725,7 @@ export default function AdminInboxPage() {
               })}
             </nav>
             <div className="p-4 border-t border-gray-100">
-              <button onClick={() => { fetchEmails(); setShowMobileFolders(false); }}
+              <button onClick={() => { fetchEmails(false); setShowMobileFolders(false); }}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm text-gray-600 bg-gray-50 rounded-xl">
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 Aktualisieren
@@ -684,16 +743,12 @@ export default function AdminInboxPage() {
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => !compose.sending && setCompose(defaultCompose)} />
           <div className="relative w-full max-w-2xl bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
-            {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-900 text-base">
-                {compose.replyToId ? 'Antworten' : 'Neue E-Mail'}
-              </h3>
+              <h3 className="font-semibold text-gray-900 text-base">{compose.replyToId ? 'Antworten' : 'Neue E-Mail'}</h3>
               <button onClick={() => !compose.sending && setCompose(defaultCompose)} className="p-1 text-gray-400 hover:text-gray-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            {/* Fields */}
             <div className="px-5 pt-4 space-y-3">
               <div className="flex items-center gap-3">
                 <span className="text-xs text-gray-400 w-10 shrink-0">Von</span>
@@ -718,23 +773,19 @@ export default function AdminInboxPage() {
                   className="flex-1 px-3 py-2 bg-gray-100 rounded-lg text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
               </div>
             </div>
-            {/* Body */}
             <div className="flex-1 overflow-hidden px-5 pt-3 pb-2 min-h-0">
               <textarea value={compose.body} onChange={e => setCompose(c => ({ ...c, body: e.target.value }))}
                 placeholder="Nachricht schreiben..."
                 className="w-full h-48 sm:h-64 resize-none px-3 py-3 bg-gray-50 rounded-lg text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
             </div>
-            {/* Error */}
             {compose.error && (
               <div className="mx-5 mb-2 flex items-center gap-2 p-2.5 bg-red-50 border border-red-200 rounded-lg">
                 <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
                 <p className="text-xs text-red-700">{compose.error}</p>
               </div>
             )}
-            {/* Actions */}
             <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
-              <button onClick={() => !compose.sending && setCompose(defaultCompose)}
-                disabled={compose.sending}
+              <button onClick={() => !compose.sending && setCompose(defaultCompose)} disabled={compose.sending}
                 className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50">
                 Abbrechen
               </button>

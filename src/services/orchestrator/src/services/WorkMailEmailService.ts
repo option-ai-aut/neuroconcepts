@@ -90,18 +90,30 @@ export function getMailboxCredentials(mailboxEmail: string): WorkMailCredentials
 }
 
 /**
- * Create an EWS service that reads on behalf of `targetEmail` using impersonation.
- * If targetEmail equals the service account, no impersonation header is needed.
+ * Create an EWS service for `targetEmail`.
+ * Priority:
+ *   1. Direct credentials (WORKMAIL_CREDENTIALS map) — no impersonation needed, always works
+ *   2. EWS impersonation via service account — requires WorkMail impersonation role to be set up
+ * Using direct credentials avoids the "does not have permission to impersonate" error.
  */
 function createImpersonatedService(targetEmail: string): ExchangeService {
   const svc = getServiceCreds();
   if (!svc) throw new Error('WorkMail service account (WORKMAIL_EMAIL/PASSWORD) not configured');
 
+  // Prefer direct per-mailbox credentials when available (no impersonation needed)
+  const directCreds = getMailboxCredentials(targetEmail);
+  if (directCreds && directCreds.password) {
+    const service = new ExchangeService(ExchangeVersion.Exchange2010_SP1);
+    service.Url = new Uri(EWS_URL);
+    service.Credentials = new WebCredentials(directCreds.email, directCreds.password);
+    return service;
+  }
+
+  // Fallback: service account + EWS impersonation
   const service = new ExchangeService(ExchangeVersion.Exchange2010_SP1);
   service.Url = new Uri(EWS_URL);
   service.Credentials = new WebCredentials(svc.email, svc.password);
 
-  // Impersonate the target mailbox (no-op if same as service account)
   if (svc.email.toLowerCase() !== targetEmail.toLowerCase()) {
     service.ImpersonatedUserId = new ImpersonatedUserId(ConnectingIdType.SmtpAddress, targetEmail);
   }
