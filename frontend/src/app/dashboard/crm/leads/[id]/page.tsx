@@ -22,7 +22,7 @@ const getFileUrl = (url: string): string => {
 
 export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { openDrawer, updateEmailForm } = useGlobalState();
+  const { openDrawer, updateEmailForm, aiActionPerformed } = useGlobalState();
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [activities, setActivities] = useState<any[]>([]);
@@ -46,6 +46,11 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
   const router = useRouter();
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Reload lead when Mivo performs an action (e.g. update_lead, upload_documents_to_lead)
+  useEffect(() => {
+    if (aiActionPerformed) loadLead();
+  }, [aiActionPerformed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     loadLead();

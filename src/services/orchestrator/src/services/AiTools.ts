@@ -709,7 +709,7 @@ export const CRM_TOOLS = {
   },
   generate_expose_pdf: {
     name: "generate_expose_pdf",
-    description: "Generates a PDF for an Exposé.",
+    description: "Generates a PDF for an Exposé, uploads it to S3 and returns the download URL.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -718,7 +718,22 @@ export const CRM_TOOLS = {
       required: ["exposeId"]
     }
   },
-  
+
+  send_expose_to_lead: {
+    name: "send_expose_to_lead",
+    description: "Generates the Exposé as a PDF (or reuses cached) and sends it by email to a lead. Returns the PDF URL and confirms delivery.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        exposeId: { type: SchemaType.STRING, description: "ID of the Exposé to send" } as FunctionDeclarationSchema,
+        leadId: { type: SchemaType.STRING, description: "ID of the Lead to send the PDF to" } as FunctionDeclarationSchema,
+        subject: { type: SchemaType.STRING, description: "Email subject line (optional, defaults to 'Exposé: [property title]')" } as FunctionDeclarationSchema,
+        message: { type: SchemaType.STRING, description: "Custom email body text (optional)" } as FunctionDeclarationSchema,
+      },
+      required: ["exposeId", "leadId"]
+    }
+  },
+
   get_channel_messages: {
     name: "get_channel_messages",
     description: "Retrieves messages from a specific channel.",
@@ -2760,9 +2775,100 @@ export class AiToolExecutor {
           ? `${cdnUrl}/${s3Key}`
           : `https://${mediaBucket}.s3.${region}.amazonaws.com/${s3Key}`;
 
+        // Persist pdfUrl on the Expose so it can be reused and shared
+        await getPrisma().expose.update({
+          where: { id: exposeId },
+          data: { pdfUrl, pdfGeneratedAt: new Date() },
+        });
+
         return {
           message: `Das PDF für "${(expose as any).title || 'Exposé'}" wurde erfolgreich generiert.`,
           url: pdfUrl,
+        };
+      }
+
+      case 'send_expose_to_lead': {
+        const { exposeId, leadId, subject: emailSubject, message: emailMessage } = args;
+        if (!exposeId) return { error: 'exposeId ist erforderlich.' };
+        if (!leadId) return { error: 'leadId ist erforderlich.' };
+
+        const [expose, lead] = await Promise.all([
+          getPrisma().expose.findFirst({ where: { id: exposeId, tenantId }, include: { property: true } }),
+          getPrisma().lead.findFirst({ where: { id: leadId, tenantId } }),
+        ]);
+        if (!expose) return { error: `Exposé mit ID "${exposeId}" nicht gefunden.` };
+        if (!lead) return { error: `Lead mit ID "${leadId}" nicht gefunden.` };
+        if (!lead.email) return { error: 'Der Lead hat keine E-Mail-Adresse.' };
+
+        // Reuse cached pdfUrl or generate fresh
+        let pdfUrl = expose.pdfUrl;
+        if (!pdfUrl) {
+          const pdfUserForSend = await getPrisma().user.findUnique({ where: { id: userId } });
+          const { PdfService: PdfSvc } = await import('./PdfService');
+          const pdfBuffer = await PdfSvc.generateExposePdf({
+            id: expose.id,
+            blocks: expose.blocks as any[],
+            theme: expose.theme,
+            property: {
+              title: (expose.property as any).title,
+              address: (expose.property as any).address || '',
+              price: Number((expose.property as any).price) || 0,
+              area: Number((expose.property as any).area) || 0,
+              rooms: Number((expose.property as any).rooms) || 0,
+              description: (expose.property as any).description || undefined,
+              images: (expose.property as any).images || [],
+            },
+            user: pdfUserForSend ? {
+              name: `${pdfUserForSend.firstName || ''} ${pdfUserForSend.lastName || ''}`.trim(),
+              email: pdfUserForSend.email,
+            } : undefined,
+          });
+          const mediaBucketSend = process.env.MEDIA_BUCKET_NAME || '';
+          const regionSend = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'eu-central-1';
+          const s3KeySend = `exposes/${tenantId}/${exposeId}-${Date.now()}.pdf`;
+          const AWS = require('aws-sdk');
+          const s3Send = new AWS.S3();
+          await s3Send.putObject({ Bucket: mediaBucketSend, Key: s3KeySend, Body: pdfBuffer, ContentType: 'application/pdf' }).promise();
+          const cdnSend = process.env.MEDIA_CDN_URL;
+          pdfUrl = cdnSend ? `${cdnSend}/${s3KeySend}` : `https://${mediaBucketSend}.s3.${regionSend}.amazonaws.com/${s3KeySend}`;
+          await getPrisma().expose.update({ where: { id: exposeId }, data: { pdfUrl, pdfGeneratedAt: new Date() } });
+        }
+
+        // Load sender info
+        const sender = await getPrisma().user.findUnique({ where: { id: userId } });
+        const senderTenant = await getPrisma().tenant.findUnique({ where: { id: tenantId }, select: { name: true, email: true } });
+        const fromEmail = senderTenant?.email || process.env.RESEND_FROM_EMAIL || 'mivo@immivo.ai';
+        const senderName = sender ? `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || sender.email : senderTenant?.name || 'Mivo';
+
+        const subject = emailSubject || `Exposé: ${(expose.property as any).title}`;
+        const salutation = (lead as any).salutation === 'HERR' ? 'Sehr geehrter Herr' : (lead as any).salutation === 'FRAU' ? 'Sehr geehrte Frau' : 'Guten Tag';
+        const leadName = [(lead as any).lastName].filter(Boolean).join(' ') || (lead as any).name || 'Interessent/in';
+        const body = emailMessage || `${salutation} ${leadName},\n\nvielen Dank für Ihr Interesse an "${(expose.property as any).title}".\n\nIm Anhang finden Sie das Exposé als PDF.\n\nMit freundlichen Grüßen\n${senderName}`;
+
+        const { Resend } = await import('resend');
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        await resend.emails.send({
+          from: `${senderName} <${fromEmail}>`,
+          to: lead.email,
+          subject,
+          html: `<p style="font-family:sans-serif;white-space:pre-line">${body.replace(/\n/g, '<br>')}</p><p style="margin-top:16px"><a href="${pdfUrl}" style="display:inline-block;padding:10px 20px;background:#111;color:#fff;text-decoration:none;border-radius:6px;font-family:sans-serif;font-size:14px">📄 Exposé herunterladen</a></p>`,
+        });
+
+        // Log activity on lead
+        await getPrisma().leadActivity.create({
+          data: {
+            leadId: lead.id,
+            type: 'EMAIL_SENT',
+            description: `Exposé-PDF gesendet: "${subject}"`,
+            metadata: { pdfUrl, exposeId },
+            createdBy: sender?.email || 'mivo',
+          },
+        }).catch(() => {});
+
+        return {
+          message: `Das Exposé-PDF wurde erfolgreich an ${lead.email} (${(lead as any).name || 'Lead'}) gesendet.`,
+          url: pdfUrl,
+          leadEmail: lead.email,
         };
       }
 
