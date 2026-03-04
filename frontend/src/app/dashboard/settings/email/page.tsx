@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchWithAuth } from '@/lib/api';
 import { useEnv } from '@/components/EnvProvider';
-import { Save, Eye, Code, Loader2, Sparkles, User, Mail, Phone, Building2, Globe, AlertCircle } from 'lucide-react';
+import { Eye, Code, Loader2, Sparkles, User, Mail, Phone, Building2, Globe, AlertCircle, Check } from 'lucide-react';
 import useSWR from 'swr';
 import { useGlobalState } from '@/context/GlobalStateContext';
 
@@ -49,14 +49,14 @@ function SignaturePreview({ html }: { html: string }) {
 
 export default function EmailSettingsPage() {
   const { apiUrl } = useEnv();
-  const { aiActionPerformed } = useGlobalState();
+  const { aiActionPerformed, setAiChatDraft, setSidebarExpanded } = useGlobalState();
   const [signature, setSignature] = useState('');
   const [signatureName, setSignatureName] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
-  const [generating, setGenerating] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isInitialLoad = useRef(true);
 
   // Load user settings
   const { data: settings, mutate } = useSWR(
@@ -64,83 +64,59 @@ export default function EmailSettingsPage() {
     (url: string) => fetchWithAuth(url)
   );
 
-  // Load user profile for AI generation
-  const { data: user } = useSWR(
-    apiUrl ? `${apiUrl}/me` : null,
-    (url: string) => fetchWithAuth(url)
-  );
-
   useEffect(() => {
     if (settings) {
       setSignature(settings.emailSignature || '');
       setSignatureName(settings.emailSignatureName || '');
+      isInitialLoad.current = false;
     }
   }, [settings]);
 
-  // Reload when Mivo performs an action (e.g. update_email_signature) + auto-switch to preview
+  // Reload when Mivo performs an action + auto-switch to preview
   useEffect(() => {
     if (aiActionPerformed) {
       mutate().then(() => setViewMode('preview'));
     }
   }, [aiActionPerformed, mutate]);
 
-  const handleSave = async () => {
-    if (!apiUrl) return;
-    setSaving(true);
-    try {
-      await fetchWithAuth(`${apiUrl}/me/settings`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          emailSignature: signature,
-          emailSignatureName: signatureName,
-        }),
-      });
-      mutate();
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (error) {
-      console.error('Error saving signature:', error);
-      alert('Fehler beim Speichern');
-    } finally {
-      setSaving(false);
-    }
+  // Auto-save: debounced 900ms after any change
+  const triggerAutoSave = useCallback((sig: string, sigName: string) => {
+    if (isInitialLoad.current) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    setSaveState('saving');
+    autoSaveTimer.current = setTimeout(async () => {
+      if (!apiUrl) return;
+      try {
+        await fetchWithAuth(`${apiUrl}/me/settings`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emailSignature: sig, emailSignatureName: sigName }),
+        });
+        mutate();
+        setSaveState('saved');
+        setTimeout(() => setSaveState('idle'), 2000);
+      } catch {
+        setSaveState('idle');
+      }
+    }, 900);
+  }, [apiUrl, mutate]);
+
+  const handleSignatureChange = (val: string) => {
+    setSignature(val);
+    triggerAutoSave(val, signatureName);
   };
 
-  const generateSignature = async () => {
-    if (!apiUrl || !user) return;
-    setGenerating(true);
-    try {
-      const response = await fetchWithAuth(`${apiUrl}/mivo/generate-signature`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          company: user.tenant?.name,
-        }),
-      });
-      if (response.signature) {
-        setSignature(response.signature);
-      }
-    } catch (error) {
-      console.error('Error generating signature:', error);
-      // Fallback: Generate a simple signature locally
-      const fallbackSignature = `
-<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
-  <p style="margin: 0; font-weight: bold;">${user.name || 'Ihr Name'}</p>
-  ${user.tenant?.name ? `<p style="margin: 4px 0 0 0; color: #666;">${user.tenant.name}</p>` : ''}
-  <p style="margin: 8px 0 0 0;">
-    ${user.email ? `<span style="color: #2563eb;">${user.email}</span>` : ''}
-    ${user.phone ? `<span style="margin-left: 16px;">${user.phone}</span>` : ''}
-  </p>
-</div>
-      `.trim();
-      setSignature(fallbackSignature);
-    } finally {
-      setGenerating(false);
-    }
+  const handleSignatureNameChange = (val: string) => {
+    setSignatureName(val);
+    triggerAutoSave(signature, val);
+  };
+
+  // Opens Mivo chat with a guided prompt for signature creation
+  const openMivoForSignature = () => {
+    setAiChatDraft(
+      'Erstelle mir eine professionelle HTML E-Mail-Signatur. Frag mich kurz: welche Infos sollen rein (Name, Titel, Telefon, Website etc.) und ob ich ein Logo hochladen möchte. Falls ein Logo dabei ist, pass die Größe automatisch an (max. 150px Höhe).'
+    );
+    setSidebarExpanded(true);
   };
 
   const insertVariable = (variable: string) => {
@@ -185,7 +161,7 @@ export default function EmailSettingsPage() {
         <input
           type="text"
           value={signatureName}
-          onChange={(e) => setSignatureName(e.target.value)}
+          onChange={(e) => handleSignatureNameChange(e.target.value)}
           placeholder="z.B. Geschäftlich, Privat..."
           className="w-full max-w-md rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 outline-none transition-all"
         />
@@ -218,18 +194,25 @@ export default function EmailSettingsPage() {
           </button>
         </div>
 
-        <button
-          onClick={generateSignature}
-          disabled={generating}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
-        >
-          {generating ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Sparkles className="w-4 h-4" />
+        <div className="flex items-center gap-3">
+          {saveState === 'saving' && (
+            <span className="flex items-center gap-1.5 text-xs text-gray-400">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Speichern...
+            </span>
           )}
-          Mit Mivo generieren
-        </button>
+          {saveState === 'saved' && (
+            <span className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
+              <Check className="w-3.5 h-3.5" /> Gespeichert
+            </span>
+          )}
+          <button
+            onClick={openMivoForSignature}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            <Sparkles className="w-4 h-4" />
+            Mit Mivo generieren
+          </button>
+        </div>
       </div>
 
       {/* Variables (only in edit mode) */}
@@ -258,7 +241,7 @@ export default function EmailSettingsPage() {
           <textarea
             ref={textareaRef}
             value={signature}
-            onChange={(e) => setSignature(e.target.value)}
+            onChange={(e) => handleSignatureChange(e.target.value)}
             placeholder="<div>
   <p><strong>Max Mustermann</strong></p>
   <p>Immobilienmakler</p>
@@ -296,26 +279,6 @@ export default function EmailSettingsPage() {
         </div>
       </div>
 
-      {/* Save Button */}
-      <div className="flex items-center gap-4 pt-4 border-t border-gray-200">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 px-6 py-2.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
-        >
-          {saving ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Save className="w-4 h-4" />
-          )}
-          {saving ? 'Speichern...' : 'Speichern'}
-        </button>
-        {saved && (
-          <span className="text-sm text-green-600 font-medium">
-            Signatur gespeichert!
-          </span>
-        )}
-      </div>
     </div>
   );
 }
