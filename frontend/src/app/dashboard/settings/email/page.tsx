@@ -1,12 +1,51 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import DOMPurify from 'dompurify';
 import { fetchWithAuth } from '@/lib/api';
 import { useEnv } from '@/components/EnvProvider';
 import { Save, Eye, Code, Loader2, Sparkles, User, Mail, Phone, Building2, Globe, AlertCircle } from 'lucide-react';
 import useSWR from 'swr';
 import { useGlobalState } from '@/context/GlobalStateContext';
+
+// Iframe-based preview — renders HTML natively, no DOMPurify stripping of images/styles
+function SignaturePreview({ html }: { html: string }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState(120);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    const doc = iframe.contentDocument;
+    if (!doc) return;
+
+    doc.open();
+    doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: Arial, sans-serif; font-size: 14px; line-height: 1.5; color: #333; padding: 16px; word-wrap: break-word; overflow-x: hidden; }
+      img { max-width: 100%; height: auto; }
+      a { color: #2563eb; }
+      p { margin: 0 0 4px 0; }
+    </style></head><body>${html}</body></html>`);
+    doc.close();
+
+    const resize = () => {
+      const body = iframe.contentDocument?.body;
+      if (body) setHeight(Math.max(80, body.scrollHeight + 32));
+    };
+    setTimeout(resize, 80);
+    setTimeout(resize, 400);
+  }, [html]);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      className="w-full border-0"
+      style={{ height }}
+      sandbox="allow-same-origin"
+      title="Signatur Vorschau"
+    />
+  );
+}
 
 export default function EmailSettingsPage() {
   const { apiUrl } = useEnv();
@@ -38,10 +77,10 @@ export default function EmailSettingsPage() {
     }
   }, [settings]);
 
-  // Reload when Mivo performs an action (e.g. update_email_signature)
+  // Reload when Mivo performs an action (e.g. update_email_signature) + auto-switch to preview
   useEffect(() => {
     if (aiActionPerformed) {
-      mutate();
+      mutate().then(() => setViewMode('preview'));
     }
   }, [aiActionPerformed, mutate]);
 
@@ -229,14 +268,11 @@ export default function EmailSettingsPage() {
             className="w-full h-64 p-4 text-sm font-mono text-gray-800 bg-gray-50 resize-none focus:outline-none focus:bg-white transition-colors"
           />
         ) : (
-          <div className="p-6 bg-white min-h-[256px]">
+          <div className="bg-white min-h-[120px]">
             {signature ? (
-              <div 
-                className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(signature) }}
-              />
+              <SignaturePreview html={signature} />
             ) : (
-              <div className="flex flex-col items-center justify-center h-48 text-gray-400">
+              <div className="flex flex-col items-center justify-center h-32 text-gray-400">
                 <AlertCircle className="w-8 h-8 mb-2 opacity-50" />
                 <p className="text-sm">Keine Signatur vorhanden</p>
               </div>
