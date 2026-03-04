@@ -148,7 +148,9 @@ export default function AdminInboxPage() {
   // In-memory cache: key = `mailbox::folder::search`
   const cache = useRef<Map<string, CacheEntry>>(new Map());
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const activeKeyRef = useRef('');
+  // Monotonic counter: incremented every time the active view changes.
+  // Each fetch captures its version at start; results are discarded if version changed.
+  const viewVersionRef = useRef(0);
 
   const cacheKey = useCallback(
     (mailbox: string, folder: string, search: string) =>
@@ -189,11 +191,12 @@ export default function AdminInboxPage() {
     load();
   }, []);
 
-  // Core fetch — silent=true means we have cached data already shown, don't show full spinner
-  const fetchEmails = useCallback(async (silent = false) => {
+  // Core fetch — captures the current viewVersion; discards result if view changed meanwhile.
+  // silent=true = we already show cached data, only show tiny spinner.
+  const fetchEmails = useCallback(async (silent = false, forVersion?: number) => {
     if (selectedFolder !== 'FORWARDING' && !activeMailbox) return;
+    const myVersion = forVersion ?? viewVersionRef.current;
     const key = cacheKey(activeMailbox, selectedFolder, searchQuery);
-    activeKeyRef.current = key;
 
     const hasCached = cache.current.has(key);
     if (!hasCached) setLoading(true);
@@ -204,8 +207,8 @@ export default function AdminInboxPage() {
       const mailboxParam = selectedFolder === 'FORWARDING' ? '' : activeMailbox;
       const data = await getAdminEmails(mailboxParam, selectedFolder, searchQuery || undefined);
 
-      // Only apply result if this is still the active view
-      if (activeKeyRef.current !== key) return;
+      // Discard if the user navigated away while this fetch was in flight
+      if (viewVersionRef.current !== myVersion) return;
 
       const newEmails = data.emails || [];
       cache.current.set(key, { emails: newEmails, fetchedAt: Date.now(), error: data.error });
@@ -221,51 +224,57 @@ export default function AdminInboxPage() {
         }
       }
     } catch (err: any) {
-      if (activeKeyRef.current !== key) return;
+      if (viewVersionRef.current !== myVersion) return;
       setLoadError(err?.message || 'Fehler beim Laden der E-Mails');
     } finally {
-      if (activeKeyRef.current === key) {
+      if (viewVersionRef.current === myVersion) {
         setLoading(false);
         setRefreshing(false);
       }
     }
   }, [activeMailbox, selectedFolder, searchQuery, cacheKey]);
 
-  // When mailbox/folder/search changes: show cached immediately, fetch in background
+  // When mailbox/folder/search changes: bump version FIRST (invalidates all in-flight fetches),
+  // then show cached data instantly, then fetch fresh in background.
   useEffect(() => {
+    const version = ++viewVersionRef.current;
     const key = cacheKey(activeMailbox, selectedFolder, searchQuery);
     const cached = cache.current.get(key);
     if (cached) {
       setEmails(cached.emails);
+      setLoadError('');
       setLoading(false);
-      // Only background-refresh if cache is older than 10s
+      // Background-refresh if cache is older than 10s
       if (Date.now() - cached.fetchedAt > POLL_INTERVAL_MS) {
-        fetchEmails(true);
+        fetchEmails(true, version);
       }
     } else {
-      fetchEmails(false);
+      setEmails([]);
+      fetchEmails(false, version);
     }
   }, [activeMailbox, selectedFolder, searchQuery, fetchEmails, cacheKey]);
 
-  // 10-second polling — only while page is visible
+  // 10-second polling — only while page is visible.
+  // Uses a ref to fetchEmails so the interval always calls the latest version.
+  const fetchEmailsRef = useRef(fetchEmails);
+  useEffect(() => { fetchEmailsRef.current = fetchEmails; }, [fetchEmails]);
+
   useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return;
+      // Pass current version so stale poll results are discarded if user switches mailbox
+      fetchEmailsRef.current(true, viewVersionRef.current);
+      getAdminUnreadCounts().then(d => setUnreadCounts(d.counts || {})).catch(() => {});
+    };
+
     const startPolling = () => {
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-      pollTimerRef.current = setInterval(() => {
-        if (document.visibilityState === 'visible') {
-          fetchEmails(true);
-          getAdminUnreadCounts().then(d => setUnreadCounts(d.counts || {})).catch(() => {});
-        }
-      }, POLL_INTERVAL_MS);
+      pollTimerRef.current = setInterval(tick, POLL_INTERVAL_MS);
     };
 
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        fetchEmails(true);
-        startPolling();
-      } else {
-        if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-      }
+      if (document.visibilityState === 'visible') { tick(); startPolling(); }
+      else if (pollTimerRef.current) clearInterval(pollTimerRef.current);
     };
 
     startPolling();
@@ -274,7 +283,8 @@ export default function AdminInboxPage() {
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [fetchEmails]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only mount/unmount — stable via ref
 
   // Initial unread counts
   useEffect(() => {
