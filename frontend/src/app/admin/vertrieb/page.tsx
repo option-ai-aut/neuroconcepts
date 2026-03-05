@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { useRuntimeConfig } from '@/components/RuntimeConfigProvider';
@@ -135,7 +135,7 @@ function CreateProspectModal({ apiUrl, token, onClose, onCreated }: CreateProspe
   );
 }
 
-export default function VertriebPipelinePage() {
+function VertriebPipelineInner() {
   const config = useRuntimeConfig();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -339,5 +339,13 @@ export default function VertriebPipelinePage() {
         <CreateProspectModal apiUrl={apiUrl} token={token} onClose={() => setShowCreateModal(false)} onCreated={loadProspects} />
       )}
     </div>
+  );
+}
+
+export default function VertriebPipelinePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>}>
+      <VertriebPipelineInner />
+    </Suspense>
   );
 }

@@ -8374,6 +8374,29 @@ async function ensureAdminTables(db: any) {
       created++;
     }
 
+    // --- Sales CRM ---
+    if (!existing.has('SalesProspect')) {
+      console.log('🔧 Creating SalesProspect table...');
+      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "SalesStage" AS ENUM ('NEW_LEAD','DEMO_SCHEDULED','DEMO_DONE','PROPOSAL_SENT','NEGOTIATION','WON','LOST'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "SalesActivityType" AS ENUM ('NOTE','EMAIL_SENT','CALL','DEMO','PROPOSAL','STAGE_CHANGE','MEETING','FILE_UPLOAD','TASK_DONE'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`CREATE TABLE "SalesProspect" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "name" TEXT NOT NULL, "email" TEXT NOT NULL, "phone" TEXT, "jobTitle" TEXT, "company" TEXT, "companySize" TEXT, "companyUrl" TEXT, "stage" "SalesStage" NOT NULL DEFAULT 'NEW_LEAD', "dealValue" DECIMAL, "expectedCloseDate" TIMESTAMP(3), "documents" JSONB, "sourceBookingId" TEXT, "assignedToEmail" TEXT, "meetLink" TEXT, "meetRoomCode" TEXT, "lastActivityAt" TIMESTAMP(3), "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "SalesProspect_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "SalesProspect_stage_createdAt_idx" ON "SalesProspect"("stage","createdAt")`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "SalesProspect_email_idx" ON "SalesProspect"("email")`);
+      created++;
+    }
+    if (!existing.has('SalesActivity')) {
+      await db.$executeRawUnsafe(`CREATE TABLE "SalesActivity" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "prospectId" TEXT NOT NULL, "type" "SalesActivityType" NOT NULL, "content" TEXT NOT NULL, "createdBy" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "SalesActivity_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`DO $$ BEGIN ALTER TABLE "SalesActivity" ADD CONSTRAINT "SalesActivity_prospectId_fkey" FOREIGN KEY ("prospectId") REFERENCES "SalesProspect"("id") ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "SalesActivity_prospectId_createdAt_idx" ON "SalesActivity"("prospectId","createdAt")`);
+      created++;
+    }
+    if (!existing.has('SalesTask')) {
+      await db.$executeRawUnsafe(`CREATE TABLE "SalesTask" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "prospectId" TEXT NOT NULL, "title" TEXT NOT NULL, "dueDate" TIMESTAMP(3), "done" BOOLEAN NOT NULL DEFAULT false, "doneAt" TIMESTAMP(3), "assignedTo" TEXT, "createdBy" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "SalesTask_pkey" PRIMARY KEY ("id"))`);
+      await db.$executeRawUnsafe(`DO $$ BEGIN ALTER TABLE "SalesTask" ADD CONSTRAINT "SalesTask_prospectId_fkey" FOREIGN KEY ("prospectId") REFERENCES "SalesProspect"("id") ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "SalesTask_prospectId_done_idx" ON "SalesTask"("prospectId","done")`);
+      created++;
+    }
+
     // --- Fix Message cascade FK ---
     try {
       await db.$executeRawUnsafe(`ALTER TABLE "Message" DROP CONSTRAINT IF EXISTS "Message_leadId_fkey"`);
@@ -8894,19 +8917,31 @@ app.post('/calendar/book-demo', publicBookDemoLimit, async (req, res) => {
 
     console.log(`📅 Demo booking: ${name} (${email}), ${dateStr} ${timeStr}`);
 
-    // 1) Try to create calendar event via WorkMail
+    // 1) Create LiveKit meet room immediately so the customer gets the real link
+    let meetLink = '';
+    let meetRoomCode = '';
+    try {
+      const { roomService } = await getLiveKitClients();
+      meetRoomCode = generateRoomCode();
+      await roomService.createRoom({ name: meetRoomCode, emptyTimeout: 600, maxParticipants: 10 });
+      meetLink = `https://meet.immivo.ai/${meetRoomCode}`;
+      console.log(`✅ LiveKit room created: ${meetLink}`);
+    } catch (livekitErr: any) {
+      console.warn('⚠️ LiveKit room creation failed (continuing without link):', livekitErr?.message);
+    }
+
+    // 2) Create WorkMail calendar event with the real meet link
     let eventId: string | undefined;
     try {
       const creds = getWorkMailCreds();
       if (creds.email && creds.password) {
-        const meetLink = 'https://meet.google.com/new';
         const body = [
           `Demo-Termin mit ${name}`,
           `E-Mail: ${email}`,
           company ? `Unternehmen: ${company}` : '',
           message ? `Nachricht: ${message}` : '',
           '',
-          `Google Meet: ${meetLink}`,
+          meetLink ? `Meeting-Link: ${meetLink}` : '',
         ].filter(Boolean).join('\n');
 
         const result = await createCalendarEvent(creds, {
@@ -8915,7 +8950,7 @@ app.post('/calendar/book-demo', publicBookDemoLimit, async (req, res) => {
           start: startDate,
           end: endDate,
           attendees: [email],
-          meetLink,
+          meetLink: meetLink || undefined,
         });
         eventId = result?.id;
         console.log(`✅ WorkMail calendar event created: ${eventId}`);
@@ -8926,14 +8961,17 @@ app.post('/calendar/book-demo', publicBookDemoLimit, async (req, res) => {
       console.error('❌ WorkMail calendar event failed (continuing):', calErr);
     }
 
-    // 1b) Persist booking to DB
+    // 3) Persist booking to DB
+    let bookingId: string | undefined;
     try {
       const db = await initializePrisma();
       const booking = await db.demoBooking.create({
         data: {
           name, email, company: company || null, message: message || null,
           start: startDate, end: endDate, eventId: eventId || null,
-          status: eventId ? 'CONFIRMED' : 'PENDING',
+          meetRoomCode: meetRoomCode || null,
+          meetLink: meetLink || null,
+          status: 'CONFIRMED',
         },
       });
       bookingId = booking.id;
@@ -8969,66 +9007,87 @@ app.post('/calendar/book-demo', publicBookDemoLimit, async (req, res) => {
       console.error('Demo booking DB persist failed (continuing):', dbErr);
     }
 
-    // 2) Send confirmation email to office@ via SystemEmailService
+    // 4) Send confirmation to the prospect WITH the real meet link
     try {
-      const { sendSystemEmail } = await import('./services/SystemEmailService');
-      await sendSystemEmail({
-        to: 'office@immivo.ai',
-        subject: `Neue Demo gebucht: ${name} — ${dateStr} um ${timeStr}`,
-        html: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: #111827; color: white; padding: 24px 32px; border-radius: 12px 12px 0 0;">
-              <h2 style="margin: 0; font-size: 20px;">Neue Demo-Buchung</h2>
-              <p style="margin: 4px 0 0; opacity: 0.7; font-size: 14px;">via immivo.ai</p>
-            </div>
-            <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px; width: 120px;">Name</td><td style="padding: 8px 0; font-weight: 600;">${name}</td></tr>
-                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;">E-Mail</td><td style="padding: 8px 0;"><a href="mailto:${email}" style="color: #2563eb;">${email}</a></td></tr>
-                ${company ? `<tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Unternehmen</td><td style="padding: 8px 0;">${company}</td></tr>` : ''}
-                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Datum</td><td style="padding: 8px 0; font-weight: 500;">${dateStr}</td></tr>
-                <tr><td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Uhrzeit</td><td style="padding: 8px 0; font-weight: 500;">${timeStr} Uhr (30 Min)</td></tr>
-              </table>
-              ${message ? `<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;"><p style="color: #6b7280; font-size: 14px; margin: 0 0 8px;">Nachricht:</p><div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb;">${message}</div></div>` : ''}
-              <p style="margin-top: 24px; font-size: 12px; color: #9ca3af;">Kalender-Event ${eventId ? 'wurde erstellt' : 'konnte nicht automatisch erstellt werden — bitte manuell anlegen'}.</p>
-            </div>
-          </div>`,
-        replyTo: email,
+      const { sendSystemEmail, generateIcs } = await import('./services/SystemEmailService');
+      const endTimeStr = endDate.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Vienna' });
+      const icsContent = generateIcs({
+        uid: `demo-${bookingId || Date.now()}`,
+        subject,
+        description: ['Immivo AI Demo', meetLink ? `\nMeeting-Link: ${meetLink}\n\nEinfach auf den Link klicken – kein Download, kein Konto nötig.` : ''].join(''),
+        location: meetLink || 'Immivo AI Demo',
+        start: startDate,
+        end: endDate,
+        organizer: 'office@immivo.ai',
+        attendees: [email],
       });
-    } catch (emailErr) {
-      console.error('Demo confirmation email failed:', emailErr);
-    }
-
-    // 3) Send confirmation to the person who booked
-    try {
-      const { sendSystemEmail } = await import('./services/SystemEmailService');
       await sendSystemEmail({
         to: email,
-        subject: `Deine Demo mit Immivo — ${dateStr} um ${timeStr}`,
-        html: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: #111827; color: white; padding: 24px 32px; border-radius: 12px 12px 0 0;">
-              <h2 style="margin: 0; font-size: 20px;">Demo bestätigt!</h2>
-              <p style="margin: 4px 0 0; opacity: 0.7; font-size: 14px;">Immivo AI</p>
-            </div>
-            <div style="background: #f9fafb; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
-              <p style="margin: 0 0 16px; font-size: 16px; color: #111827;">Hallo ${name},</p>
-              <p style="margin: 0 0 24px; color: #4b5563;">vielen Dank für dein Interesse an Immivo! Hier die Details deiner Demo:</p>
-              <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e5e7eb;">
-                <p style="margin: 0 0 8px; font-size: 18px; font-weight: 700; color: #111827;">${dateStr}</p>
-                <p style="margin: 0 0 4px; font-size: 16px; color: #111827;">${timeStr} Uhr — 30 Minuten</p>
-                <p style="margin: 12px 0 0; font-size: 14px; color: #6b7280;">Google Meet — Link folgt kurz vor dem Termin per E-Mail</p>
-              </div>
-              <p style="margin: 24px 0 0; color: #4b5563; font-size: 14px;">Falls du den Termin verschieben oder absagen möchtest, schreib uns einfach an <a href="mailto:office@immivo.ai" style="color: #2563eb;">office@immivo.ai</a>.</p>
-              <p style="margin: 24px 0 0; color: #4b5563; font-size: 14px;">Bis bald!<br/><strong>Das Immivo Team</strong></p>
-            </div>
-          </div>`,
+        subject: `Deine Demo mit Immivo AI – ${dateStr} um ${timeStr} Uhr`,
+        html: `<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="max-width:560px;margin:32px auto;padding:0 16px;">
+    <div style="background:#111827;padding:28px 32px;border-radius:14px 14px 0 0;">
+      <p style="margin:0 0 6px;font-size:11px;font-weight:600;letter-spacing:0.08em;color:#6b7280;text-transform:uppercase;">Immivo AI</p>
+      <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">Demo bestätigt!</h1>
+    </div>
+    <div style="background:#ffffff;padding:32px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 14px 14px;">
+      <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">Hallo <strong>${name}</strong>,<br>dein Demo-Termin mit Immivo AI ist bestätigt. Wir freuen uns auf das Gespräch!</p>
+      <div style="background:#f9fafb;border-radius:10px;padding:20px;margin-bottom:24px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr><td style="padding:7px 0;color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;width:80px;">Datum</td><td style="padding:7px 0;font-size:15px;color:#111827;font-weight:700;">${dateStr}</td></tr>
+          <tr><td style="padding:7px 0;color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Uhrzeit</td><td style="padding:7px 0;font-size:15px;color:#111827;font-weight:700;">${timeStr} – ${endTimeStr} Uhr</td></tr>
+          <tr><td style="padding:7px 0;color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Format</td><td style="padding:7px 0;font-size:14px;color:#2563eb;font-weight:600;">Video-Meeting</td></tr>
+        </table>
+      </div>
+      ${meetLink ? `
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${meetLink}" style="display:inline-block;background:#2563eb;color:#ffffff;font-weight:700;font-size:16px;padding:16px 36px;border-radius:12px;text-decoration:none;">Meeting beitreten</a>
+        <p style="margin:10px 0 0;font-size:12px;color:#9ca3af;">Direkt im Browser – kein Download, kein Konto nötig.</p>
+      </div>
+      <div style="background:#eff6ff;border-left:3px solid #2563eb;border-radius:0 8px 8px 0;padding:14px 16px;margin-bottom:20px;">
+        <p style="margin:0;font-size:13px;color:#1e40af;line-height:1.5;"><strong>Kalender-Einladung im Anhang (.ics):</strong> Einfach öffnen und den Termin hinzufügen – funktioniert mit Google, Apple, Outlook.</p>
+      </div>` : ''}
+      <hr style="border:none;border-top:1px solid #f3f4f6;margin:20px 0;">
+      <p style="margin:0;font-size:14px;color:#4b5563;line-height:1.6;">Bis bald!<br><strong>Das Immivo Team</strong></p>
+      <p style="margin:12px 0 0;font-size:13px;color:#9ca3af;">Fragen? <a href="mailto:office@immivo.ai" style="color:#2563eb;text-decoration:none;">office@immivo.ai</a></p>
+    </div>
+  </div>
+</body>
+</html>`,
+        replyTo: 'office@immivo.ai',
+        attachments: meetLink ? [{ filename: 'termin-immivo-demo.ics', content: icsContent, contentType: 'text/calendar' }] : [],
       });
     } catch (emailErr) {
       console.error('Demo guest confirmation email failed:', emailErr);
     }
 
-    res.json({ success: true, eventId: eventId || 'booked' });
+    // 5) Notify admin (dennis.kral@immivo.ai + office@)
+    try {
+      const { sendSystemEmail } = await import('./services/SystemEmailService');
+      await sendSystemEmail({
+        to: ['dennis.kral@immivo.ai', 'office@immivo.ai'],
+        subject: `Neue Demo gebucht: ${name}${company ? ` (${company})` : ''} — ${dateStr} ${timeStr}`,
+        html: `<!DOCTYPE html><html lang="de"><body style="font-family:sans-serif;max-width:500px;margin:32px auto;padding:0 16px;">
+          <h2 style="color:#111827;">Neue Demo-Buchung</h2>
+          <table style="width:100%;border-collapse:collapse;">
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px;width:100px;">Name</td><td style="font-weight:600;">${name}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px;">E-Mail</td><td><a href="mailto:${email}">${email}</a></td></tr>
+            ${company ? `<tr><td style="padding:6px 0;color:#6b7280;font-size:13px;">Unternehmen</td><td>${company}</td></tr>` : ''}
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:13px;">Datum</td><td style="font-weight:600;">${dateStr} ${timeStr} Uhr</td></tr>
+            ${meetLink ? `<tr><td style="padding:6px 0;color:#6b7280;font-size:13px;">Meet Link</td><td><a href="${meetLink}" style="color:#2563eb;">${meetLink}</a></td></tr>` : ''}
+          </table>
+          ${message ? `<div style="margin-top:16px;padding:12px;background:#f9fafb;border-radius:8px;"><p style="margin:0 0 4px;font-size:12px;color:#6b7280;">Nachricht:</p><p style="margin:0;font-size:14px;">${message}</p></div>` : ''}
+        </body></html>`,
+        replyTo: email,
+      });
+    } catch (adminEmailErr) {
+      console.error('Admin notification email failed:', adminEmailErr);
+    }
+
+    res.json({ success: true, bookingId, meetLink: meetLink || null });
   } catch (error: any) {
     console.error('Demo booking error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -9327,8 +9386,7 @@ app.patch('/admin/platform/demo-bookings/:id', adminAuthMiddleware, async (req, 
     // Sync status to SalesProspect pipeline
     if (status && ['COMPLETED', 'CANCELLED', 'NO_SHOW', 'CONFIRMED'].includes(status)) {
       try {
-        const bookingRecord = await db.demoBooking.findUnique({ where: { id: req.params.id } });
-        const prospect = bookingRecord ? await db.salesProspect.findFirst({ where: { sourceBookingId: req.params.id } }) : null;
+        const prospect = await db.salesProspect.findFirst({ where: { sourceBookingId: req.params.id } });
         if (prospect) {
           let newStage: string | null = null;
           let activityContent = '';

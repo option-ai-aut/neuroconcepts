@@ -46,7 +46,7 @@ Hat sich `schema.prisma` geändert? Wenn ja:
 
 - [ ] Ist jede neue Tabelle in `ensureAdminTables` abgedeckt?
 - [ ] Ist jede neue Spalte in `applyPendingMigrations` als `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` enthalten?
-- [ ] Wurde `MIGRATION_VERSION` erhöht? (aktuell: **14**, nach v5-Audit — `WebhookEvent`-Tabelle)
+- [ ] Wurde `MIGRATION_VERSION` erhöht? (aktuell: **20** — Sales CRM: SalesProspect, SalesActivity, SalesTask)
 
 > **Faustregel**: Neue Tabellen → `ensureAdminTables` in `index.ts`. Neue Spalten auf bestehenden Tabellen → `applyPendingMigrations` in `index.ts` + `MIGRATION_VERSION` erhöhen.
 
