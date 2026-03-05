@@ -1081,6 +1081,88 @@ enum DemoBookingStatus {
   NO_SHOW
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Sales CRM (Immivo internal B2B sales pipeline)
+// ═══════════════════════════════════════════════════════════════
+
+model SalesProspect {
+  id                String      @id @default(uuid())
+  name              String
+  email             String
+  phone             String?
+  jobTitle          String?
+  company           String?
+  companySize       String?     // "1-10", "11-50", "51-200", "200+"
+  companyUrl        String?
+  stage             SalesStage  @default(NEW_LEAD)
+  dealValue         Decimal?
+  expectedCloseDate DateTime?
+  documents         Json?       // [{ name, url, uploadedAt }]
+  sourceBookingId   String?     // soft-link to DemoBooking.id
+  assignedToEmail   String?
+  meetLink          String?
+  meetRoomCode      String?
+  lastActivityAt    DateTime?   // for deal-rotting calculation
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  activities SalesActivity[]
+  tasks      SalesTask[]
+
+  @@index([stage, createdAt])
+  @@index([email])
+}
+
+model SalesActivity {
+  id         String            @id @default(uuid())
+  prospectId String
+  prospect   SalesProspect     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  type       SalesActivityType
+  content    String            @db.Text
+  createdBy  String?
+  createdAt  DateTime          @default(now())
+
+  @@index([prospectId, createdAt])
+}
+
+model SalesTask {
+  id         String        @id @default(uuid())
+  prospectId String
+  prospect   SalesProspect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  title      String
+  dueDate    DateTime?
+  done       Boolean       @default(false)
+  doneAt     DateTime?
+  assignedTo String?
+  createdBy  String?
+  createdAt  DateTime      @default(now())
+
+  @@index([prospectId, done])
+  @@index([dueDate, done])
+}
+
+enum SalesStage {
+  NEW_LEAD
+  DEMO_SCHEDULED
+  DEMO_DONE
+  PROPOSAL_SENT
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum SalesActivityType {
+  NOTE
+  EMAIL_SENT
+  CALL
+  DEMO
+  PROPOSAL
+  STAGE_CHANGE
+  MEETING
+  FILE_UPLOAD
+  TASK_DONE
+}
+
 // --- Blog ---
 
 model BlogPost {

@@ -8929,14 +8929,42 @@ app.post('/calendar/book-demo', publicBookDemoLimit, async (req, res) => {
     // 1b) Persist booking to DB
     try {
       const db = await initializePrisma();
-      await db.demoBooking.create({
+      const booking = await db.demoBooking.create({
         data: {
           name, email, company: company || null, message: message || null,
           start: startDate, end: endDate, eventId: eventId || null,
           status: eventId ? 'CONFIRMED' : 'PENDING',
         },
       });
-      console.log(`💾 Demo booking persisted for ${email}`);
+      bookingId = booking.id;
+
+      // Auto-create SalesProspect in the sales pipeline
+      try {
+        const prospect = await db.salesProspect.create({
+          data: {
+            name,
+            email,
+            phone: null,
+            company: company || null,
+            stage: 'NEW_LEAD',
+            sourceBookingId: booking.id,
+            lastActivityAt: new Date(),
+          },
+        });
+        await db.salesActivity.create({
+          data: {
+            prospectId: prospect.id,
+            type: 'NOTE',
+            content: `Demo-Termin gebucht für ${startDate.toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${timeStr} Uhr${message ? `\n\nNachricht: ${message}` : ''}`,
+            createdBy: 'system',
+          },
+        });
+        console.log(`💼 SalesProspect created for ${email} (prospectId: ${prospect.id})`);
+      } catch (salesErr: any) {
+        console.warn('SalesProspect creation failed (non-fatal):', salesErr?.message);
+      }
+
+      console.log(`💾 Demo booking persisted for ${email} (id: ${bookingId})`);
     } catch (dbErr) {
       console.error('Demo booking DB persist failed (continuing):', dbErr);
     }
@@ -9295,9 +9323,282 @@ app.patch('/admin/platform/demo-bookings/:id', adminAuthMiddleware, async (req, 
       where: { id: req.params.id },
       data,
     });
+
+    // Sync status to SalesProspect pipeline
+    if (status && ['COMPLETED', 'CANCELLED', 'NO_SHOW', 'CONFIRMED'].includes(status)) {
+      try {
+        const bookingRecord = await db.demoBooking.findUnique({ where: { id: req.params.id } });
+        const prospect = bookingRecord ? await db.salesProspect.findFirst({ where: { sourceBookingId: req.params.id } }) : null;
+        if (prospect) {
+          let newStage: string | null = null;
+          let activityContent = '';
+          if (status === 'CONFIRMED') {
+            newStage = 'DEMO_SCHEDULED';
+            activityContent = 'Demo-Termin bestätigt';
+          } else if (status === 'COMPLETED') {
+            newStage = 'WON';
+            activityContent = 'Demo als "Gewonnen" markiert';
+          } else if (status === 'CANCELLED') {
+            newStage = 'LOST';
+            activityContent = 'Demo wurde abgesagt';
+          } else if (status === 'NO_SHOW') {
+            newStage = 'LOST';
+            activityContent = 'Prospect ist nicht erschienen';
+          }
+          if (newStage) {
+            await db.salesProspect.update({
+              where: { id: prospect.id },
+              data: { stage: newStage as any, lastActivityAt: new Date() },
+            });
+            await db.salesActivity.create({
+              data: {
+                prospectId: prospect.id,
+                type: 'STAGE_CHANGE',
+                content: activityContent,
+                createdBy: req.headers['x-admin-email'] as string || 'admin',
+              },
+            });
+          }
+        }
+      } catch (syncErr: any) {
+        console.warn('SalesProspect sync failed (non-fatal):', syncErr?.message);
+      }
+    }
+
     res.json(booking);
   } catch (error: any) {
     console.error('Demo booking update error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// ============================================
+// Sales CRM API
+// ============================================
+
+// GET /admin/sales/dashboard
+app.get('/admin/sales/dashboard', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const [prospects, openTasks, activities] = await Promise.all([
+      db.salesProspect.findMany({ orderBy: { createdAt: 'desc' } }),
+      db.salesTask.findMany({ where: { done: false }, orderBy: { dueDate: 'asc' }, take: 20, include: { prospect: { select: { name: true, company: true } } } }),
+      db.salesActivity.findMany({ orderBy: { createdAt: 'desc' }, take: 20, include: { prospect: { select: { name: true, company: true } } } }),
+    ]);
+    const byStage = prospects.reduce((acc: any, p: any) => {
+      acc[p.stage] = (acc[p.stage] || 0) + 1;
+      return acc;
+    }, {});
+    const dealValue = prospects.reduce((sum: number, p: any) => sum + (parseFloat(p.dealValue || '0') || 0), 0);
+    const now = new Date();
+    const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const rottingThresholdDays: Record<string, number> = { NEW_LEAD: 7, DEMO_SCHEDULED: 14, DEMO_DONE: 7, PROPOSAL_SENT: 14, NEGOTIATION: 21 };
+    const rottingProspects = prospects.filter((p: any) => {
+      if (['WON','LOST'].includes(p.stage)) return false;
+      const days = rottingThresholdDays[p.stage] || 14;
+      const threshold = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+      return !p.lastActivityAt || new Date(p.lastActivityAt) < threshold;
+    });
+    const closingSoon = prospects.filter((p: any) => p.expectedCloseDate && new Date(p.expectedCloseDate) <= in30Days && !['WON','LOST'].includes(p.stage));
+    const overdueTasks = openTasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < now);
+    res.json({ totalProspects: prospects.length, byStage, dealValue, rottingProspects: rottingProspects.length, closingSoon: closingSoon.length, overdueTasks: overdueTasks.length, openTasksList: openTasks, recentActivities: activities });
+  } catch (err: any) {
+    console.error('Sales dashboard error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// GET /admin/sales/prospects
+app.get('/admin/sales/prospects', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { stage, search, assignedTo } = req.query as any;
+    const where: any = {};
+    if (stage && stage !== 'ALL') where.stage = stage;
+    if (assignedTo) where.assignedToEmail = assignedTo;
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { company: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    const prospects = await db.salesProspect.findMany({
+      where,
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        _count: { select: { activities: true, tasks: true } },
+        tasks: { where: { done: false }, select: { id: true, dueDate: true } },
+      },
+    });
+    res.json({ prospects });
+  } catch (err: any) {
+    console.error('Sales prospects error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// POST /admin/sales/prospects
+app.post('/admin/sales/prospects', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { name, email, phone, jobTitle, company, companySize, companyUrl, stage, dealValue, expectedCloseDate, assignedToEmail } = req.body;
+    if (!name || !email) return res.status(400).json({ error: 'name and email required' });
+    const prospect = await db.salesProspect.create({
+      data: { name, email, phone, jobTitle, company, companySize, companyUrl, stage: stage || 'NEW_LEAD', dealValue: dealValue ? parseFloat(dealValue) : null, expectedCloseDate: expectedCloseDate ? new Date(expectedCloseDate) : null, assignedToEmail, lastActivityAt: new Date() },
+    });
+    await db.salesActivity.create({ data: { prospectId: prospect.id, type: 'NOTE', content: 'Prospect manuell angelegt', createdBy: req.headers['x-admin-email'] as string || 'admin' } });
+    res.json({ prospect });
+  } catch (err: any) {
+    console.error('Create prospect error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// GET /admin/sales/prospects/:id
+app.get('/admin/sales/prospects/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const prospect = await db.salesProspect.findUnique({
+      where: { id: req.params.id },
+      include: {
+        activities: { orderBy: { createdAt: 'desc' } },
+        tasks: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+    if (!prospect) return res.status(404).json({ error: 'Not found' });
+    res.json({ prospect });
+  } catch (err: any) {
+    console.error('Get prospect error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// PATCH /admin/sales/prospects/:id
+app.patch('/admin/sales/prospects/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const existing = await db.salesProspect.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Not found' });
+    const { name, email, phone, jobTitle, company, companySize, companyUrl, stage, dealValue, expectedCloseDate, assignedToEmail, meetLink, meetRoomCode } = req.body;
+    const data: any = {};
+    if (name !== undefined) data.name = name;
+    if (email !== undefined) data.email = email;
+    if (phone !== undefined) data.phone = phone;
+    if (jobTitle !== undefined) data.jobTitle = jobTitle;
+    if (company !== undefined) data.company = company;
+    if (companySize !== undefined) data.companySize = companySize;
+    if (companyUrl !== undefined) data.companyUrl = companyUrl;
+    if (stage !== undefined) data.stage = stage;
+    if (dealValue !== undefined) data.dealValue = dealValue ? parseFloat(dealValue) : null;
+    if (expectedCloseDate !== undefined) data.expectedCloseDate = expectedCloseDate ? new Date(expectedCloseDate) : null;
+    if (assignedToEmail !== undefined) data.assignedToEmail = assignedToEmail;
+    if (meetLink !== undefined) data.meetLink = meetLink;
+    if (meetRoomCode !== undefined) data.meetRoomCode = meetRoomCode;
+    data.lastActivityAt = new Date();
+    // Log stage change
+    if (stage && stage !== existing.stage) {
+      await db.salesActivity.create({
+        data: { prospectId: req.params.id, type: 'STAGE_CHANGE', content: `Stage geändert: ${existing.stage} → ${stage}`, createdBy: req.headers['x-admin-email'] as string || 'admin' },
+      });
+    }
+    const prospect = await db.salesProspect.update({ where: { id: req.params.id }, data });
+    res.json({ prospect });
+  } catch (err: any) {
+    console.error('Update prospect error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// DELETE /admin/sales/prospects/:id
+app.delete('/admin/sales/prospects/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    await db.salesProspect.delete({ where: { id: req.params.id } });
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('Delete prospect error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// POST /admin/sales/prospects/:id/activities
+app.post('/admin/sales/prospects/:id/activities', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { type, content } = req.body;
+    if (!type || !content) return res.status(400).json({ error: 'type and content required' });
+    const [activity] = await db.$transaction([
+      db.salesActivity.create({ data: { prospectId: req.params.id, type, content, createdBy: req.headers['x-admin-email'] as string || 'admin' } }),
+      db.salesProspect.update({ where: { id: req.params.id }, data: { lastActivityAt: new Date() } }),
+    ]);
+    res.json({ activity });
+  } catch (err: any) {
+    console.error('Create activity error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// GET /admin/sales/prospects/:id/tasks
+app.get('/admin/sales/prospects/:id/tasks', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const tasks = await db.salesTask.findMany({ where: { prospectId: req.params.id }, orderBy: { createdAt: 'desc' } });
+    res.json({ tasks });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// POST /admin/sales/prospects/:id/tasks
+app.post('/admin/sales/prospects/:id/tasks', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { title, dueDate, assignedTo } = req.body;
+    if (!title) return res.status(400).json({ error: 'title required' });
+    const task = await db.salesTask.create({ data: { prospectId: req.params.id, title, dueDate: dueDate ? new Date(dueDate) : null, assignedTo, createdBy: req.headers['x-admin-email'] as string || 'admin' } });
+    res.json({ task });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// PATCH /admin/sales/prospects/:id/tasks/:taskId
+app.patch('/admin/sales/prospects/:id/tasks/:taskId', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { done, title, dueDate, assignedTo } = req.body;
+    const data: any = {};
+    if (title !== undefined) data.title = title;
+    if (done !== undefined) { data.done = done; if (done) data.doneAt = new Date(); }
+    if (dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate) : null;
+    if (assignedTo !== undefined) data.assignedTo = assignedTo;
+    const task = await db.salesTask.update({ where: { id: req.params.taskId }, data });
+    if (done) {
+      await db.salesActivity.create({ data: { prospectId: req.params.id, type: 'TASK_DONE', content: `Aufgabe erledigt: ${task.title}`, createdBy: req.headers['x-admin-email'] as string || 'admin' } }).catch(() => {});
+    }
+    res.json({ task });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// POST /admin/sales/prospects/:id/meet
+app.post('/admin/sales/prospects/:id/meet', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await initializePrisma();
+    const { roomService } = await getLiveKitClients();
+    const roomCode = generateRoomCode();
+    await roomService.createRoom({ name: roomCode, emptyTimeout: 600, maxParticipants: 10 });
+    const meetLink = `https://meet.immivo.ai/${roomCode}`;
+    const prospect = await db.salesProspect.update({
+      where: { id: req.params.id },
+      data: { meetLink, meetRoomCode: roomCode, lastActivityAt: new Date() },
+    });
+    await db.salesActivity.create({ data: { prospectId: req.params.id, type: 'MEETING', content: `Meeting-Raum erstellt: ${meetLink}`, createdBy: req.headers['x-admin-email'] as string || 'admin' } });
+    res.json({ meetLink, meetRoomCode: roomCode, prospect });
+  } catch (err: any) {
+    console.error('Create meet room error:', err);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });

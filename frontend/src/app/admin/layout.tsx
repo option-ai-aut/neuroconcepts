@@ -10,9 +10,9 @@ import {
   Loader2, LayoutDashboard, Users, MessageSquare, Calendar, 
   HeadphonesIcon, DollarSign, Activity, TrendingUp, 
   ClipboardList, Settings, LogOut,
-  Bell, Command, Mail, Inbox, RefreshCw,
+  Bell, Search, Command, Mail, Inbox, RefreshCw,
   Newspaper, Briefcase, Megaphone, Menu, X,
-  User, Bug, AlertCircle
+  User, Bug, AlertCircle, BarChart2, Target, Users2
 } from 'lucide-react';
 import GlobalSearch from '@/components/admin/GlobalSearch';
 import { safeRedirect } from '@/lib/safeRedirect';
@@ -54,6 +54,14 @@ const NAV_SECTIONS = [
     ],
   },
   {
+    label: 'Vertrieb',
+    items: [
+      { name: 'Pipeline', href: '/admin/vertrieb', icon: Target },
+      { name: 'Prospects', href: '/admin/vertrieb/prospects', icon: Users2 },
+      { name: 'Dashboard', href: '/admin/vertrieb/dashboard', icon: BarChart2 },
+    ],
+  },
+  {
     label: 'Betrieb',
     items: [
       { name: 'Bug Reports', href: '/admin/support', icon: HeadphonesIcon, notifKey: 'bugReports' },
@@ -81,6 +89,9 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/users': 'Mitarbeiter',
   '/admin/chat': 'Team Chat',
   '/admin/calendar': 'Kalender',
+  '/admin/vertrieb': 'Vertrieb Pipeline',
+  '/admin/vertrieb/prospects': 'Prospects',
+  '/admin/vertrieb/dashboard': 'Vertrieb Dashboard',
   '/admin/support': 'Bug Reports',
   '/admin/sales': 'Tenants',
   '/admin/finance': 'Finance',

@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { fetchAuthSession } from 'aws-amplify/auth';
-import { Mail, Clock, CheckCircle2, AlertCircle, Loader2, MessageSquare, User, CalendarDays, Building2, Video, ExternalLink, Copy } from 'lucide-react';
+import { Mail, Clock, CheckCircle2, AlertCircle, Loader2, MessageSquare, User, CalendarDays, Building2, Video, ExternalLink, Copy, TrendingUp } from 'lucide-react';
 import { useRuntimeConfig } from '@/components/RuntimeConfigProvider';
-import { getAdminDemoBookings, updateAdminDemoBooking, DemoBooking } from '@/lib/adminApi';
+import { getAdminDemoBookings, DemoBooking } from '@/lib/adminApi';
 
 interface ContactSubmission {
   id: string;
@@ -117,20 +117,6 @@ export default function AdminContactsPage() {
       fetchContacts();
     } catch (err) {
       console.error('Failed to update:', err);
-    }
-  };
-
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
-
-  const updateDemoStatus = async (id: string, status: string) => {
-    try {
-      if (status === 'CONFIRMED') setConfirmingId(id);
-      await updateAdminDemoBooking(id, { status });
-      fetchDemos();
-    } catch (err) {
-      console.error('Failed to update demo:', err);
-    } finally {
-      setConfirmingId(null);
     }
   };
 
@@ -354,24 +340,16 @@ export default function AdminContactsPage() {
                         )}
 
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs text-gray-500">Status:</span>
-                          {(['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'NO_SHOW'] as const).map((key) => (
-                            <button key={key} onClick={(e) => {
-                              e.stopPropagation();
-                              updateDemoStatus(demo.id, key);
-                            }}
-                              disabled={confirmingId === demo.id}
-                              className={`px-3 py-1 text-xs rounded-lg transition-colors flex items-center gap-1 ${demo.status === key ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                              {key === 'CONFIRMED' && confirmingId === demo.id
-                                ? <><Loader2 className="w-3 h-3 animate-spin" /> Erstelle Meet...</>
-                                : key === 'CONFIRMED' && !demo.meetLink
-                                  ? <><Video className="w-3 h-3" /> Bestätigen & Meet erstellen</>
-                                  : DEMO_STATUS_CONFIG[key].label
-                              }
-                            </button>
-                          ))}
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${cfg.color}`}>
+                            <StatusIcon className="w-3 h-3" />{cfg.label}
+                          </span>
+                          <a href={`/admin/vertrieb?sourceBookingId=${demo.id}`} onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-700 transition-colors">
+                            <TrendingUp className="w-3.5 h-3.5" />
+                            Im Vertrieb öffnen →
+                          </a>
                           <a href={`mailto:${demo.email}?subject=Demo Call – ${demo.name}`} onClick={(e) => e.stopPropagation()}
-                            className="ml-auto px-3 py-1 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                             E-Mail senden
                           </a>
                         </div>
