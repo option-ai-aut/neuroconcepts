@@ -405,11 +405,12 @@ export async function sendDraftMessage(messageId: string) {
 
 // --- Auth & Team ---
 
-export async function syncUser(): Promise<{ user: any; tenantId: string; needsOnboarding?: boolean }> {
+export async function syncUser(consent?: { termsAccepted?: boolean; privacyAccepted?: boolean; newsletterOptIn?: boolean }): Promise<{ user: any; tenantId: string; needsOnboarding?: boolean }> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${getApiUrl()}/auth/sync`, {
     method: 'POST',
-    headers,
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: consent ? JSON.stringify(consent) : undefined,
   });
   if (!res.ok) throw new Error('Failed to sync user');
   return res.json();

@@ -375,7 +375,7 @@ async function upsertWorkmailCredential(email: string, password: string | null):
 }
 
 // ── Version-gated migrations ─────────────────────────────────────────────────
-const MIGRATION_VERSION = 17; // Increment when adding new migrations
+const MIGRATION_VERSION = 20; // Increment when adding new migrations
 let _migrationsApplied = false;
 
 async function applyPendingMigrations(db: PrismaClient) {
@@ -596,6 +596,23 @@ async function applyPendingMigrations(db: PrismaClient) {
     `ALTER TABLE "DemoBooking" ADD COLUMN IF NOT EXISTS "meetRoomCode" TEXT`,
     `ALTER TABLE "DemoBooking" ADD COLUMN IF NOT EXISTS "meetLink" TEXT`,
     `ALTER TABLE "DemoBooking" ADD COLUMN IF NOT EXISTS "assignedUserId" TEXT`,
+    // v18: reminder tracking for demo bookings
+    `ALTER TABLE "DemoBooking" ADD COLUMN IF NOT EXISTS "reminderSentAt" TIMESTAMP(3)`,
+    // v19: DSGVO consent fields on User
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "termsAcceptedAt" TIMESTAMP(3)`,
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "privacyAcceptedAt" TIMESTAMP(3)`,
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "newsletterOptIn" BOOLEAN NOT NULL DEFAULT false`,
+    // v20: Sales CRM tables
+    `DO $$ BEGIN CREATE TYPE "SalesStage" AS ENUM ('NEW_LEAD','DEMO_SCHEDULED','DEMO_DONE','PROPOSAL_SENT','NEGOTIATION','WON','LOST'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    `DO $$ BEGIN CREATE TYPE "SalesActivityType" AS ENUM ('NOTE','EMAIL_SENT','CALL','DEMO','PROPOSAL','STAGE_CHANGE','MEETING','FILE_UPLOAD','TASK_DONE'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    `CREATE TABLE IF NOT EXISTS "SalesProspect" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "name" TEXT NOT NULL, "email" TEXT NOT NULL, "phone" TEXT, "jobTitle" TEXT, "company" TEXT, "companySize" TEXT, "companyUrl" TEXT, "stage" "SalesStage" NOT NULL DEFAULT 'NEW_LEAD', "dealValue" DECIMAL, "expectedCloseDate" TIMESTAMP(3), "documents" JSONB, "sourceBookingId" TEXT, "assignedToEmail" TEXT, "meetLink" TEXT, "meetRoomCode" TEXT, "lastActivityAt" TIMESTAMP(3), "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "SalesProspect_pkey" PRIMARY KEY ("id"))`,
+    `CREATE TABLE IF NOT EXISTS "SalesActivity" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "prospectId" TEXT NOT NULL, "type" "SalesActivityType" NOT NULL, "content" TEXT NOT NULL, "createdBy" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "SalesActivity_pkey" PRIMARY KEY ("id"))`,
+    `CREATE TABLE IF NOT EXISTS "SalesTask" ("id" TEXT NOT NULL DEFAULT gen_random_uuid()::text, "prospectId" TEXT NOT NULL, "title" TEXT NOT NULL, "dueDate" TIMESTAMP(3), "done" BOOLEAN NOT NULL DEFAULT false, "doneAt" TIMESTAMP(3), "assignedTo" TEXT, "createdBy" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "SalesTask_pkey" PRIMARY KEY ("id"))`,
+    `DO $$ BEGIN ALTER TABLE "SalesActivity" ADD CONSTRAINT "SalesActivity_prospectId_fkey" FOREIGN KEY ("prospectId") REFERENCES "SalesProspect"("id") ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    `DO $$ BEGIN ALTER TABLE "SalesTask" ADD CONSTRAINT "SalesTask_prospectId_fkey" FOREIGN KEY ("prospectId") REFERENCES "SalesProspect"("id") ON DELETE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    `CREATE INDEX IF NOT EXISTS "SalesProspect_stage_createdAt_idx" ON "SalesProspect"("stage","createdAt")`,
+    `CREATE INDEX IF NOT EXISTS "SalesActivity_prospectId_createdAt_idx" ON "SalesActivity"("prospectId","createdAt")`,
+    `CREATE INDEX IF NOT EXISTS "SalesTask_prospectId_done_idx" ON "SalesTask"("prospectId","done")`,
   ];
   
   for (const sql of migrations) {
@@ -1327,6 +1344,13 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
     if (!user) {
       // New User (self-signup) - create new tenant
       structuredLog('info', 'Creating new user and tenant', { email });
+
+      // Consent data passed from frontend (stored in sessionStorage after signup)
+      const consentBody = req.body || {};
+      const now = new Date();
+      const termsAcceptedAt = consentBody.termsAccepted ? now : undefined;
+      const privacyAcceptedAt = consentBody.privacyAccepted ? now : undefined;
+      const newsletterOptIn = consentBody.newsletterOptIn === true;
       
       const newTenant = await db.tenant.create({
         data: {
@@ -1347,9 +1371,13 @@ app.post('/auth/sync', authMiddleware, async (req, res) => {
           city,
           country,
           tenantId: newTenant.id,
-          role: 'ADMIN' // First user is Admin
+          role: 'ADMIN', // First user is Admin
+          termsAcceptedAt,
+          privacyAcceptedAt,
+          newsletterOptIn,
         }
       });
+      structuredLog('info', 'User created with consent', { email, termsAccepted: !!termsAcceptedAt, privacyAccepted: !!privacyAcceptedAt, newsletterOptIn });
       
       // Create default settings — start 7-day free trial immediately
       await db.tenantSettings.create({

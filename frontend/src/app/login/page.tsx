@@ -147,6 +147,11 @@ export default function LoginPage() {
   const [onboardingFirstName, setOnboardingFirstName] = useState('');
   const [onboardingLastName, setOnboardingLastName] = useState('');
 
+  // Consent checkboxes
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [newsletterOptIn, setNewsletterOptIn] = useState(false);
+
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -302,6 +307,11 @@ export default function LoginPage() {
       setError(t('errors.passwordTooShort'));
       return;
     }
+
+    if (!termsAccepted || !privacyAccepted) {
+      setError('Bitte akzeptiere die AGB und die Datenschutzerklärung um fortzufahren.');
+      return;
+    }
     
     setIsLoading(true);
     
@@ -325,6 +335,11 @@ export default function LoginPage() {
           }
         }
       });
+
+      // Store consent in sessionStorage so we can pass it to /auth/sync after confirmation
+      try {
+        sessionStorage.setItem(`consent_${email}`, JSON.stringify({ termsAccepted: true, privacyAccepted: true, newsletterOptIn }));
+      } catch {}
       
       setView('confirmSignUp');
     } catch (err: any) {
@@ -343,7 +358,13 @@ export default function LoginPage() {
       await confirmSignUp({ username: email, confirmationCode });
       // Auto sign in after confirmation
       await signIn({ username: email, password });
-      await syncUser();
+      // Pass consent data from sessionStorage to /auth/sync
+      let consent: { termsAccepted?: boolean; privacyAccepted?: boolean; newsletterOptIn?: boolean } | undefined;
+      try {
+        const stored = sessionStorage.getItem(`consent_${email}`);
+        if (stored) { consent = JSON.parse(stored); sessionStorage.removeItem(`consent_${email}`); }
+      } catch {}
+      await syncUser(consent);
       handlePostLoginRedirect();
     } catch (err: any) {
       setError(formatAuthError(err.message) || t('errors.confirmationFailed'));
@@ -690,15 +711,58 @@ export default function LoginPage() {
                   </select>
                 </div>
 
-                <button type="submit" disabled={isLoading} className={buttonClass}>
+                {/* Consent Checkboxes */}
+                <div className="space-y-3 pt-1">
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                      required
+                    />
+                    <span className="text-sm text-gray-600 leading-snug">
+                      Ich akzeptiere die{' '}
+                      <Link href="/terms" target="_blank" className="text-blue-600 hover:underline font-medium">Allgemeinen Geschäftsbedingungen</Link>
+                      {' '}der Immivo GmbH. <span className="text-red-500">*</span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={privacyAccepted}
+                      onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                      required
+                    />
+                    <span className="text-sm text-gray-600 leading-snug">
+                      Ich habe die{' '}
+                      <Link href="/privacy" target="_blank" className="text-blue-600 hover:underline font-medium">Datenschutzerklärung</Link>
+                      {' '}gelesen und stimme der Verarbeitung meiner Daten zu. <span className="text-red-500">*</span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={newsletterOptIn}
+                      onChange={(e) => setNewsletterOptIn(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                    />
+                    <span className="text-sm text-gray-500 leading-snug">
+                      Ich möchte den Newsletter mit Produktneuheiten und Tipps erhalten. <span className="text-gray-400">(optional)</span>
+                    </span>
+                  </label>
+
+                  <p className="text-xs text-gray-400">
+                    <span className="text-red-500">*</span> Pflichtfelder
+                  </p>
+                </div>
+
+                <button type="submit" disabled={isLoading || !termsAccepted || !privacyAccepted} className={buttonClass}>
                   {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : t('signUp.submit')}
                 </button>
-
-                <p className="text-center text-xs text-gray-400">
-                  {t('signUp.termsPrefix')}{' '}
-                <Link href="/terms" className="text-blue-600 hover:underline">{t('signUp.terms')}</Link> und{' '}
-                <Link href="/privacy" className="text-blue-600 hover:underline">{t('signUp.privacyPolicy')}</Link>.
-                </p>
 
                 <p className="text-center text-sm text-gray-500">
                   {t('signUp.hasAccount')}{' '}

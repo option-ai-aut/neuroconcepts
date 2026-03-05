@@ -126,6 +126,11 @@ model User {
   // OpenAI Assistants API - persistent thread per user
   assistantThreadId String?
 
+  // Consent & DSGVO
+  termsAcceptedAt    DateTime?
+  privacyAcceptedAt  DateTime?
+  newsletterOptIn    Boolean   @default(false)
+
   @@index([tenantId])
   @@index([email])
 }
