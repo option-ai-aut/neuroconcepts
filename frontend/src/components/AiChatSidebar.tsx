@@ -517,6 +517,46 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     }
   };
 
+  // Compress + normalise an image file to JPEG before upload.
+  // Keeps file under ~1.5 MB and max 2048 px so it fits within the
+  // Lambda Function URL 6 MB request-payload limit.
+  // Also converts HEIC / BMP / TIFF → JPEG so the Vision URL regex always matches.
+  const compressImage = (file: File): Promise<File> =>
+    new Promise((resolve) => {
+      const MAX_BYTES = 1.5 * 1024 * 1024; // 1.5 MB
+      const MAX_DIM   = 2048;
+      // Non-image or already small + standard format → skip
+      if (!file.type.startsWith('image/') || (file.size <= MAX_BYTES && /\.(jpe?g|png|gif|webp)$/i.test(file.name))) {
+        resolve(file);
+        return;
+      }
+      const objectUrl = URL.createObjectURL(file);
+      const img = new window.Image();
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        let { width, height } = img;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width >= height) { height = Math.round((height * MAX_DIM) / width); width = MAX_DIM; }
+          else { width = Math.round((width * MAX_DIM) / height); height = MAX_DIM; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width  = width;
+        canvas.height = height;
+        canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) { resolve(file); return; }
+            const jpegName = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+            resolve(new File([blob], jpegName, { type: 'image/jpeg' }));
+          },
+          'image/jpeg',
+          0.85,
+        );
+      };
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); };
+      img.src = objectUrl;
+    });
+
   // File upload handlers
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -528,20 +568,21 @@ export default function AiChatSidebar({ mobile, onClose }: AiChatSidebarProps = 
     const newFiles: UploadedFile[] = [];
     
     for (const file of files) {
+      const processed = await compressImage(file);
       const uploadedFile: UploadedFile = {
         id: Math.random().toString(36).substr(2, 9),
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        file: file,
+        name: processed.name,
+        type: processed.type,
+        size: processed.size,
+        file: processed,
       };
       
       // Generate preview for images
-      if (file.type.startsWith('image/')) {
+      if (processed.type.startsWith('image/')) {
         const reader = new FileReader();
         uploadedFile.preview = await new Promise((resolve) => {
           reader.onload = (e) => resolve(e.target?.result as string);
-          reader.readAsDataURL(file);
+          reader.readAsDataURL(processed);
         });
       }
       
