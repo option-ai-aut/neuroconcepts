@@ -208,7 +208,8 @@ export class OpenAIService {
     }
     const streamContextStr = contextParts.length > 0 ? contextParts.join('\n') : '';
 
-    // Extract any file URLs mentioned in recent history (uploaded in a previous turn) as fallback
+    // Extract file URLs from ALL recent history — used for tool calls (CRM, virtual staging, …)
+    // so Mivo can reference the stored CDN link without re-uploading anything.
     const historyUploadedUrls: string[] = [];
     for (const h of validHistory) {
       if (!h.content) continue;
@@ -218,17 +219,27 @@ export class OpenAIService {
         if (url && url.startsWith('http')) historyUploadedUrls.push(url);
       }
     }
-    // Effective files: current request uploads take priority; fall back to URLs found in history
+    // Effective files for tools: current uploads win, otherwise fall back to any URL in history
     const effectiveUploadedFiles = uploadedFiles.length > 0 ? uploadedFiles : historyUploadedUrls;
 
-    // Build user message — include vision content blocks for images
-    // Current-turn uploads always win; if no new upload, re-attach the most recent image from
-    // history so the model can still "see" it in follow-up questions (e.g. "analyse this further").
+    // Vision content blocks: only send image_url when there is something new to see.
+    // — Current turn: always include uploaded images as vision blocks.
+    // — 1-turn look-back only: if the PREVIOUS user message contained an image upload and the
+    //   user is now asking a follow-up (no new upload), re-attach those images so Mivo can still
+    //   "see" them. Beyond that, the CDN URL in the text history is enough for tool calls.
     const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp)(\?|$)/i;
     const currentImageUrls = uploadedFiles.filter(u => IMAGE_EXT_RE.test(u));
-    const historyImageUrls  = historyUploadedUrls.filter(u => IMAGE_EXT_RE.test(u)).slice(-3);
-    // Use current uploads for Vision; if none, fall back to up to 3 recent history images
-    const visionUrls = currentImageUrls.length > 0 ? currentImageUrls : historyImageUrls;
+    // Find image URLs from the last user message only (1-turn lookback)
+    const lastUserMsg = [...validHistory].reverse().find(h => h.role === 'USER' || h.role === 'user');
+    const prevTurnImageUrls: string[] = [];
+    if (lastUserMsg?.content) {
+      const matches = [...String(lastUserMsg.content).matchAll(/\[HOCHGELADENE BILDER[^\]]*\(([^)]+)\)/g)];
+      for (const m of matches) {
+        const url = m[1]?.trim();
+        if (url && IMAGE_EXT_RE.test(url)) prevTurnImageUrls.push(url);
+      }
+    }
+    const visionUrls = currentImageUrls.length > 0 ? currentImageUrls : prevTurnImageUrls;
     const userMessageContent: OpenAI.Chat.ChatCompletionContentPart[] = visionUrls.length > 0
       ? [
           { type: 'text', text: message },
