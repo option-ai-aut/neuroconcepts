@@ -56,9 +56,9 @@ const NAV_SECTIONS = [
   {
     label: 'Vertrieb',
     items: [
-      { name: 'Pipeline', href: '/admin/vertrieb', icon: Target },
-      { name: 'Prospects', href: '/admin/vertrieb/prospects', icon: Users2 },
-      { name: 'Dashboard', href: '/admin/vertrieb/dashboard', icon: BarChart2 },
+      { name: 'Pipeline', href: '/admin/vertrieb', icon: Target, notifKey: null },
+      { name: 'Prospects', href: '/admin/vertrieb/prospects', icon: Users2, notifKey: null },
+      { name: 'Dashboard', href: '/admin/vertrieb/dashboard', icon: BarChart2, notifKey: null },
     ],
   },
   {
