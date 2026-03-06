@@ -4221,8 +4221,16 @@ app.post('/chat/stream',
       const uploadedFileUrls: string[] = [];
       if (files && files.length > 0) {
         const folder = `chat-uploads/${currentUser.tenantId}/${currentUser.id}`;
+        const CHAT_MIME_TO_EXT: Record<string, string> = {
+          'image/jpeg': '.jpg', 'image/jpg': '.jpg', 'image/png': '.png',
+          'image/gif': '.gif', 'image/webp': '.webp',
+        };
         const fileInfos = await Promise.all(files.map(async (f) => {
-          const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(f.originalname)}`;
+          const origExt = path.extname(f.originalname).toLowerCase();
+          const ext = /\.(jpe?g|png|gif|webp)$/i.test(origExt)
+            ? origExt
+            : (CHAT_MIME_TO_EXT[f.mimetype] || origExt || '');
+          const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`;
           const url = await uploadToS3(f.buffer, uniqueName, f.mimetype, folder);
 
           // Extract text content for readable documents
@@ -12846,8 +12854,19 @@ async function handleChatStream(event: any) {
     const uploadedFileUrls: string[] = [];
     if (files.length > 0) {
       const folder = `chat-uploads/${tenantId}/${userId}`;
+      // Map MIME types to standard web-image extensions so OpenAI Vision can detect them by URL
+      const MIME_TO_EXT: Record<string, string> = {
+        'image/jpeg': '.jpg', 'image/jpg': '.jpg', 'image/png': '.png',
+        'image/gif': '.gif', 'image/webp': '.webp',
+      };
       const fileInfos = await Promise.all(files.map(async (f) => {
-        const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(f.originalname)}`;
+        const origExt = path.extname(f.originalname).toLowerCase();
+        // Use original extension only if it's a recognised web-image extension; otherwise
+        // derive from MIME type (e.g. .HEIC → .jpg, missing extension → .jpg)
+        const ext = /\.(jpe?g|png|gif|webp)$/i.test(origExt)
+          ? origExt
+          : (MIME_TO_EXT[f.mimetype] || origExt || '');
+        const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`;
         const url = await uploadToS3(f.buffer, uniqueName, f.mimetype, folder);
 
         let extractedText: string | null = null;
