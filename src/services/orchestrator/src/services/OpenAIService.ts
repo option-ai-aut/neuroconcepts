@@ -221,12 +221,18 @@ export class OpenAIService {
     // Effective files: current request uploads take priority; fall back to URLs found in history
     const effectiveUploadedFiles = uploadedFiles.length > 0 ? uploadedFiles : historyUploadedUrls;
 
-    // Build user message — if images were uploaded, send them as vision content blocks
-    const imageUrls = (uploadedFiles.length > 0 ? uploadedFiles : []).filter(u => /\.(jpe?g|png|gif|webp)(\?|$)/i.test(u));
-    const userMessageContent: OpenAI.Chat.ChatCompletionContentPart[] = imageUrls.length > 0
+    // Build user message — include vision content blocks for images
+    // Current-turn uploads always win; if no new upload, re-attach the most recent image from
+    // history so the model can still "see" it in follow-up questions (e.g. "analyse this further").
+    const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp)(\?|$)/i;
+    const currentImageUrls = uploadedFiles.filter(u => IMAGE_EXT_RE.test(u));
+    const historyImageUrls  = historyUploadedUrls.filter(u => IMAGE_EXT_RE.test(u)).slice(-3);
+    // Use current uploads for Vision; if none, fall back to up to 3 recent history images
+    const visionUrls = currentImageUrls.length > 0 ? currentImageUrls : historyImageUrls;
+    const userMessageContent: OpenAI.Chat.ChatCompletionContentPart[] = visionUrls.length > 0
       ? [
           { type: 'text', text: message },
-          ...imageUrls.map(url => ({ type: 'image_url' as const, image_url: { url, detail: 'auto' as const } })),
+          ...visionUrls.map(url => ({ type: 'image_url' as const, image_url: { url, detail: 'auto' as const } })),
         ]
       : [{ type: 'text', text: message }];
 

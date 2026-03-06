@@ -12904,11 +12904,18 @@ async function handleChatStream(event: any) {
       uploadedFileUrls.push(...fileInfos.map(fi => fi.url));
       const imageFiles = fileInfos.filter(fi => fi.type.startsWith('image/'));
       const otherFiles = fileInfos.filter(fi => !fi.type.startsWith('image/'));
-      if (imageFiles.length > 0) fileContext += `\n[${imageFiles.length} Bild(er): ${imageFiles.map(fi => fi.name).join(', ')}]`;
-      otherFiles.forEach(fi => {
-        fileContext += `\n[Datei: ${fi.name}]`;
-        if (fi.extractedText) fileContext += `\n${fi.extractedText.substring(0, 3000)}`;
-      });
+      // Use the same format as the Express route so the history URL-extraction regex
+      // [HOCHGELADENE (?:BILDER|DATEI)[^\]]*\(([^)]+)\)] can find URLs in subsequent turns
+      if (imageFiles.length > 0) {
+        fileContext += `\n[HOCHGELADENE BILDER: ${imageFiles.map(fi => `"${fi.name}" (${fi.url})`).join(', ')}]`;
+      }
+      for (const fi of otherFiles) {
+        if (fi.extractedText) {
+          fileContext += `\n[DOKUMENT "${fi.name}" — INHALT:\n${fi.extractedText.substring(0, 3000)}\n]`;
+        } else {
+          fileContext += `\n[HOCHGELADENE DATEI: "${fi.name}" — Inhalt konnte nicht gelesen werden (kein unterstütztes Format)]`;
+        }
+      }
     }
 
     const fullMessage = fileContext ? `${message}\n${fileContext}` : message;
@@ -12927,7 +12934,9 @@ async function handleChatStream(event: any) {
     };
 
     console.log(`💬 [FnURL] ${currentUser.email}: "${message.substring(0, 200)}"${files.length ? ` [${files.length} file(s)]` : ''}${pageContext ? ` [${pageContext}]` : ''}`);
-    await db.userChat.create({ data: { userId, role: 'USER', content: message || `[${files.length} Datei(en) angehängt]` } });
+    // Save fullMessage (includes HOCHGELADENE-BILDER block with CDN URLs) so subsequent turns
+    // can re-extract the image URLs from history for Vision and tool calls.
+    await db.userChat.create({ data: { userId, role: 'USER', content: fullMessage || `[${files.length} Datei(en) angehängt]` } });
 
     for await (const result of openai.chatStream(fullMessage, tenantId, recentHistory, uploadedFileUrls, currentUser.id, userContext)) {
       fullResponse += result.chunk;
